@@ -199,6 +199,15 @@ describe("Config.forMode", function()
 		end
 	end)
 
+	it("rejects team spawns that would not fit on a straight", function()
+		expect(function()
+			Fixtures.config({ Match = { teamSize = 6 }, Arena = { teamSpawnSpacing = 40 } })
+		end).toThrow("Arena: Match.teamSize spawns teamSpawnSpacing apart must fit on a straight")
+		expect(function()
+			Fixtures.config({ Match = { teamSize = 6 }, Arena = { teamSpawnSpacing = 32 } })
+		end).never.toThrow()
+	end)
+
 	it("rejects a malformed mode", function()
 		expect(function()
 			Config.forMode({ id = "X", displayName = "X", itemsEnabled = "no", overrides = {} } :: any)

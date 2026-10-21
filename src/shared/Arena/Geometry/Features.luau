@@ -1,0 +1,153 @@
+--!strict
+-- Everything in the arena besides the riding surface (spec §9.1): the lap gates, the raised goal ring and its
+-- panel, the corner markers, the team and ball spawns, and the solid infield.
+
+local Centerline = require(script.Parent.Centerline)
+local Config = require(script.Parent.Parent.Parent.Config)
+local Crossing = require(script.Parent.Parent.Parent.Rules.Crossing)
+local Profile = require(script.Parent.Profile)
+local Team = require(script.Parent.Parent.Parent.Rules.Team)
+local Types = require(script.Parent.Types)
+
+type ArenaConfig = Config.ArenaConfig
+type Piece = Types.Piece
+type Team = Team.Team
+
+-- Team spawns line up along the middle of their straight: Blue on the top one, Orange on the bottom one, which
+-- mirrors Blue across the arena's long axis. The ball drops at the apex of either curved end.
+local SPAWN_SECTIONS: { [Team]: number } = { Blue = 1, Orange = 3 }
+local BALL_SECTIONS = { 2, 4 }
+
+local Features = {}
+
+local function sectionMiddle(arena: ArenaConfig, section: number): number
+	local nextStart = if section < Centerline.gateCount
+		then Centerline.gateDistance(arena, section + 1)
+		else Centerline.length(arena)
+	return (Centerline.gateDistance(arena, section) + nextStart) / 2
+end
+
+-- Gate g spans the track at the start of section g and faces the travel direction, as tall as the outer wall.
+function Features.gates(arena: ArenaConfig): { Crossing.Rectangle }
+	local gates: { Crossing.Rectangle } = {}
+	for gate = 1, Centerline.gateCount do
+		table.insert(gates, {
+			frame = Centerline.at(
+				arena,
+				Centerline.gateDistance(arena, gate),
+				arena.trackWidth / 2,
+				arena.outerWallHeight / 2
+			),
+			width = arena.trackWidth,
+			height = arena.outerWallHeight,
+		})
+	end
+	return gates
+end
+
+-- The ring stands on the goal gate's plane with its edge wallGap from the outer wall face, so it sits on the
+-- carrier's right shoulder and its front faces oncoming skaters.
+function Features.goal(arena: ArenaConfig): Types.Goal
+	local goal = arena.goal
+	local outerRadius = goal.ringRadius + goal.rimThickness
+	local frame = Centerline.at(
+		arena,
+		Centerline.gateDistance(arena, arena.goalGateIndex),
+		arena.trackWidth - goal.wallGap - outerRadius,
+		goal.heightAboveFloor
+	)
+
+	-- Blocks whose outer faces form a regular polygon around the opening.
+	local rim: { Piece } = {}
+	local segmentLength = 2 * outerRadius * math.tan(math.pi / goal.rimSegments)
+	for segment = 0, goal.rimSegments - 1 do
+		table.insert(rim, {
+			shape = "Block",
+			cframe = frame
+				* CFrame.Angles(0, 0, 2 * math.pi * segment / goal.rimSegments)
+				* CFrame.new(0, goal.ringRadius + goal.rimThickness / 2, 0),
+			size = Vector3.new(segmentLength, goal.rimThickness, goal.rimThickness),
+		})
+	end
+
+	return {
+		frame = frame,
+		openingRadius = goal.ringRadius,
+		rim = rim,
+		-- A cylinder's axis is its X axis; turned to lie along the frame's LookVector it covers the opening.
+		panel = {
+			shape = "Cylinder",
+			cframe = frame * CFrame.Angles(0, math.pi / 2, 0),
+			size = Vector3.new(goal.panelThickness, 2 * goal.ringRadius, 2 * goal.ringRadius),
+		},
+	}
+end
+
+-- A pillar standing on the outer wall's top at each gate.
+function Features.markers(arena: ArenaConfig): { Piece }
+	local markers: { Piece } = {}
+	for gate = 1, Centerline.gateCount do
+		table.insert(markers, {
+			shape = "Block",
+			cframe = Centerline.at(
+				arena,
+				Centerline.gateDistance(arena, gate),
+				arena.trackWidth + arena.surfaceThickness / 2,
+				arena.outerWallHeight + arena.marker.height / 2
+			),
+			size = Vector3.new(arena.marker.width, arena.marker.height, arena.marker.width),
+		})
+	end
+	return markers
+end
+
+-- teamSize floor-level frames per team, teamSpawnSpacing apart on the lower floor, facing the travel direction.
+function Features.teamSpawns(arena: ArenaConfig, teamSize: number): Types.TeamSpawns
+	local lane = Profile.lowerFloorCenter(arena)
+	local spawns: Types.TeamSpawns = { Blue = {}, Orange = {} }
+	for _, team: Team in Team.list do
+		local middle = sectionMiddle(arena, SPAWN_SECTIONS[team])
+		for slot = 1, teamSize do
+			local distance = middle + (slot - (teamSize + 1) / 2) * arena.teamSpawnSpacing
+			table.insert(spawns[team], Centerline.at(arena, distance, lane, 0))
+		end
+	end
+	return spawns
+end
+
+-- ballSpawnHeight above the middle of the track at each curved end's apex: equally far from both teams' spawns.
+function Features.ballSpawns(arena: ArenaConfig): { CFrame }
+	local spawns: { CFrame } = {}
+	for _, section in BALL_SECTIONS do
+		table.insert(
+			spawns,
+			Centerline.at(arena, sectionMiddle(arena, section), arena.trackWidth / 2, arena.ballSpawnHeight)
+		)
+	end
+	return spawns
+end
+
+-- Solid up to the inner wall's top: a block between the straights and a cylinder under each curved end, recessed
+-- surfaceThickness so it meets the back of the inner wall's slab instead of overlapping its face.
+function Features.infield(arena: ArenaConfig): { Piece }
+	local radius = arena.endRadius - arena.trackWidth / 2 - arena.surfaceThickness
+	local height = arena.infieldWallHeight
+	local pieces: { Piece } = {
+		{
+			shape = "Block",
+			cframe = CFrame.new(0, height / 2, 0),
+			size = Vector3.new(arena.straightLength, height, 2 * radius),
+		},
+	}
+	for _, x in { -arena.straightLength / 2, arena.straightLength / 2 } do
+		table.insert(pieces, {
+			shape = "Cylinder",
+			-- Stood upright: the cylinder's X axis turned to point up.
+			cframe = CFrame.new(x, height / 2, 0) * CFrame.Angles(0, 0, math.pi / 2),
+			size = Vector3.new(height, 2 * radius, 2 * radius),
+		})
+	end
+	return pieces
+end
+
+return Features
