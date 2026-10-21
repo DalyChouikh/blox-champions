@@ -25,12 +25,12 @@ From the repository folder:
 rokit trust rojo-rbx/rojo && rokit trust UpliftGames/wally && rokit trust JohnnyMorganz/StyLua && rokit trust Kampfkarren/selene && rokit trust JohnnyMorganz/luau-lsp
 rokit install
 wally install
-rojo plugin install
+bash scripts/install-rojo-plugin.sh
 ```
 
 - `rokit install` installs the exact tool versions pinned in `rokit.toml` (Rojo, Wally, StyLua, selene, luau-lsp).
 - `wally install` downloads the test framework (Jest-Lua) into `DevPackages/`.
-- `rojo plugin install` adds the Rojo plugin to Roblox Studio (restart Studio if it was open).
+- `scripts/install-rojo-plugin.sh` builds and installs the Rojo Studio plugin (restart Studio if it was open). It applies an upstream fix ([rojo#1344](https://github.com/rojo-rbx/rojo/pull/1344)) that stops the stock plugin from printing three `rbxassetid://203785492` errors on every playtest; once a Rojo release includes that fix, this step goes back to `rojo plugin install`.
 
 ## Daily workflow
 
