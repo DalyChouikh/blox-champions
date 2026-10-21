@@ -1,0 +1,45 @@
+--!strict
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
+local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
+
+local AssistTracker = require(ReplicatedStorage.Shared.Rules.AssistTracker)
+
+describe("AssistTracker", function()
+	it("credits the previous holder when the scorer received the ball within the window", function()
+		local assists = AssistTracker.new(8)
+		assists:pickedUp("A", 0)
+		assists:pickedUp("S", 2)
+		expect(assists:assister("S", 10)).toBe("A")
+		expect(assists:assister("S", 10.5)).toBeNil()
+	end)
+
+	it("keeps the handoff time when the scorer picks up their own loose ball again", function()
+		local assists = AssistTracker.new(8)
+		assists:pickedUp("A", 0)
+		assists:pickedUp("S", 2)
+		assists:pickedUp("S", 6)
+		expect(assists:assister("S", 10)).toBe("A")
+		expect(assists:assister("S", 10.5)).toBeNil()
+	end)
+
+	it("credits the last different holder", function()
+		local assists = AssistTracker.new(8)
+		assists:pickedUp("A", 0)
+		assists:pickedUp("B", 1)
+		assists:pickedUp("S", 2)
+		expect(assists:assister("S", 3)).toBe("B")
+	end)
+
+	it("gives no assist for a solo play, a scorer who is not the holder, or after a reset", function()
+		local assists = AssistTracker.new(8)
+		assists:pickedUp("S", 0)
+		expect(assists:assister("S", 1)).toBeNil()
+		assists:pickedUp("A", 1)
+		expect(assists:assister("S", 2)).toBeNil()
+		assists:reset()
+		assists:pickedUp("S", 3)
+		expect(assists:assister("S", 4)).toBeNil()
+	end)
+end)
