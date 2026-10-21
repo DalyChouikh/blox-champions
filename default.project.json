@@ -6,6 +6,18 @@
 			"Shared": {
 				"$path": "src/shared"
 			}
+		},
+		"ServerScriptService": {
+			"Server": {
+				"$path": "src/server"
+			}
+		},
+		"StarterPlayer": {
+			"StarterPlayerScripts": {
+				"Client": {
+					"$path": "src/client"
+				}
+			}
 		}
 	}
 }
