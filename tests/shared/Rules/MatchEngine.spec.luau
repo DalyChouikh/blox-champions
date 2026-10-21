@@ -590,6 +590,28 @@ describe("MatchEngine end of regulation", function()
 	end)
 end)
 
+describe("MatchEngine 0:00 outside live play", function()
+	it(
+		"judges 0:00 during a celebration with no possessing team, so the team that just scored gets no Last Chance",
+		function()
+			local engine = liveEngine({
+				Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2, clockPausesDuringKickoff = false },
+			})
+			scoreGoal(engine, "O1")
+			resumePlay(engine)
+			scoreGoal(engine, "O1")
+			resumePlay(engine)
+			engine:tick(284) -- liveEngine's kickoff and two celebration + kickoff pairs used 15 s: 1 s left
+			scoreGoal(engine, "B1")
+			engine:drainEvents()
+			engine:tick(3) -- 0:00 during Blue's celebration
+			local events = engine:drainEvents()
+			expect(names(events)).toEqual({ "MatchEnded" })
+			expect(events[1]).toMatchObject({ winner = "Orange" })
+		end
+	)
+end)
+
 describe("MatchEngine performance", function()
 	it("keeps a live tick with ball movement far below the 1 ms server budget", function()
 		local engine = liveEngine()

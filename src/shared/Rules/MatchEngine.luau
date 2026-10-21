@@ -160,8 +160,11 @@ local function pointScored(self: MatchEngine, team: Team)
 end
 
 local function timeUp(self: MatchEngine)
+	-- The ball is dead during a kickoff or celebration, so nobody has it for Last Chance; the possession
+	-- left over from a celebrated point is about to be reset anyway.
+	local possessing: Team? = if self._state == "Live" then self._possession.team else nil
 	local outcome: MatchOutcome.TimeUp, team: Team? =
-		MatchOutcome.atTimeUp(self._scores:teamScores(), self._possession.team, self._config.Match.lastChance)
+		MatchOutcome.atTimeUp(self._scores:teamScores(), possessing, self._config.Match.lastChance)
 	if outcome == "Overtime" then
 		startOvertime(self)
 	elseif outcome == "LastChance" then
