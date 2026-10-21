@@ -26,6 +26,12 @@ describe("Validate", function()
 		expect(v(2.5, "Match.teamSize")).toEqual({ "Match.teamSize: must be an integer (got 2.5)" })
 	end)
 
+	it("enforces an exclusive lower bound with above", function()
+		local v = Validate.number({ above = 0 })
+		expect(v(0.5, "A.size")).toEqual({})
+		expect(v(0, "A.size")).toEqual({ "A.size: must be > 0 (got 0)" })
+	end)
+
 	it("validates booleans and strings with oneOf", function()
 		expect(Validate.boolean()(1, "B")).toEqual({ "B: expected boolean, got number" })
 		local s = Validate.string({ oneOf = { "Hold", "Toggle" } })

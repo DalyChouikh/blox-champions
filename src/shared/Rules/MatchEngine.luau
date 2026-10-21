@@ -60,9 +60,7 @@ local function isFiniteVector(v: Vector3): boolean
 	return isFinite(v.X) and isFinite(v.Y) and isFinite(v.Z)
 end
 
-local positive = Validate.check(Validate.number(), function(n: number): boolean
-	return n > 0
-end, "must be > 0")
+local positive = Validate.number({ above = 0 })
 
 local frame = Validate.check(Validate.datatype("CFrame"), function(c: CFrame): boolean
 	return isFiniteVector(c.Position) and isFiniteVector(c.LookVector)

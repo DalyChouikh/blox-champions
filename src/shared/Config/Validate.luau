@@ -18,9 +18,11 @@ local function typeError(path: string, expected: string, value: any): { string }
 	return { atPath(path, `expected {expected}, got {typeof(value)}`) }
 end
 
-function Validate.number(options: { min: number?, max: number?, integer: boolean? }?): Validator
+-- min and max are inclusive bounds; above is an exclusive lower bound (for sizes that must be > 0).
+function Validate.number(options: { min: number?, max: number?, above: number?, integer: boolean? }?): Validator
 	local min = options and options.min
 	local max = options and options.max
+	local above = options and options.above
 	local integer = options and options.integer
 	return function(value: any, path: string): { string }
 		if type(value) ~= "number" then
@@ -38,6 +40,9 @@ function Validate.number(options: { min: number?, max: number?, integer: boolean
 		end
 		if max ~= nil and value > max then
 			table.insert(errors, atPath(path, `must be <= {max} (got {value})`))
+		end
+		if above ~= nil and value <= above then
+			table.insert(errors, atPath(path, `must be > {above} (got {value})`))
 		end
 		if integer and value % 1 ~= 0 then
 			table.insert(errors, atPath(path, `must be an integer (got {value})`))
