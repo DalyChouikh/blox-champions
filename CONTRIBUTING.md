@@ -27,6 +27,10 @@ Keep commits small and focused; a test and the code that makes it pass land toge
 
 Tests live in `tests/`, mirror the `src/` folders, and are named `<Module>.spec.luau`. Import every Jest function from `JestGlobals`. See [Running tests](README.md#running-tests).
 
+## Zero warnings
+
+Never leave a warning or error unaddressed — from tests, CI, StyLua, selene, luau-lsp, or Studio's Output window during playtests. Find the cause and fix it in the same change; if it comes from outside our code, change our setup so it no longer appears. Code-review findings of every severity are fixed, not deferred.
+
 ## Code rules
 
 - Every `.luau` file starts with `--!strict`.

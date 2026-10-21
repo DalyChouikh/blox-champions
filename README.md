@@ -50,10 +50,12 @@ rojo plugin install
 With Rojo connected, paste this into Studio's command bar (View → Command Bar):
 
 ```lua
-print(require(game:GetService("ServerStorage").RunTests)())
+require(game:GetService("ServerStorage").RunTests:Clone())()
 ```
 
-Pass a filter to run only some tests, e.g. `require(game:GetService("ServerStorage").RunTests)({ testPathPattern = "Freeze" })`. The runner returns a summary with `success`, test counts, and failure messages; Jest's full report appears in the Output window.
+The Output window shows one summary line, such as `[RunTests] PASS 49/49 tests`, or a `[RunTests] FAIL …` warning naming the first failure, followed by Jest's full report. `:Clone()` makes Studio load the latest version of the runner instead of a cached copy.
+
+To run only some tests, pass a filter, e.g. `require(game:GetService("ServerStorage").RunTests:Clone())({ testPathPattern = "Freeze" })`. A filter that matches no tests is reported as a failure.
 
 ## Project layout
 
