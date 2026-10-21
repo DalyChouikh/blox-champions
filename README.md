@@ -62,7 +62,9 @@ To run only some tests, pass a filter, e.g. `require(game:GetService("ServerStor
 | Folder | What lives there |
 |---|---|
 | `src/shared/` | Code shared by server and client (synced to `ReplicatedStorage.Shared`) |
-| `tests/` | Jest-Lua tests (`*.spec.luau`), mirroring the `src/` folders |
+| `src/server/` | Server scripts (synced to `ServerScriptService.Server`) |
+| `src/client/` | Client scripts (synced to `StarterPlayer.StarterPlayerScripts.Client`) |
+| `tests/` | Jest-Lua tests (`*.spec.luau`), mirroring the `src/` folders, plus shared test data in `tests/Fixtures.luau` |
 | `scripts/` | Development scripts, such as the in-Studio test runner |
 | `docs/` | Design specs and implementation plans |
 
