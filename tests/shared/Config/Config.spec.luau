@@ -181,14 +181,7 @@ describe("Config.forMode", function()
 				overrides = { profileBlendLength = 200 },
 				message = "Arena: profileBlendLength must fit within a straight and a curved end",
 			},
-			{
-				overrides = { goal = { wallGap = 30 } },
-				message = "Arena: the goal ring must fit across the track",
-			},
-			{
-				overrides = { goal = { heightAboveFloor = 24 } },
-				message = "Arena: the goal ring must sit between the upper floor and the outer wall top",
-			},
+			{ overrides = { goal = { wallGap = 0 } }, message = "Arena.goal.wallGap: must be > 0 (got 0)" },
 			{ overrides = { stripsPerSection = 6 }, message = "Arena.stripsPerSection: must be >= 7 (got 6)" },
 			{ overrides = { goalGateIndex = 5 }, message = "Arena.goalGateIndex: must be <= 4 (got 5)" },
 		}

@@ -4,8 +4,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
+local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Features = require(ReplicatedStorage.Shared.Arena.Geometry.Features)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 
 local arena = Config.defaults().Arena
 
@@ -45,6 +47,48 @@ describe("Features.goal", function()
 		near(goal.panel.cframe.Position, goal.frame.Position)
 		expect(math.abs(goal.panel.cframe.RightVector:Dot(goal.frame.LookVector))).toBeCloseTo(1, 4)
 		near(goal.panel.size, Vector3.new(0.5, 14, 14))
+	end)
+end)
+
+describe("Features.goal fit", function()
+	local function goalWith(overrides: { [string]: any }): () -> ()
+		local arenaConfig = Fixtures.config({ Arena = overrides }).Arena
+		return function()
+			Features.goal(arenaConfig)
+		end
+	end
+
+	it("keeps the rim's farthest corner wallGap from the outer wall, whatever its number of segments", function()
+		for _, segments in { 4, 5, 6, 16 } do
+			local a = Fixtures.config({ Arena = { goal = { rimSegments = segments } } }).Arena
+			local goal = Features.goal(a)
+			local gate = Centerline.frameAt(a, Centerline.gateDistance(a, a.goalGateIndex))
+			local farthest = -math.huge
+			for _, piece in goal.rim do
+				for _, side in { -1, 1 } do
+					local corner = Vector3.new(side * piece.size.X / 2, piece.size.Y / 2, 0)
+					farthest = math.max(farthest, gate:PointToObjectSpace(piece.cframe:PointToWorldSpace(corner)).X)
+				end
+			end
+			expect(farthest).toBeCloseTo(a.trackWidth / 2 - a.goal.wallGap, 3)
+		end
+	end)
+
+	it("rejects a ring that does not fit across the track or between the upper floor and the wall top", function()
+		expect(goalWith({ goal = { wallGap = 30 } })).toThrow("Arena: the goal ring must fit across the track")
+		expect(goalWith({ goal = { heightAboveFloor = 24 } })).toThrow(
+			"Arena: the goal ring must sit between the upper floor and the outer wall top"
+		)
+		expect(goalWith({ goal = { rimSegments = 3 } })).toThrow(
+			"Arena: the goal ring must sit between the upper floor and the outer wall top"
+		)
+	end)
+
+	it("rejects a low ring whose rim would cut into the outer wall's foot curve at the goal gate", function()
+		expect(goalWith({ stepHeight = 0, goal = { heightAboveFloor = 8, wallGap = 0.01 } })).toThrow(
+			"Arena: the goal ring must clear the track's surface at the goal gate"
+		)
+		expect(goalWith({ stepHeight = 0, goal = { heightAboveFloor = 12, wallGap = 0.01 } })).never.toThrow()
 	end)
 end)
 

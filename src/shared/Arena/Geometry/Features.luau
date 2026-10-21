@@ -45,17 +45,77 @@ function Features.gates(arena: ArenaConfig): { Crossing.Rectangle }
 	return gates
 end
 
--- The ring stands on the goal gate's plane with its edge wallGap from the outer wall face, so it sits on the
+local function fail(message: string): never
+	error(`Arena: {message}`, 0)
+end
+
+-- The rim's outline in the ring's plane (x toward the outer wall, y up): its blocks' outer faces form a regular
+-- polygon around the opening, whose corners reach past ringRadius + rimThickness.
+local function rimCorners(arena: ArenaConfig): { Vector2 }
+	local goal = arena.goal
+	local count = goal.rimSegments
+	local radius = (goal.ringRadius + goal.rimThickness) / math.cos(math.pi / count)
+	local corners: { Vector2 } = {}
+	for corner = 0, count - 1 do
+		-- Segment j faces 90° + 360°·j/n (see the rim below); its outer corners sit half a segment either side.
+		local angle = math.pi / 2 + math.pi / count + 2 * math.pi * corner / count
+		table.insert(corners, radius * Vector2.new(math.cos(angle), math.sin(angle)))
+	end
+	return corners
+end
+
+-- How far the outline reaches from the ring's center along a unit direction.
+local function reach(corners: { Vector2 }, direction: Vector2): number
+	local farthest = -math.huge
+	for _, corner in corners do
+		farthest = math.max(farthest, corner:Dot(direction))
+	end
+	return farthest
+end
+
+-- The height of the cross-section's riding surface at a lateral position between the walls, or nil at a wall.
+local function surfaceHeight(points: { Vector2 }, lateral: number): number?
+	for index = 1, #points - 1 do
+		local from, to = points[index], points[index + 1]
+		if from.X < to.X and from.X <= lateral and lateral <= to.X then
+			return from.Y + (to.Y - from.Y) * (lateral - from.X) / (to.X - from.X)
+		end
+	end
+	return nil
+end
+
+-- The ring must fit inside the track's cross-section at the goal gate, judged by its real outline against the
+-- surface as built (the step half blended there, the wall's foot curve as strips).
+local function checkFit(arena: ArenaConfig, corners: { Vector2 }, lateral: number, gateDistance: number)
+	local height = arena.goal.heightAboveFloor
+	if lateral - reach(corners, -Vector2.xAxis) < 0 then
+		fail("the goal ring must fit across the track")
+	end
+	if
+		height - reach(corners, -Vector2.yAxis) < arena.stepHeight
+		or height + reach(corners, Vector2.yAxis) > arena.outerWallHeight
+	then
+		fail("the goal ring must sit between the upper floor and the outer wall top")
+	end
+	local surface = Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, gateDistance))
+	for _, corner in corners do
+		local floor = surfaceHeight(surface, lateral + corner.X)
+		if floor == nil or height + corner.Y <= floor then
+			fail("the goal ring must clear the track's surface at the goal gate")
+		end
+	end
+end
+
+-- The ring stands on the goal gate's plane with its outline wallGap from the outer wall face, so it sits on the
 -- carrier's right shoulder and its front faces oncoming skaters.
 function Features.goal(arena: ArenaConfig): Types.Goal
 	local goal = arena.goal
 	local outerRadius = goal.ringRadius + goal.rimThickness
-	local frame = Centerline.at(
-		arena,
-		Centerline.gateDistance(arena, arena.goalGateIndex),
-		arena.trackWidth - goal.wallGap - outerRadius,
-		goal.heightAboveFloor
-	)
+	local corners = rimCorners(arena)
+	local gateDistance = Centerline.gateDistance(arena, arena.goalGateIndex)
+	local lateral = arena.trackWidth - goal.wallGap - reach(corners, Vector2.xAxis)
+	checkFit(arena, corners, lateral, gateDistance)
+	local frame = Centerline.at(arena, gateDistance, lateral, goal.heightAboveFloor)
 
 	-- Blocks whose outer faces form a regular polygon around the opening.
 	local rim: { Piece } = {}

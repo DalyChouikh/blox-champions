@@ -1,7 +1,7 @@
 --!strict
 -- The graybox arena (spec §9.1): the track loop, its cross-section, the goal ring, corner markers, spawns and
--- colors. Lengths are in studs. Arena/Geometry turns these numbers into parts; the cross-field checks reject
--- sizes that geometry could not build without overlaps or gaps.
+-- colors. Lengths are in studs. Arena/Geometry turns these numbers into parts; the cross-field checks here and the
+-- goal ring's fit check in Arena/Geometry reject sizes that could not be built without overlaps or gaps.
 
 local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
@@ -109,7 +109,8 @@ local fields = Validate.record({
 		panelThickness = partSize,
 		rimThickness = partSize,
 		rimSegments = Validate.number({ min = 3, integer = true }),
-		wallGap = nonNegative,
+		-- A ring touching the wall would put a rim face in the wall's plane, where the two flicker.
+		wallGap = size,
 	}),
 	marker = Validate.record({ width = partSize, height = partSize }),
 	teamSpawnSpacing = size,
@@ -117,11 +118,8 @@ local fields = Validate.record({
 	colors = Validate.record({ surface = color, infield = color, goal = color, marker = color }),
 })
 
-local function ringOuterRadius(arena: ArenaConfig): number
-	return arena.goal.ringRadius + arena.goal.rimThickness
-end
-
--- Checked in order; the first that fails is reported.
+-- Checked in order; the first that fails is reported. Whether the goal ring fits is judged by Arena/Geometry
+-- against the surface as built (Features.goal), which config cannot require.
 local crossFieldRules: { { message: string, holds: (arena: ArenaConfig) -> boolean } } = {
 	{
 		message = "trackWidth must fit both wall curves, the step, the upper floor and a lower floor",
@@ -148,19 +146,6 @@ local crossFieldRules: { { message: string, holds: (arena: ArenaConfig) -> boole
 		holds = function(arena: ArenaConfig): boolean
 			return arena.profileBlendLength <= arena.straightLength
 				and arena.profileBlendLength <= math.pi * arena.endRadius
-		end,
-	},
-	{
-		message = "the goal ring must fit across the track",
-		holds = function(arena: ArenaConfig): boolean
-			return arena.trackWidth - arena.goal.wallGap - 2 * ringOuterRadius(arena) >= 0
-		end,
-	},
-	{
-		message = "the goal ring must sit between the upper floor and the outer wall top",
-		holds = function(arena: ArenaConfig): boolean
-			return arena.goal.heightAboveFloor - ringOuterRadius(arena) >= arena.stepHeight
-				and arena.goal.heightAboveFloor + ringOuterRadius(arena) <= arena.outerWallHeight
 		end,
 	},
 }
