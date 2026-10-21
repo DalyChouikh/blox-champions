@@ -5,11 +5,8 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local NormalChampions = require(ReplicatedStorage.Shared.Modes.NormalChampions)
-
-local function mode(overrides: { [string]: any })
-	return { id = "Test", displayName = "Test", itemsEnabled = false, overrides = overrides }
-end
 
 describe("Config defaults", function()
 	it("match the spec's match rules", function()
@@ -43,6 +40,10 @@ describe("Config defaults", function()
 		expect(s.saveLookaheadSeconds).toBe(1.5)
 	end)
 
+	it("match the spec's UI values", function()
+		expect(Config.defaults().UI.clockWarnings).toEqual({ 60, 30 })
+	end)
+
 	it("are valid and deeply frozen", function()
 		local d = Config.defaults()
 		expect(#Config.schema(d, "")).toBe(0)
@@ -60,7 +61,7 @@ describe("Config.forMode", function()
 	end)
 
 	it("deep-merges nested overrides without touching the defaults", function()
-		local c = Config.forMode(mode({ Match = { lastChance = { maxDeficit = 2 } } }))
+		local c = Fixtures.config({ Match = { lastChance = { maxDeficit = 2 } } })
 		expect(c.Match.lastChance).toEqual({ enabled = true, maxDeficit = 2 })
 		expect(c.Match.pointsToWin).toBe(5)
 		expect(Config.defaults().Match.lastChance.maxDeficit).toBe(1)
@@ -69,26 +70,43 @@ describe("Config.forMode", function()
 
 	it("rejects an override key that does not exist", function()
 		expect(function()
-			Config.forMode(mode({ Match = { lapsToOpenGaol = 3 } }))
+			Fixtures.config({ Match = { lapsToOpenGaol = 3 } })
 		end).toThrow("Match.lapsToOpenGaol: unknown key")
 	end)
 
 	it("rejects an override with the wrong type", function()
 		expect(function()
-			Config.forMode(mode({ Match = { pointsToWin = "5" } }))
+			Fixtures.config({ Match = { pointsToWin = "5" } })
 		end).toThrow("Match.pointsToWin: expected number, got string")
 	end)
 
 	it("rejects a streak target that does not exceed the goal-opening laps", function()
 		expect(function()
-			Config.forMode(mode({ Match = { lapsForStreakPoint = 4 } }))
+			Fixtures.config({ Match = { lapsForStreakPoint = 4 } })
 		end).toThrow("Match: lapsForStreakPoint must be greater than lapsToOpenGoal")
 	end)
 
 	it("rejects more required players than two full teams", function()
 		expect(function()
-			Config.forMode(mode({ Match = { minPlayersToStart = 7 } }))
+			Fixtures.config({ Match = { minPlayersToStart = 7 } })
 		end).toThrow("Match: minPlayersToStart must be <= 2 × teamSize")
+	end)
+
+	it("replaces a list from an override instead of merging it item by item", function()
+		expect(Fixtures.config({ UI = { clockWarnings = { 10 } } }).UI.clockWarnings).toEqual({ 10 })
+		expect(Fixtures.config({ UI = { clockWarnings = {} } }).UI.clockWarnings).toEqual({})
+	end)
+
+	it("rejects duplicate clock warnings", function()
+		expect(function()
+			Fixtures.config({ UI = { clockWarnings = { 30, 30 } } })
+		end).toThrow("UI.clockWarnings: must not contain duplicates")
+	end)
+
+	it("rejects a clock warning that is not a whole number of seconds", function()
+		expect(function()
+			Fixtures.config({ UI = { clockWarnings = { 60, 2.5 } } })
+		end).toThrow("UI.clockWarnings[2]: must be an integer (got 2.5)")
 	end)
 
 	it("rejects a mode with an empty id or display name", function()
