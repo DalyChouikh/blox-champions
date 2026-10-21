@@ -95,6 +95,48 @@ local function lastEvent(engine: MatchEngine.MatchEngine): any
 	return events[#events]
 end
 
+describe("MatchEngine options", function()
+	local function creating(arena: any, gravity: any): () -> ()
+		return function()
+			MatchEngine.new({ config = Fixtures.config(), arena = arena, gravity = gravity })
+		end
+	end
+
+	it("rejects an invalid arena layout or gravity, naming the field", function()
+		local ring = Fixtures.ring()
+		local thinGates = Fixtures.gates()
+		thinGates[3] = { frame = thinGates[3].frame, width = 0, height = 40 }
+		expect(creating({ gates = {}, goal = ring }, Fixtures.GRAVITY)).toThrow(
+			"arena.gates: must contain at least one gate"
+		)
+		expect(creating({ gates = thinGates, goal = ring }, Fixtures.GRAVITY)).toThrow(
+			"arena.gates[3].width: must be > 0"
+		)
+		expect(creating({ gates = Fixtures.gates(), goal = { frame = ring.frame, radius = 0 / 0 } }, Fixtures.GRAVITY)).toThrow(
+			"arena.goal.radius: must not be NaN"
+		)
+		expect(creating({ gates = Fixtures.gates(), goal = { frame = "ring", radius = 3 } }, Fixtures.GRAVITY)).toThrow(
+			"arena.goal.frame: expected CFrame, got string"
+		)
+		expect(creating(Fixtures.arena(), Vector3.new(0, -math.huge, 0))).toThrow("gravity: must be finite")
+	end)
+
+	it("keeps its own frozen copy of the arena, so later changes to the caller's tables have no effect", function()
+		local arena = Fixtures.arena()
+		local engine = MatchEngine.new({ config = Fixtures.config(), arena = arena, gravity = Fixtures.GRAVITY })
+		engine:addPlayer("B1", "Blue")
+		engine:start()
+		engine:tick(3)
+		table.insert(arena.gates, Fixtures.gate(500))
+		arena.gates[1] = Fixtures.gate(9999)
+		expect(table.isfrozen(arena.gates)).toBe(false)
+		engine:pickedUp("B1", ZERO, ZERO)
+		engine:drainEvents()
+		lap(engine)
+		expect(engine:drainEvents()[5]).toMatchObject({ name = "LapCompleted", streak = 1 })
+	end)
+end)
+
 describe("MatchEngine flow", function()
 	it("starts with a kickoff countdown and goes live when it ends", function()
 		local engine = newEngine()

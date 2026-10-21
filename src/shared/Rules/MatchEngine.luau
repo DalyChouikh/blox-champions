@@ -16,6 +16,7 @@ local SaveDetector = require(script.Parent.SaveDetector)
 local ScoreKeeper = require(script.Parent.ScoreKeeper)
 local Team = require(script.Parent.Team)
 local Types = require(script.Parent.Types)
+local Validate = require(script.Parent.Parent.Config.Validate)
 
 type Team = Team.Team
 type PlayerId = Types.PlayerId
@@ -41,6 +42,49 @@ export type Snapshot = {
 -- Returned on quiet ticks so draining never allocates.
 local NO_EVENTS: { Event } = {}
 table.freeze(NO_EVENTS)
+
+local function isFinite(n: number): boolean
+	return n > -math.huge and n < math.huge -- false for NaN too
+end
+
+local function isFiniteVector(v: Vector3): boolean
+	return isFinite(v.X) and isFinite(v.Y) and isFinite(v.Z)
+end
+
+local positive = Validate.check(Validate.number(), function(n: number): boolean
+	return n > 0
+end, "must be > 0")
+
+local frame = Validate.check(Validate.datatype("CFrame"), function(c: CFrame): boolean
+	return isFiniteVector(c.Position) and isFiniteVector(c.LookVector)
+end, "must be finite")
+
+-- The arena is built from tagged parts at runtime (Phase 3), so a mis-tagged part must fail here, by name,
+-- rather than silently never counting a lap or a goal.
+local optionsSchema = Validate.record({
+	config = Validate.table(),
+	arena = Validate.record({
+		gates = Validate.check(
+			Validate.list(Validate.record({ frame = frame, width = positive, height = positive })),
+			function(gates: { any }): boolean
+				return #gates > 0
+			end,
+			"must contain at least one gate"
+		),
+		goal = Validate.record({ frame = frame, radius = positive }),
+	}),
+	gravity = Validate.check(Validate.datatype("Vector3"), isFiniteVector, "must be finite"),
+})
+
+-- The engine keeps its own frozen copy, so the caller rebuilding its tables cannot desync the lap sequence.
+local function frozenArena(arena: ArenaLayout): ArenaLayout
+	local gates: { Crossing.Rectangle } = {}
+	for index, gate in arena.gates do
+		gates[index] = table.freeze(table.clone(gate))
+	end
+	table.freeze(gates)
+	return table.freeze({ gates = gates, goal = table.freeze(table.clone(arena.goal)) })
+end
 
 local MatchEngine = {}
 MatchEngine.__index = MatchEngine
@@ -213,6 +257,8 @@ local function lapCompleted(self: MatchEngine, team: Team): boolean
 end
 
 function MatchEngine.new(options: EngineOptions): MatchEngine
+	Validate.assertValid(options, optionsSchema, "", "MatchEngine: invalid options")
+	local arena = frozenArena(options.arena)
 	local config = options.config
 	local match = config.Match
 	local engine: MatchEngine
@@ -233,11 +279,11 @@ function MatchEngine.new(options: EngineOptions): MatchEngine
 			_pendingBlockUntil = 0,
 			_events = {},
 			_possession = Possession.new(),
-			_laps = LapTracker.new(options.arena.gates),
-			_goal = GoalJudge.new(options.arena.goal, match.lapsToOpenGoal),
+			_laps = LapTracker.new(arena.gates),
+			_goal = GoalJudge.new(arena.goal, match.lapsToOpenGoal),
 			_clock = MatchClock.new(match.durationSeconds, config.UI.clockWarnings),
 			_assists = AssistTracker.new(config.Scoring.assistWindowSeconds),
-			_saves = SaveDetector.new(options.arena.goal, options.gravity, config.Scoring.saveLookaheadSeconds),
+			_saves = SaveDetector.new(arena.goal, options.gravity, config.Scoring.saveLookaheadSeconds),
 			_scores = ScoreKeeper.new(config),
 			_onClockWarning = onClockWarning,
 		} :: Fields,

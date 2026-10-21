@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
+local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
 
 local Fixtures = {}
 
@@ -42,7 +43,7 @@ function Fixtures.ring(): Crossing.Disc
 	return { frame = CFrame.lookAt(position, position + Vector3.xAxis), radius = 3 }
 end
 
-function Fixtures.arena(): { gates: { Crossing.Rectangle }, goal: Crossing.Disc }
+function Fixtures.arena(): MatchEngine.ArenaLayout
 	return { gates = Fixtures.gates(), goal = Fixtures.ring() }
 end
 
