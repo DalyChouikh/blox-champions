@@ -2,6 +2,11 @@
 -- The rules of one match composed into a deterministic state machine (spec §4.6). Callers feed it facts — time
 -- passing, the ball's per-tick movement, pickups, touches, throws, knockdowns — and drain the ordered events
 -- (spec §4.7) once per tick. It never touches an Instance, so the same inputs always produce the same events.
+--
+-- Each server frame, report facts in this order: ballMoved (the ball's path during the physics step), then
+-- that step's contacts and actions (pickedUp, touched, thrown, knockedDown), then tick(dt), then
+-- drainEvents. Results depend on it: on the 0:00 frame a ball that went through the ring before time ran out
+-- still scores, and contacts are judged against the goal state the ball's path left behind.
 
 local AssistTracker = require(script.Parent.AssistTracker)
 local Config = require(script.Parent.Parent.Config)
