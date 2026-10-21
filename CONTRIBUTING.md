@@ -34,6 +34,6 @@ Never leave a warning or error unaddressed — from tests, CI, StyLua, selene, l
 ## Code rules
 
 - Every `.luau` file starts with `--!strict`.
-- Formatting is StyLua (`stylua src tests scripts`); linting is selene (`selene src tests scripts`). CI fails on either.
+- Formatting is StyLua (`stylua src tests scripts`); linting is selene (`selene src tests scripts`); type checking is `bash scripts/analyze.sh` (strict luau-lsp, the same script CI runs). CI fails on any of them.
 - Inside `src/`, require siblings relative to `script`; tests require through service paths (`ReplicatedStorage.Shared...`).
 - Gameplay numbers live in `src/shared/Config/`, never hard-coded in logic.

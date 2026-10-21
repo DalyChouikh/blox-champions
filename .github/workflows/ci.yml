@@ -17,12 +17,6 @@ jobs:
       - name: Install packages
         run: wally install
 
-      - name: Download Roblox type definitions
-        run: curl -sSfL -o globalTypes.d.luau https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/1.70.1/scripts/globalTypes.d.luau
-
-      - name: Generate sourcemap
-        run: rojo sourcemap test.project.json --output sourcemap.json
-
       - name: Check formatting
         run: stylua --check src tests scripts
 
@@ -30,15 +24,7 @@ jobs:
         run: selene src tests scripts
 
       - name: Type check
-        run: >-
-          luau-lsp analyze
-          --platform=roblox
-          --sourcemap=sourcemap.json
-          --definitions=@roblox=globalTypes.d.luau
-          --base-luaurc=.luaurc
-          --ignore="DevPackages/**"
-          --ignore="Packages/**"
-          src tests scripts
+        run: bash scripts/analyze.sh
 
       - name: Build game and test places
         run: |
