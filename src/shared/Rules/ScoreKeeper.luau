@@ -69,15 +69,21 @@ function ScoreKeeper.new(config: Config.GameConfig): ScoreKeeper
 	return setmetatable({ _config = config, _scores = scores, _players = {}, _joined = 0 } :: Fields, ScoreKeeper)
 end
 
--- Adds a player, or brings back one who left (keeping their stats and join order) on the given team.
+-- Adds a player, or brings back one who left, keeping their stats and join order. A returning player must
+-- rejoin the team they played for: their stats, and any ball they last held, belong to that team.
 function ScoreKeeper.addPlayer(self: ScoreKeeper, player: Types.PlayerId, team: Team.Team)
+	if not Team.is(team) then
+		error(`ScoreKeeper: unknown team "{tostring(team)}"`, 0)
+	end
 	local existing = self._players[player]
 	if existing ~= nil then
 		if existing.present then
 			error(`ScoreKeeper: player "{player}" is already in the match`, 0)
 		end
+		if existing.team ~= team then
+			error(`ScoreKeeper: player "{player}" played for {existing.team} and can only return to {existing.team}`, 0)
+		end
 		existing.present = true
-		existing.team = team
 		return
 	end
 	self._joined += 1
