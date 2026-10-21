@@ -79,10 +79,63 @@ local function lastChanceEngine(overrides: { [string]: any }?): MatchEngine.Matc
 	return engine
 end
 
+-- Blue's goal is open, B1 has thrown the ball at it, and O1 has blocked it; nothing is drained yet after the block.
+local function blockedEngine(): MatchEngine.MatchEngine
+	local engine = liveEngine(SHORT_STREAK)
+	engine:pickedUp("B1", ZERO, ZERO)
+	lap(engine)
+	engine:thrown("B1")
+	engine:drainEvents()
+	engine:touched("O1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+	return engine
+end
+
 local function lastEvent(engine: MatchEngine.MatchEngine): any
 	local events = engine:drainEvents()
 	return events[#events]
 end
+
+describe("MatchEngine options", function()
+	local function creating(arena: any, gravity: any): () -> ()
+		return function()
+			MatchEngine.new({ config = Fixtures.config(), arena = arena, gravity = gravity })
+		end
+	end
+
+	it("rejects an invalid arena layout or gravity, naming the field", function()
+		local ring = Fixtures.ring()
+		local thinGates = Fixtures.gates()
+		thinGates[3] = { frame = thinGates[3].frame, width = 0, height = 40 }
+		expect(creating({ gates = {}, goal = ring }, Fixtures.GRAVITY)).toThrow(
+			"arena.gates: must contain at least one gate"
+		)
+		expect(creating({ gates = thinGates, goal = ring }, Fixtures.GRAVITY)).toThrow(
+			"arena.gates[3].width: must be > 0"
+		)
+		expect(creating({ gates = Fixtures.gates(), goal = { frame = ring.frame, radius = 0 / 0 } }, Fixtures.GRAVITY)).toThrow(
+			"arena.goal.radius: must not be NaN"
+		)
+		expect(creating({ gates = Fixtures.gates(), goal = { frame = "ring", radius = 3 } }, Fixtures.GRAVITY)).toThrow(
+			"arena.goal.frame: expected CFrame, got string"
+		)
+		expect(creating(Fixtures.arena(), Vector3.new(0, -math.huge, 0))).toThrow("gravity: must be finite")
+	end)
+
+	it("keeps its own frozen copy of the arena, so later changes to the caller's tables have no effect", function()
+		local arena = Fixtures.arena()
+		local engine = MatchEngine.new({ config = Fixtures.config(), arena = arena, gravity = Fixtures.GRAVITY })
+		engine:addPlayer("B1", "Blue")
+		engine:start()
+		engine:tick(3)
+		table.insert(arena.gates, Fixtures.gate(500))
+		arena.gates[1] = Fixtures.gate(9999)
+		expect(table.isfrozen(arena.gates)).toBe(false)
+		engine:pickedUp("B1", ZERO, ZERO)
+		engine:drainEvents()
+		lap(engine)
+		expect(engine:drainEvents()[5]).toMatchObject({ name = "LapCompleted", streak = 1 })
+	end)
+end)
 
 describe("MatchEngine flow", function()
 	it("starts with a kickoff countdown and goes live when it ends", function()
@@ -110,18 +163,30 @@ describe("MatchEngine flow", function()
 		expect(engine:snapshot().possessingTeam).toBeNil()
 	end)
 
-	it("rejects a second start and a negative or NaN tick", function()
+	it("rejects a second start and a negative, NaN or infinite tick", function()
 		local engine = newEngine()
 		engine:start()
 		expect(function()
 			engine:start()
 		end).toThrow("MatchEngine: start() called in state Kickoff")
-		expect(function()
-			engine:tick(-1)
-		end).toThrow("MatchEngine: dt must be a non-negative number")
-		expect(function()
-			engine:tick(0 / 0)
-		end).toThrow("MatchEngine: dt must be a non-negative number")
+		for _, dt in { -1, 0 / 0, math.huge } do
+			expect(function()
+				engine:tick(dt)
+			end).toThrow("MatchEngine: dt must be a finite non-negative number")
+		end
+	end)
+
+	it("reports the kickoff or celebration time left and the Last Chance team in snapshots", function()
+		local engine = newEngine()
+		engine:start()
+		engine:tick(1)
+		expect(engine:snapshot()).toMatchObject({ state = "Kickoff", phaseSecondsLeft = 2 })
+		local lastChance = lastChanceEngine()
+		expect(lastChance:snapshot()).toMatchObject({
+			period = "LastChance",
+			trailingTeam = "Blue",
+			phaseSecondsLeft = 0,
+		})
 	end)
 
 	it("returns the same frozen empty list when nothing happened", function()
@@ -317,7 +382,7 @@ describe("MatchEngine goals and points", function()
 end)
 
 describe("MatchEngine saves and knockdowns", function()
-	it("makes a defender's touch on a thrown ball headed into the open goal one block save", function()
+	it("holds a block until the danger has passed, counting one save however often defenders touch", function()
 		local engine = liveEngine(SHORT_STREAK)
 		engine:pickedUp("B1", ZERO, ZERO)
 		lap(engine)
@@ -325,8 +390,64 @@ describe("MatchEngine saves and knockdowns", function()
 		engine:drainEvents()
 		engine:touched("B2", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
 		engine:touched("O1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+		engine:touched("O1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
 		engine:touched("O2", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+		engine:tick(1)
+		expectEvents(engine, {})
+		engine:tick(0.5)
 		expectEvents(engine, { { name = "SaveMade", player = "O1", kind = "Block" } })
+	end)
+
+	it("drops a block when the ball still goes in", function()
+		local engine = blockedEngine()
+		engine:ballMoved(Fixtures.throughRing())
+		expect(names(engine:drainEvents())).toEqual({ "GoalScored", "GoalClosed" })
+		expect(engine:stats().players[1]).toMatchObject({ player = "B1", goals = 1 })
+	end)
+
+	it("confirms a block at the next pickup, and counts a block then the blocker's pickup as one save", function()
+		local engine = blockedEngine()
+		engine:pickedUp("O1", ZERO, ZERO)
+		expectEvents(engine, {
+			{ name = "SaveMade", player = "O1", kind = "Block" },
+			{ name = "PossessionChanged", team = "Orange", player = "O1", previousTeam = "Blue" },
+			{ name = "Steal", player = "O1", fromTeam = "Blue" },
+			{ name = "GoalClosed" },
+		})
+	end)
+
+	it("confirms a block when a streak point stops play", function()
+		local engine = blockedEngine()
+		lap(engine)
+		local events = engine:drainEvents()
+		expect(names(events)).toEqual({
+			"GateCrossed",
+			"GateCrossed",
+			"GateCrossed",
+			"GateCrossed",
+			"LapCompleted",
+			"StreakPointScored",
+			"SaveMade",
+			"GoalClosed",
+		})
+	end)
+
+	it("confirms a block when the match ends at 0:00", function()
+		local engine = liveEngine(SHORT_STREAK)
+		scoreGoal(engine, "B1")
+		resumePlay(engine)
+		scoreGoal(engine, "B1")
+		resumePlay(engine)
+		engine:tick(299)
+		engine:pickedUp("O1", ZERO, ZERO)
+		lap(engine)
+		engine:thrown("O1")
+		engine:drainEvents()
+		engine:touched("B1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+		engine:tick(1)
+		local events = engine:drainEvents()
+		expect(names(events)).toEqual({ "SaveMade", "MatchEnded" })
+		expect(events[1]).toEqual({ name = "SaveMade", player = "B1", kind = "Block" })
 	end)
 
 	it("makes a defender's pickup at an open goal a steal save, counted once when it is also a block", function()
@@ -359,17 +480,60 @@ describe("MatchEngine saves and knockdowns", function()
 end)
 
 describe("MatchEngine players", function()
-	it("rejects unknown players and ignores departed ones, keeping their stats", function()
+	it("rejects an unknown id in every player input", function()
+		local engine = liveEngine()
+		local inputs: { () -> () } = {
+			function()
+				engine:pickedUp("Ghost", ZERO, ZERO)
+			end,
+			function()
+				engine:touched("Ghost", ZERO, ZERO)
+			end,
+			function()
+				engine:thrown("Ghost")
+			end,
+			function()
+				engine:knockedDown("Ghost", "B1")
+			end,
+			function()
+				engine:knockedDown("B1", "Ghost")
+			end,
+			function()
+				engine:removePlayer("Ghost")
+			end,
+		}
+		for _, input in inputs do
+			expect(input).toThrow('MatchEngine: unknown player "Ghost"')
+		end
+	end)
+
+	it("rejects a throw by a player who is not the last holder", function()
 		local engine = liveEngine()
 		expect(function()
-			engine:pickedUp("Ghost", ZERO, ZERO)
-		end).toThrow('MatchEngine: unknown player "Ghost"')
+			engine:thrown("B1")
+		end).toThrow('MatchEngine: player "B1" threw the ball without holding it')
+		engine:pickedUp("B1", ZERO, ZERO)
+		expect(function()
+			engine:thrown("B2")
+		end).toThrow('MatchEngine: player "B2" threw the ball without holding it')
+	end)
+
+	it("ignores departed players, keeping their stats", function()
+		local engine = liveEngine(SHORT_STREAK)
 		engine:knockedDown("O1", "B1")
 		engine:removePlayer("O1")
-		engine:pickedUp("O1", ZERO, ZERO)
+		-- Blue's goal is open and a thrown ball is on target, so every input below would count if O1 were present.
+		engine:pickedUp("B1", ZERO, ZERO)
+		lap(engine)
+		engine:thrown("B1")
+		engine:drainEvents()
+		engine:touched("O1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+		engine:pickedUp("O1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+		engine:thrown("O1")
 		engine:knockedDown("O1", "B2")
-		expectEvents(engine, { { name = "TackleKnockdown", attacker = "O1", victim = "B1" } })
-		expect(engine:snapshot().possessingTeam).toBeNil()
+		engine:tick(1.5)
+		expectEvents(engine, {})
+		expect(engine:snapshot().possessingTeam).toBe("Blue")
 		local departed: Types.PlayerStats? = nil
 		for _, entry in engine:stats().players do
 			if entry.player == "O1" then
@@ -523,12 +687,35 @@ describe("MatchEngine end of regulation", function()
 	end)
 end)
 
+describe("MatchEngine 0:00 outside live play", function()
+	it(
+		"judges 0:00 during a celebration with no possessing team, so the team that just scored gets no Last Chance",
+		function()
+			local engine = liveEngine({
+				Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2, clockPausesDuringKickoff = false },
+			})
+			scoreGoal(engine, "O1")
+			resumePlay(engine)
+			scoreGoal(engine, "O1")
+			resumePlay(engine)
+			engine:tick(284) -- liveEngine's kickoff and two celebration + kickoff pairs used 15 s: 1 s left
+			scoreGoal(engine, "B1")
+			engine:drainEvents()
+			engine:tick(3) -- 0:00 during Blue's celebration
+			local events = engine:drainEvents()
+			expect(names(events)).toEqual({ "MatchEnded" })
+			expect(events[1]).toMatchObject({ winner = "Orange" })
+		end
+	)
+end)
+
 describe("MatchEngine performance", function()
 	it("keeps a live tick with ball movement far below the 1 ms server budget", function()
-		local engine = liveEngine()
+		local engine = liveEngine(SHORT_STREAK)
 		engine:pickedUp("B1", ZERO, ZERO)
+		lap(engine) -- opens the goal, so the ring is checked every tick too
 		engine:drainEvents()
-		-- Crosses Gate 1's plane outside its rectangle, so every geometry check runs and nothing counts.
+		-- Crosses Gate 1's plane outside its rectangle, so every gate and ring check runs and nothing counts.
 		local from, to = Vector3.new(99, 0, 50), Vector3.new(101, 0, 50)
 		local iterations = 10000
 		local started = os.clock()

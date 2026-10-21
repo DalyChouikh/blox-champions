@@ -72,6 +72,16 @@ function Validate.string(options: { oneOf: { string }?, nonEmpty: boolean? }?): 
 	end
 end
 
+-- Roblox value types by their typeof name, e.g. "Vector3" or "CFrame".
+function Validate.datatype(name: string): Validator
+	return function(value: any, path: string): { string }
+		if typeof(value) ~= name then
+			return typeError(path, name, value)
+		end
+		return {}
+	end
+end
+
 function Validate.table(): Validator
 	return function(value: any, path: string): { string }
 		if type(value) ~= "table" then
@@ -165,10 +175,10 @@ function Validate.check(inner: Validator, predicate: (value: any) -> boolean, me
 	end
 end
 
-function Validate.assertValid(value: any, validator: Validator, rootPath: string)
+function Validate.assertValid(value: any, validator: Validator, rootPath: string, heading: string?)
 	local errors = validator(value, rootPath)
 	if #errors > 0 then
-		error("Invalid config:\n  - " .. table.concat(errors, "\n  - "), 2)
+		error(`{heading or "Invalid config"}:\n  - ` .. table.concat(errors, "\n  - "), 2)
 	end
 end
 

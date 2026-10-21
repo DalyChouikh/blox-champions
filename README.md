@@ -55,7 +55,7 @@ require(game:GetService("ServerStorage").RunTests:Clone())()
 
 The Output window shows one summary line, such as `[RunTests] PASS 49/49 tests`, or a `[RunTests] FAIL …` warning naming the first failure, followed by Jest's full report. `:Clone()` makes Studio load the latest version of the runner instead of a cached copy.
 
-To run only some tests, pass a filter, e.g. `require(game:GetService("ServerStorage").RunTests:Clone())({ testPathPattern = "Freeze" })`. A filter that matches no tests is reported as a failure.
+To run only some tests, pass a filter, e.g. `require(game:GetService("ServerStorage").RunTests:Clone())({ testPathPattern = "Freeze" })`. A filter that matches no tests is reported as a failure. To match several files, wrap the alternatives in parentheses, e.g. `testPathPattern = "(Possession|LapTracker)"`: in Jest-Lua 3.10 a bare `Possession|LapTracker` only matches the first alternative.
 
 ## Project layout
 

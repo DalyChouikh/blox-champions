@@ -33,6 +33,15 @@ describe("Trajectory.forwardCrossingTime", function()
 		)
 	end)
 
+	it("treats a ball already on the plane as having crossed it, as Crossing does", function()
+		expect(
+			Trajectory.forwardCrossingTime(Vector3.new(10, 0, 0), Vector3.new(20, 0, 0), Fixtures.GRAVITY, FACING_X, 2)
+		).toBeNil()
+		expect(
+			Trajectory.forwardCrossingTime(Vector3.new(0, 10, 0), Vector3.new(0, 5, 0), SIMPLE_GRAVITY, FACING_UP, 2)
+		).toBeNil()
+	end)
+
 	it("ignores crossings against the facing, in the past, or after maxTime", function()
 		expect(Trajectory.forwardCrossingTime(Vector3.new(0, 20, 0), Vector3.zero, SIMPLE_GRAVITY, FACING_UP, 5)).toBeNil()
 		expect(

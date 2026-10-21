@@ -2,6 +2,11 @@
 -- The rules of one match composed into a deterministic state machine (spec §4.6). Callers feed it facts — time
 -- passing, the ball's per-tick movement, pickups, touches, throws, knockdowns — and drain the ordered events
 -- (spec §4.7) once per tick. It never touches an Instance, so the same inputs always produce the same events.
+--
+-- Each server frame, report facts in this order: ballMoved (the ball's path during the physics step), then
+-- that step's contacts and actions (pickedUp, touched, thrown, knockedDown), then tick(dt), then
+-- drainEvents. Results depend on it: on the 0:00 frame a ball that went through the ring before time ran out
+-- still scores, and contacts are judged against the goal state the ball's path left behind.
 
 local AssistTracker = require(script.Parent.AssistTracker)
 local Config = require(script.Parent.Parent.Config)
@@ -16,6 +21,7 @@ local SaveDetector = require(script.Parent.SaveDetector)
 local ScoreKeeper = require(script.Parent.ScoreKeeper)
 local Team = require(script.Parent.Team)
 local Types = require(script.Parent.Types)
+local Validate = require(script.Parent.Parent.Config.Validate)
 
 type Team = Team.Team
 type PlayerId = Types.PlayerId
@@ -28,6 +34,10 @@ export type EngineOptions = { config: Config.GameConfig, arena: ArenaLayout, gra
 export type Snapshot = {
 	state: Types.MatchState,
 	period: Types.Period,
+	-- Kickoff countdown or celebration time left; 0 in other states.
+	phaseSecondsLeft: number,
+	-- The team playing its Last Chance, while the period is "LastChance".
+	trailingTeam: Team?,
 	secondsLeft: number,
 	overtimeSeconds: number,
 	scores: { [Team]: number },
@@ -42,6 +52,49 @@ export type Snapshot = {
 local NO_EVENTS: { Event } = {}
 table.freeze(NO_EVENTS)
 
+local function isFinite(n: number): boolean
+	return n > -math.huge and n < math.huge -- false for NaN too
+end
+
+local function isFiniteVector(v: Vector3): boolean
+	return isFinite(v.X) and isFinite(v.Y) and isFinite(v.Z)
+end
+
+local positive = Validate.check(Validate.number(), function(n: number): boolean
+	return n > 0
+end, "must be > 0")
+
+local frame = Validate.check(Validate.datatype("CFrame"), function(c: CFrame): boolean
+	return isFiniteVector(c.Position) and isFiniteVector(c.LookVector)
+end, "must be finite")
+
+-- The arena is built from tagged parts at runtime (Phase 3), so a mis-tagged part must fail here, by name,
+-- rather than silently never counting a lap or a goal.
+local optionsSchema = Validate.record({
+	config = Validate.table(),
+	arena = Validate.record({
+		gates = Validate.check(
+			Validate.list(Validate.record({ frame = frame, width = positive, height = positive })),
+			function(gates: { any }): boolean
+				return #gates > 0
+			end,
+			"must contain at least one gate"
+		),
+		goal = Validate.record({ frame = frame, radius = positive }),
+	}),
+	gravity = Validate.check(Validate.datatype("Vector3"), isFiniteVector, "must be finite"),
+})
+
+-- The engine keeps its own frozen copy, so the caller rebuilding its tables cannot desync the lap sequence.
+local function frozenArena(arena: ArenaLayout): ArenaLayout
+	local gates: { Crossing.Rectangle } = {}
+	for index, gate in arena.gates do
+		gates[index] = table.freeze(table.clone(gate))
+	end
+	table.freeze(gates)
+	return table.freeze({ gates = gates, goal = table.freeze(table.clone(arena.goal)) })
+end
+
 local MatchEngine = {}
 MatchEngine.__index = MatchEngine
 
@@ -54,6 +107,12 @@ type Fields = {
 	_phaseTimeLeft: number,
 	_now: number,
 	_ballThrown: boolean,
+	-- Set by a block until an attacker touches the ball again, so one defensive play earns one save.
+	_playSaved: boolean,
+	-- A block waiting to see whether the ball still goes in (owner decision, 2026-10-21): it becomes a save at
+	-- the next pickup, at `_pendingBlockUntil`, or when play stops, and is dropped if the ball scores.
+	_pendingBlocker: PlayerId?,
+	_pendingBlockUntil: number,
 	_events: { Event },
 	_possession: Possession.Possession,
 	_laps: LapTracker.LapTracker,
@@ -74,12 +133,18 @@ local function emit(self: MatchEngine, event: Event)
 	self._scores:apply(event)
 end
 
--- The player's team, or nil for a player who left. An id that was never added is a wiring bug: fail fast.
-local function activeTeam(self: MatchEngine, player: PlayerId): Team?
+-- An id that was never added is a wiring bug: fail fast.
+local function knownPlayer(self: MatchEngine, player: PlayerId): Types.PlayerStats
 	local stats = self._scores:player(player)
 	if stats == nil then
 		error(`MatchEngine: unknown player "{player}"`, 0)
 	end
+	return stats
+end
+
+-- The player's team, or nil for a player who left.
+local function activeTeam(self: MatchEngine, player: PlayerId): Team?
+	local stats = knownPlayer(self, player)
 	return if stats.present then stats.team else nil
 end
 
@@ -89,18 +154,34 @@ local function closeGoal(self: MatchEngine)
 	end
 end
 
+-- True for a player of the team defending an open goal.
+local function defendsOpenGoal(self: MatchEngine, team: Team): boolean
+	local openFor: Team? = self._goal.openFor
+	return openFor ~= nil and team ~= openFor
+end
+
+local function confirmBlock(self: MatchEngine)
+	local blocker: PlayerId? = self._pendingBlocker
+	if blocker ~= nil then
+		self._pendingBlocker = nil
+		emit(self, { name = "SaveMade", player = blocker, kind = "Block" })
+	end
+end
+
 local function kickoff(self: MatchEngine)
 	self._possession:reset()
 	self._laps:reset()
 	self._assists:reset()
 	closeGoal(self)
 	self._ballThrown = false
+	self._playSaved = false
 	self._state = "Kickoff"
 	self._phaseTimeLeft = self._config.Match.kickoffCountdownSeconds
 	emit(self, { name = "KickoffStarted", countdownSeconds = self._phaseTimeLeft })
 end
 
 local function endMatch(self: MatchEngine, winner: Team)
+	confirmBlock(self)
 	self._state = "Ended"
 	emit(self, { name = "MatchEnded", winner = winner, mvp = self._scores:mvp(winner), stats = self._scores:stats() })
 end
@@ -113,6 +194,8 @@ local function startOvertime(self: MatchEngine)
 end
 
 local function pointScored(self: MatchEngine, team: Team)
+	-- Play stops, so a block still waiting on the ball has done its job (a goal drops it before this).
+	confirmBlock(self)
 	closeGoal(self)
 	local match = self._config.Match
 	local scores = self._scores:teamScores()
@@ -136,8 +219,11 @@ local function pointScored(self: MatchEngine, team: Team)
 end
 
 local function timeUp(self: MatchEngine)
+	-- The ball is dead during a kickoff or celebration, so nobody has it for Last Chance; the possession
+	-- left over from a celebrated point is about to be reset anyway.
+	local possessing: Team? = if self._state == "Live" then self._possession.team else nil
 	local outcome: MatchOutcome.TimeUp, team: Team? =
-		MatchOutcome.atTimeUp(self._scores:teamScores(), self._possession.team, self._config.Match.lastChance)
+		MatchOutcome.atTimeUp(self._scores:teamScores(), possessing, self._config.Match.lastChance)
 	if outcome == "Overtime" then
 		startOvertime(self)
 	elseif outcome == "LastChance" then
@@ -150,6 +236,8 @@ local function timeUp(self: MatchEngine)
 end
 
 local function goalScored(self: MatchEngine)
+	-- The ball went in after all, so a pending block saved nothing.
+	self._pendingBlocker = nil
 	-- The goal only opens for the possessing team, which always has a last holder.
 	local team: Team = self._possession.team :: Team
 	local scorer: PlayerId = self._possession.lastHolder :: PlayerId
@@ -178,6 +266,8 @@ local function lapCompleted(self: MatchEngine, team: Team): boolean
 end
 
 function MatchEngine.new(options: EngineOptions): MatchEngine
+	Validate.assertValid(options, optionsSchema, "", "MatchEngine: invalid options")
+	local arena = frozenArena(options.arena)
 	local config = options.config
 	local match = config.Match
 	local engine: MatchEngine
@@ -193,13 +283,16 @@ function MatchEngine.new(options: EngineOptions): MatchEngine
 			_phaseTimeLeft = 0,
 			_now = 0,
 			_ballThrown = false,
+			_playSaved = false,
+			_pendingBlocker = nil,
+			_pendingBlockUntil = 0,
 			_events = {},
 			_possession = Possession.new(),
-			_laps = LapTracker.new(options.arena.gates),
-			_goal = GoalJudge.new(options.arena.goal, match.lapsToOpenGoal),
+			_laps = LapTracker.new(arena.gates),
+			_goal = GoalJudge.new(arena.goal, match.lapsToOpenGoal),
 			_clock = MatchClock.new(match.durationSeconds, config.UI.clockWarnings),
 			_assists = AssistTracker.new(config.Scoring.assistWindowSeconds),
-			_saves = SaveDetector.new(options.arena.goal, options.gravity, config.Scoring.saveLookaheadSeconds),
+			_saves = SaveDetector.new(arena.goal, options.gravity, config.Scoring.saveLookaheadSeconds),
 			_scores = ScoreKeeper.new(config),
 			_onClockWarning = onClockWarning,
 		} :: Fields,
@@ -213,6 +306,7 @@ function MatchEngine.addPlayer(self: MatchEngine, player: PlayerId, team: Team)
 end
 
 function MatchEngine.removePlayer(self: MatchEngine, player: PlayerId)
+	knownPlayer(self, player)
 	self._scores:removePlayer(player)
 end
 
@@ -226,8 +320,8 @@ end
 
 function MatchEngine.tick(self: MatchEngine, dt: number)
 	-- Written so NaN fails too.
-	if not (dt >= 0) then
-		error("MatchEngine: dt must be a non-negative number", 0)
+	if not (dt >= 0 and dt < math.huge) then
+		error("MatchEngine: dt must be a finite non-negative number", 0)
 	end
 	local state = self._state
 	if state == "Waiting" or state == "Ended" then
@@ -243,6 +337,10 @@ function MatchEngine.tick(self: MatchEngine, dt: number)
 				return
 			end
 		end
+	end
+
+	if self._pendingBlocker ~= nil and self._now >= self._pendingBlockUntil then
+		confirmBlock(self)
 	end
 
 	if state == "Kickoff" or state == "Celebration" then
@@ -293,15 +391,17 @@ function MatchEngine.pickedUp(self: MatchEngine, player: PlayerId, ballPosition:
 		return
 	end
 
-	-- Judged on the state before the pickup changes it.
-	local openFor = self._goal.openFor
-	if openFor ~= nil and team ~= openFor then
+	-- A pickup ends the danger, so a pending block counts first. The save check below is judged on the state
+	-- before this pickup changes it, and skipped when the play already earned a save.
+	confirmBlock(self)
+	if defendsOpenGoal(self, team) and not self._playSaved then
 		local kind: Types.SaveKind? = self._saves:classify("Pickup", self._ballThrown, ballPosition, ballVelocity)
 		if kind ~= nil then
 			emit(self, { name = "SaveMade", player = player, kind = kind })
 		end
 	end
 	self._ballThrown = false
+	self._playSaved = false
 
 	local previous: Team? = self._possession.team
 	if self._possession:pickUp(player, team) then
@@ -323,24 +423,27 @@ end
 
 function MatchEngine.touched(self: MatchEngine, player: PlayerId, ballPosition: Vector3, ballVelocity: Vector3)
 	local team: Team? = activeTeam(self, player)
-	if team == nil or self._state ~= "Live" or not self._ballThrown then
+	if team == nil or self._state ~= "Live" or not self._ballThrown or self._playSaved then
 		return
 	end
-	local openFor = self._goal.openFor
-	if openFor == nil or team == openFor then
-		return
-	end
-	if self._saves:classify("Touch", true, ballPosition, ballVelocity) == "Block" then
-		-- One save per throw, however many ticks the defender stays in contact.
+	if defendsOpenGoal(self, team) and self._saves:classify("Touch", true, ballPosition, ballVelocity) == "Block" then
+		-- One save per play, however many ticks defenders stay in contact; it counts once the danger passes.
 		self._ballThrown = false
-		emit(self, { name = "SaveMade", player = player, kind = "Block" })
+		self._playSaved = true
+		self._pendingBlocker = player
+		self._pendingBlockUntil = self._now + self._config.Scoring.saveLookaheadSeconds
 	end
 end
 
 function MatchEngine.thrown(self: MatchEngine, player: PlayerId)
-	if activeTeam(self, player) ~= nil and self._state == "Live" then
-		self._ballThrown = true
+	if activeTeam(self, player) == nil or self._state ~= "Live" then
+		return
 	end
+	-- Only the carrier can throw; anything else means the ball service and the rules disagree.
+	if self._possession.lastHolder ~= player then
+		error(`MatchEngine: player "{player}" threw the ball without holding it`, 0)
+	end
+	self._ballThrown = true
 end
 
 function MatchEngine.knockedDown(self: MatchEngine, attacker: PlayerId, victim: PlayerId)
@@ -362,9 +465,13 @@ function MatchEngine.drainEvents(self: MatchEngine): { Event }
 end
 
 function MatchEngine.snapshot(self: MatchEngine): Snapshot
+	local state: Types.MatchState = self._state
+	local timed = state == "Kickoff" or state == "Celebration"
 	return {
-		state = self._state,
+		state = state,
 		period = self._period,
+		phaseSecondsLeft = if timed then math.max(self._phaseTimeLeft, 0) else 0,
+		trailingTeam = self._trailingTeam,
 		secondsLeft = self._clock.secondsLeft,
 		overtimeSeconds = self._clock.overtimeSeconds,
 		scores = self._scores:teamScores(),
