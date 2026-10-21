@@ -1,0 +1,139 @@
+--!strict
+-- Small validation DSL for config tables. Every validator returns all the errors it finds, each
+-- prefixed with the exact config path (e.g. "Match.lapsToOpenGoal"), so a bad value is easy to locate.
+
+export type Validator = (value: any, path: string) -> { string }
+
+local Validate = {}
+
+local function joinPath(path: string, key: string): string
+	return if path == "" then key else `{path}.{key}`
+end
+
+local function atPath(path: string, message: string): string
+	return if path == "" then message else `{path}: {message}`
+end
+
+local function typeError(path: string, expected: string, value: any): { string }
+	return { atPath(path, `expected {expected}, got {typeof(value)}`) }
+end
+
+function Validate.number(options: { min: number?, max: number?, integer: boolean? }?): Validator
+	local min = options and options.min
+	local max = options and options.max
+	local integer = options and options.integer
+	return function(value: any, path: string): { string }
+		if type(value) ~= "number" then
+			return typeError(path, "number", value)
+		end
+		if value ~= value then
+			return { atPath(path, "must not be NaN") }
+		end
+		if value == math.huge or value == -math.huge then
+			return { atPath(path, "must be finite") }
+		end
+		local errors = {}
+		if min ~= nil and value < min then
+			table.insert(errors, atPath(path, `must be >= {min} (got {value})`))
+		end
+		if max ~= nil and value > max then
+			table.insert(errors, atPath(path, `must be <= {max} (got {value})`))
+		end
+		if integer and value % 1 ~= 0 then
+			table.insert(errors, atPath(path, `must be an integer (got {value})`))
+		end
+		return errors
+	end
+end
+
+function Validate.boolean(): Validator
+	return function(value: any, path: string): { string }
+		if type(value) ~= "boolean" then
+			return typeError(path, "boolean", value)
+		end
+		return {}
+	end
+end
+
+function Validate.string(options: { oneOf: { string }? }?): Validator
+	local oneOf = options and options.oneOf
+	return function(value: any, path: string): { string }
+		if type(value) ~= "string" then
+			return typeError(path, "string", value)
+		end
+		if oneOf ~= nil and table.find(oneOf, value) == nil then
+			return { atPath(path, `must be one of {table.concat(oneOf, ", ")} (got "{value}")`) }
+		end
+		return {}
+	end
+end
+
+function Validate.table(): Validator
+	return function(value: any, path: string): { string }
+		if type(value) ~= "table" then
+			return typeError(path, "table", value)
+		end
+		return {}
+	end
+end
+
+function Validate.record(fields: { [string]: Validator }): Validator
+	local fieldNames: { string } = {}
+	for name in fields do
+		table.insert(fieldNames, name)
+	end
+	table.sort(fieldNames)
+
+	return function(value: any, path: string): { string }
+		if type(value) ~= "table" then
+			return typeError(path, "table", value)
+		end
+
+		local errors: { string } = {}
+		for _, name in fieldNames do
+			local fieldPath = joinPath(path, name)
+			if value[name] == nil then
+				table.insert(errors, `{fieldPath}: missing`)
+			else
+				for _, fieldError in fields[name](value[name], fieldPath) do
+					table.insert(errors, fieldError)
+				end
+			end
+		end
+
+		local unknownKeys: { string } = {}
+		for key in value do
+			if type(key) ~= "string" or fields[key] == nil then
+				table.insert(unknownKeys, tostring(key))
+			end
+		end
+		table.sort(unknownKeys)
+		for _, key in unknownKeys do
+			table.insert(errors, `{joinPath(path, key)}: unknown key`)
+		end
+
+		return errors
+	end
+end
+
+function Validate.check(inner: Validator, predicate: (value: any) -> boolean, message: string): Validator
+	return function(value: any, path: string): { string }
+		local errors = inner(value, path)
+		if #errors > 0 then
+			return errors
+		end
+		if not predicate(value) then
+			return { atPath(path, message) }
+		end
+		return {}
+	end
+end
+
+function Validate.assertValid(value: any, validator: Validator, rootPath: string)
+	local errors = validator(value, rootPath)
+	if #errors > 0 then
+		error("Invalid config:\n  - " .. table.concat(errors, "\n  - "), 2)
+	end
+end
+
+return Validate
