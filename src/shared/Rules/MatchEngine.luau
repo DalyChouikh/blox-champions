@@ -29,6 +29,10 @@ export type EngineOptions = { config: Config.GameConfig, arena: ArenaLayout, gra
 export type Snapshot = {
 	state: Types.MatchState,
 	period: Types.Period,
+	-- Kickoff countdown or celebration time left; 0 in other states.
+	phaseSecondsLeft: number,
+	-- The team playing its Last Chance, while the period is "LastChance".
+	trailingTeam: Team?,
 	secondsLeft: number,
 	overtimeSeconds: number,
 	scores: { [Team]: number },
@@ -456,9 +460,13 @@ function MatchEngine.drainEvents(self: MatchEngine): { Event }
 end
 
 function MatchEngine.snapshot(self: MatchEngine): Snapshot
+	local state: Types.MatchState = self._state
+	local timed = state == "Kickoff" or state == "Celebration"
 	return {
-		state = self._state,
+		state = state,
 		period = self._period,
+		phaseSecondsLeft = if timed then math.max(self._phaseTimeLeft, 0) else 0,
+		trailingTeam = self._trailingTeam,
 		secondsLeft = self._clock.secondsLeft,
 		overtimeSeconds = self._clock.overtimeSeconds,
 		scores = self._scores:teamScores(),

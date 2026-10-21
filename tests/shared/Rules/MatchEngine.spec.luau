@@ -176,6 +176,19 @@ describe("MatchEngine flow", function()
 		end
 	end)
 
+	it("reports the kickoff or celebration time left and the Last Chance team in snapshots", function()
+		local engine = newEngine()
+		engine:start()
+		engine:tick(1)
+		expect(engine:snapshot()).toMatchObject({ state = "Kickoff", phaseSecondsLeft = 2 })
+		local lastChance = lastChanceEngine()
+		expect(lastChance:snapshot()).toMatchObject({
+			period = "LastChance",
+			trailingTeam = "Blue",
+			phaseSecondsLeft = 0,
+		})
+	end)
+
 	it("returns the same frozen empty list when nothing happened", function()
 		local engine = liveEngine()
 		engine:tick(1)
