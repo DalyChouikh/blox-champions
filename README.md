@@ -57,6 +57,8 @@ The Output window shows one summary line, such as `[RunTests] PASS 49/49 tests`,
 
 To run only some tests, pass a filter, e.g. `require(game:GetService("ServerStorage").RunTests:Clone())({ testPathPattern = "Freeze" })`. A filter that matches no tests is reported as a failure. To match several files, wrap the alternatives in parentheses, e.g. `testPathPattern = "(Possession|LapTracker)"`: in Jest-Lua 3.10 a bare `Possession|LapTracker` only matches the first alternative.
 
+Tests under `tests/server` and `tests/integration` build parts (a whole arena, for example) in the open place, under a temporary folder they remove when they finish, so a run leaves the place as it found it.
+
 ## Project layout
 
 | Folder | What lives there |
