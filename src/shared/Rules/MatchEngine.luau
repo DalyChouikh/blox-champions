@@ -80,12 +80,18 @@ local function emit(self: MatchEngine, event: Event)
 	self._scores:apply(event)
 end
 
--- The player's team, or nil for a player who left. An id that was never added is a wiring bug: fail fast.
-local function activeTeam(self: MatchEngine, player: PlayerId): Team?
+-- An id that was never added is a wiring bug: fail fast.
+local function knownPlayer(self: MatchEngine, player: PlayerId): Types.PlayerStats
 	local stats = self._scores:player(player)
 	if stats == nil then
 		error(`MatchEngine: unknown player "{player}"`, 0)
 	end
+	return stats
+end
+
+-- The player's team, or nil for a player who left.
+local function activeTeam(self: MatchEngine, player: PlayerId): Team?
+	local stats = knownPlayer(self, player)
 	return if stats.present then stats.team else nil
 end
 
@@ -245,6 +251,7 @@ function MatchEngine.addPlayer(self: MatchEngine, player: PlayerId, team: Team)
 end
 
 function MatchEngine.removePlayer(self: MatchEngine, player: PlayerId)
+	knownPlayer(self, player)
 	self._scores:removePlayer(player)
 end
 
@@ -258,8 +265,8 @@ end
 
 function MatchEngine.tick(self: MatchEngine, dt: number)
 	-- Written so NaN fails too.
-	if not (dt >= 0) then
-		error("MatchEngine: dt must be a non-negative number", 0)
+	if not (dt >= 0 and dt < math.huge) then
+		error("MatchEngine: dt must be a finite non-negative number", 0)
 	end
 	local state = self._state
 	if state == "Waiting" or state == "Ended" then
@@ -374,9 +381,14 @@ function MatchEngine.touched(self: MatchEngine, player: PlayerId, ballPosition: 
 end
 
 function MatchEngine.thrown(self: MatchEngine, player: PlayerId)
-	if activeTeam(self, player) ~= nil and self._state == "Live" then
-		self._ballThrown = true
+	if activeTeam(self, player) == nil or self._state ~= "Live" then
+		return
 	end
+	-- Only the carrier can throw; anything else means the ball service and the rules disagree.
+	if self._possession.lastHolder ~= player then
+		error(`MatchEngine: player "{player}" threw the ball without holding it`, 0)
+	end
+	self._ballThrown = true
 end
 
 function MatchEngine.knockedDown(self: MatchEngine, attacker: PlayerId, victim: PlayerId)

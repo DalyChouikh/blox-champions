@@ -121,18 +121,17 @@ describe("MatchEngine flow", function()
 		expect(engine:snapshot().possessingTeam).toBeNil()
 	end)
 
-	it("rejects a second start and a negative or NaN tick", function()
+	it("rejects a second start and a negative, NaN or infinite tick", function()
 		local engine = newEngine()
 		engine:start()
 		expect(function()
 			engine:start()
 		end).toThrow("MatchEngine: start() called in state Kickoff")
-		expect(function()
-			engine:tick(-1)
-		end).toThrow("MatchEngine: dt must be a non-negative number")
-		expect(function()
-			engine:tick(0 / 0)
-		end).toThrow("MatchEngine: dt must be a non-negative number")
+		for _, dt in { -1, 0 / 0, math.huge } do
+			expect(function()
+				engine:tick(dt)
+			end).toThrow("MatchEngine: dt must be a finite non-negative number")
+		end
 	end)
 
 	it("returns the same frozen empty list when nothing happened", function()
@@ -426,17 +425,60 @@ describe("MatchEngine saves and knockdowns", function()
 end)
 
 describe("MatchEngine players", function()
-	it("rejects unknown players and ignores departed ones, keeping their stats", function()
+	it("rejects an unknown id in every player input", function()
+		local engine = liveEngine()
+		local inputs: { () -> () } = {
+			function()
+				engine:pickedUp("Ghost", ZERO, ZERO)
+			end,
+			function()
+				engine:touched("Ghost", ZERO, ZERO)
+			end,
+			function()
+				engine:thrown("Ghost")
+			end,
+			function()
+				engine:knockedDown("Ghost", "B1")
+			end,
+			function()
+				engine:knockedDown("B1", "Ghost")
+			end,
+			function()
+				engine:removePlayer("Ghost")
+			end,
+		}
+		for _, input in inputs do
+			expect(input).toThrow('MatchEngine: unknown player "Ghost"')
+		end
+	end)
+
+	it("rejects a throw by a player who is not the last holder", function()
 		local engine = liveEngine()
 		expect(function()
-			engine:pickedUp("Ghost", ZERO, ZERO)
-		end).toThrow('MatchEngine: unknown player "Ghost"')
+			engine:thrown("B1")
+		end).toThrow('MatchEngine: player "B1" threw the ball without holding it')
+		engine:pickedUp("B1", ZERO, ZERO)
+		expect(function()
+			engine:thrown("B2")
+		end).toThrow('MatchEngine: player "B2" threw the ball without holding it')
+	end)
+
+	it("ignores departed players, keeping their stats", function()
+		local engine = liveEngine(SHORT_STREAK)
 		engine:knockedDown("O1", "B1")
 		engine:removePlayer("O1")
-		engine:pickedUp("O1", ZERO, ZERO)
+		-- Blue's goal is open and a thrown ball is on target, so every input below would count if O1 were present.
+		engine:pickedUp("B1", ZERO, ZERO)
+		lap(engine)
+		engine:thrown("B1")
+		engine:drainEvents()
+		engine:touched("O1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+		engine:pickedUp("O1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+		engine:thrown("O1")
 		engine:knockedDown("O1", "B2")
-		expectEvents(engine, { { name = "TackleKnockdown", attacker = "O1", victim = "B1" } })
-		expect(engine:snapshot().possessingTeam).toBeNil()
+		engine:tick(1.5)
+		expectEvents(engine, {})
+		expect(engine:snapshot().possessingTeam).toBe("Blue")
 		local departed: Types.PlayerStats? = nil
 		for _, entry in engine:stats().players do
 			if entry.player == "O1" then
