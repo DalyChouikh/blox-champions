@@ -1,0 +1,11 @@
+{
+	"name": "blox-champions",
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"Shared": {
+				"$path": "src/shared"
+			}
+		}
+	}
+}

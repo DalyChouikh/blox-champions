@@ -1,0 +1,22 @@
+{
+	"name": "blox-champions-test",
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"Shared": {
+				"$path": "src/shared"
+			},
+			"Tests": {
+				"$path": "tests"
+			},
+			"DevPackages": {
+				"$path": "DevPackages"
+			}
+		},
+		"ServerStorage": {
+			"RunTests": {
+				"$path": "scripts/RunTests.luau"
+			}
+		}
+	}
+}
