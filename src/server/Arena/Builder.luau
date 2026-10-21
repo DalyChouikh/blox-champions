@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Finite = require(ReplicatedStorage.Shared.Util.Finite)
 local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
+local PartSize = require(ReplicatedStorage.Shared.Util.PartSize)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
@@ -26,7 +27,8 @@ local Builder = {}
 -- What is wrong with a piece Roblox could not build as given, or nil.
 local function problemWith(piece: Piece): string?
 	local size = piece.size
-	if not (Finite.vector(size) and math.min(size.X, size.Y, size.Z) >= Types.MIN_PART_SIZE) then
+	local fits = math.min(size.X, size.Y, size.Z) >= PartSize.MIN and math.max(size.X, size.Y, size.Z) <= PartSize.MAX
+	if not (Finite.vector(size) and fits) then
 		return `size {size}`
 	end
 	if not Finite.frame(piece.cframe) then

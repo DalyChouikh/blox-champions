@@ -13,7 +13,4 @@ export type TeamSpawns = { Blue: { CFrame }, Orange: { CFrame } }
 -- The upright goal ring. frame faces oncoming skaters; its opening is also the scoring disc.
 export type Goal = { frame: CFrame, openingRadius: number, rim: { Piece }, panel: Piece }
 
-return table.freeze({
-	-- Roblox's smallest part size per axis: geometry never emits a thinner piece, and the builder rejects one.
-	MIN_PART_SIZE = 0.001,
-})
+return table.freeze({})

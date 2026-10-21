@@ -199,6 +199,27 @@ describe("Config.forMode", function()
 		end
 	end)
 
+	it("rejects arena values that would size a part beyond what Roblox can build", function()
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{ overrides = { straightLength = 3000 }, message = "Arena.straightLength: must be <= 2048 (got 3000)" },
+			{ overrides = { endRadius = 1100 }, message = "Arena.endRadius: must be <= 1024 (got 1100)" },
+			{
+				overrides = { surfaceThickness = 0.0005 },
+				message = "Arena.surfaceThickness: must be >= 0.001 (got 0.0005)",
+			},
+			{
+				overrides = { goal = { panelThickness = 0.0005 } },
+				message = "Arena.goal.panelThickness: must be >= 0.001 (got 0.0005)",
+			},
+			{ overrides = { marker = { height = 2500 } }, message = "Arena.marker.height: must be <= 2048 (got 2500)" },
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config({ Arena = case.overrides })
+			end).toThrow(case.message)
+		end
+	end)
+
 	it("rejects team spawns that would not fit on a straight", function()
 		expect(function()
 			Fixtures.config({ Match = { teamSize = 6 }, Arena = { teamSpawnSpacing = 40 } })

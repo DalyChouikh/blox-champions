@@ -68,6 +68,12 @@ describe("Builder.build", function()
 		expect(function()
 			Builder.build(adrift, config, parent)
 		end).toThrow("ArenaBuilder: infield piece 1 is invalid (cframe ")
+		-- Roblox would silently clamp it to 2048, leaving a hole.
+		local oversized = table.clone(geometry)
+		oversized.markers = { { shape = "Block", cframe = CFrame.identity, size = Vector3.new(3000, 1, 1) } }
+		expect(function()
+			Builder.build(oversized, config, parent)
+		end).toThrow("ArenaBuilder: marker piece 1 is invalid (size 3000, 1, 1)")
 		expect(#parent:GetChildren()).toBe(0)
 	end)
 end)
