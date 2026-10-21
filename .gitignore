@@ -1,0 +1,9 @@
+/Packages/
+/DevPackages/
+/build/
+sourcemap.json
+globalTypes.d.luau
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+*.rbxlx.lock
