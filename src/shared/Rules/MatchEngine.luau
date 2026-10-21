@@ -11,6 +11,7 @@
 local AssistTracker = require(script.Parent.AssistTracker)
 local Config = require(script.Parent.Parent.Config)
 local Crossing = require(script.Parent.Crossing)
+local Finite = require(script.Parent.Parent.Util.Finite)
 local GoalJudge = require(script.Parent.GoalJudge)
 local LastChance = require(script.Parent.LastChance)
 local LapTracker = require(script.Parent.LapTracker)
@@ -52,18 +53,10 @@ export type Snapshot = {
 local NO_EVENTS: { Event } = {}
 table.freeze(NO_EVENTS)
 
-local function isFinite(n: number): boolean
-	return n > -math.huge and n < math.huge -- false for NaN too
-end
-
-local function isFiniteVector(v: Vector3): boolean
-	return isFinite(v.X) and isFinite(v.Y) and isFinite(v.Z)
-end
-
 local positive = Validate.number({ above = 0 })
 
 local frame = Validate.check(Validate.datatype("CFrame"), function(c: CFrame): boolean
-	return isFiniteVector(c.Position) and isFiniteVector(c.LookVector)
+	return Finite.vector(c.Position) and Finite.vector(c.LookVector)
 end, "must be finite")
 
 -- The arena is built from tagged parts at runtime (Phase 3), so a mis-tagged part must fail here, by name,
@@ -80,7 +73,7 @@ local optionsSchema = Validate.record({
 		),
 		goal = Validate.record({ frame = frame, radius = positive }),
 	}),
-	gravity = Validate.check(Validate.datatype("Vector3"), isFiniteVector, "must be finite"),
+	gravity = Validate.check(Validate.datatype("Vector3"), Finite.vector, "must be finite"),
 })
 
 -- The engine keeps its own frozen copy, so the caller rebuilding its tables cannot desync the lap sequence.
