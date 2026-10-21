@@ -14,8 +14,10 @@ type Fields = {
 	progress: number,
 	_gates: { Crossing.Rectangle },
 	_nextGate: number?,
-	-- Reused between calls so ordering crossings never allocates a lookup table.
+	-- Reused by every call, so reporting and ordering crossings never allocates on a tick.
+	_crossed: { number },
 	_fractions: { [number]: number },
+	_byFraction: (a: number, b: number) -> boolean,
 }
 
 export type LapTracker = typeof(setmetatable({} :: Fields, LapTracker))
@@ -24,6 +26,7 @@ function LapTracker.new(gates: { Crossing.Rectangle }): LapTracker
 	if #gates == 0 then
 		error("LapTracker: at least one gate is required", 0)
 	end
+	local fractions: { [number]: number } = {}
 	return setmetatable(
 		{
 			gateCount = #gates,
@@ -31,31 +34,33 @@ function LapTracker.new(gates: { Crossing.Rectangle }): LapTracker
 			progress = 0,
 			_gates = gates,
 			_nextGate = nil,
-			_fractions = {},
+			_crossed = {},
+			_fractions = fractions,
+			_byFraction = function(a: number, b: number): boolean
+				return fractions[a] < fractions[b]
+			end,
 		} :: Fields,
 		LapTracker
 	)
 end
 
--- Gates the segment crosses forward, in the order the segment meets them; nil (and no allocation) when none.
+-- Gates the segment crosses forward, in the order the segment meets them, or nil when none. The list is
+-- reused by the next call, so read it before calling again.
 function LapTracker.crossedGates(self: LapTracker, from: Vector3, to: Vector3): { number }?
-	local crossed: { number }? = nil
+	local crossed = self._crossed
+	table.clear(crossed)
 	for index, gate in self._gates do
 		local fraction = Crossing.throughRectangle(gate, from, to)
 		if fraction ~= nil then
 			self._fractions[index] = fraction
-			if crossed == nil then
-				crossed = { index }
-			else
-				table.insert(crossed, index)
-			end
+			table.insert(crossed, index)
 		end
 	end
-	if crossed ~= nil and #crossed > 1 then
-		local fractions = self._fractions
-		table.sort(crossed, function(a: number, b: number): boolean
-			return fractions[a] < fractions[b]
-		end)
+	if #crossed == 0 then
+		return nil
+	end
+	if #crossed > 1 then
+		table.sort(crossed, self._byFraction)
 	end
 	return crossed
 end

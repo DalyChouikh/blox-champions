@@ -698,10 +698,11 @@ end)
 
 describe("MatchEngine performance", function()
 	it("keeps a live tick with ball movement far below the 1 ms server budget", function()
-		local engine = liveEngine()
+		local engine = liveEngine(SHORT_STREAK)
 		engine:pickedUp("B1", ZERO, ZERO)
+		lap(engine) -- opens the goal, so the ring is checked every tick too
 		engine:drainEvents()
-		-- Crosses Gate 1's plane outside its rectangle, so every geometry check runs and nothing counts.
+		-- Crosses Gate 1's plane outside its rectangle, so every gate and ring check runs and nothing counts.
 		local from, to = Vector3.new(99, 0, 50), Vector3.new(101, 0, 50)
 		local iterations = 10000
 		local started = os.clock()
