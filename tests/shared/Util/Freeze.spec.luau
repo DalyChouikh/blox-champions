@@ -37,6 +37,12 @@ describe("Freeze.deep", function()
 		expect(table.isfrozen(child)).toBe(true)
 	end)
 
+	it("freezes tables used as keys", function()
+		local key = { id = 1 }
+		Freeze.deep({ [key] = true })
+		expect(table.isfrozen(key)).toBe(true)
+	end)
+
 	it("handles cycles without infinite recursion", function()
 		local a: any = {}
 		a.self = a
