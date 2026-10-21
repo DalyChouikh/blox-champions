@@ -1,5 +1,7 @@
 # Blox Champions
 
+[![CI](https://github.com/DalyChouikh/blox-champions/actions/workflows/ci.yml/badge.svg)](https://github.com/DalyChouikh/blox-champions/actions/workflows/ci.yml)
+
 A 3v3 roller-skate ball game for Roblox, inspired by Ubisoft's Roller Champions: skate laps with the ball to open the goal, then score. The design for the first milestone lives in [the M1 spec](docs/superpowers/specs/2026-10-21-m1-foundation-core-match-design.md), and progress is tracked in [GitHub milestones](https://github.com/DalyChouikh/blox-champions/milestones).
 
 ## Prerequisites
@@ -61,3 +63,7 @@ Pass a filter to run only some tests, e.g. `require(game:GetService("ServerStora
 | `tests/` | Jest-Lua tests (`*.spec.luau`), mirroring the `src/` folders |
 | `scripts/` | Development scripts, such as the in-Studio test runner |
 | `docs/` | Design specs and implementation plans |
+
+## Contributing
+
+Branch, commit, testing, and pull-request conventions are in [CONTRIBUTING.md](CONTRIBUTING.md).
