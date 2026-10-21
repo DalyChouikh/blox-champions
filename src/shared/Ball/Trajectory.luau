@@ -11,11 +11,12 @@ function Trajectory.positionAt(position: Vector3, velocity: Vector3, gravity: Ve
 	return position + velocity * t + gravity * (0.5 * t * t)
 end
 
+-- t must be strictly ahead: like Crossing, a ball already on the plane has crossed it.
 local function isForwardCrossing(t: number, speedAlong: number, gravityAlong: number, maxTime: number): boolean
-	return t >= 0 and t <= maxTime and speedAlong + gravityAlong * t > 0
+	return t > 0 and t <= maxTime and speedAlong + gravityAlong * t > 0
 end
 
--- Earliest time in [0, maxTime] at which the path crosses the frame's plane moving along frame.LookVector.
+-- Earliest time in (0, maxTime] at which the path crosses the frame's plane moving along frame.LookVector.
 function Trajectory.forwardCrossingTime(
 	position: Vector3,
 	velocity: Vector3,
