@@ -21,6 +21,9 @@ export type Summary = {
 
 local REQUIRED_CHILDREN = { "DevPackages", "Tests" }
 
+local NO_TESTS_GUIDANCE = "No tests matched, or Jest could not start. If you passed testPathPattern or "
+	.. "testNamePattern, check that it matches a test file or test name."
+
 local function failedSummary(message: string): Summary
 	return {
 		success = false,
@@ -53,11 +56,16 @@ local function runTests(options: RunOptions?): Summary
 	}, { tests }):awaitStatus()
 
 	if status ~= "Resolved" then
-		return failedSummary(tostring(result))
+		local summary = failedSummary(NO_TESTS_GUIDANCE)
+		table.insert(summary.failureMessages, tostring(result))
+		return summary
 	end
 
 	local results = result.results
 	local failureMessages: { string } = {}
+	if results.numTotalTests == 0 then
+		table.insert(failureMessages, NO_TESTS_GUIDANCE)
+	end
 	for _, testResult in results.testResults do
 		if type(testResult.failureMessage) == "string" and testResult.failureMessage ~= "" then
 			table.insert(failureMessages, testResult.failureMessage)

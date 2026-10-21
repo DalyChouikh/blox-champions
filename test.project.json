@@ -13,9 +13,21 @@
 				"$path": "DevPackages"
 			}
 		},
+		"ServerScriptService": {
+			"Server": {
+				"$path": "src/server"
+			}
+		},
 		"ServerStorage": {
 			"RunTests": {
 				"$path": "scripts/RunTests.luau"
+			}
+		},
+		"StarterPlayer": {
+			"StarterPlayerScripts": {
+				"Client": {
+					"$path": "src/client"
+				}
 			}
 		}
 	}
