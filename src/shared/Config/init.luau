@@ -30,8 +30,8 @@ Config.schema = Validate.record({
 })
 
 local modeSchema = Validate.record({
-	id = Validate.string(),
-	displayName = Validate.string(),
+	id = Validate.string({ nonEmpty = true }),
+	displayName = Validate.string({ nonEmpty = true }),
 	itemsEnabled = Validate.boolean(),
 	overrides = Validate.table(),
 })

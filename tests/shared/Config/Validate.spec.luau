@@ -33,6 +33,12 @@ describe("Validate", function()
 		expect(s("Press", "Input.mode")).toEqual({ 'Input.mode: must be one of Hold, Toggle (got "Press")' })
 	end)
 
+	it("rejects empty strings when nonEmpty is set", function()
+		local s = Validate.string({ nonEmpty = true })
+		expect(s("NormalChampions", "Mode.id")).toEqual({})
+		expect(s("", "Mode.id")).toEqual({ "Mode.id: must not be empty" })
+	end)
+
 	it("accepts any table for Validate.table and rejects non-tables", function()
 		expect(Validate.table()({ anything = 1 }, "Mode.overrides")).toEqual({})
 		expect(Validate.table()(1, "Mode.overrides")).toEqual({ "Mode.overrides: expected table, got number" })

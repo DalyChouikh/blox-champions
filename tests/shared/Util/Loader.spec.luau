@@ -116,4 +116,27 @@ describe("Loader.start", function()
 		expect(string.find(message, 'Loader: module "Broken" failed in start: ', 1, true) ~= nil).toBe(true)
 		expect(string.find(message, "bad start", 1, true) ~= nil).toBe(true)
 	end)
+
+	it("rejects a module that depends on itself", function()
+		expect(function()
+			Loader.start({ { name = "A", dependencies = { "A" } } })
+		end).toThrow('Loader: module "A" depends on itself')
+	end)
+
+	it("includes the stack trace of a module failure", function()
+		local ok, message = captureError(function()
+			return Loader.start({
+				{
+					name = "Deep",
+					init = function()
+						error("deep failure")
+					end,
+				},
+			})
+		end)
+		expect(ok).toBe(false)
+		expect(string.find(message, "deep failure", 1, true) ~= nil).toBe(true)
+		-- A traceback frame reads "<script>:<line> function init"; the bare error line reads "<script>:<line>: deep failure".
+		expect(string.match(message, ":%d+ function init") ~= nil).toBe(true)
+	end)
 end)

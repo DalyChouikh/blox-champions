@@ -26,6 +26,9 @@ local function validate(modules: { LoadableModule }, provided: { [string]: any }
 	for index, module in modules do
 		local dependencies: { string } = module.dependencies or {}
 		for _, dependency in dependencies do
+			if dependency == module.name then
+				error(`Loader: module "{module.name}" depends on itself`, 0)
+			end
 			if provided[dependency] == nil then
 				local position = positions[dependency]
 				if position == nil then
@@ -39,7 +42,8 @@ local function validate(modules: { LoadableModule }, provided: { [string]: any }
 end
 
 local function runPhase(module: LoadableModule, phase: string, fn: (...any) -> ...any, ...: any)
-	local ok, message = pcall(fn, ...)
+	-- debug.traceback keeps the failing module's full stack in the message, not just the error line.
+	local ok, message = xpcall(fn, debug.traceback, ...)
 	if not ok then
 		error(`Loader: module "{module.name}" failed in {phase}: {message}`, 0)
 	end

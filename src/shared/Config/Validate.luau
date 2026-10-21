@@ -55,11 +55,15 @@ function Validate.boolean(): Validator
 	end
 end
 
-function Validate.string(options: { oneOf: { string }? }?): Validator
+function Validate.string(options: { oneOf: { string }?, nonEmpty: boolean? }?): Validator
 	local oneOf = options and options.oneOf
+	local nonEmpty = options and options.nonEmpty
 	return function(value: any, path: string): { string }
 		if type(value) ~= "string" then
 			return typeError(path, "string", value)
+		end
+		if nonEmpty and value == "" then
+			return { atPath(path, "must not be empty") }
 		end
 		if oneOf ~= nil and table.find(oneOf, value) == nil then
 			return { atPath(path, `must be one of {table.concat(oneOf, ", ")} (got "{value}")`) }

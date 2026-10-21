@@ -35,7 +35,7 @@ local function failedSummary(message: string): Summary
 	}
 end
 
-local function runTests(options: RunOptions?): Summary
+local function execute(options: RunOptions?): Summary
 	for _, childName in REQUIRED_CHILDREN do
 		if ReplicatedStorage:FindFirstChild(childName) == nil then
 			return failedSummary(
@@ -83,6 +83,22 @@ local function runTests(options: RunOptions?): Summary
 		numFailedTestSuites = results.numFailedTestSuites,
 		failureMessages = failureMessages,
 	}
+end
+
+local function firstLine(message: string): string
+	local plain = string.gsub(message, "\27%[[%d;]*m", "")
+	return string.match(plain, "^%s*([^\n]*)") or ""
+end
+
+local function runTests(options: RunOptions?): Summary
+	local summary = execute(options)
+	if summary.success then
+		print(`[RunTests] PASS {summary.numPassedTests}/{summary.numTotalTests} tests`)
+	else
+		local headline = if #summary.failureMessages > 0 then firstLine(summary.failureMessages[1]) else ""
+		warn(`[RunTests] FAIL {summary.numPassedTests}/{summary.numTotalTests} tests passed: {headline}`)
+	end
+	return summary
 end
 
 return runTests

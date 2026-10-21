@@ -9,7 +9,10 @@ local function freezeTable(value: { [any]: any }, visited: { [any]: boolean })
 	end
 	visited[value] = true
 
-	for _, child in value do
+	for key, child in value do
+		if type(key) == "table" then
+			freezeTable(key, visited)
+		end
 		if type(child) == "table" then
 			freezeTable(child, visited)
 		end
