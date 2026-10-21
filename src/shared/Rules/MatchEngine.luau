@@ -7,6 +7,7 @@ local AssistTracker = require(script.Parent.AssistTracker)
 local Config = require(script.Parent.Parent.Config)
 local Crossing = require(script.Parent.Crossing)
 local GoalJudge = require(script.Parent.GoalJudge)
+local LastChance = require(script.Parent.LastChance)
 local LapTracker = require(script.Parent.LapTracker)
 local MatchClock = require(script.Parent.MatchClock)
 local MatchOutcome = require(script.Parent.MatchOutcome)
@@ -48,6 +49,8 @@ type Fields = {
 	_config: Config.GameConfig,
 	_state: Types.MatchState,
 	_period: Types.Period,
+	-- The team playing its Last Chance; set only while the period is "LastChance".
+	_trailingTeam: Team?,
 	_phaseTimeLeft: number,
 	_now: number,
 	_ballThrown: boolean,
@@ -59,6 +62,8 @@ type Fields = {
 	_assists: AssistTracker.AssistTracker,
 	_saves: SaveDetector.SaveDetector,
 	_scores: ScoreKeeper.ScoreKeeper,
+	-- Created once in `new`, so advancing the clock never allocates a callback.
+	_onClockWarning: (secondsLeft: number) -> (),
 }
 
 export type MatchEngine = typeof(setmetatable({} :: Fields, MatchEngine))
@@ -100,16 +105,48 @@ local function endMatch(self: MatchEngine, winner: Team)
 	emit(self, { name = "MatchEnded", winner = winner, mvp = self._scores:mvp(winner), stats = self._scores:stats() })
 end
 
+local function startOvertime(self: MatchEngine)
+	self._period = "Overtime"
+	self._trailingTeam = nil
+	self._clock:startOvertime()
+	emit(self, { name = "OvertimeStarted" })
+end
+
 local function pointScored(self: MatchEngine, team: Team)
 	closeGoal(self)
 	local match = self._config.Match
-	local winner: Team? = MatchOutcome.afterPoint(self._period, self._scores:teamScores(), team, match.pointsToWin)
+	local scores = self._scores:teamScores()
+	local winner: Team? = MatchOutcome.afterPoint(self._period, scores, team, match.pointsToWin)
 	if winner ~= nil then
 		endMatch(self, winner)
 		return
 	end
+	-- During Last Chance only the trailing team can score: a leading-team pickup would already have ended it.
+	if self._period == "LastChance" then
+		local result: LastChance.AfterPoint = LastChance.afterPoint(scores, team)
+		if result == "Win" then
+			endMatch(self, team)
+			return
+		elseif result == "Overtime" then
+			startOvertime(self)
+		end
+	end
 	self._state = "Celebration"
 	self._phaseTimeLeft = match.celebrationSeconds
+end
+
+local function timeUp(self: MatchEngine)
+	local outcome: MatchOutcome.TimeUp, team: Team? =
+		MatchOutcome.atTimeUp(self._scores:teamScores(), self._possession.team, self._config.Match.lastChance)
+	if outcome == "Overtime" then
+		startOvertime(self)
+	elseif outcome == "LastChance" then
+		self._period = "LastChance"
+		self._trailingTeam = team
+		emit(self, { name = "LastChanceStarted", team = team :: Team })
+	else
+		endMatch(self, team :: Team)
+	end
 end
 
 local function goalScored(self: MatchEngine)
@@ -143,11 +180,16 @@ end
 function MatchEngine.new(options: EngineOptions): MatchEngine
 	local config = options.config
 	local match = config.Match
-	return setmetatable(
+	local engine: MatchEngine
+	local function onClockWarning(secondsLeft: number)
+		emit(engine, { name = "ClockWarning", secondsLeft = secondsLeft })
+	end
+	engine = setmetatable(
 		{
 			_config = config,
 			_state = "Waiting",
 			_period = "Regulation",
+			_trailingTeam = nil,
 			_phaseTimeLeft = 0,
 			_now = 0,
 			_ballThrown = false,
@@ -159,9 +201,11 @@ function MatchEngine.new(options: EngineOptions): MatchEngine
 			_assists = AssistTracker.new(config.Scoring.assistWindowSeconds),
 			_saves = SaveDetector.new(options.arena.goal, options.gravity, config.Scoring.saveLookaheadSeconds),
 			_scores = ScoreKeeper.new(config),
+			_onClockWarning = onClockWarning,
 		} :: Fields,
 		MatchEngine
 	)
+	return engine
 end
 
 function MatchEngine.addPlayer(self: MatchEngine, player: PlayerId, team: Team)
@@ -190,6 +234,16 @@ function MatchEngine.tick(self: MatchEngine, dt: number)
 		return
 	end
 	self._now += dt
+
+	-- The clock runs before the phase timer, so a match that ends at 0:00 skips the rest of the tick.
+	if state == "Live" or not self._config.Match.clockPausesDuringKickoff then
+		if self._clock:advance(dt, self._onClockWarning) then
+			timeUp(self)
+			if self._state == "Ended" then
+				return
+			end
+		end
+	end
 
 	if state == "Kickoff" or state == "Celebration" then
 		self._phaseTimeLeft -= dt
@@ -260,6 +314,11 @@ function MatchEngine.pickedUp(self: MatchEngine, player: PlayerId, ballPosition:
 		closeGoal(self)
 	end
 	self._assists:pickedUp(player, self._now)
+
+	local trailing: Team? = self._trailingTeam
+	if self._period == "LastChance" and trailing ~= nil and LastChance.endsOnPickup(trailing, team) then
+		endMatch(self, team)
+	end
 end
 
 function MatchEngine.touched(self: MatchEngine, player: PlayerId, ballPosition: Vector3, ballVelocity: Vector3)

@@ -56,6 +56,34 @@ local function expectEvents(engine: MatchEngine.MatchEngine, expected: { Types.E
 	expect(engine:drainEvents()).toEqual(expected)
 end
 
+-- Needs lapsToOpenGoal = 1: picks up, laps once, throws through the ring.
+local function scoreGoal(engine: MatchEngine.MatchEngine, player: string)
+	engine:pickedUp(player, ZERO, ZERO)
+	lap(engine)
+	engine:ballMoved(Fixtures.throughRing())
+end
+
+local function resumePlay(engine: MatchEngine.MatchEngine)
+	engine:tick(3) -- celebration
+	engine:tick(3) -- kickoff countdown
+end
+
+-- Orange leads 1-0, Blue has the ball, and the clock has just hit 0:00.
+local function lastChanceEngine(overrides: { [string]: any }?): MatchEngine.MatchEngine
+	local engine = liveEngine(overrides or SHORT_STREAK)
+	scoreGoal(engine, "O1")
+	resumePlay(engine)
+	engine:pickedUp("B1", ZERO, ZERO)
+	engine:tick(300)
+	engine:drainEvents()
+	return engine
+end
+
+local function lastEvent(engine: MatchEngine.MatchEngine): any
+	local events = engine:drainEvents()
+	return events[#events]
+end
+
 describe("MatchEngine flow", function()
 	it("starts with a kickoff countdown and goes live when it ends", function()
 		local engine = newEngine()
@@ -349,5 +377,167 @@ describe("MatchEngine players", function()
 			end
 		end
 		expect(departed).toMatchObject({ present = false, score = 10 })
+	end)
+end)
+
+describe("MatchEngine clock", function()
+	it("runs the clock only during live play by default", function()
+		local engine = newEngine(SHORT_STREAK)
+		engine:start()
+		engine:tick(3)
+		expect(engine:snapshot().secondsLeft).toBe(300)
+		engine:tick(10)
+		scoreGoal(engine, "B1")
+		resumePlay(engine)
+		expect(engine:snapshot().secondsLeft).toBe(290)
+	end)
+
+	it("also runs the clock during kickoffs when clockPausesDuringKickoff is false", function()
+		local engine = newEngine({ Match = { clockPausesDuringKickoff = false } })
+		engine:start()
+		engine:tick(2)
+		expect(engine:snapshot().secondsLeft).toBe(298)
+	end)
+
+	it("emits a ClockWarning at each configured threshold", function()
+		local engine = liveEngine()
+		engine:tick(240)
+		expectEvents(engine, { { name = "ClockWarning", secondsLeft = 60 } })
+		engine:tick(30)
+		expectEvents(engine, { { name = "ClockWarning", secondsLeft = 30 } })
+	end)
+end)
+
+describe("MatchEngine end of regulation", function()
+	it("goes to golden-goal overtime on a tie without a kickoff, and the next point wins", function()
+		local engine = liveEngine(SHORT_STREAK)
+		engine:tick(300)
+		expect(names(engine:drainEvents())).toEqual({ "ClockWarning", "ClockWarning", "OvertimeStarted" })
+		local snapshot = engine:snapshot()
+		expect(snapshot.state).toBe("Live")
+		expect(snapshot.period).toBe("Overtime")
+		engine:tick(5)
+		expect(engine:snapshot().overtimeSeconds).toBe(5)
+		scoreGoal(engine, "O1")
+		expect(lastEvent(engine)).toMatchObject({ name = "MatchEnded", winner = "Orange" })
+	end)
+
+	it("lets the leader win at 0:00 when the trailing team does not have the ball", function()
+		local engine = liveEngine(SHORT_STREAK)
+		scoreGoal(engine, "O1")
+		resumePlay(engine)
+		engine:drainEvents()
+		engine:tick(300)
+		expect(lastEvent(engine)).toMatchObject({ name = "MatchEnded", winner = "Orange" })
+	end)
+
+	it(
+		"gives the trailing team with the ball a Last Chance; tying sends the match to overtime after a kickoff",
+		function()
+			local engine = liveEngine(SHORT_STREAK)
+			scoreGoal(engine, "O1")
+			resumePlay(engine)
+			engine:pickedUp("B1", ZERO, ZERO)
+			engine:drainEvents()
+			engine:tick(300)
+			expect(engine:drainEvents()[3]).toEqual({ name = "LastChanceStarted", team = "Blue" })
+			expect(engine:snapshot().period).toBe("LastChance")
+			lap(engine)
+			engine:drainEvents()
+			engine:ballMoved(Fixtures.throughRing())
+			expect(names(engine:drainEvents())).toEqual({ "GoalScored", "GoalClosed", "OvertimeStarted" })
+			resumePlay(engine)
+			expect(names(engine:drainEvents())).toEqual({ "KickoffStarted", "KickoffEnded" })
+			local snapshot = engine:snapshot()
+			expect(snapshot.state).toBe("Live")
+			expect(snapshot.period).toBe("Overtime")
+		end
+	)
+
+	it("ends Last Chance with a win for the leader when a leading-team player picks up the ball", function()
+		local engine = lastChanceEngine()
+		engine:pickedUp("O1", ZERO, ZERO)
+		local events = engine:drainEvents()
+		expect(names(events)).toEqual({ "PossessionChanged", "Steal", "MatchEnded" })
+		expect(events[3]).toMatchObject({ winner = "Orange" })
+	end)
+
+	it("keeps Last Chance going while the trailing team keeps the ball, even when it is loose", function()
+		local engine = lastChanceEngine()
+		engine:thrown("B1")
+		engine:touched("O1", ZERO, ZERO)
+		engine:pickedUp("B2", ZERO, ZERO)
+		engine:tick(5)
+		expectEvents(engine, {})
+		local snapshot = engine:snapshot()
+		expect(snapshot.state).toBe("Live")
+		expect(snapshot.period).toBe("LastChance")
+		expect(snapshot.secondsLeft).toBe(0)
+	end)
+
+	it("with maxDeficit 2, keeps Last Chance after a point that leaves the team behind", function()
+		local engine =
+			liveEngine({ Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2, lastChance = { maxDeficit = 2 } } })
+		scoreGoal(engine, "O1")
+		resumePlay(engine)
+		scoreGoal(engine, "O1")
+		resumePlay(engine)
+		engine:pickedUp("B1", ZERO, ZERO)
+		engine:tick(300)
+		scoreGoal(engine, "B1")
+		resumePlay(engine)
+		expect(table.find(names(engine:drainEvents()), "OvertimeStarted")).toBeNil()
+		expect(engine:snapshot().period).toBe("LastChance")
+		engine:pickedUp("O1", ZERO, ZERO)
+		expect(lastEvent(engine)).toMatchObject({ name = "MatchEnded", winner = "Orange" })
+	end)
+
+	it("lets the trailing team win when a Last Chance point puts it ahead", function()
+		-- Streak points are worth 1 and goals 2: Orange leads 1-0, then Blue's goal after 0:00 makes it 2-1.
+		local engine = liveEngine({
+			Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2, pointValue = { goal = 2, streak = 1 } },
+		})
+		engine:pickedUp("O1", ZERO, ZERO)
+		lap(engine)
+		lap(engine)
+		resumePlay(engine)
+		engine:pickedUp("B1", ZERO, ZERO)
+		engine:tick(300)
+		expect(engine:snapshot().period).toBe("LastChance")
+		scoreGoal(engine, "B1")
+		expect(lastEvent(engine)).toMatchObject({ name = "MatchEnded", winner = "Blue" })
+	end)
+
+	it("resolves 0:00 during a kickoff when the clock keeps running", function()
+		local engine = liveEngine({
+			Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2, clockPausesDuringKickoff = false },
+		})
+		engine:tick(293) -- liveEngine's kickoff already used 3 s: 4 s left
+		scoreGoal(engine, "O1")
+		engine:tick(3) -- celebration ends with 1 s left
+		engine:drainEvents()
+		engine:tick(1)
+		local events = engine:drainEvents()
+		expect(names(events)).toEqual({ "MatchEnded" })
+		expect(events[1]).toMatchObject({ winner = "Orange" })
+	end)
+end)
+
+describe("MatchEngine performance", function()
+	it("keeps a live tick with ball movement far below the 1 ms server budget", function()
+		local engine = liveEngine()
+		engine:pickedUp("B1", ZERO, ZERO)
+		engine:drainEvents()
+		-- Crosses Gate 1's plane outside its rectangle, so every geometry check runs and nothing counts.
+		local from, to = Vector3.new(99, 0, 50), Vector3.new(101, 0, 50)
+		local iterations = 10000
+		local started = os.clock()
+		for _ = 1, iterations do
+			engine:tick(1 / 60)
+			engine:ballMoved(from, to)
+		end
+		local averageMilliseconds = (os.clock() - started) / iterations * 1000
+		expect(averageMilliseconds).toBeLessThan(0.05)
+		expectEvents(engine, {})
 	end)
 end)
