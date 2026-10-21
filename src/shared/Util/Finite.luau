@@ -12,4 +12,12 @@ function Finite.vector(v: Vector3): boolean
 	return Finite.number(v.X) and Finite.number(v.Y) and Finite.number(v.Z)
 end
 
+-- Position and all three axes: one NaN in the rotation corrupts every point transformed by the frame.
+function Finite.frame(c: CFrame): boolean
+	return Finite.vector(c.Position)
+		and Finite.vector(c.XVector)
+		and Finite.vector(c.YVector)
+		and Finite.vector(c.ZVector)
+end
+
 return Finite

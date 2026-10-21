@@ -21,4 +21,12 @@ describe("Finite", function()
 		expect(Finite.vector(Vector3.new(0, -math.huge, 0))).toBe(false)
 		expect(Finite.vector(Vector3.new(0, 0, math.huge))).toBe(false)
 	end)
+
+	it("checks a frame's position and every axis", function()
+		local nan = 0 / 0
+		expect(Finite.frame(CFrame.new(1, 2, 3) * CFrame.Angles(0.1, 0.2, 0.3))).toBe(true)
+		expect(Finite.frame(CFrame.new(nan, 0, 0))).toBe(false)
+		expect(Finite.frame(CFrame.new(0, 0, 0, 1, 0, 0, 0, nan, 0, 0, 0, 1))).toBe(false)
+		expect(Finite.frame(CFrame.new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, math.huge))).toBe(false)
+	end)
 end)

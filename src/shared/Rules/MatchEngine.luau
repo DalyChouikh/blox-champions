@@ -55,9 +55,7 @@ table.freeze(NO_EVENTS)
 
 local positive = Validate.number({ above = 0 })
 
-local frame = Validate.check(Validate.datatype("CFrame"), function(c: CFrame): boolean
-	return Finite.vector(c.Position) and Finite.vector(c.LookVector)
-end, "must be finite")
+local frame = Validate.check(Validate.datatype("CFrame"), Finite.frame, "must be finite")
 
 -- The arena is built from tagged parts at runtime (Phase 3), so a mis-tagged part must fail here, by name,
 -- rather than silently never counting a lap or a goal.
