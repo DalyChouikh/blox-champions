@@ -5,14 +5,17 @@
 local Freeze = require(script.Parent.Util.Freeze)
 local Match = require(script.Match)
 local Scoring = require(script.Scoring)
+local UI = require(script.UI)
 local Validate = require(script.Validate)
 
 export type MatchConfig = Match.MatchConfig
 export type ScoringConfig = Scoring.ScoringConfig
+export type UIConfig = UI.UIConfig
 
 export type GameConfig = {
 	Match: MatchConfig,
 	Scoring: ScoringConfig,
+	UI: UIConfig,
 }
 
 export type Mode = {
@@ -27,6 +30,7 @@ local Config = {}
 Config.schema = Validate.record({
 	Match = Match.schema,
 	Scoring = Scoring.schema,
+	UI = UI.schema,
 })
 
 local modeSchema = Validate.record({
@@ -47,11 +51,12 @@ local function deepCopy(value: any): any
 	return copy
 end
 
--- Tables present on both sides merge key by key; any other override value replaces the default.
+-- Tables present on both sides merge key by key, except lists: an override list replaces the default list
+-- whole, so `{ 10 }` over `{ 60, 30 }` gives `{ 10 }`. Any other override value replaces the default.
 local function deepMerge(target: { [any]: any }, overrides: { [any]: any })
 	for key, overrideValue in overrides do
 		local current = target[key]
-		if type(current) == "table" and type(overrideValue) == "table" then
+		if type(current) == "table" and type(overrideValue) == "table" and not Validate.isList(current) then
 			deepMerge(current, overrideValue)
 		else
 			target[key] = deepCopy(overrideValue)
@@ -60,7 +65,7 @@ local function deepMerge(target: { [any]: any }, overrides: { [any]: any })
 end
 
 local function build(overrides: { [string]: any }): GameConfig
-	local config = deepCopy({ Match = Match.defaults, Scoring = Scoring.defaults })
+	local config = deepCopy({ Match = Match.defaults, Scoring = Scoring.defaults, UI = UI.defaults })
 	deepMerge(config, overrides)
 	Validate.assertValid(config, Config.schema, "")
 	return Freeze.deep(config)

@@ -120,6 +120,38 @@ function Validate.record(fields: { [string]: Validator }): Validator
 	end
 end
 
+-- True when the keys are exactly the integers 1..n (an empty table counts as an empty list).
+function Validate.isList(value: { [any]: any }): boolean
+	local length = #value
+	local count = 0
+	for key in value do
+		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > length then
+			return false
+		end
+		count += 1
+	end
+	return count == length
+end
+
+function Validate.list(item: Validator): Validator
+	return function(value: any, path: string): { string }
+		if type(value) ~= "table" then
+			return typeError(path, "table", value)
+		end
+		if not Validate.isList(value) then
+			return { atPath(path, "must be a list") }
+		end
+
+		local errors: { string } = {}
+		for index = 1, #value do
+			for _, itemError in item(value[index], `{path}[{index}]`) do
+				table.insert(errors, itemError)
+			end
+		end
+		return errors
+	end
+end
+
 function Validate.check(inner: Validator, predicate: (value: any) -> boolean, message: string): Validator
 	return function(value: any, path: string): { string }
 		local errors = inner(value, path)

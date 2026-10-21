@@ -6,6 +6,7 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 
 local Bootstrap = require(ReplicatedStorage.Shared.Util.Bootstrap)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local NormalChampions = require(ReplicatedStorage.Shared.Modes.NormalChampions)
 
 describe("Bootstrap.run", function()
@@ -44,12 +45,7 @@ describe("Bootstrap.run", function()
 		expect(function()
 			Bootstrap.run({
 				realm = "Client",
-				mode = {
-					id = "Bad",
-					displayName = "Bad",
-					itemsEnabled = false,
-					overrides = { Match = { teamSize = 0 } },
-				},
+				mode = Fixtures.mode({ Match = { teamSize = 0 } }),
 				modules = { probe },
 				log = function() end,
 			})
