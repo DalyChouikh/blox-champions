@@ -54,6 +54,12 @@ type Fields = {
 	_phaseTimeLeft: number,
 	_now: number,
 	_ballThrown: boolean,
+	-- Set by a block until an attacker touches the ball again, so one defensive play earns one save.
+	_playSaved: boolean,
+	-- A block waiting to see whether the ball still goes in (owner decision, 2026-10-21): it becomes a save at
+	-- the next pickup, at `_pendingBlockUntil`, or when play stops, and is dropped if the ball scores.
+	_pendingBlocker: PlayerId?,
+	_pendingBlockUntil: number,
 	_events: { Event },
 	_possession: Possession.Possession,
 	_laps: LapTracker.LapTracker,
@@ -89,18 +95,34 @@ local function closeGoal(self: MatchEngine)
 	end
 end
 
+-- True for a player of the team defending an open goal.
+local function defendsOpenGoal(self: MatchEngine, team: Team): boolean
+	local openFor: Team? = self._goal.openFor
+	return openFor ~= nil and team ~= openFor
+end
+
+local function confirmBlock(self: MatchEngine)
+	local blocker: PlayerId? = self._pendingBlocker
+	if blocker ~= nil then
+		self._pendingBlocker = nil
+		emit(self, { name = "SaveMade", player = blocker, kind = "Block" })
+	end
+end
+
 local function kickoff(self: MatchEngine)
 	self._possession:reset()
 	self._laps:reset()
 	self._assists:reset()
 	closeGoal(self)
 	self._ballThrown = false
+	self._playSaved = false
 	self._state = "Kickoff"
 	self._phaseTimeLeft = self._config.Match.kickoffCountdownSeconds
 	emit(self, { name = "KickoffStarted", countdownSeconds = self._phaseTimeLeft })
 end
 
 local function endMatch(self: MatchEngine, winner: Team)
+	confirmBlock(self)
 	self._state = "Ended"
 	emit(self, { name = "MatchEnded", winner = winner, mvp = self._scores:mvp(winner), stats = self._scores:stats() })
 end
@@ -113,6 +135,8 @@ local function startOvertime(self: MatchEngine)
 end
 
 local function pointScored(self: MatchEngine, team: Team)
+	-- Play stops, so a block still waiting on the ball has done its job (a goal drops it before this).
+	confirmBlock(self)
 	closeGoal(self)
 	local match = self._config.Match
 	local scores = self._scores:teamScores()
@@ -150,6 +174,8 @@ local function timeUp(self: MatchEngine)
 end
 
 local function goalScored(self: MatchEngine)
+	-- The ball went in after all, so a pending block saved nothing.
+	self._pendingBlocker = nil
 	-- The goal only opens for the possessing team, which always has a last holder.
 	local team: Team = self._possession.team :: Team
 	local scorer: PlayerId = self._possession.lastHolder :: PlayerId
@@ -193,6 +219,9 @@ function MatchEngine.new(options: EngineOptions): MatchEngine
 			_phaseTimeLeft = 0,
 			_now = 0,
 			_ballThrown = false,
+			_playSaved = false,
+			_pendingBlocker = nil,
+			_pendingBlockUntil = 0,
 			_events = {},
 			_possession = Possession.new(),
 			_laps = LapTracker.new(options.arena.gates),
@@ -245,6 +274,10 @@ function MatchEngine.tick(self: MatchEngine, dt: number)
 		end
 	end
 
+	if self._pendingBlocker ~= nil and self._now >= self._pendingBlockUntil then
+		confirmBlock(self)
+	end
+
 	if state == "Kickoff" or state == "Celebration" then
 		self._phaseTimeLeft -= dt
 		if self._phaseTimeLeft <= 0 then
@@ -293,15 +326,17 @@ function MatchEngine.pickedUp(self: MatchEngine, player: PlayerId, ballPosition:
 		return
 	end
 
-	-- Judged on the state before the pickup changes it.
-	local openFor = self._goal.openFor
-	if openFor ~= nil and team ~= openFor then
+	-- A pickup ends the danger, so a pending block counts first. The save check below is judged on the state
+	-- before this pickup changes it, and skipped when the play already earned a save.
+	confirmBlock(self)
+	if defendsOpenGoal(self, team) and not self._playSaved then
 		local kind: Types.SaveKind? = self._saves:classify("Pickup", self._ballThrown, ballPosition, ballVelocity)
 		if kind ~= nil then
 			emit(self, { name = "SaveMade", player = player, kind = kind })
 		end
 	end
 	self._ballThrown = false
+	self._playSaved = false
 
 	local previous: Team? = self._possession.team
 	if self._possession:pickUp(player, team) then
@@ -323,17 +358,15 @@ end
 
 function MatchEngine.touched(self: MatchEngine, player: PlayerId, ballPosition: Vector3, ballVelocity: Vector3)
 	local team: Team? = activeTeam(self, player)
-	if team == nil or self._state ~= "Live" or not self._ballThrown then
+	if team == nil or self._state ~= "Live" or not self._ballThrown or self._playSaved then
 		return
 	end
-	local openFor = self._goal.openFor
-	if openFor == nil or team == openFor then
-		return
-	end
-	if self._saves:classify("Touch", true, ballPosition, ballVelocity) == "Block" then
-		-- One save per throw, however many ticks the defender stays in contact.
+	if defendsOpenGoal(self, team) and self._saves:classify("Touch", true, ballPosition, ballVelocity) == "Block" then
+		-- One save per play, however many ticks defenders stay in contact; it counts once the danger passes.
 		self._ballThrown = false
-		emit(self, { name = "SaveMade", player = player, kind = "Block" })
+		self._playSaved = true
+		self._pendingBlocker = player
+		self._pendingBlockUntil = self._now + self._config.Scoring.saveLookaheadSeconds
 	end
 end
 

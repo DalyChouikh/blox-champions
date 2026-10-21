@@ -79,6 +79,17 @@ local function lastChanceEngine(overrides: { [string]: any }?): MatchEngine.Matc
 	return engine
 end
 
+-- Blue's goal is open, B1 has thrown the ball at it, and O1 has blocked it; nothing is drained yet after the block.
+local function blockedEngine(): MatchEngine.MatchEngine
+	local engine = liveEngine(SHORT_STREAK)
+	engine:pickedUp("B1", ZERO, ZERO)
+	lap(engine)
+	engine:thrown("B1")
+	engine:drainEvents()
+	engine:touched("O1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+	return engine
+end
+
 local function lastEvent(engine: MatchEngine.MatchEngine): any
 	local events = engine:drainEvents()
 	return events[#events]
@@ -317,7 +328,7 @@ describe("MatchEngine goals and points", function()
 end)
 
 describe("MatchEngine saves and knockdowns", function()
-	it("makes a defender's touch on a thrown ball headed into the open goal one block save", function()
+	it("holds a block until the danger has passed, counting one save however often defenders touch", function()
 		local engine = liveEngine(SHORT_STREAK)
 		engine:pickedUp("B1", ZERO, ZERO)
 		lap(engine)
@@ -325,8 +336,64 @@ describe("MatchEngine saves and knockdowns", function()
 		engine:drainEvents()
 		engine:touched("B2", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
 		engine:touched("O1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+		engine:touched("O1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
 		engine:touched("O2", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+		engine:tick(1)
+		expectEvents(engine, {})
+		engine:tick(0.5)
 		expectEvents(engine, { { name = "SaveMade", player = "O1", kind = "Block" } })
+	end)
+
+	it("drops a block when the ball still goes in", function()
+		local engine = blockedEngine()
+		engine:ballMoved(Fixtures.throughRing())
+		expect(names(engine:drainEvents())).toEqual({ "GoalScored", "GoalClosed" })
+		expect(engine:stats().players[1]).toMatchObject({ player = "B1", goals = 1 })
+	end)
+
+	it("confirms a block at the next pickup, and counts a block then the blocker's pickup as one save", function()
+		local engine = blockedEngine()
+		engine:pickedUp("O1", ZERO, ZERO)
+		expectEvents(engine, {
+			{ name = "SaveMade", player = "O1", kind = "Block" },
+			{ name = "PossessionChanged", team = "Orange", player = "O1", previousTeam = "Blue" },
+			{ name = "Steal", player = "O1", fromTeam = "Blue" },
+			{ name = "GoalClosed" },
+		})
+	end)
+
+	it("confirms a block when a streak point stops play", function()
+		local engine = blockedEngine()
+		lap(engine)
+		local events = engine:drainEvents()
+		expect(names(events)).toEqual({
+			"GateCrossed",
+			"GateCrossed",
+			"GateCrossed",
+			"GateCrossed",
+			"LapCompleted",
+			"StreakPointScored",
+			"SaveMade",
+			"GoalClosed",
+		})
+	end)
+
+	it("confirms a block when the match ends at 0:00", function()
+		local engine = liveEngine(SHORT_STREAK)
+		scoreGoal(engine, "B1")
+		resumePlay(engine)
+		scoreGoal(engine, "B1")
+		resumePlay(engine)
+		engine:tick(299)
+		engine:pickedUp("O1", ZERO, ZERO)
+		lap(engine)
+		engine:thrown("O1")
+		engine:drainEvents()
+		engine:touched("B1", ON_TARGET_POSITION, ON_TARGET_VELOCITY)
+		engine:tick(1)
+		local events = engine:drainEvents()
+		expect(names(events)).toEqual({ "SaveMade", "MatchEnded" })
+		expect(events[1]).toEqual({ name = "SaveMade", player = "B1", kind = "Block" })
 	end)
 
 	it("makes a defender's pickup at an open goal a steal save, counted once when it is also a block", function()
