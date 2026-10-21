@@ -129,18 +129,38 @@ describe("Features markers, spawns and infield", function()
 		end
 	end)
 
-	it("fills the infield up to the inner wall top, tucked behind the wall's slab", function()
+	it("fills the infield between the straights up to the inner wall top, tucked behind the wall's slab", function()
 		local pieces = Features.infield(arena)
-		expect(#pieces).toBe(3)
 		expect(pieces[1].shape).toBe("Block")
 		near(pieces[1].cframe.Position, Vector3.new(0, 10, 0))
 		near(pieces[1].size, Vector3.new(160, 20, 74))
-		for index = 2, 3 do
-			expect(pieces[index].shape).toBe("Cylinder")
-			expect(math.abs(pieces[index].cframe.RightVector.Y)).toBeCloseTo(1, 4)
-			near(pieces[index].size, Vector3.new(20, 74, 74))
+	end)
+
+	-- The inner wall is flat strips between stations, so a cylinder would overlap them between stations.
+	it("fills each curved end with a fan of prisms that meets the back of the wall's slab at every station", function()
+		local pieces = Features.infield(arena)
+		expect(#pieces).toBe(1 + 2 * 48 * 2)
+		local corners: { Vector3 } = {}
+		for index = 2, #pieces do
+			local piece = pieces[index]
+			expect(piece.shape).toBe("Wedge")
+			expect(piece.size.X).toBeCloseTo(20, 4)
+			for _, corner in Fixtures.wedgeFace(piece, Vector3.yAxis) do
+				expect(corner.Y).toBeCloseTo(20, 3)
+				local center = Vector3.new(if corner.X < 0 then -80 else 80, 20, 0)
+				expect((corner - center).Magnitude <= 37 + 1e-3).toBe(true)
+				table.insert(corners, corner)
+			end
 		end
-		near(pieces[2].cframe.Position, Vector3.new(-80, 10, 0))
-		near(pieces[3].cframe.Position, Vector3.new(80, 10, 0))
+		for _, section in { 2, 4 } do
+			for _, distance in Centerline.sectionStations(arena, section) do
+				local back = Centerline.at(arena, distance, -arena.surfaceThickness, 20).Position
+				local meets = false
+				for _, corner in corners do
+					meets = meets or (corner - back).Magnitude < 1e-3
+				end
+				expect(meets).toBe(true)
+			end
+		end
 	end)
 end)

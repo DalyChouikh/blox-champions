@@ -74,16 +74,26 @@ function Centerline.gateDistance(arena: ArenaConfig, gateIndex: number): number
 	return distance
 end
 
--- Cross-section positions for the swept surface: each section split into equal pieces at most segmentLength long,
--- so every gate (a section start) is exactly a station.
+-- One section split into equal pieces at most segmentLength long: the distances from its start to its end.
+function Centerline.sectionStations(arena: ArenaConfig, index: number): { number }
+	local start = Centerline.gateDistance(arena, index)
+	local length = sectionLength(arena, index)
+	local count = math.ceil(length / arena.segmentLength)
+	local stations: { number } = {}
+	for step = 0, count do
+		table.insert(stations, start + step * (length / count))
+	end
+	return stations
+end
+
+-- Cross-section positions for the swept surface around the whole loop, each section's stations without its end
+-- (the next section's start), so every gate is exactly a station.
 function Centerline.stations(arena: ArenaConfig): { number }
 	local stations: { number } = {}
 	for index = 1, SECTION_COUNT do
-		local start = Centerline.gateDistance(arena, index)
-		local length = sectionLength(arena, index)
-		local count = math.ceil(length / arena.segmentLength)
-		for step = 0, count - 1 do
-			table.insert(stations, start + step * (length / count))
+		local section = Centerline.sectionStations(arena, index)
+		for step = 1, #section - 1 do
+			table.insert(stations, section[step])
 		end
 	end
 	return stations

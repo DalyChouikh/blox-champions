@@ -7,6 +7,7 @@ local Config = require(script.Parent.Parent.Parent.Config)
 local Crossing = require(script.Parent.Parent.Parent.Rules.Crossing)
 local Profile = require(script.Parent.Profile)
 local Team = require(script.Parent.Parent.Parent.Rules.Team)
+local Triangles = require(script.Parent.Triangles)
 local Types = require(script.Parent.Types)
 
 type ArenaConfig = Config.ArenaConfig
@@ -14,9 +15,9 @@ type Piece = Types.Piece
 type Team = Team.Team
 
 -- Team spawns line up along the middle of their straight: Blue on the top one, Orange on the bottom one, which
--- mirrors Blue across the arena's long axis. The ball drops at the apex of either curved end.
+-- mirrors Blue across the arena's long axis.
 local SPAWN_SECTIONS: { [Team]: number } = { Blue = 1, Orange = 3 }
-local BALL_SECTIONS = { 2, 4 }
+local CURVED_ENDS = { 2, 4 }
 
 local Features = {}
 
@@ -178,7 +179,7 @@ end
 -- ballSpawnHeight above the middle of the track at each curved end's apex: equally far from both teams' spawns.
 function Features.ballSpawns(arena: ArenaConfig): { CFrame }
 	local spawns: { CFrame } = {}
-	for _, section in BALL_SECTIONS do
+	for _, section in CURVED_ENDS do
 		table.insert(
 			spawns,
 			Centerline.at(arena, sectionMiddle(arena, section), arena.trackWidth / 2, arena.ballSpawnHeight)
@@ -187,25 +188,36 @@ function Features.ballSpawns(arena: ArenaConfig): { CFrame }
 	return spawns
 end
 
--- Solid up to the inner wall's top: a block between the straights and a cylinder under each curved end, recessed
--- surfaceThickness so it meets the back of the inner wall's slab instead of overlapping its face.
+-- Solid up to the inner wall's top, meeting the back of the inner wall's slab (surfaceThickness behind its face)
+-- instead of overlapping it: a block between the straights, and under each curved end a fan of prisms from the
+-- end's center to the slab's back at every station, because the wall there is flat strips, not a circle.
 function Features.infield(arena: ArenaConfig): { Piece }
-	local radius = arena.endRadius - arena.trackWidth / 2 - arena.surfaceThickness
+	local behindWall = -arena.surfaceThickness
 	local height = arena.infieldWallHeight
 	local pieces: { Piece } = {
 		{
 			shape = "Block",
 			cframe = CFrame.new(0, height / 2, 0),
-			size = Vector3.new(arena.straightLength, height, 2 * radius),
+			size = Vector3.new(
+				arena.straightLength,
+				height,
+				2 * (arena.endRadius - arena.trackWidth / 2 - arena.surfaceThickness)
+			),
 		},
 	}
-	for _, x in { -arena.straightLength / 2, arena.straightLength / 2 } do
-		table.insert(pieces, {
-			shape = "Cylinder",
-			-- Stood upright: the cylinder's X axis turned to point up.
-			cframe = CFrame.new(x, height / 2, 0) * CFrame.Angles(0, 0, math.pi / 2),
-			size = Vector3.new(height, 2 * radius, 2 * radius),
-		})
+	for _, section in CURVED_ENDS do
+		local stations = Centerline.sectionStations(arena, section)
+		-- The end's center: endRadius from the centerline, on the infield side.
+		local center = Centerline.at(arena, stations[1], arena.trackWidth / 2 - arena.endRadius, height).Position
+		local previous = Centerline.at(arena, stations[1], behindWall, height).Position
+		for step = 2, #stations do
+			local current = Centerline.at(arena, stations[step], behindWall, height).Position
+			-- Each wedge's slab hangs `height` below the top face: a prism down to the base.
+			for _, wedge in Triangles.wedges(center, previous, current, Vector3.yAxis, height) do
+				table.insert(pieces, wedge)
+			end
+			previous = current
+		end
 	end
 	return pieces
 end

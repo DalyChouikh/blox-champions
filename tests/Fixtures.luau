@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
+local GeometryTypes = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
 
 local Fixtures = {}
@@ -50,6 +51,17 @@ end
 function Fixtures.throughGate(index: number): (Vector3, Vector3)
 	local x = GATE_SPACING * index
 	return Vector3.new(x - 1, 0, 0), Vector3.new(x + 1, 0, 0)
+end
+
+-- The triangular face of a wedge piece on the side `normal` points to: right-angle corner, top corner, front corner.
+function Fixtures.wedgeFace(piece: GeometryTypes.Piece, normal: Vector3): { Vector3 }
+	local half = piece.size / 2
+	local side = if piece.cframe.RightVector:Dot(normal) > 0 then half.X else -half.X
+	return {
+		piece.cframe:PointToWorldSpace(Vector3.new(side, -half.Y, half.Z)),
+		piece.cframe:PointToWorldSpace(Vector3.new(side, half.Y, half.Z)),
+		piece.cframe:PointToWorldSpace(Vector3.new(side, -half.Y, -half.Z)),
+	}
 end
 
 -- Also crosses Gate 2, whose rectangle contains the ring.
