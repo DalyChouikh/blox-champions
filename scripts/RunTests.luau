@@ -41,7 +41,7 @@ local function runTests(options: RunOptions?): Summary
 		end
 	end
 
-	local runOptions = options or {}
+	local runOptions: RunOptions = options or {}
 	local tests = (ReplicatedStorage :: any).Tests
 	local Jest = require((ReplicatedStorage :: any).DevPackages.Jest) :: any
 
