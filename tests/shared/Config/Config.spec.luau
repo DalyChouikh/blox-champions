@@ -42,6 +42,44 @@ describe("Config defaults", function()
 		expect(d.Network).toEqual({ pickupLagToleranceStuds = 2 })
 	end)
 
+	it("match the spec's skating values, plus this phase's", function()
+		expect(Config.defaults().Movement).toEqual({
+			colliderDiameter = 2,
+			hoverHeight = 2.5,
+			hoverSpring = 15,
+			groundProbeLength = 6,
+			strideAccel = 30,
+			rollingFriction = 4,
+			airDrag = 0.02,
+			cruiseSpeed = 60,
+			softCap = 90,
+			hardCap = 140,
+			turnRateLow = 4.0,
+			turnRateHigh = 1.5,
+			airTurnRate = 1,
+			airUprightRate = 6,
+			minWallSpeed = 35,
+			maxStickAngle = 60,
+			pumpSlopeMultiplier = 1.6,
+			pumpFlatAccel = 8,
+			pumpFlatSlopeDeg = 3,
+			brakeDecel = 120,
+			tiptoeSpeed = 12,
+			jumpImpulse = 60,
+			normalFilter = { maxTurnDeg = 30, smoothing = 30 },
+			draftRange = 18,
+			draftConeDeg = 30,
+			draftMaxAccel = 20,
+			attachRange = 8,
+			attachConeDeg = 45,
+			attachFollowDistance = 4,
+			attachSpring = 10,
+			attachMaxSeconds = 3,
+			attachBoostSpeed = 40,
+			attachCooldown = 3,
+		})
+	end)
+
 	it("match the spec's scoring values", function()
 		local s = Config.defaults().Scoring
 		expect(s.points).toEqual({
@@ -254,6 +292,40 @@ describe("Config.forMode", function()
 			{
 				overrides = { Ball = { radius = 7 } },
 				message = "Ball: radius must be smaller than the goal ring's opening (Arena.goal.ringRadius)",
+			},
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config(case.overrides)
+			end).toThrow(case.message)
+		end
+	end)
+
+	it("rejects skating speeds, turn rates and sizes that contradict each other", function()
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{
+				overrides = { Movement = { softCap = 150 } },
+				message = "Movement: speeds must rise: cruiseSpeed <= softCap < hardCap",
+			},
+			{
+				overrides = { Movement = { turnRateHigh = 5 } },
+				message = "Movement: turnRateHigh must not exceed turnRateLow",
+			},
+			{
+				overrides = { Movement = { groundProbeLength = 2 } },
+				message = "Movement: groundProbeLength must reach past hoverHeight",
+			},
+			{
+				overrides = { Movement = { tiptoeSpeed = 70 } },
+				message = "Movement: tiptoeSpeed must not exceed cruiseSpeed",
+			},
+			{
+				overrides = { Movement = { colliderDiameter = 6 } },
+				message = "Movement: the collider must clear the ground: colliderDiameter / 2 < hoverHeight",
+			},
+			{
+				overrides = { Movement = { pumpSlopeMultiplier = 0.5 } },
+				message = "Movement.pumpSlopeMultiplier: must be >= 1 (got 0.5)",
 			},
 		}
 		for _, case in cases do
