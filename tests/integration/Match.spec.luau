@@ -1,7 +1,6 @@
 --!strict
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
-local ServerStorage = game:GetService("ServerStorage")
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
@@ -18,7 +17,8 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local TeamService = require(ServerScriptService.Server.TeamService)
 local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 
-type Fired = { name: string, payload: any, to: string? }
+-- ballAt: where the ball was when the remote fired, to tell events sent before or after the frame's reactions.
+type Fired = { name: string, payload: any, to: string?, ballAt: string? }
 
 local FRAME = 1 / 60
 local BASE_MATCH = { lapsToOpenGoal = 1, lapsForStreakPoint = 2 }
@@ -27,9 +27,16 @@ local config: Config.GameConfig
 local folder: Folder
 local fired: { Fired } = {}
 
+-- The name of the ball's model's parent. Assertions compare names: Jest prints a failing Instance with all its
+-- descendants, which for the workspace (the whole arena) takes minutes.
+local function ballAt(): string?
+	local parent = BallService.model.Parent
+	return if parent ~= nil then parent.Name else nil
+end
+
 local fakeNet = {
 	fireAll = function(_self: any, name: string, payload: any)
-		table.insert(fired, { name = name, payload = payload })
+		table.insert(fired, { name = name, payload = payload, ballAt = ballAt() })
 	end,
 	fireTo = function(_self: any, to: string, name: string, payload: any)
 		table.insert(fired, { name = name, payload = payload, to = to })
@@ -194,11 +201,11 @@ describe("A match on the generated arena", function()
 			local rigs = seat(1)
 			frames(FRAME)
 			expect(events()).toEqual({ "MatchStarted", "KickoffStarted" })
-			expect(BallService.model.Parent).toBe(ServerStorage)
+			expect(ballAt()).toBe("ServerStorage")
 			expect((rigs[1].PrimaryPart :: BasePart).Anchored).toBe(true)
 			frames(config.Match.kickoffCountdownSeconds + 0.05)
 			expect(table.find(events(), "KickoffEnded")).never.toBeNil()
-			expect(BallService.model.Parent).toBe(workspace)
+			expect(ballAt()).toBe("Workspace")
 			expect(BallService.state.status).toBe("Loose")
 			expect((rigs[1].PrimaryPart :: BasePart).Anchored).toBe(false)
 		end
@@ -222,7 +229,7 @@ describe("A match on the generated arena", function()
 		expect(BallService.state.status).toBe("Dead")
 		frames(config.Match.celebrationSeconds + 0.05)
 		expect(#eventsNamed("KickoffStarted")).toBe(2)
-		expect(BallService.model.Parent).toBe(ServerStorage)
+		expect(ballAt()).toBe("ServerStorage")
 		expect(tagged().goalPanel.CanCollide).toBe(true)
 	end)
 
@@ -259,6 +266,45 @@ describe("A match on the generated arena", function()
 		expect(MatchService.engine).never.toBe(first)
 		expect(lastFired(Remotes.names.MatchSnapshot).to).toBeNil()
 		expect(MatchService.engine:snapshot().state).toBe("Kickoff")
+		expect(#MatchService.engine:stats().players).toBe(1)
+	end)
+
+	it("sends a frame's events before reacting to them", function()
+		setup()
+		seat(1)
+		kickoff()
+		for _, batch in firedNamed(Remotes.names.RuleEvents) do
+			for _, event in batch.payload do
+				if event.name == "KickoffEnded" then
+					expect(batch.ballAt).toBe("ServerStorage")
+				end
+			end
+		end
+	end)
+
+	it("starts over with a fresh match once every player has left", function()
+		setup()
+		local rigs, players = seat(1)
+		kickoff()
+		catchWith(rigs[1])
+		local first = MatchService.engine
+		TeamService:leave(players[1])
+		frames(FRAME)
+		expect(MatchService.engine).never.toBe(first)
+		expect(MatchService.engine:snapshot().state).toBe("Waiting")
+		expect(ballAt()).toBe("ServerStorage")
+		expect(BallService.state.carrier).toBeNil()
+	end)
+
+	it("tells a player who joins who carries the ball", function()
+		setup()
+		local rigs = seat(1)
+		kickoff()
+		catchWith(rigs[1])
+		TeamService:join(Fixtures.stubPlayer(2))
+		local told = lastFired(Remotes.names.BallCarrier)
+		expect(told.to).toBe("2")
+		expect(told.payload).toEqual({ carrier = "1" })
 	end)
 
 	it("closes the goal for the next match when a match ends on time with the goal open", function()
@@ -302,10 +348,17 @@ describe("A match on the generated arena", function()
 		setup()
 		local rigs = seat(6)
 		kickoff()
-		catchWith(rigs[1])
 		local from = ballDistance()
 		local total = 0
-		for step = 1, 600 do
+		-- A free ball moving along the outside of the track: the catch scan and the bounds check every frame.
+		for step = 1, 300 do
+			BallService.part.CFrame = Centerline.at(config.Arena, from + step, 35, 8)
+			local started = os.clock()
+			MatchService:step(FRAME)
+			total += os.clock() - started
+		end
+		catchWith(rigs[1])
+		for step = 1, 300 do
 			rigs[1]:PivotTo(Centerline.at(config.Arena, from + step * 0.5, 22, 3))
 			local started = os.clock()
 			MatchService:step(FRAME)
