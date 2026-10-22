@@ -8,25 +8,24 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Finite = require(ReplicatedStorage.Shared.Util.Finite)
 local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
+local PartSize = require(ReplicatedStorage.Shared.Util.PartSize)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 
+type ArenaConfig = Config.ArenaConfig
 type Piece = Types.Piece
 
--- Sizes and looks of the parts that only carry a tag: none of them has a gameplay size of its own.
-local GATE_THICKNESS = 0.2
-local SPAWN_PAD_SIZE = Vector3.new(4, 0.2, 4)
-local SPAWN_PAD_TRANSPARENCY = 0.4
-local BALL_SPAWN_SIZE = Vector3.one
-local PANEL_TRANSPARENCY = 0.3
+-- Invisible tag-only parts: gates and ball spawns.
+local HIDDEN = 1
 
 local Builder = {}
 
 -- What is wrong with a piece Roblox could not build as given, or nil.
 local function problemWith(piece: Piece): string?
 	local size = piece.size
-	if not (Finite.vector(size) and math.min(size.X, size.Y, size.Z) >= Types.MIN_PART_SIZE) then
+	local fits = math.min(size.X, size.Y, size.Z) >= PartSize.MIN and math.max(size.X, size.Y, size.Z) <= PartSize.MAX
+	if not (Finite.vector(size) and fits) then
 		return `size {size}`
 	end
 	if not Finite.frame(piece.cframe) then
@@ -107,7 +106,8 @@ local function addSolids(pieces: { Piece }, prefix: string, color: Color3, paren
 	end
 end
 
-local function buildGoal(goal: Types.Goal, color: Color3, parent: Instance)
+local function buildGoal(goal: Types.Goal, arena: ArenaConfig, parent: Instance)
+	local color = arena.colors.goal
 	local hoop = Instance.new("Model")
 	hoop.Name = "GoalHoop"
 	addSolids(goal.rim, "Rim", color, hoop)
@@ -117,27 +117,31 @@ local function buildGoal(goal: Types.Goal, color: Color3, parent: Instance)
 	hoop.Parent = parent
 
 	local panel = addSolid(goal.panel, "GoalPanel", color, parent)
-	panel.Transparency = PANEL_TRANSPARENCY
+	panel.Transparency = arena.goal.panelTransparency
 	panel:AddTag(Tags.GoalPanel)
 end
 
-local function buildSpawns(geometry: Geometry.ArenaGeometry, ui: Config.UIConfig, parent: Instance)
+local function buildSpawns(geometry: Geometry.ArenaGeometry, config: Config.GameConfig, parent: Instance)
+	local pad = config.Arena.spawnPad
+	local padSize = Vector3.new(pad.width, pad.thickness, pad.width)
 	for _, team: Team.Team in Team.list do
 		for index, frame in geometry.teamSpawns[team] do
-			local pad = addGhost(`{team}{index}`, frame, SPAWN_PAD_SIZE, SPAWN_PAD_TRANSPARENCY, parent)
-			pad.Color = ui.teamColors[team]
-			pad:SetAttribute(Tags.Attribute.Team, team)
-			pad:AddTag(Tags.TeamSpawn)
+			local part = addGhost(`{team}{index}`, frame, padSize, pad.transparency, parent)
+			part.Color = config.UI.teamColors[team]
+			part:SetAttribute(Tags.Attribute.Team, team)
+			part:AddTag(Tags.TeamSpawn)
 		end
 	end
+	local ballSize = Vector3.one * config.Arena.ballSpawnSize
 	for index, frame in geometry.ballSpawns do
-		addGhost(`Ball{index}`, frame, BALL_SPAWN_SIZE, 1, parent):AddTag(Tags.BallSpawn)
+		addGhost(`Ball{index}`, frame, ballSize, HIDDEN, parent):AddTag(Tags.BallSpawn)
 	end
 end
 
 function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConfig, parent: Instance): Model
 	validate(geometry)
-	local colors = config.Arena.colors
+	local arena = config.Arena
+	local colors = arena.colors
 	local model = Instance.new("Model")
 	model.Name = "Arena"
 
@@ -146,13 +150,13 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 
 	local gates = newFolder("Gates", model)
 	for index, gate in geometry.gates do
-		local size = Vector3.new(gate.width, gate.height, GATE_THICKNESS)
-		local part = addGhost(`Gate{index}`, gate.frame, size, 1, gates)
+		local size = Vector3.new(gate.width, gate.height, arena.gateThickness)
+		local part = addGhost(`Gate{index}`, gate.frame, size, HIDDEN, gates)
 		part:SetAttribute(Tags.Attribute.GateIndex, index)
 		part:AddTag(Tags.LapGate)
 	end
 
-	buildGoal(geometry.goal, colors.goal, newFolder("Goal", model))
+	buildGoal(geometry.goal, arena, newFolder("Goal", model))
 
 	local markers = newFolder("Markers", model)
 	for index, piece in geometry.markers do
@@ -161,7 +165,7 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 		marker:AddTag(Tags.CornerMarker)
 	end
 
-	buildSpawns(geometry, config.UI, newFolder("Spawns", model))
+	buildSpawns(geometry, config, newFolder("Spawns", model))
 
 	model.Parent = parent
 	return model

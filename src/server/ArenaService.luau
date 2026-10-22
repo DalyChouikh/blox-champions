@@ -28,8 +28,14 @@ local ArenaService: ArenaService = {
 	init = function(self: ArenaService, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		local model = Builder.build(Geometry.build(config), config, workspace)
+		-- Tags are read from the place, so the arena is parented first; an unreadable one is removed again.
+		local ok, arena = pcall(TaggedLayout.read, model)
+		if not ok then
+			model:Destroy()
+			error(arena, 0)
+		end
 		self.model = model
-		self.arena = TaggedLayout.read(model)
+		self.arena = arena
 	end,
 }
 

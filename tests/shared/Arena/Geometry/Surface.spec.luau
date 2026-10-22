@@ -22,6 +22,19 @@ describe("Surface.quadPieces", function()
 		near(pieces[1].size, Vector3.new(5, 1, 4))
 	end)
 
+	it("still makes one block for a rectangle that float error leaves slightly imperfect", function()
+		local noise = 2e-4
+		local pieces = Surface.quadPieces(
+			Vector3.new(100, 0, 100),
+			Vector3.new(100 + noise, 0, 96),
+			Vector3.new(105, noise, 100),
+			Vector3.new(105, 0, 96 - noise),
+			1
+		)
+		expect(#pieces).toBe(1)
+		expect(pieces[1].shape).toBe("Block")
+	end)
+
 	it("splits any other quad into four wedges", function()
 		local pieces =
 			Surface.quadPieces(Vector3.zero, Vector3.new(0, 0, -4), Vector3.new(5, 0, 0), Vector3.new(6, 1, -4), 1)

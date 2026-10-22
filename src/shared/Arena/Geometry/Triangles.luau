@@ -4,11 +4,13 @@
 -- (−sy/2, −sz/2), extruded along X (verified in Studio). Splitting a triangle at the foot of the height on its
 -- longest edge gives two right triangles, each one wedge.
 
+local PartSize = require(script.Parent.Parent.Parent.Util.PartSize)
 local Types = require(script.Parent.Types)
 
 type Piece = Types.Piece
 
-local MIN_SIZE = Types.MIN_PART_SIZE
+-- Geometry never emits a piece thinner than a part can be.
+local MIN_SIZE = PartSize.MIN
 
 local Triangles = {}
 

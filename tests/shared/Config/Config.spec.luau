@@ -64,6 +64,7 @@ describe("Config defaults", function()
 			ringRadius = 7,
 			heightAboveFloor = 18,
 			panelThickness = 0.5,
+			panelTransparency = 0.3,
 			rimThickness = 1,
 			rimSegments = 16,
 			wallGap = 1,
@@ -71,6 +72,13 @@ describe("Config defaults", function()
 		expect(a.marker).toEqual({ width = 2, height = 8 })
 		expect(a.teamSpawnSpacing).toBe(10)
 		expect(a.ballSpawnHeight).toBe(6)
+	end)
+
+	it("size and shade the arena parts that only carry a tag", function()
+		local a = Config.defaults().Arena
+		expect(a.gateThickness).toBe(0.2)
+		expect(a.spawnPad).toEqual({ width = 4, thickness = 0.2, transparency = 0.4 })
+		expect(a.ballSpawnSize).toBe(1)
 	end)
 
 	it("give each team and each arena part a color", function()
@@ -181,16 +189,30 @@ describe("Config.forMode", function()
 				overrides = { profileBlendLength = 200 },
 				message = "Arena: profileBlendLength must fit within a straight and a curved end",
 			},
-			{
-				overrides = { goal = { wallGap = 30 } },
-				message = "Arena: the goal ring must fit across the track",
-			},
-			{
-				overrides = { goal = { heightAboveFloor = 24 } },
-				message = "Arena: the goal ring must sit between the upper floor and the outer wall top",
-			},
+			{ overrides = { goal = { wallGap = 0 } }, message = "Arena.goal.wallGap: must be > 0 (got 0)" },
 			{ overrides = { stripsPerSection = 6 }, message = "Arena.stripsPerSection: must be >= 7 (got 6)" },
 			{ overrides = { goalGateIndex = 5 }, message = "Arena.goalGateIndex: must be <= 4 (got 5)" },
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config({ Arena = case.overrides })
+			end).toThrow(case.message)
+		end
+	end)
+
+	it("rejects arena values that would size a part beyond what Roblox can build", function()
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{ overrides = { straightLength = 3000 }, message = "Arena.straightLength: must be <= 2048 (got 3000)" },
+			{ overrides = { endRadius = 1100 }, message = "Arena.endRadius: must be <= 1024 (got 1100)" },
+			{
+				overrides = { surfaceThickness = 0.0005 },
+				message = "Arena.surfaceThickness: must be >= 0.001 (got 0.0005)",
+			},
+			{
+				overrides = { goal = { panelThickness = 0.0005 } },
+				message = "Arena.goal.panelThickness: must be >= 0.001 (got 0.0005)",
+			},
+			{ overrides = { marker = { height = 2500 } }, message = "Arena.marker.height: must be <= 2048 (got 2500)" },
 		}
 		for _, case in cases do
 			expect(function()

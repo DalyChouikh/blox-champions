@@ -1,8 +1,9 @@
 --!strict
 -- The graybox arena (spec §9.1): the track loop, its cross-section, the goal ring, corner markers, spawns and
--- colors. Lengths are in studs. Arena/Geometry turns these numbers into parts; the cross-field checks reject
--- sizes that geometry could not build without overlaps or gaps.
+-- colors. Lengths are in studs. Arena/Geometry turns these numbers into parts; the cross-field checks here and the
+-- goal ring's fit check in Arena/Geometry reject sizes that could not be built without overlaps or gaps.
 
+local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
 
 export type ArenaConfig = {
@@ -32,6 +33,8 @@ export type ArenaConfig = {
 		ringRadius: number,
 		heightAboveFloor: number,
 		panelThickness: number,
+		-- The panel starts closed: see-through enough to show the ring is shut.
+		panelTransparency: number,
 		rimThickness: number,
 		rimSegments: number,
 		-- Gap between the ring's outer edge and the outer wall.
@@ -40,6 +43,11 @@ export type ArenaConfig = {
 	marker: { width: number, height: number },
 	teamSpawnSpacing: number,
 	ballSpawnHeight: number,
+	-- Parts that only carry a tag: lap gates (invisible; only their plane counts), team spawn pads (a square in the
+	-- team's color) and ball spawns (invisible).
+	gateThickness: number,
+	spawnPad: { width: number, thickness: number, transparency: number },
+	ballSpawnSize: number,
 	colors: { surface: Color3, infield: Color3, goal: Color3, marker: Color3 },
 }
 
@@ -62,6 +70,7 @@ local defaults: ArenaConfig = {
 		ringRadius = 7,
 		heightAboveFloor = 18,
 		panelThickness = 0.5,
+		panelTransparency = 0.3,
 		rimThickness = 1,
 		rimSegments = 16,
 		wallGap = 1,
@@ -69,6 +78,9 @@ local defaults: ArenaConfig = {
 	marker = { width = 2, height = 8 },
 	teamSpawnSpacing = 10,
 	ballSpawnHeight = 6,
+	gateThickness = 0.2,
+	spawnPad = { width = 4, thickness = 0.2, transparency = 0.4 },
+	ballSpawnSize = 1,
 	colors = {
 		surface = Color3.fromRGB(163, 162, 165),
 		infield = Color3.fromRGB(99, 95, 98),
@@ -78,15 +90,20 @@ local defaults: ArenaConfig = {
 }
 
 local size = Validate.number({ above = 0 })
+-- Sizes one part directly (the infield, a gate, a wall slab, a marker, the panel), so it must be a size Roblox
+-- builds as given instead of clamping.
+local partSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
 local nonNegative = Validate.number({ min = 0 })
+local transparency = Validate.number({ min = 0, max = 1 })
 local color = Validate.datatype("Color3")
 
 local fields = Validate.record({
-	straightLength = size,
-	endRadius = size,
-	trackWidth = size,
-	outerWallHeight = size,
-	infieldWallHeight = size,
+	straightLength = partSize,
+	-- The infield block between the straights is almost 2·endRadius deep.
+	endRadius = Validate.number({ above = 0, max = PartSize.MAX / 2 }),
+	trackWidth = partSize,
+	outerWallHeight = partSize,
+	infieldWallHeight = partSize,
 	wallCurveRadius = size,
 	stepHeight = nonNegative,
 	stepWidth = size,
@@ -95,28 +112,30 @@ local fields = Validate.record({
 	segmentLength = size,
 	-- One strip for each wall and each flat floor, and at least one for each wall curve and the step.
 	stripsPerSection = Validate.number({ min = 7, integer = true }),
-	surfaceThickness = size,
+	surfaceThickness = partSize,
 	-- The loop has four sections (two straights, two curved ends), and a lap gate starts each one.
 	goalGateIndex = Validate.number({ min = 1, max = 4, integer = true }),
 	goal = Validate.record({
 		ringRadius = size,
 		heightAboveFloor = size,
-		panelThickness = size,
-		rimThickness = size,
+		panelThickness = partSize,
+		panelTransparency = transparency,
+		rimThickness = partSize,
 		rimSegments = Validate.number({ min = 3, integer = true }),
-		wallGap = nonNegative,
+		-- A ring touching the wall would put a rim face in the wall's plane, where the two flicker.
+		wallGap = size,
 	}),
-	marker = Validate.record({ width = size, height = size }),
+	marker = Validate.record({ width = partSize, height = partSize }),
 	teamSpawnSpacing = size,
 	ballSpawnHeight = size,
+	gateThickness = partSize,
+	spawnPad = Validate.record({ width = partSize, thickness = partSize, transparency = transparency }),
+	ballSpawnSize = partSize,
 	colors = Validate.record({ surface = color, infield = color, goal = color, marker = color }),
 })
 
-local function ringOuterRadius(arena: ArenaConfig): number
-	return arena.goal.ringRadius + arena.goal.rimThickness
-end
-
--- Checked in order; the first that fails is reported.
+-- Checked in order; the first that fails is reported. Whether the goal ring fits is judged by Arena/Geometry
+-- against the surface as built (Features.goal), which config cannot require.
 local crossFieldRules: { { message: string, holds: (arena: ArenaConfig) -> boolean } } = {
 	{
 		message = "trackWidth must fit both wall curves, the step, the upper floor and a lower floor",
@@ -143,19 +162,6 @@ local crossFieldRules: { { message: string, holds: (arena: ArenaConfig) -> boole
 		holds = function(arena: ArenaConfig): boolean
 			return arena.profileBlendLength <= arena.straightLength
 				and arena.profileBlendLength <= math.pi * arena.endRadius
-		end,
-	},
-	{
-		message = "the goal ring must fit across the track",
-		holds = function(arena: ArenaConfig): boolean
-			return arena.trackWidth - arena.goal.wallGap - 2 * ringOuterRadius(arena) >= 0
-		end,
-	},
-	{
-		message = "the goal ring must sit between the upper floor and the outer wall top",
-		holds = function(arena: ArenaConfig): boolean
-			return arena.goal.heightAboveFloor - ringOuterRadius(arena) >= arena.stepHeight
-				and arena.goal.heightAboveFloor + ringOuterRadius(arena) <= arena.outerWallHeight
 		end,
 	},
 }

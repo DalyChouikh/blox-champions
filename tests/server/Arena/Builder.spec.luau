@@ -8,6 +8,7 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local Builder = require(game:GetService("ServerScriptService").Server.Arena.Builder)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
 
 local config = Config.defaults()
@@ -30,7 +31,7 @@ describe("Builder.build", function()
 		local arena = Builder.build(Geometry.build(config), config, parent)
 		expect(arena.Parent).toBe(parent)
 		expect(#folder(arena, "Surface"):GetChildren()).toBe(8172)
-		expect(#folder(arena, "Infield"):GetChildren()).toBe(3)
+		expect(#folder(arena, "Infield"):GetChildren()).toBe(193)
 		expect(#folder(arena, "Gates"):GetChildren()).toBe(4)
 		expect(#folder(arena, "Markers"):GetChildren()).toBe(4)
 		expect(#folder(arena, "Spawns"):GetChildren()).toBe(8)
@@ -55,6 +56,24 @@ describe("Builder.build", function()
 		end
 	end)
 
+	it("takes the tag-only parts' sizes and the goal panel's transparency from config", function()
+		local custom = Fixtures.config({
+			Arena = {
+				gateThickness = 0.5,
+				spawnPad = { width = 6, thickness = 0.3, transparency = 0.2 },
+				ballSpawnSize = 2,
+				goal = { panelTransparency = 0.6 },
+			},
+		})
+		local arena = Builder.build(Geometry.build(custom), custom, parent)
+		expect((folder(arena, "Gates"):FindFirstChild("Gate1") :: Part).Size.Z).toBeCloseTo(0.5, 4)
+		local pad = folder(arena, "Spawns"):FindFirstChild("Orange2") :: Part
+		expect(pad.Size).toEqual(Vector3.new(6, 0.3, 6))
+		expect(pad.Transparency).toBeCloseTo(0.2, 4)
+		expect((folder(arena, "Spawns"):FindFirstChild("Ball1") :: Part).Size).toEqual(Vector3.new(2, 2, 2))
+		expect((folder(arena, "Goal"):FindFirstChild("GoalPanel") :: Part).Transparency).toBeCloseTo(0.6, 4)
+	end)
+
 	it("leaves nothing behind when a piece is invalid", function()
 		local geometry = Geometry.build(config)
 		local broken = table.clone(geometry)
@@ -68,6 +87,12 @@ describe("Builder.build", function()
 		expect(function()
 			Builder.build(adrift, config, parent)
 		end).toThrow("ArenaBuilder: infield piece 1 is invalid (cframe ")
+		-- Roblox would silently clamp it to 2048, leaving a hole.
+		local oversized = table.clone(geometry)
+		oversized.markers = { { shape = "Block", cframe = CFrame.identity, size = Vector3.new(3000, 1, 1) } }
+		expect(function()
+			Builder.build(oversized, config, parent)
+		end).toThrow("ArenaBuilder: marker piece 1 is invalid (size 3000, 1, 1)")
 		expect(#parent:GetChildren()).toBe(0)
 	end)
 end)

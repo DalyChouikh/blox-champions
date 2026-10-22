@@ -50,6 +50,7 @@ describe("The generated arena", function()
 			{ Vector3.new(-80, 60, -63), 1 }, -- Gate 2: the step is half blended away
 			{ Vector3.new(-130, 60, 0), 0 }, -- left curved end, flat floor
 			{ Vector3.new(0, 60, 0), 20 }, -- infield top
+			{ Vector3.new(-110, 60, 15), 20 }, -- infield top under the left curved end
 		}
 		for _, case in floors do
 			local hit = cast(case[1], Vector3.new(0, -100, 0))

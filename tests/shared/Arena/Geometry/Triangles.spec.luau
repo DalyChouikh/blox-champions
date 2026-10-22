@@ -4,23 +4,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Triangles = require(ReplicatedStorage.Shared.Arena.Geometry.Triangles)
-local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 
 local function near(actual: Vector3, expected: Vector3)
 	expect((actual - expected).Magnitude).toBeLessThan(1e-3)
 end
 
--- The triangular face of a wedge on the side `normal` points to: right-angle corner, top corner, front corner.
-local function face(piece: Types.Piece, normal: Vector3): { Vector3 }
-	local half = piece.size / 2
-	local side = if piece.cframe.RightVector:Dot(normal) > 0 then half.X else -half.X
-	return {
-		piece.cframe:PointToWorldSpace(Vector3.new(side, -half.Y, half.Z)),
-		piece.cframe:PointToWorldSpace(Vector3.new(side, half.Y, half.Z)),
-		piece.cframe:PointToWorldSpace(Vector3.new(side, -half.Y, -half.Z)),
-	}
-end
+local face = Fixtures.wedgeFace
 
 describe("Triangles.wedges", function()
 	local a, b, c = Vector3.new(0, 0, 0), Vector3.new(10, 0, 0), Vector3.new(3, 0, 4)
