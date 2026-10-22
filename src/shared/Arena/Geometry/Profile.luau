@@ -138,7 +138,7 @@ function Profile.points(arena: ArenaConfig, stepHeight: number): { Vector2 }
 	return points
 end
 
--- The highest point of the roof: the apex of its circle. Gates and the skater's roof rules are sized from it.
+-- The highest point of the roof: the apex of its circle. The lap gates are as tall as it.
 function Profile.roofTop(arena: ArenaConfig): number
 	local center, radius = roofCircle(arena)
 	return center.Y + radius

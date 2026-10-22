@@ -237,12 +237,15 @@ describe("SkateMath off the ground and on walls", function()
 	end)
 end)
 
--- Loop physics (A3). The roof is an arc of `RADIUS` around the origin with the skater inside the tube, so its normal
--- at angle phi points back at the centre. Past straight up (phi above 0 with a downward normal) gravity pulls the
--- skater off unless the arc bends hard enough: speed² × curvature must reach gravity's pull into the surface.
+-- Loop physics (A3). A roof is an arc around the origin with the skater inside the tube, so its normal at angle phi
+-- points back at the centre. Past straight up gravity pulls the skater off unless the arc bends hard enough:
+-- speed² × curvature must reach gravity's pull into the surface. The curvature is measured over curvatureWindow studs
+-- of the skater's path, so a roof of flat strips (the arena's) reads as the arc it approximates.
 describe("SkateMath riding the roof by loop physics", function()
 	local RADIUS = 22
 	local DT = 1 / 60
+	-- The arena's roof: 21 flat strips over the half circle.
+	local ROOF_STRIPS = 21
 
 	local function normalAt(phi: number): Vector3
 		return Vector3.new(-math.cos(phi), -math.sin(phi), 0)
@@ -252,16 +255,27 @@ describe("SkateMath riding the roof by loop physics", function()
 		return Vector3.new(-math.sin(phi), math.cos(phi), 0) * speed
 	end
 
-	-- Rides the arc at `speed` from level (phi 0, where gravity does not pull off) up to `phi`, one step per DT,
-	-- and says whether the skater stayed on.
-	local function staysOn(speed: number, phi: number): boolean
+	-- Rides an arc of `radius` at `speed` from angle `from` to `to`, one step per DT, and says whether the skater
+	-- stayed on. Each frame moves the full speed × DT, as in a real game. With `strips`, the arc is that many flat
+	-- strips over a half circle, so the normal holds still across a strip and turns at its edges. The skater first
+	-- rides the flat surface the arc starts from (the wall below a roof, the floor before a quarter-pipe), as in the
+	-- arena.
+	local function staysOn(speed: number, radius: number, from: number, to: number, strips: number?): boolean
 		local s = skater(Vector3.zero)
-		local steps = math.ceil(phi / (speed * DT / RADIUS))
-		for step = 0, steps do
-			-- Each frame moves the full speed × DT, as in a real game: the last may pass phi by under half a step.
-			local at = step * speed * DT / RADIUS
+		for _ = 1, 10 do
+			s.velocity = tangentAt(from, speed)
+			s:step(input(), ground(normalAt(from)), DT)
+		end
+		local step = speed * DT / radius
+		for frame = 0, math.ceil((to - from) / step) do
+			local at = from + frame * step
+			local facing = at
+			if strips ~= nil then
+				local width = math.pi / strips
+				facing = (math.floor(at / width) + 0.5) * width
+			end
 			s.velocity = tangentAt(at, speed)
-			s:step(input(), ground(normalAt(at)), DT)
+			s:step(input(), ground(normalAt(facing)), DT)
 			if s.mode == "Airborne" then
 				return false
 			end
@@ -271,28 +285,52 @@ describe("SkateMath riding the roof by loop physics", function()
 
 	it("holds the top of a loop, upside down, only above the speed its curve needs", function()
 		-- The top needs speed² ≥ gravity × radius: 196.2 × 22, so 65.7 studs/s.
-		expect(staysOn(70, math.pi / 2)).toBe(true)
-		expect(staysOn(60, math.pi / 2)).toBe(false)
+		expect(staysOn(70, RADIUS, 0, math.pi / 2)).toBe(true)
+		expect(staysOn(60, RADIUS, 0, math.pi / 2)).toBe(false)
+	end)
+
+	it("reads a roof of flat strips as the arc it makes, so the same speeds hold and fall", function()
+		expect(staysOn(70, RADIUS, 0, math.pi / 2, ROOF_STRIPS)).toBe(true)
+		expect(staysOn(60, RADIUS, 0, math.pi / 2, ROOF_STRIPS)).toBe(false)
+		-- Just above the arc's 65.7, the strips hold as the arc does. A plain average of the window's turning dips at
+		-- the top and drops a skater here (measured: up to 66.5).
+		expect(staysOn(66.5, RADIUS, 0, math.pi / 2)).toBe(true)
+		expect(staysOn(66.5, RADIUS, 0, math.pi / 2, ROOF_STRIPS)).toBe(true)
 	end)
 
 	it("holds where gravity pulls half as hard as at the top, above the speed its curve needs there", function()
 		-- Pull 98.1 needs speed ≥ 46.5 on this arc.
-		expect(staysOn(50, math.pi / 6)).toBe(true)
-		expect(staysOn(40, math.pi / 6)).toBe(false)
+		expect(staysOn(50, RADIUS, 0, math.pi / 6)).toBe(true)
+		expect(staysOn(40, RADIUS, 0, math.pi / 6)).toBe(false)
 	end)
 
-	it("never holds a flat ceiling, which has no curve, at any speed", function()
-		local s = skater(Vector3.new(140, 0, 0))
-		s:step(input(), ground(Vector3.new(0, -1, 0)), DT)
+	it("lets go of a flat ceiling once the corner that led onto it is behind, at any speed", function()
+		local s = skater(Vector3.zero)
+		local wall, ceiling = Vector3.new(-1, 0, 0), Vector3.new(0, -1, 0)
+		for _ = 1, 10 do
+			s.velocity = Vector3.new(0, 140, 0)
+			s:step(input(), ground(wall), DT)
+		end
+		s.velocity = Vector3.new(-140, 0, 0)
+		s:step(input(), ground(ceiling), DT)
+		-- The corner's turn is still within the window: the skater holds for now.
+		expect(s.mode).toBe("Grounded")
+		local frames = 0
+		while s.mode == "Grounded" and frames < 60 do
+			s.velocity = Vector3.new(-140, 0, 0)
+			s:step(input(), ground(ceiling), DT)
+			frames += 1
+		end
 		expect(s.mode).toBe("Airborne")
+		-- Within the window plus a frame's travel (140 × DT = 2.3 studs).
+		expect(frames * 140 * DT).toBeLessThan(movement.curvatureWindow + 140 * DT + 1e-6)
 	end)
 
-	it("drops a tight overhang at 30 studs/s, under the wall rule's minWallSpeed", function()
-		-- A 95° overhang: its normal is 5° past straight down, so the wall rule applies.
-		local normal = Vector3.new(0, -math.sin(math.rad(5)), math.cos(math.rad(5)))
-		local s = skater(Vector3.new(30, 0, 0))
-		s:step(input(), ground(normal), DT)
-		expect(s.mode).toBe("Airborne")
+	it("drops a skater too slow for the wall rule on a tight overhang that their curve would still hold", function()
+		-- A quarter-pipe of radius 2 from the floor to 5° past straight up: its curve holds anyone above 6 studs/s.
+		local floor, overhang = -math.pi / 2, math.rad(5)
+		expect(staysOn(40, 2, floor, overhang)).toBe(true)
+		expect(staysOn(30, 2, floor, overhang)).toBe(false)
 	end)
 
 	it("keeps a skater riding a vertical wall at 40 studs/s, where gravity does not pull off", function()

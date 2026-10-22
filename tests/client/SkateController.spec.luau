@@ -121,6 +121,60 @@ describe("SkateController", function()
 		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -2.594))
 	end)
 
+	-- The kickoff freeze anchors every root while the server places them (spec §4.5). Nothing held or pressed during
+	-- it may carry into the kickoff.
+	it(
+		"starts the kickoff from rest, upright, facing its spawn, whatever was held or pressed during the freeze",
+		function()
+			local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
+			table.insert(others, { player = "2", team = "Blue", root = root(leader) })
+			local attachKey = Fixtures.scriptedBinding(action("Attach"))
+			attachKey:Fire(true)
+			SkateController:step(1 / 60)
+			local skater = SkateController.skater :: any
+			expect(skater.mode).toBe("Attached")
+			-- Riding a wall when the point is scored.
+			skater.up = Vector3.xAxis
+
+			root(rig).Anchored = true
+			local spawn = Vector3.new(0, movement.hoverHeight, 0)
+			rig:PivotTo(CFrame.lookAt(spawn, spawn + Vector3.xAxis))
+			attachKey:Fire(false)
+			local jumpKey = Fixtures.scriptedBinding(action("Jump"))
+			jumpKey:Fire(true)
+			task.wait()
+			jumpKey:Fire(false)
+			for _ = 1, 3 do
+				SkateController:step(1 / 60)
+			end
+
+			root(rig).Anchored = false
+			SkateController:step(1 / 60)
+			expect(skater.mode).toBe("Grounded")
+			expect(velocityOf(rig).Magnitude).toBeLessThan(1)
+			Fixtures.expectNear(alignOf(rig).SecondaryAxis, Vector3.yAxis)
+			-- Facing +X, so the skater's right is +Z.
+			Fixtures.expectNear(alignOf(rig).PrimaryAxis, Vector3.zAxis)
+		end
+	)
+
+	it("keeps telling the server about pump and brake during the freeze", function()
+		root(rig).Anchored = true
+		Fixtures.scriptedBinding(action("Pump")):Fire(true)
+		SkateController:step(1 / 60)
+		expect(sent).toEqual({ { true, false } })
+	end)
+
+	it("drops a jump pressed while it had no character", function()
+		local jumpKey = Fixtures.scriptedBinding(action("Jump"))
+		jumpKey:Fire(true)
+		task.wait()
+		jumpKey:Fire(false)
+		SkateController:bind(skaterAt("Respawned", Vector3.new(50, 0, 0)))
+		SkateController:step(1 / 60)
+		expect((SkateController.skater :: any).mode).toBe("Grounded")
+	end)
+
 	it("falls when no riding surface is below", function()
 		rig:PivotTo(CFrame.new(1000, 50, 1000))
 		SkateController:step(0.1)
@@ -149,6 +203,31 @@ describe("SkateController", function()
 		pump:Fire(false)
 		SkateController:step(1 / 60)
 		expect(sent).toEqual({ { true, false }, { false, false } })
+	end)
+
+	-- The server drops states beyond its rate limit, and nothing resends one: the client keeps to the same limit and
+	-- sends the latest state once it may, so the server always ends up with what the keys hold.
+	it("keeps to the server's rate for pump and brake, then sends the latest state", function()
+		local now = 0
+		setup({
+			Clock = function(): number
+				return now
+			end,
+		})
+		SkateController:bind(rig)
+		local pump = Fixtures.scriptedBinding(action("Pump"))
+		local perSecond = config.Network.maxSkateStatesPerSecond
+		-- An odd count of toggles ends on pump held, unlike the last state the burst sends.
+		for toggle = 1, perSecond + 11 do
+			pump:Fire(toggle % 2 == 1)
+			SkateController:step(1 / 60)
+		end
+		expect(#sent).toBe(perSecond)
+		expect(sent[perSecond]).toEqual({ false, false })
+		now = 1
+		SkateController:step(1 / 60)
+		expect(#sent).toBe(perSecond + 1)
+		expect(sent[perSecond + 1]).toEqual({ true, false })
 	end)
 
 	it("ignores one seam ray's side face, so the skater's up holds", function()
@@ -201,12 +280,19 @@ describe("SkateController over the roof", function()
 	local RADIUS = 22
 	local DT = 1 / 60
 
-	-- Whether the skater stays on from level up to the top of the arc at `speed`.
-	local function holdsOverTheTop(speed: number): boolean
+	-- Whether the skater stays on from level up to the top of the arc at `speed`. With `strips`, the roof is that many
+	-- flat strips over the half circle, as the arena builds it, so the ray's normal turns only at strip edges.
+	local function holdsOverTheTop(speed: number, strips: number?): boolean
 		local phi = 0
 		setup({
 			Raycast = function(): any
-				return { Normal = Vector3.new(-math.cos(phi), -math.sin(phi), 0), Distance = movement.hoverHeight }
+				local facing = phi
+				if strips ~= nil then
+					local width = math.pi / strips
+					facing = (math.floor(phi / width) + 0.5) * width
+				end
+				local normal = Vector3.new(-math.cos(facing), -math.sin(facing), 0)
+				return { Normal = normal, Distance = movement.hoverHeight }
 			end,
 		})
 		SkateController:bind(rig)
@@ -226,5 +312,10 @@ describe("SkateController over the roof", function()
 	it("holds a skater over the top of the roof at 70 studs/s and drops one at 60, as the loop rule says", function()
 		expect(holdsOverTheTop(70)).toBe(true)
 		expect(holdsOverTheTop(60)).toBe(false)
+	end)
+
+	it("does the same over the arena's roof of 21 flat strips, through its own normal filter", function()
+		expect(holdsOverTheTop(70, 21)).toBe(true)
+		expect(holdsOverTheTop(60, 21)).toBe(false)
 	end)
 end)

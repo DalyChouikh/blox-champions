@@ -6,12 +6,9 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 
 local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 
 local arena = Config.defaults().Arena
-
-local function near(actual: Vector3, expected: Vector3)
-	expect((actual - expected).Magnitude).toBeLessThan(1e-3)
-end
 
 describe("Centerline", function()
 	it("is two straights and two half circles long", function()
@@ -27,20 +24,26 @@ describe("Centerline", function()
 		}
 		for gate, pair in expected do
 			local frame = Centerline.frameAt(arena, Centerline.gateDistance(arena, gate))
-			near(frame.Position, pair[1])
-			near(frame.LookVector, pair[2])
+			Fixtures.expectNear(frame.Position, pair[1])
+			Fixtures.expectNear(frame.LookVector, pair[2])
 		end
-		near(Centerline.frameAt(arena, 0).RightVector, Vector3.new(0, 0, -1))
-		near(Centerline.frameAt(arena, Centerline.gateDistance(arena, 3)).RightVector, Vector3.new(0, 0, 1))
+		Fixtures.expectNear(Centerline.frameAt(arena, 0).RightVector, Vector3.new(0, 0, -1))
+		Fixtures.expectNear(
+			Centerline.frameAt(arena, Centerline.gateDistance(arena, 3)).RightVector,
+			Vector3.new(0, 0, 1)
+		)
 	end)
 
 	it("turns left through each curved end, closes the loop, and offsets across the track", function()
 		local apex = Centerline.frameAt(arena, 160 + 30 * math.pi)
-		near(apex.Position, Vector3.new(-140, 0, 0))
-		near(apex.LookVector, Vector3.new(0, 0, 1))
-		near(apex.RightVector, Vector3.new(-1, 0, 0))
-		near(Centerline.frameAt(arena, Centerline.length(arena)).Position, Centerline.frameAt(arena, 0).Position)
-		near(Centerline.at(arena, 80, 0, 20).Position, Vector3.new(0, 20, -38))
+		Fixtures.expectNear(apex.Position, Vector3.new(-140, 0, 0))
+		Fixtures.expectNear(apex.LookVector, Vector3.new(0, 0, 1))
+		Fixtures.expectNear(apex.RightVector, Vector3.new(-1, 0, 0))
+		Fixtures.expectNear(
+			Centerline.frameAt(arena, Centerline.length(arena)).Position,
+			Centerline.frameAt(arena, 0).Position
+		)
+		Fixtures.expectNear(Centerline.at(arena, 80, 0, 20).Position, Vector3.new(0, 20, -38))
 	end)
 
 	it("puts stations at most segmentLength apart around the whole loop, one on every gate", function()

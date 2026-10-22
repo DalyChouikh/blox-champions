@@ -11,7 +11,7 @@ local Tags = {
 	TeamSpawn = "TeamSpawn",
 	BallSpawn = "BallSpawn",
 	CornerMarker = "CornerMarker",
-	-- On the folders of surfaces skaters ride (the track and the infield top): the only things their rays hit.
+	-- On the folders of surfaces skaters ride (the track, its roof, the infield top): the only things their rays hit.
 	RideSurface = "RideSurface",
 	Attribute = {
 		-- On LapGate and CornerMarker parts: which gate, 1..4 in travel order.

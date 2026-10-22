@@ -5,12 +5,9 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Surface = require(ReplicatedStorage.Shared.Arena.Geometry.Surface)
 local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
-
-local function near(actual: Vector3, expected: Vector3)
-	expect((actual - expected).Magnitude).toBeLessThan(1e-3)
-end
 
 describe("Surface.quadPieces", function()
 	it("makes one block for a flat rectangle, with its slab behind the surface", function()
@@ -18,9 +15,9 @@ describe("Surface.quadPieces", function()
 			Surface.quadPieces(Vector3.zero, Vector3.new(0, 0, -4), Vector3.new(5, 0, 0), Vector3.new(5, 0, -4), 1)
 		expect(#pieces).toBe(1)
 		expect(pieces[1].shape).toBe("Block")
-		near(pieces[1].cframe.Position, Vector3.new(2.5, -0.5, -2))
+		Fixtures.expectNear(pieces[1].cframe.Position, Vector3.new(2.5, -0.5, -2))
 		expect(pieces[1].cframe.UpVector.Y).toBeCloseTo(1, 4)
-		near(pieces[1].size, Vector3.new(5, 1, 4))
+		Fixtures.expectNear(pieces[1].size, Vector3.new(5, 1, 4))
 	end)
 
 	it("still makes one block for a rectangle that float error leaves slightly imperfect", function()
@@ -84,5 +81,23 @@ describe("Surface.build", function()
 		expect(between).toBe(2 * 12)
 		expect(lowerFloor).never.toBeNil()
 		expect(((lowerFloor :: Types.Piece).size - Vector3.new(10, 1, 160)).Magnitude).toBeLessThan(1e-3)
+	end)
+
+	-- The roof's axis is the centerline at the wall tops' height (the walls are level): its strips lie 22 studs from
+	-- it, and a slab that hangs behind a strip, outside the tube, lies farther. A roof facing away from the track would
+	-- hang its slabs inside.
+	it("hangs every roof piece behind the roof, outside the tube, so the roof faces the track", function()
+		local arena = Config.defaults().Arena
+		local half = arena.straightLength / 2
+		local radius = arena.trackWidth / 2
+		local roof = Surface.build(arena).roof
+		expect(#roof > 0).toBe(true)
+		for _, piece in roof do
+			local position = piece.cframe.Position
+			local along = math.clamp(position.X, -half, half)
+			local fromCenterline = Vector2.new(position.X - along, position.Z).Magnitude - arena.endRadius
+			local fromAxis = Vector2.new(fromCenterline, position.Y - arena.outerWallHeight).Magnitude
+			expect(fromAxis).toBeGreaterThan(radius)
+		end
 	end)
 end)

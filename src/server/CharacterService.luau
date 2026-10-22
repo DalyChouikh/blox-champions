@@ -20,6 +20,7 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 local Signal = require(ReplicatedStorage.Shared.Util.Signal)
 local SkaterBody = require(script.Parent.SkaterBody)
+local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local TeamService = require(script.Parent.TeamService)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
@@ -63,7 +64,7 @@ export type CharacterService = {
 }
 
 local function rootOf(character: Model): BasePart?
-	return character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	return character:FindFirstChild(SkaterRig.root) :: BasePart?
 end
 
 local function forget(self: CharacterService, player: PlayerId)

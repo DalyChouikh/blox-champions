@@ -33,6 +33,9 @@ export type MovementConfig = {
 	-- On a surface steeper than maxStickAngle, a skater slower than minWallSpeed falls off.
 	minWallSpeed: number,
 	maxStickAngle: number,
+	-- How far back along the skater's path the curve of an overhang is measured (A3): a few of the roof's flat strips,
+	-- so a roof of strips reads as the arc it makes, yet short enough to follow a curve from where it starts.
+	curvatureWindow: number,
 	pumpSlopeMultiplier: number,
 	pumpFlatAccel: number,
 	-- Within this slope of flat, pumping gives pumpFlatAccel.
@@ -73,6 +76,7 @@ local defaults: MovementConfig = {
 	airUprightRate = 6,
 	minWallSpeed = 35,
 	maxStickAngle = 60,
+	curvatureWindow = 10,
 	pumpSlopeMultiplier = 1.6,
 	pumpFlatAccel = 8,
 	pumpFlatSlopeDeg = 3,
@@ -113,6 +117,7 @@ local fields = Validate.record({
 	airUprightRate = positive,
 	minWallSpeed = nonNegative,
 	maxStickAngle = angle,
+	curvatureWindow = positive,
 	pumpSlopeMultiplier = Validate.number({ min = 1 }),
 	pumpFlatAccel = nonNegative,
 	pumpFlatSlopeDeg = Validate.check(nonNegative, function(degrees: number): boolean

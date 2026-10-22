@@ -108,10 +108,11 @@ local function addSolids(pieces: { Piece }, prefix: string, color: Color3, paren
 end
 
 -- A folder of surfaces skaters ride, tagged so their rays hit nothing else.
-local function addRideSurface(pieces: { Piece }, name: string, color: Color3, parent: Instance)
+local function addRideSurface(pieces: { Piece }, name: string, color: Color3, parent: Instance): Folder
 	local folder = newFolder(name, parent)
 	folder:AddTag(Tags.RideSurface)
 	addSolids(pieces, name, color, folder)
+	return folder
 end
 
 local function buildGoal(goal: Types.Goal, arena: ArenaConfig, parent: Instance)
@@ -156,8 +157,11 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 
 	addRideSurface(geometry.surface, "Surface", colors.surface, model)
-	-- The roof is its own folder so its lighting can be tuned apart from the floor (A2).
-	addRideSurface(geometry.roof, "Roof", colors.surface, model)
+	-- The roof is its own folder so its lighting can be tuned apart from the floor (A2). It casts no shadow: under
+	-- one, the whole track sat in its shade.
+	for _, part in addRideSurface(geometry.roof, "Roof", colors.surface, model):GetChildren() do
+		(part :: BasePart).CastShadow = false
+	end
 	addRideSurface(geometry.infield, "Infield", colors.infield, model)
 
 	local gates = newFolder("Gates", model)

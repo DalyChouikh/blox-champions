@@ -25,6 +25,27 @@ local function jointOf(model: Model, name: string): Motor6D
 	return model:FindFirstChild(name, true) :: Motor6D
 end
 
+-- R6's joint frames as Roblox builds them: the RootJoint's up axis is the body's back, the hips are turned 90°.
+local R6_ROOT_FRAME = CFrame.fromMatrix(Vector3.zero, Vector3.new(-1, 0, 0), Vector3.new(0, 0, 1))
+local R6_RIGHT_HIP_FRAME = CFrame.fromMatrix(Vector3.new(1, -1, 0), Vector3.new(0, 0, -1), Vector3.yAxis)
+
+-- A Motor6D from the R6 rig's root to its leg, with the frame an R6 joint of that name has.
+local function r6Joint(model: Model, name: string, frame: CFrame): Motor6D
+	local joint = Instance.new("Motor6D")
+	joint.Name = name
+	joint.Part0 = model.PrimaryPart
+	joint.Part1 = model:FindFirstChild("Left Leg") :: BasePart
+	joint.C0 = frame
+	joint.Parent = model.PrimaryPart
+	return joint
+end
+
+-- What a joint's Transform does, seen in the axes of the part it hangs from.
+local function inParentAxes(joint: Motor6D): CFrame
+	local axes = joint.C0.Rotation
+	return axes * joint.Transform * axes:Inverse()
+end
+
 local function setup()
 	PoseController:init({
 		Config = config,
@@ -65,15 +86,23 @@ describe("PoseController", function()
 		expect(jointOf(avatar, "Root").Transform.Position.Y).toBeCloseTo(0.5, 6)
 
 		local r6 = Fixtures.rig(folder, "R6", HOVER_CFRAME, Enum.HumanoidRigType.R6)
-		local rootJoint = Instance.new("Motor6D")
-		rootJoint.Name = "RootJoint"
-		rootJoint.Part0 = r6.PrimaryPart
-		rootJoint.Part1 = r6:FindFirstChild("Left Leg") :: BasePart
-		rootJoint.Parent = r6.PrimaryPart
+		local rootJoint = r6Joint(r6, "RootJoint", R6_ROOT_FRAME)
 		PoseController:track(r6, false)
 		PoseController:step(1 / 60)
-		-- R6 standing height: half the root (1) plus the leg (2) = 3.
-		expect(jointOf(r6, "RootJoint").Transform.Position.Y).toBeCloseTo(0.5, 6)
+		-- R6 standing height: half the root (1) plus the leg (2) = 3. The lift is up in the root part's own axes.
+		Fixtures.expectNear(inParentAxes(rootJoint).Position, Vector3.new(0, 0.5, 0))
+	end)
+
+	-- R6 joint frames are turned (read from a Roblox R6 rig): the pose must still bend the body, not the joint's axes.
+	it("bends an R6 body the way it bends an R15 one, whatever way the R6 joints' frames are turned", function()
+		local r6 = Fixtures.rig(folder, "R6", HOVER_CFRAME, Enum.HumanoidRigType.R6)
+		local rootJoint = r6Joint(r6, "RootJoint", R6_ROOT_FRAME)
+		local rightHip = r6Joint(r6, "Right Hip", R6_RIGHT_HIP_FRAME)
+		r6:SetAttribute(Attributes.Pumping, true)
+		PoseController:track(r6, false)
+		PoseController:step(1 / 60)
+		expect((inParentAxes(rootJoint).Rotation * Vector3.yAxis).Z).toBeLessThan(0) -- the body leans forward
+		expect((inParentAxes(rightHip).Rotation * -Vector3.yAxis).Z).toBeLessThan(0) -- the thigh comes forward
 	end)
 
 	it("raises the carrier's arm and shows another player's pump from their character's attribute", function()
@@ -87,6 +116,16 @@ describe("PoseController", function()
 		expect(math.abs(math.deg(shoulderRoll))).toBeCloseTo(75, 3)
 		local kneeBend = jointOf(carrier, "RightKnee").Transform:ToEulerAnglesXYZ()
 		expect(math.abs(math.deg(kneeBend))).toBeCloseTo(60, 3)
+	end)
+
+	it("stops posing a character that is gone, even one that left without CharacterRemoving", function()
+		local gone = Fixtures.jointedRig(folder, "Gone", HOVER_CFRAME)
+		gone:SetAttribute(Attributes.Pumping, true)
+		PoseController:track(gone, false)
+		gone.Parent = nil
+		PoseController:step(1 / 60)
+		expect(jointOf(gone, "RightKnee").Transform == CFrame.identity).toBe(true)
+		gone:Destroy()
 	end)
 
 	it("leans a character into the turn its velocity makes", function()

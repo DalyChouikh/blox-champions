@@ -2,17 +2,13 @@
 -- The skater body (spec §7.1), added by the server to each character it loads:
 -- - one collider of the same size for every avatar, welded to the root;
 -- - avatar parts that touch nothing;
--- - the velocity and facing constraints the owning client drives;
--- - no default animations, since poses are code-driven.
--- Destroying Animate as the load returns keeps the client from ever starting it (probed in Studio).
+-- - the velocity and facing constraints the owning client drives.
+-- Default animations never start: StarterCharacterScripts holds our own Animate (src/character).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
-
--- Roblox's group for every part not given one: the arena and the ball.
-local DEFAULT_GROUP = "Default"
 
 -- The PhysicsService methods registering the groups uses, so tests can pass a fake.
 export type Physics = {
@@ -67,16 +63,12 @@ local function addConstraints(root: BasePart)
 end
 
 function SkaterBody.build(character: Model, movement: Config.MovementConfig)
-	local animate = character:FindFirstChild("Animate")
-	if animate ~= nil then
-		animate:Destroy()
-	end
 	for _, part in character:GetDescendants() do
 		if part:IsA("BasePart") then
 			part.CollisionGroup = SkaterRig.groups.body
 		end
 	end
-	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart
+	local root = character:FindFirstChild(SkaterRig.root) :: BasePart
 	addCollider(root, movement, character)
 	addConstraints(root)
 end
@@ -89,10 +81,10 @@ function SkaterBody.registerGroups(physics: Physics)
 			physics:RegisterCollisionGroup(name)
 		end
 	end
-	physics:CollisionGroupSetCollidable(body, DEFAULT_GROUP, false)
+	physics:CollisionGroupSetCollidable(body, SkaterRig.groups.arena, false)
 	physics:CollisionGroupSetCollidable(body, body, false)
 	physics:CollisionGroupSetCollidable(body, collider, false)
-	physics:CollisionGroupSetCollidable(collider, DEFAULT_GROUP, true)
+	physics:CollisionGroupSetCollidable(collider, SkaterRig.groups.arena, true)
 	physics:CollisionGroupSetCollidable(collider, collider, false)
 end
 

@@ -66,6 +66,7 @@ Tests under `tests/server` and `tests/integration` build parts (a whole arena, f
 | `src/shared/` | Code shared by server and client (synced to `ReplicatedStorage.Shared`) |
 | `src/server/` | Server scripts (synced to `ServerScriptService.Server`) |
 | `src/client/` | Client scripts (synced to `StarterPlayer.StarterPlayerScripts.Client`) |
+| `src/character/` | Scripts every character gets (synced to `StarterPlayer.StarterCharacterScripts`); `Animate` replaces Roblox's default animations |
 | `tests/` | Jest-Lua tests (`*.spec.luau`), mirroring the `src/` folders, plus shared test data in `tests/Fixtures.luau` |
 | `scripts/` | Development scripts, such as the in-Studio test runner |
 | `docs/` | Design specs and implementation plans |

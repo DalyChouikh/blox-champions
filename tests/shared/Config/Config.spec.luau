@@ -67,6 +67,7 @@ describe("Config defaults", function()
 			airUprightRate = 6,
 			minWallSpeed = 35,
 			maxStickAngle = 60,
+			curvatureWindow = 10,
 			pumpSlopeMultiplier = 1.6,
 			pumpFlatAccel = 8,
 			pumpFlatSlopeDeg = 3,

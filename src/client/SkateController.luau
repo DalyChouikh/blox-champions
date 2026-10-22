@@ -19,6 +19,8 @@ local Draft = require(ReplicatedStorage.Shared.Skate.Draft)
 local InputController = require(script.Parent.InputController)
 local NormalFilter = require(ReplicatedStorage.Shared.Skate.NormalFilter)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
+local PlayerList = require(ReplicatedStorage.Shared.Util.PlayerList)
+local RateLimiter = require(ReplicatedStorage.Shared.Net.RateLimiter)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
@@ -50,6 +52,11 @@ export type SkateController = {
 	_camera: { CFrame: CFrame },
 	_skaters: () -> { SkaterView },
 	_sendSkateState: (pump: boolean, brake: boolean) -> (),
+	-- Keeps the sends within the server's rate limit for SkateState (os.clock; a fake in tests).
+	_stateLimiter: RateLimiter.RateLimiter,
+	_clock: () -> number,
+	-- A pump or brake change the limit has not let out yet.
+	_statePending: boolean,
 	_team: () -> string?,
 	_gravity: Vector3,
 	-- workspace:Raycast; a fake in tests, which can then hand the controller a seam's side face.
@@ -67,7 +74,12 @@ export type SkateController = {
 	_sources: { Draft.Source },
 	_teammates: { Attach.Candidate },
 	_views: { SkaterView },
+	-- The game's players, followed from start on.
+	_playerList: PlayerList.PlayerList?,
 }
+
+-- Who playersAround walks before start.
+local NO_PLAYERS: { Player } = table.freeze({})
 
 local function worldUp(self: SkateController): Vector3
 	return -self._gravity.Unit
@@ -83,13 +95,15 @@ local function playersAround(self: SkateController): { SkaterView }
 	local views = self._views
 	local count = 0
 	local localPlayer = Players.LocalPlayer
-	for _, player in Players:GetPlayers() do
+	local playerList = self._playerList
+	local players: { Player } = if playerList ~= nil then playerList.list else NO_PLAYERS
+	for _, player in players do
 		local character = player.Character
-		local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+		local root = if character ~= nil then character:FindFirstChild(SkaterRig.root) :: BasePart? else nil
 		if player ~= localPlayer and root ~= nil then
 			count += 1
 			local view = views[count]
-			local team: string? = player:GetAttribute(Attributes.Team)
+			local team = player:GetAttribute(Attributes.Team) :: string?
 			if view == nil then
 				views[count] = { player = PlayerIds.of(player), team = team, root = root }
 			else
@@ -211,13 +225,37 @@ local function apply(self: SkateController, skater: SkateMath.Skater)
 	end
 end
 
+-- Sends pump and brake when they change, within the server's rate limit: a change the limit holds back goes out as
+-- the latest state once it may, since the server would drop it and nothing would send it again.
 local function shareState(self: SkateController)
 	local keys = self._keys
 	if keys.pump ~= self.pumping or keys.brake ~= self.braking then
 		self.pumping = keys.pump
 		self.braking = keys.brake
-		self._sendSkateState(keys.pump, keys.brake)
+		self._statePending = true
 	end
+	if self._statePending and self._stateLimiter:allow(Remotes.names.SkateState, self._clock()) then
+		self._statePending = false
+		self._sendSkateState(self.pumping, self.braking)
+	end
+end
+
+-- The kickoff freeze (the server anchors every root while it places them): the skater starts from rest, upright and
+-- facing where the server put them, with no attach held over and no jump pressed during the countdown. Pump and brake
+-- are still shared, so other players see what this one holds.
+local function freeze(self: SkateController, root: BasePart, skater: SkateMath.Skater)
+	self._inputController:read(self._keys)
+	skater:stop()
+	local up = worldUp(self)
+	skater.up = up
+	local facing = Vectors.alongSurface(root.CFrame.LookVector, up)
+	if facing.Magnitude > Vectors.EPSILON then
+		skater.forward = facing.Unit
+	end
+	self._filter:reset(up)
+	self._attach:reset()
+	apply(self, skater)
+	shareState(self)
 end
 
 local SkateController: SkateController = {
@@ -233,6 +271,9 @@ local SkateController: SkateController = {
 		return {}
 	end,
 	_sendSkateState = function(_pump: boolean, _brake: boolean) end,
+	_stateLimiter = nil :: any,
+	_clock = os.clock,
+	_statePending = false,
 	_team = function(): string?
 		return nil
 	end,
@@ -252,9 +293,10 @@ local SkateController: SkateController = {
 	_sources = {},
 	_teammates = {},
 	_views = {},
+	_playerList = nil,
 
-	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.Gravity, deps.Team and deps.Raycast replace the live game
-	-- in tests.
+	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.Clock, deps.Gravity, deps.Team and deps.Raycast replace
+	-- the live game in tests.
 	init = function(self: SkateController, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -267,6 +309,9 @@ local SkateController: SkateController = {
 			or function(pump: boolean, brake: boolean)
 				Remotes.get(ReplicatedStorage, Remotes.names.SkateState):FireServer({ pump = pump, brake = brake })
 			end
+		self._stateLimiter = RateLimiter.new(config.Network.maxSkateStatesPerSecond)
+		self._clock = deps.Clock or os.clock
+		self._statePending = false
 		self._team = deps.Team
 			or function(): string?
 				return (Players.LocalPlayer :: Player):GetAttribute(Attributes.Team) :: string?
@@ -294,6 +339,7 @@ local SkateController: SkateController = {
 	end,
 
 	start = function(self: SkateController)
+		self._playerList = PlayerList.new(Players)
 		CollectionService:GetInstanceAddedSignal(Tags.RideSurface):Connect(function()
 			refreshSurfaces(self)
 		end)
@@ -316,8 +362,8 @@ local SkateController: SkateController = {
 	end,
 
 	bind = function(self: SkateController, character: Model)
-		local humanoid = character:WaitForChild("Humanoid") :: Humanoid
-		local root = character:WaitForChild("HumanoidRootPart") :: BasePart
+		local humanoid = character:WaitForChild(SkaterRig.humanoid) :: Humanoid
+		local root = character:WaitForChild(SkaterRig.root) :: BasePart
 		local velocity = root:WaitForChild(SkaterRig.velocity) :: LinearVelocity
 		local align = root:WaitForChild(SkaterRig.align) :: AlignOrientation
 		humanoid.EvaluateStateMachine = false
@@ -329,8 +375,11 @@ local SkateController: SkateController = {
 		self._align = align
 		self._filter:reset(worldUp(self))
 		self._attach = Attach.new(self._config.Movement)
+		-- Jump presses made while there was no character to jump are spent here, not on the new one.
+		self._inputController:read(self._keys)
 		self.pumping = false
 		self.braking = false
+		self._statePending = false
 	end,
 
 	step = function(self: SkateController, dt: number)
@@ -340,9 +389,7 @@ local SkateController: SkateController = {
 			return
 		end
 		if root.Anchored then
-			-- The kickoff freeze: no speed builds up, and the skater starts from rest when it ends.
-			skater:stop()
-			self._filter:reset(worldUp(self))
+			freeze(self, root, skater)
 			return
 		end
 

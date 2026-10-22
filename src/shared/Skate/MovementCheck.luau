@@ -35,9 +35,18 @@ function MovementCheck.new(movement: Config.MovementConfig, network: Config.Netw
 	return setmetatable(self, MovementCheck)
 end
 
--- Starts a player over at `position`: their next sample is measured from here.
+-- Starts a player over at `position`: their next sample is measured from here. The guard resets every frozen skater
+-- each sample, so a player's record is reused.
 function MovementCheck.reset(self: MovementCheck, player: string, position: Vector3, now: number)
-	self._records[player] = { time = now, position = position, lastValid = position, strikes = 0 }
+	local record = self._records[player]
+	if record == nil then
+		self._records[player] = { time = now, position = position, lastValid = position, strikes = 0 }
+		return
+	end
+	record.time = now
+	record.position = position
+	record.lastValid = position
+	record.strikes = 0
 end
 
 -- Judges the move since the player's last sample. The first sample for a player is a reset, so it is always Ok.
