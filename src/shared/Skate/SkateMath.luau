@@ -21,6 +21,9 @@ type Fields = {
 	forward: Vector3,
 	_movement: Config.MovementConfig,
 	_gravity: Vector3,
+	_worldUp: Vector3,
+	-- A surface whose normal is closer to world up than this cosine is not steep (maxStickAngle).
+	_stickCos: number,
 	-- Gravity's pull along a surface no steeper than pumpFlatSlopeDeg: pumping there counts as on the flat.
 	_flatPull: number,
 }
@@ -35,6 +38,8 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		forward = -Vector3.zAxis,
 		_movement = movement,
 		_gravity = gravity,
+		_worldUp = -gravity.Unit,
+		_stickCos = math.cos(math.rad(movement.maxStickAngle)),
 		_flatPull = gravity.Magnitude * math.sin(math.rad(movement.pumpFlatSlopeDeg)),
 	}
 	return setmetatable(self, SkateMath)
@@ -56,6 +61,21 @@ local function rotateToward(from: Vector3, to: Vector3, maxAngle: number, fallba
 	axis = if axis.Magnitude > EPSILON then axis.Unit else fallbackAxis
 	local cos, sin = math.cos(maxAngle), math.sin(maxAngle)
 	return from * cos + axis:Cross(from) * sin + axis * (axis:Dot(from) * (1 - cos))
+end
+
+-- The way the skater faces, laid onto the surface. A facing straight into it (head-on against a wall, or straight
+-- up after riding a wall) lies on it nowhere, so the skater then faces up the surface's slope, or sideways on level
+-- ground.
+local function facingOn(self: Skater, normal: Vector3): Vector3
+	local facing = alongSurface(self.forward, normal)
+	if facing.Magnitude > EPSILON then
+		return facing.Unit
+	end
+	local uphill = alongSurface(self._worldUp, normal)
+	if uphill.Magnitude > EPSILON then
+		return uphill.Unit
+	end
+	return normal:Cross(Vector3.zAxis).Unit
 end
 
 -- Turns widen with speed: turnRateLow at rest down to turnRateHigh at hardCap.
@@ -80,7 +100,7 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	local normal = ground.normal
 	local velocity = alongSurface(self.velocity, normal)
 	local speed = velocity.Magnitude
-	local heading = if speed > EPSILON then velocity / speed else alongSurface(self.forward, normal).Unit
+	local heading = if speed > EPSILON then velocity / speed else facingOn(self, normal)
 
 	local stick = math.min(input.move.Magnitude, 1)
 	local wish = alongSurface(input.move, normal)
@@ -129,8 +149,68 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	self.forward = if speed > EPSILON then direction else heading
 end
 
+-- Ballistic: gravity and drag, a little horizontal steering, and turning back upright.
+local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
+	local movement = self._movement
+	local worldUp = self._worldUp
+	local velocity = self.velocity
+	local rising = worldUp * velocity:Dot(worldUp)
+	local horizontal = velocity - rising
+	local horizontalSpeed = horizontal.Magnitude
+	local wish = input.move - worldUp * input.move:Dot(worldUp)
+	if horizontalSpeed > EPSILON and wish.Magnitude > EPSILON then
+		local turned = rotateToward(horizontal / horizontalSpeed, wish.Unit, movement.airTurnRate * dt, worldUp)
+		horizontal = turned * horizontalSpeed
+	end
+
+	velocity = horizontal + rising + self._gravity * dt
+	local speed = velocity.Magnitude
+	if speed > EPSILON then
+		velocity *= math.min(speed - movement.airDrag * speed * dt, movement.hardCap) / speed
+	end
+	self.velocity = velocity
+	self.up = rotateToward(self.up, worldUp, movement.airUprightRate * dt, self.forward)
+	local travel = velocity - worldUp * velocity:Dot(worldUp)
+	if travel.Magnitude > EPSILON then
+		self.forward = travel.Unit
+	end
+end
+
+-- The mode changes first, so a jump or a fall is stepped in the air at once.
+local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.Ground)
+	local movement = self._movement
+	if self.mode == "Grounded" then
+		if ground.hit and input.jump then
+			self.velocity += ground.normal * movement.jumpImpulse
+			self.mode = "Airborne"
+		elseif
+			not ground.hit
+			-- Too slow to ride a surface this steep.
+			or (
+				ground.normal:Dot(self._worldUp) < self._stickCos
+				and alongSurface(self.velocity, ground.normal).Magnitude < movement.minWallSpeed
+			)
+		then
+			self.mode = "Airborne"
+		end
+	elseif ground.hit and ground.distance <= movement.hoverHeight and self.velocity:Dot(ground.normal) <= 0 then
+		self.mode = "Grounded"
+	end
+end
+
 function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
-	stepGrounded(self, input, ground, dt)
+	resolveMode(self, input, ground)
+	if self.mode == "Grounded" then
+		stepGrounded(self, input, ground, dt)
+	else
+		stepAirborne(self, input, dt)
+	end
+end
+
+-- Still and on the ground: the kickoff freeze and a fresh character start from rest.
+function SkateMath.stop(self: Skater)
+	self.velocity = Vector3.zero
+	self.mode = "Grounded"
 end
 
 return SkateMath
