@@ -131,6 +131,56 @@ function Fixtures.rig(parent: Instance, name: string, cframe: CFrame, rigType: E
 	return model
 end
 
+-- An R15 rig whose joints are Motor6Ds, named as the avatar's own joints are. The parts all sit on `cframe`: only the
+-- joints matter to the tests that use it.
+function Fixtures.jointedRig(parent: Instance, name: string, cframe: CFrame): Model
+	local model = Instance.new("Model")
+	model.Name = name
+	local parts: { [string]: BasePart } = {}
+	for _, partName in
+		{
+			"HumanoidRootPart",
+			"LowerTorso",
+			"UpperTorso",
+			"LeftUpperLeg",
+			"LeftLowerLeg",
+			"RightUpperLeg",
+			"RightLowerLeg",
+			"RightUpperArm",
+		}
+	do
+		local part = Instance.new("Part")
+		part.Name = partName
+		part.Size = if partName == "HumanoidRootPart" then Vector3.new(2, 2, 1) else Vector3.new(1, 1, 1)
+		part.CFrame = cframe
+		part.Parent = model
+		parts[partName] = part
+	end
+	local joints = {
+		{ name = "Root", from = "HumanoidRootPart", to = "LowerTorso" },
+		{ name = "Waist", from = "LowerTorso", to = "UpperTorso" },
+		{ name = "LeftHip", from = "LowerTorso", to = "LeftUpperLeg" },
+		{ name = "LeftKnee", from = "LeftUpperLeg", to = "LeftLowerLeg" },
+		{ name = "RightHip", from = "LowerTorso", to = "RightUpperLeg" },
+		{ name = "RightKnee", from = "RightUpperLeg", to = "RightLowerLeg" },
+		{ name = "RightShoulder", from = "UpperTorso", to = "RightUpperArm" },
+	}
+	for _, joint in joints do
+		local motor = Instance.new("Motor6D")
+		motor.Name = joint.name
+		motor.Part0 = parts[joint.from]
+		motor.Part1 = parts[joint.to]
+		motor.Parent = parts[joint.from]
+	end
+	local humanoid = Instance.new("Humanoid")
+	humanoid.RigType = Enum.HumanoidRigType.R15
+	humanoid.HipHeight = 2
+	humanoid.Parent = model
+	model.PrimaryPart = parts.HumanoidRootPart
+	model.Parent = parent
+	return model
+end
+
 -- Also crosses Gate 2, whose rectangle contains the ring.
 function Fixtures.throughRing(): (Vector3, Vector3)
 	local x = 2 * GATE_SPACING
