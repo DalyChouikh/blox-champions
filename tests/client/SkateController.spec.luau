@@ -201,12 +201,19 @@ describe("SkateController over the roof", function()
 	local RADIUS = 22
 	local DT = 1 / 60
 
-	-- Whether the skater stays on from level up to the top of the arc at `speed`.
-	local function holdsOverTheTop(speed: number): boolean
+	-- Whether the skater stays on from level up to the top of the arc at `speed`. With `strips`, the roof is that many
+	-- flat strips over the half circle, as the arena builds it, so the ray's normal turns only at strip edges.
+	local function holdsOverTheTop(speed: number, strips: number?): boolean
 		local phi = 0
 		setup({
 			Raycast = function(): any
-				return { Normal = Vector3.new(-math.cos(phi), -math.sin(phi), 0), Distance = movement.hoverHeight }
+				local facing = phi
+				if strips ~= nil then
+					local width = math.pi / strips
+					facing = (math.floor(phi / width) + 0.5) * width
+				end
+				local normal = Vector3.new(-math.cos(facing), -math.sin(facing), 0)
+				return { Normal = normal, Distance = movement.hoverHeight }
 			end,
 		})
 		SkateController:bind(rig)
@@ -226,5 +233,10 @@ describe("SkateController over the roof", function()
 	it("holds a skater over the top of the roof at 70 studs/s and drops one at 60, as the loop rule says", function()
 		expect(holdsOverTheTop(70)).toBe(true)
 		expect(holdsOverTheTop(60)).toBe(false)
+	end)
+
+	it("does the same over the arena's roof of 21 flat strips, through its own normal filter", function()
+		expect(holdsOverTheTop(70, 21)).toBe(true)
+		expect(holdsOverTheTop(60, 21)).toBe(false)
 	end)
 end)

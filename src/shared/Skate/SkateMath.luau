@@ -11,6 +11,12 @@ local EPSILON = Vectors.EPSILON
 local alongSurface = Vectors.alongSurface
 local rotateToward = Vectors.rotateToward
 
+-- How many past grounded steps the curvature window can reach back over: at hardCap a window of ten studs spans five,
+-- and at a crawl the window simply covers less road, where the loop rule's speed² makes the curve irrelevant.
+local HISTORY = 32
+-- A ground normal turning less than this in a step (radians) has not turned: float noise on a flat surface.
+local TURN_EPSILON = 1e-6
+
 local SkateMath = {}
 SkateMath.__index = SkateMath
 
@@ -28,8 +34,14 @@ type Fields = {
 	_stickCos: number,
 	-- Gravity's pull along a surface no steeper than pumpFlatSlopeDeg: pumping there counts as on the flat.
 	_flatPull: number,
-	-- The ground normal the last grounded step rode on: the curve the surface makes is measured from it (A3).
+	-- The ground normal the last grounded step rode on, nil in the air: each step's turn is measured from it (A3).
 	_lastNormal: Vector3?,
+	-- The last grounded steps, newest at `_historyHead`: how far each went and how much the ground turned under it,
+	-- positive on the inside of a loop. The curve is read over curvatureWindow studs of them.
+	_steps: { number },
+	_turns: { number },
+	_historyHead: number,
+	_historyCount: number,
 }
 
 export type Skater = typeof(setmetatable({} :: Fields, SkateMath))
@@ -46,6 +58,10 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_stickCos = math.cos(math.rad(movement.maxStickAngle)),
 		_flatPull = gravity.Magnitude * math.sin(math.rad(movement.pumpFlatSlopeDeg)),
 		_lastNormal = nil,
+		_steps = table.create(HISTORY, 0),
+		_turns = table.create(HISTORY, 0),
+		_historyHead = 0,
+		_historyCount = 0,
 	}
 	return setmetatable(self, SkateMath)
 end
@@ -163,28 +179,83 @@ local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
 	end
 end
 
--- How sharply the surface bends around the skater, 1/radius, positive on the inside of a loop: how far the normal
--- turned along the heading in one step, per stud travelled. Zero until a grounded step has measured it, and while
--- the skater is still.
-local function curvature(self: Skater, normal: Vector3, heading: Vector3, speed: number, dt: number): number
+-- This step's travel along the ground and how far the ground's normal turned since the last grounded step, positive
+-- when the surface bends around the skater (the inside of a loop). No turn is known before a grounded step.
+local function measure(self: Skater, normal: Vector3, dt: number): (number, number)
+	local along = alongSurface(self.velocity, normal)
+	local speed = along.Magnitude
 	local last = self._lastNormal
-	if last == nil or speed * dt <= EPSILON then
-		return 0
+	if last == nil or speed <= EPSILON then
+		return speed * dt, 0
 	end
-	return -(normal - last):Dot(heading) / (speed * dt)
+	-- atan2 of the cross and dot products is exactly zero for a normal that has not turned; acos of a dot product of
+	-- single-precision vectors reads a few ten-thousandths of a radian there, enough to look like a turn.
+	local angle = math.atan2(last:Cross(normal).Magnitude, last:Dot(normal))
+	return speed * dt, if (normal - last):Dot(along) > 0 then -angle else angle
+end
+
+-- How sharply the surface bends around the skater, 1/radius, from the turns of the last curvatureWindow studs of
+-- path. Across the arena roof's flat strips the ground turns only at each strip's edge, so the curve is the turning
+-- between the oldest and the newest turn in the window over the road between them: one strip's angle per strip's
+-- width, the arc they make. On a smooth curve every step turns, and this is the turn per stud. With fewer than two
+-- turns in the window it is the turning over the window's road. Zero until a grounded step has measured a turn.
+local function curvature(self: Skater, travel: number, turn: number): number
+	local window = self._movement.curvatureWindow
+	-- Walking back from now, a step's turn happened where that step ended: `behind` studs ago.
+	local behind, turned, turns = 0, 0, 0
+	local newest, oldest, oldestTurn = 0, 0, 0
+	local step, stepTurn = travel, turn
+	local index, remaining = self._historyHead, self._historyCount
+	while true do
+		if math.abs(stepTurn) > TURN_EPSILON then
+			if turns == 0 then
+				newest = behind
+			end
+			turns += 1
+			turned += stepTurn
+			oldest, oldestTurn = behind, stepTurn
+		end
+		behind += step
+		if behind >= window or remaining == 0 then
+			break
+		end
+		step, stepTurn = self._steps[index], self._turns[index]
+		index = if index == 1 then HISTORY else index - 1
+		remaining -= 1
+	end
+	if turns >= 2 then
+		return (turned - oldestTurn) / (oldest - newest)
+	end
+	return if behind > EPSILON then turned / behind else 0
 end
 
 -- Past straight up the surface overhangs, and gravity pulls the skater off it: they stay on only while speed² ×
 -- curvature reaches that pull. A flat ceiling has no curvature, so it never holds (spec §7.2, A3).
-local function loopBreaks(self: Skater, normal: Vector3, dt: number): boolean
+local function loopBreaks(self: Skater, normal: Vector3, travel: number, turn: number): boolean
 	local pull = self._gravity:Dot(normal)
 	if pull <= 0 then
 		return false
 	end
-	local along = alongSurface(self.velocity, normal)
-	local speed = along.Magnitude
-	local heading = if speed > EPSILON then along / speed else Vector3.zero
-	return speed * speed * curvature(self, normal, heading, speed, dt) < pull
+	local speed = alongSurface(self.velocity, normal).Magnitude
+	return speed * speed * curvature(self, travel, turn) < pull
+end
+
+-- Keeps this grounded step's travel and turn for the curvature window.
+local function remember(self: Skater, normal: Vector3, travel: number, turn: number)
+	if self._lastNormal ~= nil and travel > EPSILON then
+		local head = self._historyHead % HISTORY + 1
+		self._historyHead = head
+		self._steps[head] = travel
+		self._turns[head] = turn
+		self._historyCount = math.min(self._historyCount + 1, HISTORY)
+	end
+	self._lastNormal = normal
+end
+
+-- Off the ground the path's curve no longer says anything about a surface.
+local function forget(self: Skater)
+	self._lastNormal = nil
+	self._historyCount = 0
 end
 
 -- A surface steeper than maxStickAngle holds only a skater moving at least minWallSpeed along it.
@@ -194,7 +265,7 @@ local function tooSlowOnWall(self: Skater, normal: Vector3): boolean
 end
 
 -- The mode changes first, so a jump or a fall is stepped in the air at once.
-local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
+local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.Ground, travel: number, turn: number)
 	local movement = self._movement
 	if self.mode == "Grounded" then
 		if ground.hit and input.jump then
@@ -204,7 +275,7 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 			not ground.hit
 			or tooSlowOnWall(self, ground.normal)
 			-- Past straight up, the curve of the surface must hold the skater (A3).
-			or loopBreaks(self, ground.normal, dt)
+			or loopBreaks(self, ground.normal, travel, turn)
 		then
 			self.mode = "Airborne"
 		end
@@ -214,12 +285,16 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 end
 
 function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
-	resolveMode(self, input, ground, dt)
+	local travel, turn = 0, 0
+	if self.mode == "Grounded" and ground.hit then
+		travel, turn = measure(self, ground.normal, dt)
+	end
+	resolveMode(self, input, ground, travel, turn)
 	if self.mode == "Grounded" then
-		self._lastNormal = ground.normal
+		remember(self, ground.normal, travel, turn)
 		stepGrounded(self, input, ground, dt)
 	else
-		self._lastNormal = nil
+		forget(self)
 		stepAirborne(self, input, dt)
 	end
 end
@@ -254,7 +329,7 @@ end
 function SkateMath.stop(self: Skater)
 	self.velocity = Vector3.zero
 	self.mode = "Grounded"
-	self._lastNormal = nil
+	forget(self)
 end
 
 return SkateMath
