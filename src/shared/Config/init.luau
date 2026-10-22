@@ -2,17 +2,20 @@
 -- Game configuration: per-area defaults merged with a game mode's overrides, validated, and deep-frozen.
 -- Adding a tunable means adding it to an area file (defaults + schema); modes only list what they change.
 
+local Arena = require(script.Arena)
 local Freeze = require(script.Parent.Util.Freeze)
 local Match = require(script.Match)
 local Scoring = require(script.Scoring)
 local UI = require(script.UI)
 local Validate = require(script.Validate)
 
+export type ArenaConfig = Arena.ArenaConfig
 export type MatchConfig = Match.MatchConfig
 export type ScoringConfig = Scoring.ScoringConfig
 export type UIConfig = UI.UIConfig
 
 export type GameConfig = {
+	Arena: ArenaConfig,
 	Match: MatchConfig,
 	Scoring: ScoringConfig,
 	UI: UIConfig,
@@ -28,6 +31,7 @@ export type Mode = {
 local Config = {}
 
 Config.schema = Validate.record({
+	Arena = Arena.schema,
 	Match = Match.schema,
 	Scoring = Scoring.schema,
 	UI = UI.schema,
@@ -65,7 +69,8 @@ local function deepMerge(target: { [any]: any }, overrides: { [any]: any })
 end
 
 local function build(overrides: { [string]: any }): GameConfig
-	local config = deepCopy({ Match = Match.defaults, Scoring = Scoring.defaults, UI = UI.defaults })
+	local config =
+		deepCopy({ Arena = Arena.defaults, Match = Match.defaults, Scoring = Scoring.defaults, UI = UI.defaults })
 	deepMerge(config, overrides)
 	Validate.assertValid(config, Config.schema, "")
 	return Freeze.deep(config)

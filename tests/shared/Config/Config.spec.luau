@@ -44,6 +44,46 @@ describe("Config defaults", function()
 		expect(Config.defaults().UI.clockWarnings).toEqual({ 60, 30 })
 	end)
 
+	it("match the spec's arena layout", function()
+		local a = Config.defaults().Arena
+		expect(a.straightLength).toBe(160)
+		expect(a.endRadius).toBe(60)
+		expect(a.trackWidth).toBe(44)
+		expect(a.outerWallHeight).toBe(28)
+		expect(a.infieldWallHeight).toBe(20)
+		expect(a.wallCurveRadius).toBe(10)
+		expect(a.stepHeight).toBe(4)
+		expect(a.stepWidth).toBe(10)
+		expect(a.upperFloorWidth).toBe(4)
+		expect(a.profileBlendLength).toBe(20)
+		expect(a.segmentLength).toBe(4)
+		expect(a.stripsPerSection).toBe(18)
+		expect(a.surfaceThickness).toBe(1)
+		expect(a.goalGateIndex).toBe(2)
+		expect(a.goal).toEqual({
+			ringRadius = 7,
+			heightAboveFloor = 18,
+			panelThickness = 0.5,
+			rimThickness = 1,
+			rimSegments = 16,
+			wallGap = 1,
+		})
+		expect(a.marker).toEqual({ width = 2, height = 8 })
+		expect(a.teamSpawnSpacing).toBe(10)
+		expect(a.ballSpawnHeight).toBe(6)
+	end)
+
+	it("give each team and each arena part a color", function()
+		local d = Config.defaults()
+		expect(d.UI.teamColors).toEqual({ Blue = Color3.fromRGB(13, 105, 172), Orange = Color3.fromRGB(218, 133, 65) })
+		expect(d.Arena.colors).toEqual({
+			surface = Color3.fromRGB(163, 162, 165),
+			infield = Color3.fromRGB(99, 95, 98),
+			goal = Color3.fromRGB(248, 248, 248),
+			marker = Color3.fromRGB(27, 42, 53),
+		})
+	end)
+
 	it("are valid and deeply frozen", function()
 		local d = Config.defaults()
 		expect(#Config.schema(d, "")).toBe(0)
@@ -121,6 +161,42 @@ describe("Config.forMode", function()
 	it("keeps the Normal Champions mode frozen", function()
 		expect(table.isfrozen(NormalChampions)).toBe(true)
 		expect(table.isfrozen(NormalChampions.overrides)).toBe(true)
+	end)
+
+	it("rejects arena sizes that cannot be built", function()
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{
+				overrides = { trackWidth = 30 },
+				message = "Arena: trackWidth must fit both wall curves, the step, the upper floor and a lower floor",
+			},
+			{
+				overrides = { endRadius = 22 },
+				message = "Arena: endRadius must leave room for the infield behind the inner wall",
+			},
+			{
+				overrides = { infieldWallHeight = 10 },
+				message = "Arena: each wall must rise above the curve at its foot",
+			},
+			{
+				overrides = { profileBlendLength = 200 },
+				message = "Arena: profileBlendLength must fit within a straight and a curved end",
+			},
+			{
+				overrides = { goal = { wallGap = 30 } },
+				message = "Arena: the goal ring must fit across the track",
+			},
+			{
+				overrides = { goal = { heightAboveFloor = 24 } },
+				message = "Arena: the goal ring must sit between the upper floor and the outer wall top",
+			},
+			{ overrides = { stripsPerSection = 6 }, message = "Arena.stripsPerSection: must be >= 7 (got 6)" },
+			{ overrides = { goalGateIndex = 5 }, message = "Arena.goalGateIndex: must be <= 4 (got 5)" },
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config({ Arena = case.overrides })
+			end).toThrow(case.message)
+		end
 	end)
 
 	it("rejects a malformed mode", function()
