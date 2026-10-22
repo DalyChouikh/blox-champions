@@ -6,6 +6,7 @@ local Arena = require(script.Arena)
 local Ball = require(script.Ball)
 local Freeze = require(script.Parent.Util.Freeze)
 local Match = require(script.Match)
+local Movement = require(script.Movement)
 local Network = require(script.Network)
 local Scoring = require(script.Scoring)
 local UI = require(script.UI)
@@ -14,6 +15,7 @@ local Validate = require(script.Validate)
 export type ArenaConfig = Arena.ArenaConfig
 export type BallConfig = Ball.BallConfig
 export type MatchConfig = Match.MatchConfig
+export type MovementConfig = Movement.MovementConfig
 export type NetworkConfig = Network.NetworkConfig
 export type ScoringConfig = Scoring.ScoringConfig
 export type UIConfig = UI.UIConfig
@@ -22,6 +24,7 @@ export type GameConfig = {
 	Arena: ArenaConfig,
 	Ball: BallConfig,
 	Match: MatchConfig,
+	Movement: MovementConfig,
 	Network: NetworkConfig,
 	Scoring: ScoringConfig,
 	UI: UIConfig,
@@ -58,6 +61,7 @@ Config.schema = Validate.checkAll(
 		Arena = Arena.schema,
 		Ball = Ball.schema,
 		Match = Match.schema,
+		Movement = Movement.schema,
 		Network = Network.schema,
 		Scoring = Scoring.schema,
 		UI = UI.schema,
@@ -101,6 +105,7 @@ local function build(overrides: { [string]: any }): GameConfig
 		Arena = Arena.defaults,
 		Ball = Ball.defaults,
 		Match = Match.defaults,
+		Movement = Movement.defaults,
 		Network = Network.defaults,
 		Scoring = Scoring.defaults,
 		UI = UI.defaults,

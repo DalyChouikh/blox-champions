@@ -8,10 +8,17 @@ local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local GeometryTypes = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
 
+local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
+
 local Fixtures = {}
 
 -- Roblox's default workspace.Gravity, pointing down.
 Fixtures.GRAVITY = Vector3.new(0, -196.2, 0)
+
+-- Asserts two vectors are within `tolerance` (default 1e-3) of each other.
+function Fixtures.expectNear(actual: Vector3, expected: Vector3, tolerance: number?)
+	JestGlobals.expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-3)
+end
 
 local GATE_SPACING = 100
 local GATE_SIZE = 40
