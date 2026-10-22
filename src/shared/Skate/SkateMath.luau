@@ -191,6 +191,32 @@ function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Gro
 	end
 end
 
+-- Never faster than hardCap.
+local function capped(self: Skater, velocity: Vector3): Vector3
+	local speed = velocity.Magnitude
+	local hardCap = self._movement.hardCap
+	return if speed > hardCap then velocity * (hardCap / speed) else velocity
+end
+
+-- Attached behind a leader (Attach): moving with them, pulled toward the follow point.
+function SkateMath.follow(
+	self: Skater,
+	target: Vector3,
+	position: Vector3,
+	leaderVelocity: Vector3,
+	leaderForward: Vector3
+)
+	self.velocity = capped(self, leaderVelocity + (target - position) * self._movement.attachSpring)
+	self.mode = "Attached"
+	self.forward = leaderForward
+end
+
+-- Let go of the leader with a boost; the next step lands the skater if the ground is close.
+function SkateMath.release(self: Skater, direction: Vector3)
+	self.velocity = capped(self, self.velocity + direction * self._movement.attachBoostSpeed)
+	self.mode = "Airborne"
+end
+
 -- Still and on the ground: the kickoff freeze and a fresh character start from rest.
 function SkateMath.stop(self: Skater)
 	self.velocity = Vector3.zero
