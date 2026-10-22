@@ -80,6 +80,18 @@ describe("Config defaults", function()
 		})
 	end)
 
+	it("pose skaters with the starting angles", function()
+		expect(Config.defaults().Pose).toEqual({
+			maxLeanDeg = 30,
+			leanSmoothing = 10,
+			crouchDeg = 30,
+			brakeLeanDeg = 15,
+			tuckDeg = 60,
+			carryArmDeg = 75,
+			airborneProbe = 1.5,
+		})
+	end)
+
 	it("bind the skating keys of spec §8.3", function()
 		local input = Config.defaults().Input
 		expect(input.contextPriority).toBe(1000)

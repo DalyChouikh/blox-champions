@@ -9,6 +9,7 @@ local Freeze = require(script.Parent.Util.Freeze)
 local Match = require(script.Match)
 local Movement = require(script.Movement)
 local Network = require(script.Network)
+local Pose = require(script.Pose)
 local Scoring = require(script.Scoring)
 local UI = require(script.UI)
 local Validate = require(script.Validate)
@@ -19,6 +20,7 @@ export type InputConfig = Input.InputConfig
 export type MatchConfig = Match.MatchConfig
 export type MovementConfig = Movement.MovementConfig
 export type NetworkConfig = Network.NetworkConfig
+export type PoseConfig = Pose.PoseConfig
 export type ScoringConfig = Scoring.ScoringConfig
 export type UIConfig = UI.UIConfig
 
@@ -29,6 +31,7 @@ export type GameConfig = {
 	Match: MatchConfig,
 	Movement: MovementConfig,
 	Network: NetworkConfig,
+	Pose: PoseConfig,
 	Scoring: ScoringConfig,
 	UI: UIConfig,
 }
@@ -67,6 +70,7 @@ Config.schema = Validate.checkAll(
 		Match = Match.schema,
 		Movement = Movement.schema,
 		Network = Network.schema,
+		Pose = Pose.schema,
 		Scoring = Scoring.schema,
 		UI = UI.schema,
 	}),
@@ -112,6 +116,7 @@ local function build(overrides: { [string]: any }): GameConfig
 		Match = Match.defaults,
 		Movement = Movement.defaults,
 		Network = Network.defaults,
+		Pose = Pose.defaults,
 		Scoring = Scoring.defaults,
 		UI = UI.defaults,
 	})
