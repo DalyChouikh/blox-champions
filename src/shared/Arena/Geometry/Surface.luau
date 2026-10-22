@@ -25,27 +25,46 @@ local function append(target: { Piece }, items: { Piece })
 	end
 end
 
--- p10 is the next station's point, p01 the next profile point. Every slab hangs `thickness` behind the surface.
-function Surface.quadPieces(p00: Vector3, p10: Vector3, p01: Vector3, p11: Vector3, thickness: number): { Piece }
+-- p10 is the next station's point, p01 the next profile point.
+local function isRectangle(p00: Vector3, p10: Vector3, p01: Vector3, p11: Vector3): boolean
+	local across, along = p01 - p00, p10 - p00
+	return ((p11 - p10) - across).Magnitude < RECTANGLE_TOLERANCE
+		and math.abs(across.Unit:Dot(along.Unit)) < RECTANGLE_TOLERANCE
+end
+
+-- A flat rectangle as one block, its slab `thickness` behind the surface.
+local function block(p00: Vector3, p10: Vector3, p01: Vector3, p11: Vector3, thickness: number): Piece
 	local across, along = p01 - p00, p10 - p00
 	-- Points into the track for floors and walls alike.
 	local normal = across:Cross(along).Unit
-	local isRectangle = ((p11 - p10) - across).Magnitude < RECTANGLE_TOLERANCE
-		and math.abs(across.Unit:Dot(along.Unit)) < RECTANGLE_TOLERANCE
-	if isRectangle then
-		return {
-			{
-				shape = "Block",
-				cframe = CFrame.fromMatrix((p00 + p11) / 2 - normal * (thickness / 2), across.Unit, normal),
-				size = Vector3.new(across.Magnitude, thickness, along.Magnitude),
-			},
-		}
+	return {
+		shape = "Block",
+		cframe = CFrame.fromMatrix((p00 + p11) / 2 - normal * (thickness / 2), across.Unit, normal),
+		size = Vector3.new(across.Magnitude, thickness, along.Magnitude),
+	}
+end
+
+-- Whether the rectangle a → b continues the rectangle that starts at a0 → b0 in a straight line: the same width
+-- across and the same direction along, so the two make one longer rectangle.
+local function continues(a0: Vector3, b0: Vector3, a1: Vector3, a: Vector3, b: Vector3, a2: Vector3): boolean
+	return ((b - a) - (b0 - a0)).Magnitude < RECTANGLE_TOLERANCE
+		and ((a2 - a).Unit - (a1 - a0).Unit).Magnitude < RECTANGLE_TOLERANCE
+end
+
+-- Every slab hangs `thickness` behind the surface.
+function Surface.quadPieces(p00: Vector3, p10: Vector3, p01: Vector3, p11: Vector3, thickness: number): { Piece }
+	if isRectangle(p00, p10, p01, p11) then
+		return { block(p00, p10, p01, p11, thickness) }
 	end
+	local normal = (p01 - p00):Cross(p10 - p00).Unit
 	local pieces = Triangles.wedges(p00, p01, p11, normal, thickness)
 	append(pieces, Triangles.wedges(p00, p11, p10, normal, thickness))
 	return pieces
 end
 
+-- Strip by strip around the loop. Neighboring rectangles that continue each other in a straight line (a strip whose
+-- cross-section does not change along a straight) merge into one long block: fewer parts, and no seam across the
+-- strip for a rolling ball to bump on.
 function Surface.pieces(arena: ArenaConfig): { Piece }
 	local rings: { { Vector3 } } = {}
 	for _, distance in Centerline.stations(arena) do
@@ -56,21 +75,42 @@ function Surface.pieces(arena: ArenaConfig): { Piece }
 		table.insert(rings, ring)
 	end
 
+	local thickness = arena.surfaceThickness
 	local pieces: { Piece } = {}
-	for index, ring in rings do
-		local nextRing = rings[index % #rings + 1]
-		for point = 1, #ring - 1 do
-			append(
-				pieces,
-				Surface.quadPieces(
-					ring[point],
-					nextRing[point],
-					ring[point + 1],
-					nextRing[point + 1],
-					arena.surfaceThickness
+	for point = 1, #rings[1] - 1 do
+		-- The open run of rectangles: its first quad's near edge, and its far edge so far.
+		local runStart: { Vector3 }? = nil
+		local runEnd: { Vector3 }? = nil
+		local function flush()
+			if runStart ~= nil and runEnd ~= nil then
+				table.insert(
+					pieces,
+					block(runStart[point], runEnd[point], runStart[point + 1], runEnd[point + 1], thickness)
 				)
-			)
+			end
+			runStart, runEnd = nil, nil
 		end
+		for index, ring in rings do
+			-- The last station pairs with the first; runs do not continue across that seam.
+			local nextRing = rings[index % #rings + 1]
+			local p00, p10, p01, p11 = ring[point], nextRing[point], ring[point + 1], nextRing[point + 1]
+			if not isRectangle(p00, p10, p01, p11) then
+				flush()
+				append(pieces, Surface.quadPieces(p00, p10, p01, p11, thickness))
+			else
+				local start = runStart
+				if
+					start == nil
+					or index == 1
+					or not continues(start[point], start[point + 1], (runEnd :: { Vector3 })[point], p00, p01, p10)
+				then
+					flush()
+					runStart = ring
+				end
+				runEnd = nextRing
+			end
+		end
+		flush()
 	end
 	return pieces
 end

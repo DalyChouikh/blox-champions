@@ -6,6 +6,7 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Surface = require(ReplicatedStorage.Shared.Arena.Geometry.Surface)
+local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 
 local function near(actual: Vector3, expected: Vector3)
 	expect((actual - expected).Magnitude).toBeLessThan(1e-3)
@@ -55,9 +56,33 @@ describe("Surface.pieces", function()
 				wedges += 1
 			end
 		end
-		-- Straights: 34 interior stations x 18 blocks, 6 blend stations x (8 blocks + 10 x 4 wedges).
+		-- Straights: 7 strips that never change (one block each), the upper floor (one block between the blends plus
+		-- 6 tilted blend blocks), 10 stepped strips (one block between the blends, 6 blend stations x 4 wedges each).
 		-- Curves: 42 flat stations x (2 wall blocks + 16 x 4 wedges), 6 blend stations x (1 block + 17 x 4 wedges).
-		expect(blocks).toBe(1500)
+		expect(blocks).toBe(2 * (7 + 7 + 10) + 2 * (42 * 2 + 6))
 		expect(wedges).toBe(6672)
+	end)
+
+	-- Fewer parts, and no seams across a straight for a rolling ball to bump on.
+	it("spans each straight with one block per strip wherever the cross-section does not change", function()
+		local arena = Config.defaults().Arena
+		local whole, between = 0, 0
+		local lowerFloor: Types.Piece? = nil
+		for _, piece in Surface.pieces(arena) do
+			if piece.shape == "Block" then
+				if math.abs(piece.size.Z - 160) < 1e-3 then
+					whole += 1
+					if (piece.cframe.Position - Vector3.new(0, -0.5, -53)).Magnitude < 1e-3 then
+						lowerFloor = piece
+					end
+				elseif math.abs(piece.size.Z - 136) < 1e-3 then
+					between += 1
+				end
+			end
+		end
+		expect(whole).toBe(2 * 7)
+		expect(between).toBe(2 * 11)
+		expect(lowerFloor).never.toBeNil()
+		expect(((lowerFloor :: Types.Piece).size - Vector3.new(10, 1, 160)).Magnitude).toBeLessThan(1e-3)
 	end)
 end)
