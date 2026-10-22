@@ -30,11 +30,7 @@ local function near(actual: Vector3, expected: Vector3)
 end
 
 local function holder(name: string, rig: Model): BallService.Holder
-	return {
-		player = name,
-		root = rig:FindFirstChild("HumanoidRootPart") :: BasePart,
-		hand = rig:FindFirstChild("RightHand") :: BasePart,
-	}
+	return { player = name, root = rig:FindFirstChild("HumanoidRootPart") :: BasePart }
 end
 
 local function isSpawn(position: Vector3): boolean
@@ -98,11 +94,20 @@ describe("BallService", function()
 		near(frame.pickupVelocity, Vector3.new(20, 0, 0))
 		expect(BallService.state.carrier).toBe("Near")
 		expect(BallService.part.CanCollide).toBe(false)
+		expect(BallService.part.CanTouch).toBe(false)
 		expect(BallService.part.Massless).toBe(true)
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
 		closest:PivotTo(closest:GetPivot() + Vector3.new(10, 0, 0))
-		local hand = closest:FindFirstChild("RightHand") :: BasePart
-		expect((BallService.part.Position - hand.Position).Magnitude).toBeCloseTo(1.5, 3)
+		local root = closest:FindFirstChild("HumanoidRootPart") :: BasePart
+		near(BallService.part.Position, root.CFrame:PointToWorldSpace(config.Ball.carryOffset))
+	end)
+
+	it("carries the ball at the carrier's side, clear of the floor", function()
+		BallService:spawn()
+		local rig = Fixtures.rig(folder, "A", CFrame.new(BallService.part.Position.X, 3, BallService.part.Position.Z))
+		BallService:step(1 / 60, { holder("A", rig) })
+		expect(BallService.state.carrier).toBe("A")
+		expect(BallService.part.Position.Y - config.Ball.radius >= 0).toBe(true)
 	end)
 
 	it("keeps the thrower from catching their own throw, and reports the throw once", function()
@@ -142,6 +147,7 @@ describe("BallService", function()
 		expect(BallService.state.status).toBe("Loose")
 		expect(BallService.state.carrier).toBeNil()
 		expect(BallService.part.CanCollide).toBe(true)
+		expect(BallService.part.CanTouch).toBe(true)
 		rig:PivotTo(rig:GetPivot() + Vector3.new(10, 0, 0))
 		near(BallService.part.Position, carriedAt)
 	end)

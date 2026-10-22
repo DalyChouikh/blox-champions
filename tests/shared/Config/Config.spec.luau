@@ -37,6 +37,7 @@ describe("Config defaults", function()
 			rethrowPickupDelay = 0.4,
 			ballIdleResetSeconds = 15,
 			outOfBoundsMargin = 2,
+			carryOffset = Vector3.new(2.5, 0, -0.5),
 		})
 		expect(d.Network).toEqual({ pickupLagToleranceStuds = 2 })
 	end)
@@ -242,6 +243,10 @@ describe("Config.forMode", function()
 			{ overrides = { Ball = { elasticity = 1.5 } }, message = "Ball.elasticity: must be <= 1 (got 1.5)" },
 			{ overrides = { Ball = { friction = -0.1 } }, message = "Ball.friction: must be >= 0 (got -0.1)" },
 			{ overrides = { Ball = { density = 0 } }, message = "Ball.density: must be >= 0.0001 (got 0)" },
+			{
+				overrides = { Ball = { carryOffset = Vector3.new(0 / 0, 0, 0) } },
+				message = "Ball.carryOffset: must be finite",
+			},
 			{
 				overrides = { Network = { pickupLagToleranceStuds = -1 } },
 				message = "Network.pickupLagToleranceStuds: must be >= 0 (got -1)",

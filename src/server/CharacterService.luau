@@ -52,14 +52,6 @@ local function rootOf(character: Model): BasePart?
 	return character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
-local function handOf(character: Model): BasePart?
-	return (
-		character:FindFirstChild("RightHand")
-		or character:FindFirstChild("Right Arm")
-		or rootOf(character)
-	) :: BasePart?
-end
-
 -- The root's height above the floor when standing (Roblox: R15 and R6 measure HipHeight differently).
 local function standingHeight(character: Model): number
 	local humanoid = character:FindFirstChildOfClass("Humanoid") :: Humanoid
@@ -248,25 +240,24 @@ local CharacterService: CharacterService = {
 		end
 	end,
 
-	-- Seated players' living characters with a root and a hand, in adoption order; one reused list of reused records.
-	-- Only seated players: a catch the match would not count leaves the ball in the wrong hand.
+	-- Seated players' living characters with a root, in adoption order; one reused list of reused records. Only seated
+	-- players: a catch the match would not count leaves the ball in the wrong hands.
 	holders = function(self: CharacterService): { BallService.Holder }
 		local holders = self._holders
 		local count = 0
 		for _, player in self._order do
 			local character = self._characters[player]
 			local humanoid = character:FindFirstChildOfClass("Humanoid")
-			local root, hand = rootOf(character), handOf(character)
+			local root = rootOf(character)
 			local team = self._teams:teamOf(player)
-			if team ~= nil and humanoid ~= nil and humanoid.Health > 0 and root ~= nil and hand ~= nil then
+			if team ~= nil and humanoid ~= nil and humanoid.Health > 0 and root ~= nil then
 				count += 1
 				local holder = holders[count]
 				if holder == nil then
-					holders[count] = { player = player, root = root, hand = hand }
+					holders[count] = { player = player, root = root }
 				else
 					holder.player = player
 					holder.root = root
-					holder.hand = hand
 				end
 			end
 		end

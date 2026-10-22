@@ -17,8 +17,8 @@ local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
 
--- A player who can catch: their root decides the distance, the ball is held in their hand.
-export type Holder = { player: PlayerId, root: BasePart, hand: BasePart }
+-- A player who can catch: their root decides the distance and carries the ball.
+export type Holder = { player: PlayerId, root: BasePart }
 
 -- One frame's report. `from`/`to` are valid when `moved`; `pickupPosition`/`pickupVelocity` when `picker` is set.
 export type BallFrame = {
@@ -57,7 +57,7 @@ export type BallService = {
 	_teleported: boolean,
 	_last: Vector3,
 	_pendingThrower: PlayerId?,
-	_weld: WeldConstraint?,
+	_weld: Weld?,
 	_touched: RBXScriptConnection?,
 	_canPickUp: (PlayerId) -> boolean,
 	_candidates: { Pickup.Candidate },
@@ -92,17 +92,23 @@ local function release(self: BallService)
 	local part = self.part
 	part.Massless = false
 	part.CanCollide = true
+	part.CanTouch = true
 	part:SetNetworkOwner(nil)
 end
 
+-- Welds the ball at the carrier's side (Ball.carryOffset in their root's frame). A Weld with an explicit offset puts
+-- it in the same place on every machine; while carried it is weightless and touches nothing.
 local function attach(self: BallService, holder: Holder)
 	local part = self.part
-	part.CFrame = holder.hand.CFrame * CFrame.new(0, -self._config.Ball.radius, 0)
+	local offset = CFrame.new(self._config.Ball.carryOffset)
+	part.CFrame = holder.root.CFrame * offset
 	part.Massless = true
 	part.CanCollide = false
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = holder.hand
+	part.CanTouch = false
+	local weld = Instance.new("Weld")
+	weld.Part0 = holder.root
 	weld.Part1 = part
+	weld.C0 = offset
 	weld.Parent = part
 	self._weld = weld
 	self._teleported = true

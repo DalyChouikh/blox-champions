@@ -1,6 +1,7 @@
 --!strict
 -- The ball (spec §9.3): its size and physics, who can catch it and when, and when it is recovered.
 
+local Finite = require(script.Parent.Parent.Util.Finite)
 local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
 
@@ -17,6 +18,8 @@ export type BallConfig = {
 	ballIdleResetSeconds: number,
 	-- How far past the outer wall, below the floor or onto the infield the ball's center may go before it is out.
 	outOfBoundsMargin: number,
+	-- Where a carried ball sits in its carrier's root frame: at their right side, clear of the floor and the legs.
+	carryOffset: Vector3,
 }
 
 local defaults: BallConfig = {
@@ -29,6 +32,7 @@ local defaults: BallConfig = {
 	rethrowPickupDelay = 0.4,
 	ballIdleResetSeconds = 15,
 	outOfBoundsMargin = 2,
+	carryOffset = Vector3.new(2.5, 0, -0.5),
 }
 
 local nonNegative = Validate.number({ min = 0 })
@@ -43,6 +47,7 @@ local schema = Validate.record({
 	rethrowPickupDelay = nonNegative,
 	ballIdleResetSeconds = Validate.number({ above = 0 }),
 	outOfBoundsMargin = nonNegative,
+	carryOffset = Validate.check(Validate.datatype("Vector3"), Finite.vector, "must be finite"),
 })
 
 return {

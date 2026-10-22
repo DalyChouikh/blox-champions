@@ -70,7 +70,7 @@ describe("CharacterService", function()
 		expect((rig.PrimaryPart :: BasePart).Anchored).toBe(false)
 	end)
 
-	it("lists living characters that can hold the ball, with their hand", function()
+	it("lists living characters that can hold the ball, with their root", function()
 		local r15 = Fixtures.rig(folder, "A", CFrame.new(0, 3, 0))
 		local r6 = Fixtures.rig(folder, "B", CFrame.new(5, 3, 0), Enum.HumanoidRigType.R6)
 		local dead = Fixtures.rig(folder, "C", CFrame.new(10, 3, 0))
@@ -79,11 +79,11 @@ describe("CharacterService", function()
 		CharacterService:adopt("A", r15)
 		CharacterService:adopt("B", r6)
 		CharacterService:adopt("C", dead)
-		local hands: { [string]: string } = {}
+		local roots: { [string]: string } = {}
 		for _, holder in CharacterService:holders() do
-			hands[holder.player] = holder.hand.Name
+			roots[holder.player] = holder.root.Name
 		end
-		expect(hands).toEqual({ A = "RightHand", B = "Right Arm" })
+		expect(roots).toEqual({ A = "HumanoidRootPart", B = "HumanoidRootPart" })
 	end)
 
 	it("lists only seated players, so nobody the match does not count can catch the ball", function()
