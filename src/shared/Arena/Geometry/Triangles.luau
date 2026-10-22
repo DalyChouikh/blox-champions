@@ -8,8 +8,7 @@ local Types = require(script.Parent.Types)
 
 type Piece = Types.Piece
 
--- Roblox's smallest part size per axis.
-local MIN_SIZE = 0.001
+local MIN_SIZE = Types.MIN_PART_SIZE
 
 local Triangles = {}
 

@@ -1,0 +1,73 @@
+--!strict
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
+
+local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
+local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
+local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
+
+local Builder = require(game:GetService("ServerScriptService").Server.Arena.Builder)
+local Config = require(ReplicatedStorage.Shared.Config)
+local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
+
+local config = Config.defaults()
+local parent: Folder
+beforeEach(function()
+	parent = Instance.new("Folder")
+	parent.Name = "BuilderTest"
+	parent.Parent = ServerStorage
+end)
+afterEach(function()
+	parent:Destroy()
+end)
+
+local function folder(arena: Instance, name: string): Folder
+	return arena:FindFirstChild(name) :: Folder
+end
+
+describe("Builder.build", function()
+	it("builds one part per piece, grouped by what it is", function()
+		local arena = Builder.build(Geometry.build(config), config, parent)
+		expect(arena.Parent).toBe(parent)
+		expect(#folder(arena, "Surface"):GetChildren()).toBe(8172)
+		expect(#folder(arena, "Infield"):GetChildren()).toBe(3)
+		expect(#folder(arena, "Gates"):GetChildren()).toBe(4)
+		expect(#folder(arena, "Markers"):GetChildren()).toBe(4)
+		expect(#folder(arena, "Spawns"):GetChildren()).toBe(8)
+		local hoop = folder(arena, "Goal"):FindFirstChild("GoalHoop") :: Model
+		expect(#hoop:GetChildren()).toBe(16)
+	end)
+
+	it("makes gates and spawns invisible to physics and queries, and solids smooth and anchored", function()
+		local arena = Builder.build(Geometry.build(config), config, parent)
+		local gate = folder(arena, "Gates"):FindFirstChild("Gate2") :: Part
+		expect(gate.Transparency).toBe(1)
+		expect(gate.CanCollide or gate.CanQuery or gate.CanTouch).toBe(false)
+		expect(gate:GetAttribute("GateIndex")).toBe(2)
+		local pad = folder(arena, "Spawns"):FindFirstChild("Blue1") :: Part
+		expect(pad.CanCollide or pad.CanQuery or pad.CanTouch).toBe(false)
+		expect(pad.Color).toEqual(config.UI.teamColors.Blue)
+		for _, part in folder(arena, "Surface"):GetChildren() do
+			local solid = part :: BasePart
+			if not (solid.Anchored and solid.CanCollide and solid.TopSurface == Enum.SurfaceType.Smooth) then
+				error(`{solid.Name} is not an anchored, colliding, smooth part`)
+			end
+		end
+	end)
+
+	it("leaves nothing behind when a piece is invalid", function()
+		local geometry = Geometry.build(config)
+		local broken = table.clone(geometry)
+		broken.surface = table.clone(geometry.surface)
+		broken.surface[2] = { shape = "Block", cframe = CFrame.identity, size = Vector3.new(0, 1, 1) }
+		expect(function()
+			Builder.build(broken, config, parent)
+		end).toThrow("ArenaBuilder: surface piece 2 is invalid (size 0, 1, 1)")
+		local adrift = table.clone(geometry)
+		adrift.infield = { { shape = "Block", cframe = CFrame.new(0 / 0, 0, 0), size = Vector3.one } }
+		expect(function()
+			Builder.build(adrift, config, parent)
+		end).toThrow("ArenaBuilder: infield piece 1 is invalid (cframe ")
+		expect(#parent:GetChildren()).toBe(0)
+	end)
+end)
