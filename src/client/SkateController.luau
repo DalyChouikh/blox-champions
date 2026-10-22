@@ -20,6 +20,7 @@ local InputController = require(script.Parent.InputController)
 local NormalFilter = require(ReplicatedStorage.Shared.Skate.NormalFilter)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local PlayerList = require(ReplicatedStorage.Shared.Util.PlayerList)
+local RateLimiter = require(ReplicatedStorage.Shared.Net.RateLimiter)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
@@ -51,6 +52,11 @@ export type SkateController = {
 	_camera: { CFrame: CFrame },
 	_skaters: () -> { SkaterView },
 	_sendSkateState: (pump: boolean, brake: boolean) -> (),
+	-- Keeps the sends within the server's rate limit for SkateState (os.clock; a fake in tests).
+	_stateLimiter: RateLimiter.RateLimiter,
+	_clock: () -> number,
+	-- A pump or brake change the limit has not let out yet.
+	_statePending: boolean,
 	_team: () -> string?,
 	_gravity: Vector3,
 	-- workspace:Raycast; a fake in tests, which can then hand the controller a seam's side face.
@@ -219,12 +225,18 @@ local function apply(self: SkateController, skater: SkateMath.Skater)
 	end
 end
 
+-- Sends pump and brake when they change, within the server's rate limit: a change the limit holds back goes out as
+-- the latest state once it may, since the server would drop it and nothing would send it again.
 local function shareState(self: SkateController)
 	local keys = self._keys
 	if keys.pump ~= self.pumping or keys.brake ~= self.braking then
 		self.pumping = keys.pump
 		self.braking = keys.brake
-		self._sendSkateState(keys.pump, keys.brake)
+		self._statePending = true
+	end
+	if self._statePending and self._stateLimiter:allow(Remotes.names.SkateState, self._clock()) then
+		self._statePending = false
+		self._sendSkateState(self.pumping, self.braking)
 	end
 end
 
@@ -259,6 +271,9 @@ local SkateController: SkateController = {
 		return {}
 	end,
 	_sendSkateState = function(_pump: boolean, _brake: boolean) end,
+	_stateLimiter = nil :: any,
+	_clock = os.clock,
+	_statePending = false,
 	_team = function(): string?
 		return nil
 	end,
@@ -280,8 +295,8 @@ local SkateController: SkateController = {
 	_views = {},
 	_playerList = nil,
 
-	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.Gravity, deps.Team and deps.Raycast replace the live game
-	-- in tests.
+	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.Clock, deps.Gravity, deps.Team and deps.Raycast replace
+	-- the live game in tests.
 	init = function(self: SkateController, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -294,6 +309,9 @@ local SkateController: SkateController = {
 			or function(pump: boolean, brake: boolean)
 				Remotes.get(ReplicatedStorage, Remotes.names.SkateState):FireServer({ pump = pump, brake = brake })
 			end
+		self._stateLimiter = RateLimiter.new(config.Network.maxSkateStatesPerSecond)
+		self._clock = deps.Clock or os.clock
+		self._statePending = false
 		self._team = deps.Team
 			or function(): string?
 				return (Players.LocalPlayer :: Player):GetAttribute(Attributes.Team) :: string?
@@ -361,6 +379,7 @@ local SkateController: SkateController = {
 		self._inputController:read(self._keys)
 		self.pumping = false
 		self.braking = false
+		self._statePending = false
 	end,
 
 	step = function(self: SkateController, dt: number)

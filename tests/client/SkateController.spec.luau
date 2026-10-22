@@ -205,6 +205,31 @@ describe("SkateController", function()
 		expect(sent).toEqual({ { true, false }, { false, false } })
 	end)
 
+	-- The server drops states beyond its rate limit, and nothing resends one: the client keeps to the same limit and
+	-- sends the latest state once it may, so the server always ends up with what the keys hold.
+	it("keeps to the server's rate for pump and brake, then sends the latest state", function()
+		local now = 0
+		setup({
+			Clock = function(): number
+				return now
+			end,
+		})
+		SkateController:bind(rig)
+		local pump = Fixtures.scriptedBinding(action("Pump"))
+		local perSecond = config.Network.maxSkateStatesPerSecond
+		-- An odd count of toggles ends on pump held, unlike the last state the burst sends.
+		for toggle = 1, perSecond + 11 do
+			pump:Fire(toggle % 2 == 1)
+			SkateController:step(1 / 60)
+		end
+		expect(#sent).toBe(perSecond)
+		expect(sent[perSecond]).toEqual({ false, false })
+		now = 1
+		SkateController:step(1 / 60)
+		expect(#sent).toBe(perSecond + 1)
+		expect(sent[perSecond + 1]).toEqual({ true, false })
+	end)
+
 	it("ignores one seam ray's side face, so the skater's up holds", function()
 		-- Measured in Phase 3: a downward ray exactly on a seam of the step hit a slab's side face.
 		local seam = Vector3.new(0, 0.49, -0.87)
