@@ -5,12 +5,9 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Surface = require(ReplicatedStorage.Shared.Arena.Geometry.Surface)
 local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
-
-local function near(actual: Vector3, expected: Vector3)
-	expect((actual - expected).Magnitude).toBeLessThan(1e-3)
-end
 
 describe("Surface.quadPieces", function()
 	it("makes one block for a flat rectangle, with its slab behind the surface", function()
@@ -18,9 +15,9 @@ describe("Surface.quadPieces", function()
 			Surface.quadPieces(Vector3.zero, Vector3.new(0, 0, -4), Vector3.new(5, 0, 0), Vector3.new(5, 0, -4), 1)
 		expect(#pieces).toBe(1)
 		expect(pieces[1].shape).toBe("Block")
-		near(pieces[1].cframe.Position, Vector3.new(2.5, -0.5, -2))
+		Fixtures.expectNear(pieces[1].cframe.Position, Vector3.new(2.5, -0.5, -2))
 		expect(pieces[1].cframe.UpVector.Y).toBeCloseTo(1, 4)
-		near(pieces[1].size, Vector3.new(5, 1, 4))
+		Fixtures.expectNear(pieces[1].size, Vector3.new(5, 1, 4))
 	end)
 
 	it("still makes one block for a rectangle that float error leaves slightly imperfect", function()

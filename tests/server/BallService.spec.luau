@@ -31,10 +31,6 @@ local function ballAt(): string?
 	return if parent ~= nil then parent.Name else nil
 end
 
-local function near(actual: Vector3, expected: Vector3)
-	expect((actual - expected).Magnitude).toBeLessThan(1e-3)
-end
-
 local function holder(name: string, rig: Model): BallService.Holder
 	return { player = name, root = rig:FindFirstChild("HumanoidRootPart") :: BasePart }
 end
@@ -82,8 +78,8 @@ describe("BallService", function()
 		ball.CFrame = CFrame.new(start + Vector3.new(4, 0, 0))
 		local frame = BallService:step(1 / 60, {})
 		expect(frame.moved).toBe(true)
-		near(frame.from, start)
-		near(frame.to, start + Vector3.new(4, 0, 0))
+		Fixtures.expectNear(frame.from, start)
+		Fixtures.expectNear(frame.to, start + Vector3.new(4, 0, 0))
 	end)
 
 	it("gives the ball to the nearest player in reach with its velocity from before the catch", function()
@@ -96,8 +92,8 @@ describe("BallService", function()
 		local frame =
 			BallService:step(1 / 60, { holder("Far", farther), holder("Near", closest), holder("Out", outside) })
 		expect(frame.picker).toBe("Near")
-		near(frame.pickupPosition, at)
-		near(frame.pickupVelocity, Vector3.new(20, 0, 0))
+		Fixtures.expectNear(frame.pickupPosition, at)
+		Fixtures.expectNear(frame.pickupVelocity, Vector3.new(20, 0, 0))
 		expect(BallService.state.carrier).toBe("Near")
 		expect(BallService.part.CanCollide).toBe(false)
 		expect(BallService.part.CanTouch).toBe(false)
@@ -105,7 +101,7 @@ describe("BallService", function()
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
 		closest:PivotTo(closest:GetPivot() + Vector3.new(10, 0, 0))
 		local root = closest:FindFirstChild("HumanoidRootPart") :: BasePart
-		near(BallService.part.Position, root.CFrame:PointToWorldSpace(config.Ball.carryOffset))
+		Fixtures.expectNear(BallService.part.Position, root.CFrame * config.Ball.carryOffset)
 	end)
 
 	it("carries the ball at the carrier's side, clear of the floor", function()
@@ -120,7 +116,7 @@ describe("BallService", function()
 		local rig = caughtBy("A")
 		BallService:throw("A", Vector3.new(0, 0, 30))
 		expect(BallService.state.status).toBe("Flying")
-		near(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, 30))
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, 30))
 		expect(BallService.part.CanCollide).toBe(true)
 		local frame = BallService:step(1 / 60, { holder("A", rig) })
 		expect(frame.thrower).toBe("A")
@@ -138,7 +134,7 @@ describe("BallService", function()
 		BallService.part.CFrame = CFrame.new(0, 5, -90)
 		local out = BallService:step(1 / 60, {})
 		expect(out.moved).toBe(true)
-		near(out.to, Vector3.new(0, 5, -90))
+		Fixtures.expectNear(out.to, Vector3.new(0, 5, -90))
 		expect(out.respawned).toBe(true)
 		expect(isSpawn(BallService.part.Position)).toBe(true)
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
@@ -193,7 +189,7 @@ describe("BallService", function()
 		expect(BallService.part.CanCollide).toBe(true)
 		expect(BallService.part.CanTouch).toBe(true)
 		rig:PivotTo(rig:GetPivot() + Vector3.new(10, 0, 0))
-		near(BallService.part.Position, carriedAt)
+		Fixtures.expectNear(BallService.part.Position, carriedAt)
 	end)
 
 	it("lands a thrown ball when it touches the arena, not a player", function()

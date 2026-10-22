@@ -7,10 +7,6 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Triangles = require(ReplicatedStorage.Shared.Arena.Geometry.Triangles)
 
-local function near(actual: Vector3, expected: Vector3)
-	expect((actual - expected).Magnitude).toBeLessThan(1e-3)
-end
-
 local face = Fixtures.wedgeFace
 
 describe("Triangles.wedges", function()
@@ -22,15 +18,15 @@ describe("Triangles.wedges", function()
 		local fronts: { Vector3 } = {}
 		for _, wedge in wedges do
 			local corners = face(wedge, Vector3.yAxis)
-			near(corners[1], Vector3.new(3, 0, 0))
-			near(corners[2], c)
+			Fixtures.expectNear(corners[1], Vector3.new(3, 0, 0))
+			Fixtures.expectNear(corners[2], c)
 			table.insert(fronts, corners[3])
 		end
 		table.sort(fronts, function(left: Vector3, right: Vector3): boolean
 			return left.X < right.X
 		end)
-		near(fronts[1], a)
-		near(fronts[2], b)
+		Fixtures.expectNear(fronts[1], a)
+		Fixtures.expectNear(fronts[2], b)
 	end)
 
 	it("hangs each wedge's slab behind the face, away from the normal", function()
@@ -58,8 +54,8 @@ describe("Triangles.wedges", function()
 		local leaning = Vector3.new(0.2, 1, 0).Unit
 		for _, wedge in Triangles.wedges(a, b, c, leaning, 1) do
 			local corners = face(wedge, leaning)
-			near(corners[1], Vector3.new(3, 0, 0))
-			near(corners[2], c)
+			Fixtures.expectNear(corners[1], Vector3.new(3, 0, 0))
+			Fixtures.expectNear(corners[2], c)
 			expect(math.abs(corners[3].Y)).toBeLessThan(1e-3)
 			expect(wedge.cframe.Position.Y).toBeCloseTo(-0.5, 4)
 		end
