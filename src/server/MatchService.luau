@@ -1,8 +1,8 @@
 --!strict
--- Runs matches on the server (spec §4–§5, §10). Each frame it reports the ball's movement, a throw and a catch to the
--- rules engine in the order the engine documents, ticks it, reacts to its events — hiding and spawning the ball,
--- placing and freezing characters, opening and closing the goal — and sends them to clients. It keeps the ball dead
--- whenever play is not live, so the ball is only ever carried by the engine's last holder. After a match ends it
+-- Runs matches on the server (spec §4–§5, §10). Each frame it reports the ball's movement, a throw, a catch and a body
+-- touch to the rules engine in the order the engine documents, ticks it, reacts to its events — hiding and spawning the
+-- ball, placing and freezing characters, opening and closing the goal — and sends them to clients. It keeps the ball
+-- dead whenever play is not live, so the ball is only ever carried by the engine's last holder. After a match ends it
 -- waits postMatchSeconds and starts the next one with everyone reseated; once every player has left it starts over.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -162,7 +162,7 @@ local MatchService: MatchService = {
 		end)
 	end,
 
-	-- One server frame, in the engine's order: ballMoved, thrown, pickedUp, tick, then the drained events.
+	-- One server frame, in the engine's order: ballMoved, thrown, pickedUp, touched, tick, then the drained events.
 	step = function(self: MatchService, dt: number)
 		local engine = self.engine
 		if self._waiting and self._teams:seatedCount() >= self._config.Match.minPlayersToStart then
@@ -179,6 +179,9 @@ local MatchService: MatchService = {
 		end
 		if frame.picker ~= nil then
 			engine:pickedUp(frame.picker, frame.pickupPosition, frame.pickupVelocity)
+		end
+		if frame.toucher ~= nil then
+			engine:touched(frame.toucher, frame.touchPosition, frame.touchVelocity)
 		end
 		engine:tick(dt)
 

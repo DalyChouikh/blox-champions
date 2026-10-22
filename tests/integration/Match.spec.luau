@@ -11,6 +11,7 @@ local BallService = require(ServerScriptService.Server.BallService)
 local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local CharacterService = require(ServerScriptService.Server.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local MatchService = require(ServerScriptService.Server.MatchService)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
@@ -169,15 +170,16 @@ local function catchWith(rig: Model)
 	MatchService:step(FRAME)
 end
 
--- One seated player catches the ball and carries it one lap, which opens the goal. Returns the rig and where it is.
-local function openGoal(): (Model, number)
-	local rigs = seat(1)
+-- Seats `count` players (1 by default); the first catches the ball and carries it one lap, which opens the goal.
+-- Returns that rig, where it is, and every rig.
+local function openGoal(count: number?): (Model, number, { Model })
+	local rigs = seat(count or 1)
 	kickoff()
 	local start = ballDistance()
 	carry(rigs[1], start, start)
 	local finish = start + Centerline.length(config.Arena) + 2
 	carry(rigs[1], start, finish)
-	return rigs[1], finish % Centerline.length(config.Arena)
+	return rigs[1], finish % Centerline.length(config.Arena), rigs
 end
 
 -- The ball is moved through the ring's disc front to back in two frames.
@@ -237,6 +239,33 @@ describe("A match on the generated arena", function()
 		expect(#eventsNamed("KickoffStarted")).toBe(2)
 		expect(ballAt()).toBe("ServerStorage")
 		expect(tagged().goalPanel.CanCollide).toBe(true)
+	end)
+
+	it("reports a body touch to the rules after the pickups", function()
+		setup()
+		local rig, at, rigs = openGoal(2)
+		expect(TeamService:teamOf("2")).never.toBe(TeamService:teamOf("1"))
+		carry(rig, at, Centerline.gateDistance(config.Arena, config.Arena.goalGateIndex) - 3)
+		local goal = tagged().layout.goal.frame
+		-- A knocked-down defender beside the ring's approach: the ball touches them instead of being caught.
+		local defender = rigs[2]
+		defender:SetAttribute(Attributes.KnockedDown, true)
+		local approach = goal.Position - goal.LookVector * 2
+		defender:PivotTo(CFrame.new(approach + goal.RightVector * 3))
+		BallService:throw("1", goal.LookVector * 60)
+		BallService.part.CFrame = CFrame.new(approach)
+		frames(config.Scoring.saveLookaheadSeconds + 0.1)
+		local saves: { { player: string, kind: string } } = {}
+		for _, batch in firedNamed(Remotes.names.RuleEvents) do
+			for _, event in batch.payload do
+				if event.name == "SaveMade" then
+					table.insert(saves, { player = event.player, kind = event.kind })
+				end
+			end
+		end
+		expect(saves).toEqual({ { player = "2", kind = "Block" } })
+		-- The save came from the touch: a knocked-down defender never takes the ball (a catch would also block).
+		expect(BallService.state.carrier).never.toBe("2")
 	end)
 
 	it("drops the ball where a leaving carrier was, and the team keeps possession", function()

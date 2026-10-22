@@ -3,8 +3,9 @@
 -- that BallState says what to do with. It is hidden (in ServerStorage, so its next spawn is never replicated early)
 -- until a kickoff ends, then spawns at a random ball spawn. A ball that leaves the arena is recovered in any state,
 -- and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each frame `step` reports how it really
--- moved, a throw since the last frame, and who caught it. Jumps the server makes (a spawn, a respawn, the snap to a
--- catcher's side) are never reported as movement, so they can never cross a gate or the ring.
+-- moved, a throw since the last frame, who caught it, and whose body it touched. Jumps the server makes (a spawn, a
+-- respawn, the snap to a catcher's side) are never reported as movement, so they can never cross a gate or the ring.
+-- A pass homes on its target while it flies and the target can catch.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -13,15 +14,18 @@ local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local BallState = require(ReplicatedStorage.Shared.Ball.BallState)
 local Bounds = require(ReplicatedStorage.Shared.Arena.Geometry.Bounds)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Homing = require(ReplicatedStorage.Shared.Ball.Homing)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
 
--- A player who can catch: their root decides the distance and carries the ball.
-export type Holder = { player: PlayerId, root: BasePart }
+-- A player on the field: their root decides the distance and carries the ball. Only one who `canCatch` (not knocked
+-- down) catches it; anyone's body touches it.
+export type Holder = { player: PlayerId, root: BasePart, canCatch: boolean }
 
--- One frame's report. `from`/`to` are valid when `moved`; `pickupPosition`/`pickupVelocity` when `picker` is set.
+-- One frame's report. `from`/`to` are valid when `moved`; `pickupPosition`/`pickupVelocity` when `picker` is set;
+-- `touchPosition`/`touchVelocity` when `toucher` is set: the nearest body a free ball touched without being caught.
 export type BallFrame = {
 	moved: boolean,
 	from: Vector3,
@@ -30,6 +34,9 @@ export type BallFrame = {
 	picker: PlayerId?,
 	pickupPosition: Vector3,
 	pickupVelocity: Vector3,
+	toucher: PlayerId?,
+	touchPosition: Vector3,
+	touchVelocity: Vector3,
 	respawned: boolean,
 }
 
@@ -47,7 +54,10 @@ export type BallService = {
 	spawn: (self: BallService) -> (),
 	kill: (self: BallService) -> (),
 	throw: (self: BallService, player: PlayerId, velocity: Vector3) -> (),
-	drop: (self: BallService) -> (),
+	-- A throw that homes on `target`.
+	pass: (self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId?) -> (),
+	-- A given velocity replaces the ball's (a knocked-down carrier's momentum).
+	drop: (self: BallService, velocity: Vector3?) -> (),
 	onTouched: (self: BallService, hit: BasePart) -> (),
 	step: (self: BallService, dt: number, holders: { Holder }) -> BallFrame,
 	destroy: (self: BallService) -> (),
@@ -55,6 +65,11 @@ export type BallService = {
 	_spawns: { CFrame },
 	_random: Random,
 	_reach: number,
+	-- How close a body is to touch the ball: the ball's and the collider's radii, plus the lag tolerance.
+	_contact: number,
+	_homingAccel: number,
+	-- The pass's target while it homes.
+	_passTarget: PlayerId?,
 	_hidden: boolean,
 	-- A jump made by the server since the last step: the next step reports no movement.
 	_teleported: boolean,
@@ -63,7 +78,9 @@ export type BallService = {
 	_weld: Weld?,
 	_touched: RBXScriptConnection?,
 	_canPickUp: (PlayerId) -> boolean,
+	-- Every holder this frame, and which of them can catch.
 	_candidates: { Pickup.Candidate },
+	_catchers: { [PlayerId]: boolean },
 	_frame: BallFrame,
 }
 
@@ -182,19 +199,34 @@ local function isCharacterPart(hit: BasePart): boolean
 	return model ~= nil and model:FindFirstChildOfClass("Humanoid") ~= nil
 end
 
-local function holderOf(holders: { Holder }, player: PlayerId): Holder
+local function findHolder(holders: { Holder }, player: PlayerId): Holder?
 	for _, holder in holders do
 		if holder.player == player then
 			return holder
 		end
 	end
-	error(`BallService: no holder for player "{player}"`, 0)
+	return nil
 end
 
--- Fills the reused candidate list from this frame's holders.
+local function holderOf(holders: { Holder }, player: PlayerId): Holder
+	local holder = findHolder(holders, player)
+	if holder == nil then
+		error(`BallService: no holder for player "{player}"`, 0)
+	end
+	return holder
+end
+
+local function anyone(_player: PlayerId): boolean
+	return true
+end
+
+-- Fills the reused candidate list from this frame's holders, and which of them can catch.
 local function candidatesFrom(self: BallService, holders: { Holder }): { Pickup.Candidate }
 	local candidates = self._candidates
+	local catchers = self._catchers
+	table.clear(catchers)
 	for index, holder in holders do
+		catchers[holder.player] = holder.canCatch
 		local candidate = candidates[index]
 		if candidate == nil then
 			candidates[index] = { player = holder.player, position = holder.root.Position }
@@ -209,6 +241,22 @@ local function candidatesFrom(self: BallService, holders: { Holder }): { Pickup.
 	return candidates
 end
 
+-- Steers a pass toward its target while it flies and the target can catch. Once either stops, it flies on alone.
+local function home(self: BallService, holders: { Holder }, position: Vector3, dt: number)
+	local target = self._passTarget
+	if target == nil then
+		return
+	end
+	local holder = findHolder(holders, target)
+	if self.state.status ~= "Flying" or holder == nil or not holder.canCatch then
+		self._passTarget = nil
+		return
+	end
+	local part = self.part
+	part.AssemblyLinearVelocity =
+		Homing.step(position, part.AssemblyLinearVelocity, holder.root.Position, self._homingAccel, dt)
+end
+
 local BallService: BallService = {
 	name = "BallService",
 	dependencies = { "Config", "ArenaService" },
@@ -219,10 +267,14 @@ local BallService: BallService = {
 	_spawns = {},
 	_random = Random.new(),
 	_reach = 0,
+	_contact = 0,
+	_homingAccel = 0,
+	_passTarget = nil,
 	_hidden = true,
 	_teleported = true,
 	_last = Vector3.zero,
 	_candidates = {},
+	_catchers = {},
 	_canPickUp = function(_player: PlayerId): boolean
 		return false
 	end,
@@ -234,12 +286,17 @@ local BallService: BallService = {
 		self._config = config
 		self._spawns = deps.ArenaService.arena.ballSpawns
 		self._random = deps.Random or Random.new()
-		self._reach = config.Ball.pickupRadius + config.Network.pickupLagToleranceStuds
+		local lagTolerance = config.Network.pickupLagToleranceStuds
+		self._reach = config.Ball.pickupRadius + lagTolerance
+		self._contact = config.Ball.radius + config.Movement.colliderDiameter / 2 + lagTolerance
+		self._homingAccel = (config.Actions.Pass.pass :: Config.PassSettings).homingAccel
+		self._passTarget = nil
 		self.state = BallState.new(config.Ball.rethrowPickupDelay)
 		self._canPickUp = function(player: PlayerId): boolean
-			return self.state:canPickUp(player)
+			return self._catchers[player] == true and self.state:canPickUp(player)
 		end
 		self._candidates = {}
+		self._catchers = {}
 		self._frame = {
 			moved = false,
 			from = Vector3.zero,
@@ -248,6 +305,9 @@ local BallService: BallService = {
 			picker = nil,
 			pickupPosition = Vector3.zero,
 			pickupVelocity = Vector3.zero,
+			toucher = nil,
+			touchPosition = Vector3.zero,
+			touchVelocity = Vector3.zero,
 			respawned = false,
 		}
 		self._pendingThrower = nil
@@ -287,10 +347,19 @@ local BallService: BallService = {
 		self.part.AssemblyLinearVelocity = velocity
 		self.state:throw()
 		self._pendingThrower = player
+		self._passTarget = nil
 	end,
 
-	drop = function(self: BallService)
+	pass = function(self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId?)
+		self:throw(player, velocity)
+		self._passTarget = target
+	end,
+
+	drop = function(self: BallService, velocity: Vector3?)
 		release(self)
+		if velocity ~= nil then
+			self.part.AssemblyLinearVelocity = velocity
+		end
 		self.state:drop()
 	end,
 
@@ -305,6 +374,7 @@ local BallService: BallService = {
 		frame.moved = false
 		frame.thrower = nil
 		frame.picker = nil
+		frame.toucher = nil
 		frame.respawned = false
 		if self._hidden then
 			return frame
@@ -348,14 +418,23 @@ local BallService: BallService = {
 			return frame
 		end
 
-		local picker = Pickup.choose(position, candidatesFrom(self, holders), self._reach, self._canPickUp)
+		local candidates = candidatesFrom(self, holders)
+		local picker = Pickup.choose(position, candidates, self._reach, self._canPickUp)
 		if picker ~= nil then
 			frame.picker = picker
 			frame.pickupPosition = position
 			frame.pickupVelocity = self.part.AssemblyLinearVelocity
 			attach(self, holderOf(holders, picker))
 			state:pickUp(picker)
+			return frame
 		end
+		local toucher = Pickup.choose(position, candidates, self._contact, anyone)
+		if toucher ~= nil then
+			frame.toucher = toucher
+			frame.touchPosition = position
+			frame.touchVelocity = self.part.AssemblyLinearVelocity
+		end
+		home(self, holders, position, dt)
 		return frame
 	end,
 
