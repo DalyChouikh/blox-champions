@@ -1,6 +1,5 @@
 --!strict
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
@@ -25,16 +24,19 @@ afterEach(function()
 	folder:Destroy()
 end)
 
+-- The name of the ball's model's parent. Assertions compare names: Jest prints a failing Instance with all its
+-- descendants, which for the workspace can take minutes.
+local function ballAt(): string?
+	local parent = BallService.model.Parent
+	return if parent ~= nil then parent.Name else nil
+end
+
 local function near(actual: Vector3, expected: Vector3)
 	expect((actual - expected).Magnitude).toBeLessThan(1e-3)
 end
 
 local function holder(name: string, rig: Model): BallService.Holder
-	return {
-		player = name,
-		root = rig:FindFirstChild("HumanoidRootPart") :: BasePart,
-		hand = rig:FindFirstChild("RightHand") :: BasePart,
-	}
+	return { player = name, root = rig:FindFirstChild("HumanoidRootPart") :: BasePart }
 end
 
 local function isSpawn(position: Vector3): boolean
@@ -64,7 +66,7 @@ describe("BallService", function()
 		expect(physics.Friction).toBeCloseTo(0.3, 4)
 		expect(physics.Elasticity).toBeCloseTo(0.5, 4)
 		expect(ball.Color).toEqual(BallSkins.get(BallSkins.DEFAULT).color)
-		expect(ball.Parent).toBe(ServerStorage)
+		expect(ballAt()).toBe("ServerStorage")
 		expect(BallService.state.status).toBe("Dead")
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
 	end)
@@ -72,7 +74,7 @@ describe("BallService", function()
 	it("spawns the ball loose at a ball spawn and reports only real movement", function()
 		BallService:spawn()
 		local ball = BallService.part
-		expect(ball.Parent).toBe(workspace)
+		expect(ballAt()).toBe("Workspace")
 		expect(isSpawn(ball.Position)).toBe(true)
 		expect(BallService.state.status).toBe("Loose")
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
@@ -98,11 +100,20 @@ describe("BallService", function()
 		near(frame.pickupVelocity, Vector3.new(20, 0, 0))
 		expect(BallService.state.carrier).toBe("Near")
 		expect(BallService.part.CanCollide).toBe(false)
+		expect(BallService.part.CanTouch).toBe(false)
 		expect(BallService.part.Massless).toBe(true)
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
 		closest:PivotTo(closest:GetPivot() + Vector3.new(10, 0, 0))
-		local hand = closest:FindFirstChild("RightHand") :: BasePart
-		expect((BallService.part.Position - hand.Position).Magnitude).toBeCloseTo(1.5, 3)
+		local root = closest:FindFirstChild("HumanoidRootPart") :: BasePart
+		near(BallService.part.Position, root.CFrame:PointToWorldSpace(config.Ball.carryOffset))
+	end)
+
+	it("carries the ball at the carrier's side, clear of the floor", function()
+		BallService:spawn()
+		local rig = Fixtures.rig(folder, "A", CFrame.new(BallService.part.Position.X, 3, BallService.part.Position.Z))
+		BallService:step(1 / 60, { holder("A", rig) })
+		expect(BallService.state.carrier).toBe("A")
+		expect(BallService.part.Position.Y - config.Ball.radius >= 0).toBe(true)
 	end)
 
 	it("keeps the thrower from catching their own throw, and reports the throw once", function()
@@ -135,6 +146,44 @@ describe("BallService", function()
 		expect(BallService.state.looseSeconds).toBe(0)
 	end)
 
+	it("keeps the ball in its own model, sent whole to every client and never streamed out", function()
+		BallService:spawn()
+		expect(BallService.part.Parent == BallService.model).toBe(true)
+		expect(BallService.model.ModelStreamingMode).toBe(Enum.ModelStreamingMode.Persistent)
+	end)
+
+	it("rebuilds the ball if Roblox destroys it, and puts it back in play", function()
+		BallService:spawn()
+		local old = BallService.part
+		old:Destroy()
+		local frame = BallService:step(1 / 60, {})
+		expect(frame.respawned).toBe(true)
+		expect(BallService.part).never.toBe(old)
+		expect(BallService.part.Parent == BallService.model).toBe(true)
+		expect(ballAt()).toBe("Workspace")
+		expect(isSpawn(BallService.part.Position)).toBe(true)
+		expect(BallService.state.status).toBe("Loose")
+	end)
+
+	it("parks a dead ball that leaves the arena", function()
+		BallService:spawn()
+		BallService:kill()
+		BallService:step(1 / 60, {})
+		BallService.part.CFrame = CFrame.new(0, 5, -90)
+		BallService:step(1 / 60, {})
+		expect(ballAt()).toBe("ServerStorage")
+	end)
+
+	it("takes the ball back from a carrier who leaves the arena and puts it in play", function()
+		local rig = caughtBy("A")
+		rig:PivotTo(CFrame.new(0, 5, -90))
+		local frame = BallService:step(1 / 60, { holder("A", rig) })
+		expect(frame.respawned).toBe(true)
+		expect(BallService.state.carrier).toBeNil()
+		expect(BallService.state.status).toBe("Loose")
+		expect(isSpawn(BallService.part.Position)).toBe(true)
+	end)
+
 	it("drops the ball loose where its carrier is", function()
 		local rig = caughtBy("A")
 		local carriedAt = BallService.part.Position
@@ -142,6 +191,7 @@ describe("BallService", function()
 		expect(BallService.state.status).toBe("Loose")
 		expect(BallService.state.carrier).toBeNil()
 		expect(BallService.part.CanCollide).toBe(true)
+		expect(BallService.part.CanTouch).toBe(true)
 		rig:PivotTo(rig:GetPivot() + Vector3.new(10, 0, 0))
 		near(BallService.part.Position, carriedAt)
 	end)
@@ -161,7 +211,7 @@ describe("BallService", function()
 		BallService:spawn()
 		local rig = Fixtures.rig(folder, "A", CFrame.new(BallService.part.Position))
 		BallService:hide()
-		expect(BallService.part.Parent).toBe(ServerStorage)
+		expect(ballAt()).toBe("ServerStorage")
 		expect(BallService.state.status).toBe("Dead")
 		local frame = BallService:step(1 / 60, { holder("A", rig) })
 		expect(frame.picker).toBeNil()
@@ -172,7 +222,7 @@ describe("BallService", function()
 		BallService:spawn()
 		local rig = Fixtures.rig(folder, "A", CFrame.new(BallService.part.Position))
 		BallService:kill()
-		expect(BallService.part.Parent).toBe(workspace)
+		expect(ballAt()).toBe("Workspace")
 		expect(BallService:step(1 / 60, { holder("A", rig) }).picker).toBeNil()
 	end)
 end)

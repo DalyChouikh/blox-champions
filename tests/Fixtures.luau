@@ -64,6 +64,20 @@ function Fixtures.wedgeFace(piece: GeometryTypes.Piece, normal: Vector3): { Vect
 	}
 end
 
+-- A stand-in for a Player: Roblox cannot create one in Edit, so it has just the members the services use.
+function Fixtures.stubPlayer(userId: number): any
+	local attributes: { [string]: any } = {}
+	return {
+		UserId = userId,
+		SetAttribute = function(_self: any, key: string, value: any)
+			attributes[key] = value
+		end,
+		GetAttribute = function(_self: any, key: string): any
+			return attributes[key]
+		end,
+	}
+end
+
 -- A stand-in for a player's character: a Humanoid rig whose hand is welded to its root, R15 unless R6 is asked
 -- for. R15: RightHand, HipHeight 2. R6: Right Arm and Left Leg, HipHeight 0. Nothing is anchored.
 function Fixtures.rig(parent: Instance, name: string, cframe: CFrame, rigType: Enum.HumanoidRigType?): Model

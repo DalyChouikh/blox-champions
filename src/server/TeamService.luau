@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Config = require(ReplicatedStorage.Shared.Config)
+local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Roster = require(ReplicatedStorage.Shared.Rules.Roster)
 local Signal = require(ReplicatedStorage.Shared.Util.Signal)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
@@ -34,10 +35,6 @@ export type TeamService = {
 	_roster: Roster.Roster,
 	_players: { [PlayerId]: Player },
 }
-
-local function idOf(player: Player): PlayerId
-	return tostring(player.UserId)
-end
 
 -- Marks each seat on its player and announces it.
 local function announceSeats(self: TeamService, seats: { Roster.Seat })
@@ -83,8 +80,13 @@ local TeamService: TeamService = {
 		end
 	end,
 
+	-- A second session of the same user (joining before the old one has left) replaces it.
 	join = function(self: TeamService, player: Player)
-		local id = idOf(player)
+		local id = PlayerIds.of(player)
+		local current: Player? = self._players[id]
+		if current ~= nil and current ~= player then
+			self:leave(current)
+		end
 		self._players[id] = player
 		local team: Team? = self._roster:join(id)
 		player:SetAttribute(Attributes.Team, team)
@@ -94,8 +96,12 @@ local TeamService: TeamService = {
 		end
 	end,
 
+	-- A session that a newer one already replaced changes nothing.
 	leave = function(self: TeamService, player: Player)
-		local id = idOf(player)
+		local id = PlayerIds.of(player)
+		if self._players[id] ~= player then
+			return
+		end
 		local wasSeated = self._roster:teamOf(id) ~= nil
 		local promoted = self._roster:leave(id)
 		player:SetAttribute(Attributes.Team, nil)
@@ -106,24 +112,10 @@ local TeamService: TeamService = {
 		announceSeats(self, promoted)
 	end,
 
+	-- Reseats everyone. Nobody seated loses their seat: at most two full teams were seated, and they are reseated
+	-- first, so only spectators can stay out.
 	newMatch = function(self: TeamService)
-		local before: { PlayerId } = {}
-		for _, team: Team in Team.list do
-			for _, id in self._roster:members(team) do
-				table.insert(before, id)
-			end
-		end
-		local seats = self._roster:newMatch()
-		announceSeats(self, seats)
-		for _, id in before do
-			if self._roster:teamOf(id) == nil then
-				local player: Player? = self._players[id]
-				if player ~= nil then
-					player:SetAttribute(Attributes.Team, nil)
-				end
-				self.unseated:Fire(id)
-			end
-		end
+		announceSeats(self, self._roster:newMatch())
 	end,
 
 	teamOf = function(self: TeamService, player: PlayerId): Team?
@@ -140,7 +132,7 @@ local TeamService: TeamService = {
 	end,
 
 	seatedCount = function(self: TeamService): number
-		return #self._roster:members("Blue") + #self._roster:members("Orange")
+		return self._roster:seatedCount()
 	end,
 }
 

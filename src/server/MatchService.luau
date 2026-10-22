@@ -3,15 +3,21 @@
 -- rules engine in the order the engine documents, ticks it, reacts to its events — hiding and spawning the ball,
 -- placing and freezing characters, opening and closing the goal — and sends them to clients. It keeps the ball dead
 -- whenever play is not live, so the ball is only ever carried by the engine's last holder. After a match ends it
--- waits postMatchSeconds and starts the next one with everyone reseated.
+-- waits postMatchSeconds and starts the next one with everyone reseated; once every player has left it starts over.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local ArenaService = require(script.Parent.ArenaService)
+local BallService = require(script.Parent.BallService)
+local CharacterService = require(script.Parent.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
+local NetService = require(script.Parent.NetService)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
+local TeamService = require(script.Parent.TeamService)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
@@ -25,11 +31,11 @@ export type MatchService = {
 	step: (self: MatchService, dt: number) -> (),
 	engine: MatchEngine.MatchEngine,
 	_config: Config.GameConfig,
-	_arena: any,
-	_net: any,
-	_ball: any,
-	_teams: any,
-	_characters: any,
+	_arena: ArenaService.ArenaService,
+	_net: NetService.NetService,
+	_ball: BallService.BallService,
+	_teams: TeamService.TeamService,
+	_characters: CharacterService.CharacterService,
 	-- Players the current engine knows, so only they are removed from it.
 	_inEngine: { [PlayerId]: boolean },
 	_waiting: boolean,
@@ -38,22 +44,29 @@ export type MatchService = {
 	_carrier: PlayerId?,
 }
 
+-- The arena ArenaService built at init, before this module's init ran.
+local function arena(self: MatchService): TaggedLayout.TaggedArena
+	return self._arena.arena :: TaggedLayout.TaggedArena
+end
+
+local function setGoalOpen(self: MatchService, open: boolean)
+	local panel = arena(self).goalPanel
+	panel.CanCollide = not open
+	panel.CanQuery = not open
+	panel.Transparency = if open then 1 else self._config.Arena.goal.panelTransparency
+end
+
 local function newEngine(self: MatchService)
 	self.engine = MatchEngine.new({
 		config = self._config,
-		arena = self._arena.arena.layout,
+		arena = arena(self).layout,
 		gravity = Vector3.new(0, -workspace.Gravity, 0),
 	})
 	self._inEngine = {}
 	self._waiting = true
 	self._postMatchLeft = nil
-end
-
-local function setGoalOpen(self: MatchService, open: boolean)
-	local panel: BasePart = self._arena.arena.goalPanel
-	panel.CanCollide = not open
-	panel.CanQuery = not open
-	panel.Transparency = if open then 1 else self._config.Arena.goal.panelTransparency
+	-- A new engine's goal is closed; the panel must say so even if the last match ended with it open.
+	setGoalOpen(self, false)
 end
 
 local function dropIfCarrier(self: MatchService, player: PlayerId)
@@ -95,11 +108,11 @@ local MatchService: MatchService = {
 	dependencies = { "Config", "ArenaService", "NetService", "BallService", "TeamService", "CharacterService" },
 	engine = nil :: any,
 	_config = nil :: any,
-	_arena = nil,
-	_net = nil,
-	_ball = nil,
-	_teams = nil,
-	_characters = nil,
+	_arena = nil :: any,
+	_net = nil :: any,
+	_ball = nil :: any,
+	_teams = nil :: any,
+	_characters = nil :: any,
 	_inEngine = {},
 	_waiting = true,
 	_postMatchLeft = nil,
@@ -117,6 +130,7 @@ local MatchService: MatchService = {
 
 		self._teams.joined:Connect(function(player: PlayerId)
 			self._net:fireTo(player, Remotes.names.MatchSnapshot, self.engine:snapshot())
+			self._net:fireTo(player, Remotes.names.BallCarrier, { carrier = self._carrier })
 		end)
 		self._teams.seated:Connect(function(player: PlayerId, team: Team.Team)
 			-- After the match the next one seats everyone.
@@ -130,6 +144,11 @@ local MatchService: MatchService = {
 			if self._inEngine[player] then
 				self.engine:removePlayer(player)
 				self._inEngine[player] = nil
+			end
+			-- Nobody left to play: the next player starts a fresh match instead of joining an abandoned one.
+			if self._teams:seatedCount() == 0 and not self._waiting then
+				newEngine(self)
+				self._ball:hide()
 			end
 		end)
 		self._characters.characterRemoved:Connect(function(player: PlayerId)
@@ -163,12 +182,13 @@ local MatchService: MatchService = {
 		end
 		engine:tick(dt)
 
+		-- Sent before the reactions, so one that fails cannot keep the frame's events from the clients.
 		local events = engine:drainEvents()
-		for _, event in events do
-			react(self, event)
-		end
 		if #events > 0 then
 			self._net:fireAll(Remotes.names.RuleEvents, events)
+			for _, event in events do
+				react(self, event)
+			end
 		end
 
 		local carrier: PlayerId? = self._ball.state.carrier

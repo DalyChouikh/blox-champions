@@ -1,9 +1,10 @@
 --!strict
--- The ball in the arena (spec §9.3): one server-owned physics part that BallState says what to do with. It is hidden
--- (in ServerStorage, so its next spawn is never replicated early) until a kickoff ends, then spawns at a random ball
--- spawn. Each frame `step` reports how it really moved, a throw since the last frame, and who caught it. Jumps the
--- server makes (a spawn, a respawn, the snap into a catcher's hand) are never reported as movement, so they can never
--- cross a gate or the ring.
+-- The ball in the arena (spec §9.3): one server-owned physics part, in its own model that streams to every client,
+-- that BallState says what to do with. It is hidden (in ServerStorage, so its next spawn is never replicated early)
+-- until a kickoff ends, then spawns at a random ball spawn. A ball that leaves the arena is recovered in any state,
+-- and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each frame `step` reports how it really
+-- moved, a throw since the last frame, and who caught it. Jumps the server makes (a spawn, a respawn, the snap to a
+-- catcher's side) are never reported as movement, so they can never cross a gate or the ring.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -17,8 +18,8 @@ local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
 
--- A player who can catch: their root decides the distance, the ball is held in their hand.
-export type Holder = { player: PlayerId, root: BasePart, hand: BasePart }
+-- A player who can catch: their root decides the distance and carries the ball.
+export type Holder = { player: PlayerId, root: BasePart }
 
 -- One frame's report. `from`/`to` are valid when `moved`; `pickupPosition`/`pickupVelocity` when `picker` is set.
 export type BallFrame = {
@@ -38,6 +39,8 @@ export type BallService = {
 	dependencies: { string },
 	init: (self: BallService, deps: { [string]: any }) -> (),
 	start: ((self: BallService) -> ())?,
+	-- Holds the part; ModelStreamingMode.Persistent, so clients always have the ball.
+	model: Model,
 	part: Part,
 	state: BallState.BallState,
 	hide: (self: BallService) -> (),
@@ -57,7 +60,7 @@ export type BallService = {
 	_teleported: boolean,
 	_last: Vector3,
 	_pendingThrower: PlayerId?,
-	_weld: WeldConstraint?,
+	_weld: Weld?,
 	_touched: RBXScriptConnection?,
 	_canPickUp: (PlayerId) -> boolean,
 	_candidates: { Pickup.Candidate },
@@ -80,6 +83,40 @@ local function newBallPart(config: Config.GameConfig): Part
 	return part
 end
 
+-- A new ball, hidden: its model in ServerStorage.
+local function build(self: BallService)
+	if self._touched ~= nil then
+		self._touched:Disconnect()
+	end
+	local model = Instance.new("Model")
+	model.Name = "Ball"
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	local part = newBallPart(self._config)
+	part.Parent = model
+	model.Parent = ServerStorage
+	self.model = model
+	self.part = part
+	self._weld = nil
+	self._hidden = true
+	self._teleported = true
+	self._last = part.Position
+	self._touched = part.Touched:Connect(function(hit: BasePart)
+		self:onTouched(hit)
+	end)
+end
+
+-- True (after building a new, hidden ball) when Roblox destroyed the ball.
+local function rebuiltIfDestroyed(self: BallService): boolean
+	if self.model.Parent ~= nil and self.part.Parent == self.model then
+		return false
+	end
+	-- Roblox removes the model with its last part; one left behind empty is removed here.
+	local old = self.model
+	build(self)
+	old:Destroy()
+	return true
+end
+
 -- Lets go of the ball if someone carries it: a free physics part again, simulated by the server. The weld goes
 -- first: network ownership cannot be set on a part welded to an anchored one (a frozen character).
 local function release(self: BallService)
@@ -92,32 +129,52 @@ local function release(self: BallService)
 	local part = self.part
 	part.Massless = false
 	part.CanCollide = true
-	part:SetNetworkOwner(nil)
+	part.CanTouch = true
+	if part:IsDescendantOf(workspace) then
+		part:SetNetworkOwner(nil)
+	end
 end
 
+-- Welds the ball at the carrier's side (Ball.carryOffset in their root's frame). A Weld with an explicit offset puts
+-- it in the same place on every machine; while carried it is weightless and touches nothing.
 local function attach(self: BallService, holder: Holder)
 	local part = self.part
-	part.CFrame = holder.hand.CFrame * CFrame.new(0, -self._config.Ball.radius, 0)
+	local offset = CFrame.new(self._config.Ball.carryOffset)
+	part.CFrame = holder.root.CFrame * offset
 	part.Massless = true
 	part.CanCollide = false
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = holder.hand
+	part.CanTouch = false
+	local weld = Instance.new("Weld")
+	weld.Part0 = holder.root
 	weld.Part1 = part
+	weld.C0 = offset
 	weld.Parent = part
 	self._weld = weld
 	self._teleported = true
 end
 
 local function placeAtRandomSpawn(self: BallService)
+	rebuiltIfDestroyed(self)
 	release(self)
 	local part = self.part
 	part.CFrame = self._spawns[self._random:NextInteger(1, #self._spawns)]
 	part.AssemblyLinearVelocity = Vector3.zero
 	part.AssemblyAngularVelocity = Vector3.zero
-	part.Parent = workspace
+	self.model.Parent = workspace
 	part:SetNetworkOwner(nil)
 	self._hidden = false
 	self._teleported = true
+end
+
+-- Back into play at a random ball spawn from wherever it was, a carried ball taken from its carrier first.
+local function respawn(self: BallService, frame: BallFrame)
+	if self.state.status == "Carried" then
+		release(self)
+		self.state:drop()
+	end
+	placeAtRandomSpawn(self)
+	self.state:respawn()
+	frame.respawned = true
 end
 
 local function isCharacterPart(hit: BasePart): boolean
@@ -155,6 +212,7 @@ end
 local BallService: BallService = {
 	name = "BallService",
 	dependencies = { "Config", "ArenaService" },
+	model = nil :: any,
 	part = nil :: any,
 	state = nil :: any,
 	_config = nil :: any,
@@ -192,23 +250,16 @@ local BallService: BallService = {
 			pickupVelocity = Vector3.zero,
 			respawned = false,
 		}
-		self._weld = nil
 		self._pendingThrower = nil
-		local part = newBallPart(config)
-		part.Parent = ServerStorage
-		self.part = part
-		self._hidden = true
-		self._teleported = true
-		self._last = part.Position
-		self._touched = part.Touched:Connect(function(hit: BasePart)
-			self:onTouched(hit)
-		end)
+		self._touched = nil
+		build(self)
 	end,
 
 	hide = function(self: BallService)
+		rebuiltIfDestroyed(self)
 		release(self)
 		self.state:kill()
-		self.part.Parent = ServerStorage
+		self.model.Parent = ServerStorage
 		self._hidden = true
 		self._teleported = true
 	end,
@@ -258,6 +309,13 @@ local BallService: BallService = {
 		if self._hidden then
 			return frame
 		end
+		local state = self.state
+		if rebuiltIfDestroyed(self) then
+			if state.status ~= "Dead" then
+				respawn(self, frame)
+			end
+			return frame
+		end
 
 		local position = self.part.Position
 		if self._teleported then
@@ -269,22 +327,24 @@ local BallService: BallService = {
 		end
 		self._last = position
 
-		local state = self.state
 		state:tick(dt)
 		frame.thrower = self._pendingThrower
 		self._pendingThrower = nil
 
-		if state.status ~= "Loose" and state.status ~= "Flying" then
+		local ball = self._config.Ball
+		local out = Bounds.isOut(self._config.Arena, position, ball.outOfBoundsMargin)
+		if state.status == "Dead" then
+			-- Out of play anyway: parked until the next kickoff, before it can fall out of the world.
+			if out then
+				self:hide()
+			end
 			return frame
 		end
-		local ball = self._config.Ball
-		if
-			Bounds.isOut(self._config.Arena, position, ball.outOfBoundsMargin)
-			or state.looseSeconds >= ball.ballIdleResetSeconds
-		then
-			placeAtRandomSpawn(self)
-			state:respawn()
-			frame.respawned = true
+		if out or (state.status ~= "Carried" and state.looseSeconds >= ball.ballIdleResetSeconds) then
+			respawn(self, frame)
+			return frame
+		end
+		if state.status == "Carried" then
 			return frame
 		end
 
@@ -304,9 +364,9 @@ local BallService: BallService = {
 			self._touched:Disconnect()
 			self._touched = nil
 		end
-		local part: Part? = self.part
-		if part ~= nil then
-			part:Destroy()
+		local model: Model? = self.model
+		if model ~= nil then
+			model:Destroy()
 		end
 		self._weld = nil
 	end,

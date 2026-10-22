@@ -128,6 +128,11 @@ function Roster.members(self: Roster, team: Team): { PlayerId }
 	return table.clone(self._members[team])
 end
 
+-- How many players hold a seat, without copying any list (the match checks it every frame while waiting).
+function Roster.seatedCount(self: Roster): number
+	return #self._members.Blue + #self._members.Orange
+end
+
 function Roster.spectators(self: Roster): { PlayerId }
 	return table.clone(self._spectators)
 end

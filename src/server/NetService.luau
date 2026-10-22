@@ -1,9 +1,9 @@
 --!strict
 -- Creates the remotes at server start and fires them by name, addressing players by PlayerId like every rule event.
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
@@ -50,8 +50,7 @@ local NetService: NetService = {
 	-- A player who has already left is skipped.
 	fireTo = function(self: NetService, player: Types.PlayerId, name: string, payload: any)
 		local remote = event(self, name)
-		local userId = tonumber(player)
-		local target = if userId ~= nil then Players:GetPlayerByUserId(userId) else nil
+		local target = PlayerIds.player(player)
 		if target ~= nil then
 			remote:FireClient(target, payload)
 		end

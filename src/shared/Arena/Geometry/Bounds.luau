@@ -12,8 +12,9 @@ local Bounds = {}
 -- Horizontal distance from the long axis: the segment from (-straightLength/2, 0) to (straightLength/2, 0) in X/Z.
 local function fromAxis(arena: ArenaConfig, position: Vector3): number
 	local half = arena.straightLength / 2
-	local x = math.clamp(position.X, -half, half)
-	return Vector2.new(position.X - x, position.Z).Magnitude
+	local dx = position.X - math.clamp(position.X, -half, half)
+	-- Plain arithmetic: this runs every frame the ball is free.
+	return math.sqrt(dx * dx + position.Z * position.Z)
 end
 
 function Bounds.isOut(arena: ArenaConfig, position: Vector3, margin: number): boolean
