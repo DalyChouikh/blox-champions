@@ -1541,3 +1541,82 @@ The `Config.spec` network test gains `guardSampleSeconds = 0.25`, `speedToleranc
 - **The review-fixes issue and PR:** every finding is fixed test-first.
 - **Merges:** in order, with `--merge`, then the Rojo-safe `main` sync.
 - **The phase summary to the owner:** what changed, the numbers (the `SkateController` step time, the lap time at cruise against the 10–12 s target), every ruling with its cost if wrong, and what's next (Phase 6, Actions).
+
+---
+
+## Amendment (2026-10-22): the enclosed arena and riding the roof
+
+**Status: approved by the owner on 2026-10-22, as drafted.** Tasks 12–13 may start. The spec amendment (§2 rows A2–A4, §7.2, §9.1, §9.2, §10.3) lands with it. Task 11 is not affected.
+
+**Why:** the Task 9 playtest showed a skater pumping on a curved bank and flying over the 28-stud outer wall, out of the arena. The ball can leave the same way. The owner chose to enclose the track, and to let a skater ride the roof only as far as loop physics allows.
+
+### Owner decisions (2026-10-22, amendment)
+
+1. **The arena is enclosed in a tube.** The track becomes a closed "O" cross-section around the infield, and the infield stays outside it. Both walls rise to **28 studs** (`infieldWallHeight` 20 → 28). A **half-circle roof** spans the track: radius `trackWidth / 2` = 22, top at **50**.
+2. **Graybox gray now.** In the art pass the walls become glass, so players see the ball and each other. The ground stays opaque.
+3. **Later: more maps, picked at random each game.** The arena stays data-driven (config and tags), so a map is data.
+4. **Riding the roof: walls by speed, roof by loop physics.** Walls keep spec §7.2's rule: steeper than `maxStickAngle` (60°) needs `minWallSpeed` (35). Past straight up (overhangs: the roof's rounded edges and top), loop physics decides **on top of** the wall rule: the skater stays on only while `speed² × curvature ≥ gravity's pull off the surface`. A flat ceiling never holds, at any speed.
+
+### Rulings made in this amendment (the owner may change them)
+
+- **Profile:** an 8th piece in `Arena/Geometry/Profile.luau`, a half-circle arc from the outer wall top `(trackWidth, outerWallHeight)` to the inner wall top `(0, infieldWallHeight)`. Centre = midpoint of the two tops; radius = half the distance between them, so it stays general if the heights differ. Added to `CURVED_PIECES`; `Profile.roofTop(arena)` returns the apex height. `Surface.pieces` already joins consecutive profile points, so a profile that ends where it starts closes the tube, with normals "into the track". *Cost if wrong:* the tube seam or its normals need rework in Task 12.
+- **Roof parts** get their own list (`Geometry.build` → `roof`) and their own folder: `Builder` → a `Roof` folder tagged `Tags.RideSurface`. The separate folder allows a lighting fix: if a playtest shows the tube is dark, roof parts get `CastShadow = false`. *Cost if wrong:* none.
+- **Strip density:** `stripsPerSection` rises so the roof gets roughly the curves' density. Measured, then pinned. The Builder spec pins 6900 surface parts today and the arena build has a "< 1 s" test; both are re-pinned in Task 12. *Cost if wrong:* a slower build or a visible seam on the roof.
+- **Lap gates** are as tall as `Profile.roofTop` (the frame at half of it), so a high throw inside the tube cannot skip a gate. *Cost if wrong:* a gate can be skipped.
+- **Corner markers** move from pillars on the outer wall top (which poke into the roof) to flat, non-colliding panels on the outer wall's inner face at each gate, top flush with the wall top. They keep the `CornerMarker` tag and `GateIndex`. *Cost if wrong:* markers clip the roof.
+- **`Bounds.isOut`** stays as a safety net. The ball can no longer leave, but a bug should still be caught. *Cost if wrong:* none.
+- **Loop physics in `SkateMath` (pure):** keep `_lastNormal` while grounded; curvature `κ = −(normal − lastNormal)·heading / (speed·dt)`, positive when the surface curves around the skater (the inside of a loop). In `resolveMode`'s Grounded branch, also detach when `gravity·normal > 0 and speed²·κ < gravity·normal`. Clear `_lastNormal` when airborne and in `stop()`. No new config numbers. *Cost if wrong:* a skater holds on a roof they should fall from, or falls from one they should hold.
+- **Tuning note (the spec's own values, not a bug):** holding pump on flat ground keeps accelerating past cruise (`pumpFlatAccel` 8 > `rollingFriction` 4), up to about 102 studs/s inside the soft cap. Phase 9 tunes it.
+
+### Task 12: The enclosed arena (labels `feature`, `arena`)
+
+**Issue:** to be created in milestone "M1 - Foundation & Core Match" · **Branch:** `feat/<issue>-enclosed-arena` · **Stacked on:** Task 11's branch
+
+**Files:**
+- Modify: `src/shared/Arena/Geometry/Profile.luau` (the roof piece, `roofTop`), `Geometry.luau` (the `roof` list), `Surface.luau` if the seam needs it, `src/shared/Config/Arena.luau` (`infieldWallHeight` 28, `stripsPerSection`), the Builder (the `Roof` folder, `RideSurface`), the gate and marker builders, and `Bounds.luau` (kept as the safety net).
+- Test: `tests/shared/Arena/Geometry/*.spec.luau`, `tests/server/Arena/Builder.spec.luau`, `tests/shared/Config/Config.spec.luau`.
+
+**Steps (TDD, every one red first):**
+1. Failing tests: the roof arc runs from the outer top to the inner top; its apex is `Profile.roofTop`, which is 50 at the defaults (the arc's centre height 28 plus its radius 22, the value the owner chose); the profile closes (last point = first point); `infieldWallHeight` is 28 and the config is valid.
+2. Implement the profile piece and `roofTop`. The surface sweep closes the tube; test that every surface normal points into the track.
+3. Failing test: roof parts are built into a `Roof` folder tagged `RideSurface`, and no other part is tagged by them.
+4. Implement `roof` in `Geometry.build` and the `Roof` folder in the Builder.
+5. Failing tests: each gate is at least `roofTop` tall; each corner marker is a non-colliding panel on the outer wall's inner face, top flush with the wall top, and keeps `CornerMarker` and `GateIndex`.
+6. Implement the gates and the marker panels.
+7. **Measure:** the part count (the Builder spec's 6900 changes) and the build time. Pin the new numbers in the spec, with the measurement in the ledger and the PR.
+8. **Lighting probe (playtest):** probe the interior's brightness. Only if the tube is dark, set `CastShadow = false` on roof parts, with a test. Otherwise nothing changes.
+9. **Playtest:** the arena builds in under 1 s, and the Task 9 bank no longer lets a skater leave.
+
+**Expected:** the suite grows by the tests written here. Record the new total in the ledger; the plan's numbers are not fixed for this task.
+
+### Task 13: Roof riding by loop physics (labels `feature`, `skate`)
+
+**Issue:** to be created · **Branch:** `feat/<issue>-roof-riding` · **Stacked on:** Task 12's branch
+
+**Files:**
+- Modify: `src/shared/Skate/SkateMath.luau` (the loop rule, `_lastNormal`), `tests/shared/Skate/SkateMath.spec.luau`, and `tests/client/SkateController.spec.luau` (one integration case).
+
+**Test values (computed by hand, g = 196.2, roof radius 22):**
+
+| Case | Holds | Falls |
+|---|---|---|
+| Top of the loop, upside down (needs ≥ 65.7) | 70 | 60 |
+| 30° past straight up (pull-off 98.1, needs ≥ 46.5) | 50 | 40 |
+| A flat ceiling (κ = 0) | never | even at 140 |
+| A tight 95° overhang | — | at 30, by the wall rule (35) |
+
+**Steps (TDD, every one red first):**
+1. Failing tests with the table above, one per row, plus one for a skater riding a wall at 40 studs/s who stays on (the wall rule still holds for walls).
+2. Implement `_lastNormal`, the curvature, and the Grounded detach rule. Clear `_lastNormal` in the airborne branch and in `stop()`.
+3. **Mutation:** remove the loop rule. The top-of-loop and overhang rows must turn red. Restore it.
+4. **Integration:** one `SkateController` case on a roof-shaped surface, so the controller's ray and the rule meet.
+5. **Playtest:** a skater pumping on the curved bank at full speed must not leave the arena; a skater may ride the roof only at speed. Record the speed at which the owner sees it hold and fall.
+
+**The camera** must cope with a skater briefly upside down on the roof. That is Phase 7's work, noted here so it is not forgotten.
+
+---
+
+## Amendment follow-ups (for the owner)
+
+- The **spec** (docs only, straight to `main` after approval): §2 decisions log (the owner decisions above), §7.2 "Wall riding" row (the overhang loop rule), §9.1 cross-sections (the tube, `infieldWallHeight` 28, the corner markers' place), and §9.2 (the `Roof` folder tagged `RideSurface`).
+- The **open choices** are asked in the chat, one at a time.

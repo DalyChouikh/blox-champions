@@ -54,6 +54,9 @@ M1 does include the **registries** (ball skin, skate skin) holding one default e
 | Q10 | Goal placement | **Upright raised ring at a corner gate (Gate 2) on the outer wall**, on the carrier's right shoulder; track runs **counter-clockwise**. |
 | Q11 | Ground shape | Straights: walls both sides, **lower floor by the infield, one smooth wavy step up to a higher floor by the outer wall** (pump down it for speed). Curved ends: **normal floor curving up into the walls (U/J)**. |
 | A1 | Movement approach | **Custom skate controller** on physics constraints (not Humanoid, not ControllerManager). |
+| A2 | Enclosed arena (2026-10-22) | **The track is a closed tube**: a roof spans the track (half-circle, radius `trackWidth / 2`, top at 50 studs), and both walls rise to **28 studs** (`infieldWallHeight` 20 → 28). The skater's pump on a bank can no longer carry them out of the arena. |
+| A3 | Riding the roof (2026-10-22) | **Walls by speed, roof by loop physics.** Walls keep `minWallSpeed`. Past straight up, a skater stays on only while `speed² × curvature ≥ gravity's pull off the surface`. A flat ceiling never holds, at any speed. |
+| A4 | Future art and maps (2026-10-22) | **Glass walls** in the art pass (ground stays opaque). **More maps, picked at random each game**, later: the arena stays data-driven. |
 
 ---
 
@@ -242,7 +245,7 @@ Highest score on the **winning team**. Tie-breakers in order: more goals, more s
 | Body | One collider shape for every player; root hovers above the ground hit; ground sensing ray length. | `colliderSize = Vector3.new(2, 2, 2)` (sphere), `hoverHeight = 2.5`, `groundProbeLength = 6` |
 | Momentum | Gravity's component along the surface accelerates downhill / decelerates uphill. Rolling friction and air drag always apply. Soft cap: acceleration scales down linearly from `softCap` to `hardCap`. Hard cap clamps. | `gravity = workspace.Gravity`, `rollingFriction = 4`, `airDrag = 0.02`, `cruiseSpeed = 60`, `softCap = 90`, `hardCap = 140` (studs/s) |
 | Steering | Turn rate shrinks with speed (wider turns when fast). | `turnRateLow = 4.0`, `turnRateHigh = 1.5` (rad/s) |
-| Wall riding | Stays attached to a surface while speed ≥ `minWallSpeed`; below it on a surface steeper than `maxStickAngle`, the skater detaches and falls. | `minWallSpeed = 35`, `maxStickAngle = 60`° |
+| Wall riding | Stays attached to a surface while speed ≥ `minWallSpeed`; below it on a surface steeper than `maxStickAngle`, the skater detaches and falls. Past straight up (overhangs: the roof's rounded edges and top), the skater also needs loop physics: `speed² × curvature ≥ gravity's pull off the surface`, so a flat ceiling never holds (A3). | `minWallSpeed = 35`, `maxStickAngle = 60`° |
 | Pump (hold) | Multiplies the downhill gravity component; small push on flat ground; no gain uphill. Crouch pose. | `pumpSlopeMultiplier = 1.6`, `pumpFlatAccel = 8` |
 | Brake (hold) | Strong deceleration to a stop. | `brakeDecel = 120` |
 | Tiptoe (brake + steer) | Precise low-speed movement capped at `tiptoeSpeed`. | `tiptoeSpeed = 12` |
@@ -339,19 +342,20 @@ Third-person chase camera with mouse lock. `Camera.distance = 12`, `Camera.heigh
 - `trackDirection = "CounterClockwise"` (outer wall on the skater's right).
 - Gates numbered in track order: Gate 1 top-right, Gate 2 top-left, Gate 3 bottom-left, Gate 4 bottom-right.
 - `goalGateIndex = 2`: the upright goal ring is raised on the outer wall at Gate 2, front facing oncoming skaters (on the carrier's right shoulder). When open, its panel slides away and the ring glows in the possessing team's color.
-- **Corner markers:** one pillar per gate on the outer wall. The next gate for the possessing team glows in that team's color; the ball carrier also sees an on-screen arrow to it.
+- **Corner markers:** one flat, non-colliding panel per gate on the outer wall's inner face, top flush with the wall top (the roof spans above them). The next gate for the possessing team glows in that team's color; the ball carrier also sees an on-screen arrow to it.
 - **Team spawns** on opposite straights, mirrored across the arena's long axis (Blue on the top straight, Orange on the bottom). **Ball spawns** on the long axis, equidistant from both team spawns (one in each curved end). Both teams score in the same goal, so fairness comes from the mirrored spawns and the random ball spawn, not from distance to the goal.
 - **Cross-sections:**
+  - **The tube (A2):** the track is a closed "O" cross-section around the infield, with the infield outside it. Both walls rise to 28 studs, and a half-circle roof spans the track from the outer wall top to the inner wall top (centre at the midpoint of the two tops, radius = half the distance between them, top at 50 studs). The roof is graybox now and glass in the art pass; the ground stays opaque.
   - **Straights:** tall walls on both sides (infield wall and outer wall), floor curving up into each wall; **lower floor next to the infield**, one **smooth wavy step** up to a **higher floor next to the outer wall** (skating down the step is a pump spot).
   - **Curved ends:** normal floor curving up into the walls (U/J), no step.
   - Between straight and end, the profile **blends smoothly** over `profileBlendLength`.
-- Initial dimensions (studs): `straightLength = 160`, `endRadius = 60` (centerline), `trackWidth = 44`, `outerWallHeight = 28`, `infieldWallHeight = 20`, `wallCurveRadius = 10`, `stepHeight = 4`, `stepWidth = 10`, `goal = { ringRadius = 7, heightAboveFloor = 18, panelThickness = 0.5 }`, `profileBlendLength = 20`, `segmentLength = 4`, `stripsPerSection = 18`. Centerline loop length ≈ 2·160 + 2π·60 ≈ 697 studs → ≈ 11.6 s per lap at `cruiseSpeed = 60` (target 10–12 s).
+- Initial dimensions (studs): `straightLength = 160`, `endRadius = 60` (centerline), `trackWidth = 44`, `outerWallHeight = 28`, `infieldWallHeight = 28` (A2), `roofRadius = trackWidth / 2` (A2), `wallCurveRadius = 10`, `stepHeight = 4`, `stepWidth = 10`, `goal = { ringRadius = 7, heightAboveFloor = 18, panelThickness = 0.5 }`, `profileBlendLength = 20`, `segmentLength = 4`, `stripsPerSection = 18`. Centerline loop length ≈ 2·160 + 2π·60 ≈ 697 studs → ≈ 11.6 s per lap at `cruiseSpeed = 60` (target 10–12 s).
 
 ### 9.2 Arena generation
 
-- `Arena/Geometry` (pure): builds the centerline loop, evaluates the cross-section profile at each station (end profile, straight profile, blended), and outputs strip quads/triangles. Unit-tested (closure of the loop, continuity between strips, profile heights at known stations, gate and goal placement).
+- `Arena/Geometry` (pure): builds the centerline loop, the roof (its own list, `roof`, so the Builder can give it its own folder), evaluates the cross-section profile at each station (end profile, straight profile, blended), and outputs strip quads/triangles. Unit-tested (closure of the loop, continuity between strips, profile heights at known stations, gate and goal placement).
 - `server/ArenaService`: turns geometry into **anchored parts** (strips of thin parts and wedges) at server start, then places gates, markers, goal ring + panel, and spawns, tagging them.
-- Gameplay code finds arena features **only by CollectionService tag**: `LapGate` (attribute `GateIndex`), `GoalHoop`, `GoalPanel`, `TeamSpawn` (attribute `Team`), `BallSpawn`, `CornerMarker` (attribute `GateIndex`). Any future art model with the same tags drops in.
+- The roof is built into its own `Roof` folder tagged `RideSurface` (A2, so the lighting and the skate rays can treat it apart). Gameplay code finds arena features **only by CollectionService tag**: `LapGate` (attribute `GateIndex`), `GoalHoop`, `GoalPanel`, `TeamSpawn` (attribute `Team`), `BallSpawn`, `CornerMarker` (attribute `GateIndex`). Any future art model with the same tags drops in.
 - EditableMesh is **not** used in M1: per Roblox docs it fails in published games unless "Enable Mesh / Image APIs" is turned on, it is capped at 60,000 vertices / 20,000 triangles per mesh, and its docs show only `Hull` collision. Revisit in the art pass.
 
 ### 9.3 Ball (`Ball/BallState`, `server/BallService`)
@@ -388,7 +392,7 @@ Third-person chase camera with mouse lock. `Camera.distance = 12`, `Camera.heigh
 
 ### 10.3 Movement guard (`server/MovementGuard`)
 
-Samples each character every `Network.guardSampleSeconds = 0.25`. If speed exceeds `Movement.hardCap × Network.speedTolerance (1.2)` for `Network.guardStrikes = 3` consecutive samples, or a sample moves farther than physically possible, the character is returned to its last valid position and the event is logged. Thresholds are config.
+Samples each character every `Network.guardSampleSeconds = 0.25`. If the upward move in a sample exceeds `Movement.hardCap × Network.speedTolerance (1.2)` for `Network.guardStrikes = 3` consecutive samples, or one move exceeds `Network.guardTeleportFactor = 2` times that allowance, falling excluded, the character is returned to its last valid position and the event is logged. Thresholds are config.
 
 ---
 
