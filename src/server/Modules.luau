@@ -11,6 +11,7 @@ local modules: { Loader.LoadableModule } = {
 	require(script.Parent.BallService),
 	require(script.Parent.TeamService),
 	require(script.Parent.CharacterService),
+	require(script.Parent.ActionService),
 	require(script.Parent.MovementGuard),
 	require(script.Parent.MatchService),
 }

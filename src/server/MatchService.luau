@@ -8,6 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local ActionService = require(script.Parent.ActionService)
 local ArenaService = require(script.Parent.ArenaService)
 local BallService = require(script.Parent.BallService)
 local CharacterService = require(script.Parent.CharacterService)
@@ -36,6 +37,7 @@ export type MatchService = {
 	_ball: BallService.BallService,
 	_teams: TeamService.TeamService,
 	_characters: CharacterService.CharacterService,
+	_actions: ActionService.ActionService,
 	-- Players the current engine knows, so only they are removed from it.
 	_inEngine: { [PlayerId]: boolean },
 	_waiting: boolean,
@@ -79,6 +81,7 @@ local function react(self: MatchService, event: Types.Event)
 	local name = event.name
 	if name == "KickoffStarted" then
 		self._ball:hide()
+		self._actions:reset()
 		self._characters:placeAll(true)
 	elseif name == "KickoffEnded" then
 		self._ball:spawn()
@@ -105,7 +108,15 @@ end
 
 local MatchService: MatchService = {
 	name = "MatchService",
-	dependencies = { "Config", "ArenaService", "NetService", "BallService", "TeamService", "CharacterService" },
+	dependencies = {
+		"Config",
+		"ArenaService",
+		"NetService",
+		"BallService",
+		"TeamService",
+		"CharacterService",
+		"ActionService",
+	},
 	engine = nil :: any,
 	_config = nil :: any,
 	_arena = nil :: any,
@@ -113,6 +124,7 @@ local MatchService: MatchService = {
 	_ball = nil :: any,
 	_teams = nil :: any,
 	_characters = nil :: any,
+	_actions = nil :: any,
 	_inEngine = {},
 	_waiting = true,
 	_postMatchLeft = nil,
@@ -125,6 +137,7 @@ local MatchService: MatchService = {
 		self._ball = deps.BallService
 		self._teams = deps.TeamService
 		self._characters = deps.CharacterService
+		self._actions = deps.ActionService
 		self._carrier = nil
 		newEngine(self)
 
@@ -162,7 +175,9 @@ local MatchService: MatchService = {
 		end)
 	end,
 
-	-- One server frame, in the engine's order: ballMoved, thrown, pickedUp, touched, tick, then the drained events.
+	-- One server frame: the actions first (strikes, knockdowns and their drops, before the ball moves), then the ball,
+	-- then the engine's facts in its order (ballMoved, thrown, pickedUp, touched, knockedDown), tick, and the drained
+	-- events.
 	step = function(self: MatchService, dt: number)
 		local engine = self.engine
 		if self._waiting and self._teams:seatedCount() >= self._config.Match.minPlayersToStart then
@@ -170,6 +185,7 @@ local MatchService: MatchService = {
 			engine:start()
 		end
 
+		local knockdowns = self._actions:step(dt)
 		local frame = self._ball:step(dt, self._characters:holders())
 		if frame.moved then
 			engine:ballMoved(frame.from, frame.to)
@@ -182,6 +198,9 @@ local MatchService: MatchService = {
 		end
 		if frame.toucher ~= nil then
 			engine:touched(frame.toucher, frame.touchPosition, frame.touchVelocity)
+		end
+		for _, knockdown in knockdowns do
+			engine:knockedDown(knockdown.attacker, knockdown.victim)
 		end
 		engine:tick(dt)
 
