@@ -28,19 +28,16 @@ local function sectionMiddle(arena: ArenaConfig, section: number): number
 	return (Centerline.gateDistance(arena, section) + nextStart) / 2
 end
 
--- Gate g spans the track at the start of section g and faces the travel direction, as tall as the outer wall.
+-- Gate g spans the track at the start of section g and faces the travel direction, as tall as the roof (A2), so a
+-- throw inside the tube cannot pass over it.
 function Features.gates(arena: ArenaConfig): { Crossing.Rectangle }
 	local gates: { Crossing.Rectangle } = {}
+	local roofTop = Profile.roofTop(arena)
 	for gate = 1, Centerline.gateCount do
 		table.insert(gates, {
-			frame = Centerline.at(
-				arena,
-				Centerline.gateDistance(arena, gate),
-				arena.trackWidth / 2,
-				arena.outerWallHeight / 2
-			),
+			frame = Centerline.at(arena, Centerline.gateDistance(arena, gate), arena.trackWidth / 2, roofTop / 2),
 			width = arena.trackWidth,
-			height = arena.outerWallHeight,
+			height = roofTop,
 		})
 	end
 	return gates
@@ -144,7 +141,8 @@ function Features.goal(arena: ArenaConfig): Types.Goal
 	}
 end
 
--- A pillar standing on the outer wall's top at each gate.
+-- A flat panel on the outer wall's inner face at each gate, its top flush with the wall top (A2): the roof spans above
+-- it, so it never pokes into the roof. Its thickness is the surface's, and it stays out of the skaters' way.
 function Features.markers(arena: ArenaConfig): { Piece }
 	local markers: { Piece } = {}
 	for gate = 1, Centerline.gateCount do
@@ -153,10 +151,10 @@ function Features.markers(arena: ArenaConfig): { Piece }
 			cframe = Centerline.at(
 				arena,
 				Centerline.gateDistance(arena, gate),
-				arena.trackWidth + arena.surfaceThickness / 2,
-				arena.outerWallHeight + arena.marker.height / 2
+				arena.trackWidth - arena.surfaceThickness / 2,
+				arena.outerWallHeight - arena.marker.height / 2
 			),
-			size = Vector3.new(arena.marker.width, arena.marker.height, arena.marker.width),
+			size = Vector3.new(arena.surfaceThickness, arena.marker.height, arena.marker.width),
 		})
 	end
 	return markers

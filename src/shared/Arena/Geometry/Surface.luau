@@ -62,22 +62,12 @@ function Surface.quadPieces(p00: Vector3, p10: Vector3, p01: Vector3, p11: Vecto
 	return pieces
 end
 
--- Strip by strip around the loop. Neighboring rectangles that continue each other in a straight line (a strip whose
--- cross-section does not change along a straight) merge into one long block: fewer parts, and no seam across the
--- strip for a rolling ball to bump on.
-function Surface.pieces(arena: ArenaConfig): { Piece }
-	local rings: { { Vector3 } } = {}
-	for _, distance in Centerline.stations(arena) do
-		local ring: { Vector3 } = {}
-		for _, point in Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, distance)) do
-			table.insert(ring, Centerline.at(arena, distance, point.X, point.Y).Position)
-		end
-		table.insert(rings, ring)
-	end
-
-	local thickness = arena.surfaceThickness
+-- The strips between profile points first..last, around the whole loop. Neighboring rectangles that continue each
+-- other in a straight line (a strip whose cross-section does not change along a straight) merge into one long block:
+-- fewer parts, and no seams across the strip for a rolling ball to bump on.
+local function sweep(rings: { { Vector3 } }, thickness: number, first: number, last: number): { Piece }
 	local pieces: { Piece } = {}
-	for point = 1, #rings[1] - 1 do
+	for point = first, last do
 		-- The open run of rectangles: its first quad's near edge, and its far edge so far.
 		local runStart: { Vector3 }? = nil
 		local runEnd: { Vector3 }? = nil
@@ -112,6 +102,26 @@ function Surface.pieces(arena: ArenaConfig): { Piece }
 		flush()
 	end
 	return pieces
+end
+
+-- The riding surface in two lists (A2): the walls and floors, and the roof, which gets its own folder in the Builder.
+-- The profile's roof is its last strips, from the outer wall's top to the inner wall's top.
+function Surface.build(arena: ArenaConfig): { surface: { Piece }, roof: { Piece } }
+	local rings: { { Vector3 } } = {}
+	for _, distance in Centerline.stations(arena) do
+		local ring: { Vector3 } = {}
+		for _, point in Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, distance)) do
+			table.insert(ring, Centerline.at(arena, distance, point.X, point.Y).Position)
+		end
+		table.insert(rings, ring)
+	end
+
+	local thickness = arena.surfaceThickness
+	local roofEdge = Profile.roofEdge(arena)
+	return {
+		surface = sweep(rings, thickness, 1, roofEdge - 1),
+		roof = sweep(rings, thickness, roofEdge, #rings[1] - 1),
+	}
 end
 
 return Surface
