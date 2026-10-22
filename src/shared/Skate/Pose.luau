@@ -41,8 +41,12 @@ function Pose.compute(pose: Config.PoseConfig, input: PoseInput, out: Frame)
 	local pumping, airborne = input.pumping, input.airborne
 	local crouch = pose.crouchDeg
 
-	local rootPitch = if pumping then -crouch / 2 elseif input.braking then pose.brakeLeanDeg else 0
-	out.root = CFrame.new(0, input.bodyOffset, 0) * CFrame.Angles(math.rad(rootPitch), 0, math.rad(-input.lean))
+	-- The lift, then the pitch, then the roll: CFrame.new(0, lift, 0) * CFrame.Angles(pitch, 0, roll) written out as
+	-- one CFrame, so a pose allocates one per joint.
+	local pitch = math.rad(if pumping then -crouch / 2 elseif input.braking then pose.brakeLeanDeg else 0)
+	local roll = math.rad(-input.lean)
+	local cp, sp, cr, sr = math.cos(pitch), math.sin(pitch), math.cos(roll), math.sin(roll)
+	out.root = CFrame.new(0, input.bodyOffset, 0, cr, -sr, 0, cp * sr, cp * cr, -sp, sp * sr, sp * cr, cp)
 	out.waist = if pumping then CFrame.Angles(math.rad(-crouch / 2), 0, 0) else CFrame.identity
 
 	-- The thighs come forward and the shins fold back, in a crouch and in the air's tuck alike.

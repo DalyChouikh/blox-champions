@@ -5,6 +5,7 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Pose = require(ReplicatedStorage.Shared.Skate.Pose)
 
 local pose = Config.defaults().Pose
@@ -115,5 +116,19 @@ describe("Pose", function()
 		Pose.compute(pose, turningRight, out)
 		expect(points(out.root, Vector3.yAxis).X).toBeGreaterThan(0) -- into a right turn
 		expect(points(out.rightShoulder, DOWN).X).toBeGreaterThan(0) -- the right arm rises out to the side
+	end)
+
+	it("writes the root as the lift, then the pitch, then the roll", function()
+		local out = {} :: Pose.Frame
+		local input = still()
+		input.pumping = true
+		input.lean = 12
+		input.bodyOffset = 0.5
+		Pose.compute(pose, input, out)
+		local expected = CFrame.new(0, 0.5, 0) * CFrame.Angles(math.rad(-pose.crouchDeg / 2), 0, math.rad(-12))
+		Fixtures.expectNear(out.root.Position, expected.Position, 1e-6)
+		Fixtures.expectNear(out.root.XVector, expected.XVector, 1e-6)
+		Fixtures.expectNear(out.root.YVector, expected.YVector, 1e-6)
+		Fixtures.expectNear(out.root.ZVector, expected.ZVector, 1e-6)
 	end)
 end)
