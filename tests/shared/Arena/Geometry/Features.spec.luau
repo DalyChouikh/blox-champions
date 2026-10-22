@@ -16,14 +16,14 @@ local function near(actual: Vector3, expected: Vector3)
 end
 
 describe("Features.gates", function()
-	it("spans the track at each corner, facing the travel direction, as tall as the outer wall", function()
+	it("spans the track at each corner, facing the travel direction, as tall as the roof", function()
 		local gates = Features.gates(arena)
 		expect(#gates).toBe(4)
-		near(gates[1].frame.Position, Vector3.new(80, 14, -60))
+		near(gates[1].frame.Position, Vector3.new(80, 25, -60))
 		near(gates[1].frame.LookVector, Vector3.new(-1, 0, 0))
-		near(gates[3].frame.Position, Vector3.new(-80, 14, 60))
+		near(gates[3].frame.Position, Vector3.new(-80, 25, 60))
 		expect(gates[2].width).toBe(44)
-		expect(gates[2].height).toBe(28)
+		expect(gates[2].height).toBe(50)
 	end)
 end)
 
@@ -93,11 +93,12 @@ describe("Features.goal fit", function()
 end)
 
 describe("Features markers, spawns and infield", function()
-	it("stands a pillar on the outer wall top at each gate", function()
+	it("hangs a flat panel on the outer wall's inner face at each gate, its top flush with the wall top", function()
 		local markers = Features.markers(arena)
 		expect(#markers).toBe(4)
-		near(markers[2].cframe.Position, Vector3.new(-80, 32, -82.5))
-		near(markers[2].size, Vector3.new(2, 8, 2))
+		-- Lateral 43.5 (one surface thickness in from the wall at 44), top at 28 less half the 8-stud panel.
+		near(markers[2].cframe.Position, Vector3.new(-80, 24, -81.5))
+		near(markers[2].size, Vector3.new(1, 8, 2))
 	end)
 
 	it("lines each team up on the lower floor of its straight, mirrored across the long axis", function()
@@ -132,8 +133,8 @@ describe("Features markers, spawns and infield", function()
 	it("fills the infield between the straights up to the inner wall top, tucked behind the wall's slab", function()
 		local pieces = Features.infield(arena)
 		expect(pieces[1].shape).toBe("Block")
-		near(pieces[1].cframe.Position, Vector3.new(0, 10, 0))
-		near(pieces[1].size, Vector3.new(160, 20, 74))
+		near(pieces[1].cframe.Position, Vector3.new(0, 14, 0))
+		near(pieces[1].size, Vector3.new(160, 28, 74))
 	end)
 
 	-- The inner wall is flat strips between stations, so a cylinder would overlap them between stations.
@@ -144,17 +145,17 @@ describe("Features markers, spawns and infield", function()
 		for index = 2, #pieces do
 			local piece = pieces[index]
 			expect(piece.shape).toBe("Wedge")
-			expect(piece.size.X).toBeCloseTo(20, 4)
+			expect(piece.size.X).toBeCloseTo(28, 4)
 			for _, corner in Fixtures.wedgeFace(piece, Vector3.yAxis) do
-				expect(corner.Y).toBeCloseTo(20, 3)
-				local center = Vector3.new(if corner.X < 0 then -80 else 80, 20, 0)
+				expect(corner.Y).toBeCloseTo(28, 3)
+				local center = Vector3.new(if corner.X < 0 then -80 else 80, 28, 0)
 				expect((corner - center).Magnitude <= 37 + 1e-3).toBe(true)
 				table.insert(corners, corner)
 			end
 		end
 		for _, section in { 2, 4 } do
 			for _, distance in Centerline.sectionStations(arena, section) do
-				local back = Centerline.at(arena, distance, -arena.surfaceThickness, 20).Position
+				local back = Centerline.at(arena, distance, -arena.surfaceThickness, 28).Position
 				local meets = false
 				for _, corner in corners do
 					meets = meets or (corner - back).Magnitude < 1e-3

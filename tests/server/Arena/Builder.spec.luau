@@ -8,6 +8,7 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local Builder = require(game:GetService("ServerScriptService").Server.Arena.Builder)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
@@ -31,7 +32,8 @@ describe("Builder.build", function()
 	it("builds one part per piece, grouped by what it is", function()
 		local arena = Builder.build(Geometry.build(config), config, parent)
 		expect(arena.Parent).toBe(parent)
-		expect(#folder(arena, "Surface"):GetChildren()).toBe(6900)
+		expect(#folder(arena, "Surface"):GetChildren()).toBe(7334)
+		expect(#folder(arena, "Roof"):GetChildren()).toBe(8106)
 		expect(#folder(arena, "Infield"):GetChildren()).toBe(193)
 		expect(#folder(arena, "Gates"):GetChildren()).toBe(4)
 		expect(#folder(arena, "Markers"):GetChildren()).toBe(4)
@@ -57,6 +59,16 @@ describe("Builder.build", function()
 		end
 	end)
 
+	it("tags the roof as a riding surface, and makes the corner markers panels that never block a skater", function()
+		local arena = Builder.build(Geometry.build(config), config, parent)
+		expect(folder(arena, "Roof"):HasTag(Tags.RideSurface)).toBe(true)
+		local markers = folder(arena, "Markers"):GetChildren()
+		expect(#markers).toBe(Centerline.gateCount)
+		for _, marker in markers do
+			expect((marker :: BasePart).CanCollide).toBe(false)
+		end
+	end)
+
 	it("tags the riding surfaces so skaters' rays find only them", function()
 		local arena = Builder.build(Geometry.build(config), config, parent)
 		local tagged: { string } = {}
@@ -66,7 +78,7 @@ describe("Builder.build", function()
 			end
 		end
 		table.sort(tagged)
-		expect(tagged).toEqual({ "Infield", "Surface" })
+		expect(tagged).toEqual({ "Infield", "Roof", "Surface" })
 	end)
 
 	it("sends the whole arena to every client and never streams it out", function()

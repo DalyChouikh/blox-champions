@@ -30,10 +30,11 @@ afterAll(function()
 	root:Destroy()
 end)
 
+-- The roof spans the track (A2), so a ray from above it would stop there: the floors are read with the roof excluded.
 local function cast(origin: Vector3, direction: Vector3): RaycastResult
 	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Include
-	params.FilterDescendantsInstances = { arena }
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { arena:FindFirstChild("Roof") :: Instance }
 	return workspace:Raycast(origin, direction, params) :: RaycastResult
 end
 
@@ -49,8 +50,8 @@ describe("The generated arena", function()
 			{ Vector3.new(30, 60, -63), 2 }, -- top straight, middle of the step
 			{ Vector3.new(-80, 60, -63), 1 }, -- Gate 2: the step is half blended away
 			{ Vector3.new(-130, 60, 0), 0 }, -- left curved end, flat floor
-			{ Vector3.new(0, 60, 0), 20 }, -- infield top
-			{ Vector3.new(-110, 60, 15), 20 }, -- infield top under the left curved end
+			{ Vector3.new(0, 60, 0), 28 }, -- infield top
+			{ Vector3.new(-110, 60, 15), 28 }, -- infield top under the left curved end
 		}
 		for _, case in floors do
 			local hit = cast(case[1], Vector3.new(0, -100, 0))

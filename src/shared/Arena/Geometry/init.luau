@@ -12,6 +12,7 @@ type Piece = Types.Piece
 
 export type ArenaGeometry = {
 	surface: { Piece },
+	roof: { Piece },
 	infield: { Piece },
 	gates: { Crossing.Rectangle },
 	goal: Types.Goal,
@@ -24,8 +25,10 @@ local Geometry = {}
 
 function Geometry.build(config: Config.GameConfig): ArenaGeometry
 	local arena = config.Arena
+	local riding = Surface.build(arena)
 	return {
-		surface = Surface.pieces(arena),
+		surface = riding.surface,
+		roof = riding.roof,
 		infield = Features.infield(arena),
 		gates = Features.gates(arena),
 		goal = Features.goal(arena),

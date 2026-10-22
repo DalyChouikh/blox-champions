@@ -37,6 +37,7 @@ end
 local function validate(geometry: Geometry.ArenaGeometry)
 	local groups: { { name: string, pieces: { Piece } } } = {
 		{ name = "surface", pieces = geometry.surface },
+		{ name = "roof", pieces = geometry.roof },
 		{ name = "infield", pieces = geometry.infield },
 		{ name = "goal rim", pieces = geometry.goal.rim },
 		{ name = "goal panel", pieces = { geometry.goal.panel } },
@@ -155,6 +156,8 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 
 	addRideSurface(geometry.surface, "Surface", colors.surface, model)
+	-- The roof is its own folder so its lighting can be tuned apart from the floor (A2).
+	addRideSurface(geometry.roof, "Roof", colors.surface, model)
 	addRideSurface(geometry.infield, "Infield", colors.infield, model)
 
 	local gates = newFolder("Gates", model)
@@ -170,6 +173,8 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 	local markers = newFolder("Markers", model)
 	for index, piece in geometry.markers do
 		local marker = addSolid(piece, `Marker{index}`, colors.marker, markers)
+		-- A flat panel on the wall: it shows the way and never blocks a skater (A2).
+		marker.CanCollide = false
 		marker:SetAttribute(Tags.Attribute.GateIndex, index)
 		marker:AddTag(Tags.CornerMarker)
 	end
