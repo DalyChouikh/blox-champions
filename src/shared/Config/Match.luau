@@ -16,6 +16,8 @@ export type MatchConfig = {
 	kickoffCountdownSeconds: number,
 	clockPausesDuringKickoff: boolean,
 	postMatchSeconds: number,
+	-- How long a character that died waits before it is loaded again on its team spawn.
+	respawnSeconds: number,
 	lastChance: { enabled: boolean, maxDeficit: number },
 }
 
@@ -31,6 +33,7 @@ local defaults: MatchConfig = {
 	kickoffCountdownSeconds = 3,
 	clockPausesDuringKickoff = true,
 	postMatchSeconds = 15,
+	respawnSeconds = 3,
 	lastChance = { enabled = true, maxDeficit = 1 },
 }
 
@@ -49,6 +52,7 @@ local fields = Validate.record({
 	kickoffCountdownSeconds = nonNegativeSeconds,
 	clockPausesDuringKickoff = Validate.boolean(),
 	postMatchSeconds = nonNegativeSeconds,
+	respawnSeconds = nonNegativeSeconds,
 	lastChance = Validate.record({ enabled = Validate.boolean(), maxDeficit = positiveInteger }),
 })
 

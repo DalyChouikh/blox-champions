@@ -136,7 +136,7 @@ local fields = Validate.record({
 
 -- Checked in order; the first that fails is reported. Whether the goal ring fits is judged by Arena/Geometry
 -- against the surface as built (Features.goal), which config cannot require.
-local crossFieldRules: { { message: string, holds: (arena: ArenaConfig) -> boolean } } = {
+local crossFieldRules: { Validate.Rule } = {
 	{
 		message = "trackWidth must fit both wall curves, the step, the upper floor and a lower floor",
 		holds = function(arena: ArenaConfig): boolean
@@ -166,10 +166,7 @@ local crossFieldRules: { { message: string, holds: (arena: ArenaConfig) -> boole
 	},
 }
 
-local schema = fields
-for _, rule in crossFieldRules do
-	schema = Validate.check(schema, rule.holds, rule.message)
-end
+local schema = Validate.checkAll(fields, crossFieldRules)
 
 return {
 	defaults = defaults,

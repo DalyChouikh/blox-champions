@@ -56,6 +56,11 @@ describe("Builder.build", function()
 		end
 	end)
 
+	it("sends the whole arena to every client and never streams it out", function()
+		local arena = Builder.build(Geometry.build(config), config, parent)
+		expect(arena.ModelStreamingMode).toBe(Enum.ModelStreamingMode.Persistent)
+	end)
+
 	it("takes the tag-only parts' sizes and the goal panel's transparency from config", function()
 		local custom = Fixtures.config({
 			Arena = {

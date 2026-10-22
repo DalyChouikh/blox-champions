@@ -144,6 +144,8 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 	local colors = arena.colors
 	local model = Instance.new("Model")
 	model.Name = "Arena"
+	-- Every client gets the whole arena soon after joining and never loses it, so client code can rely on it.
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 
 	addSolids(geometry.surface, "Surface", colors.surface, newFolder("Surface", model))
 	addSolids(geometry.infield, "Infield", colors.infield, newFolder("Infield", model))
