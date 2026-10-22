@@ -129,6 +129,13 @@ describe("Validate", function()
 		expect(v({ 3, 0 }, "UI.clockWarnings")).toEqual({ "UI.clockWarnings[2]: must be >= 1 (got 0)" })
 	end)
 
+	it("checks Enum items by their enum", function()
+		local key = Validate.enumItem(Enum.KeyCode)
+		expect(key(Enum.KeyCode.F, "k")).toEqual({})
+		expect(key(Enum.UserInputType.Touch, "k")).toEqual({ "k: must be a KeyCode (got Enum.UserInputType.Touch)" })
+		expect(key("F", "k")).toEqual({ 'k: must be a KeyCode (got "F")' })
+	end)
+
 	it("rejects non-tables and tables that are not lists", function()
 		local v = Validate.list(Validate.number())
 		expect(v(5, "L")).toEqual({ "L: expected table, got number" })

@@ -80,6 +80,21 @@ describe("Config defaults", function()
 		})
 	end)
 
+	it("bind the skating keys of spec §8.3", function()
+		local input = Config.defaults().Input
+		expect(input.contextPriority).toBe(1000)
+		expect(input.move).toEqual({
+			composites = {
+				{ up = Enum.KeyCode.W, down = Enum.KeyCode.S, left = Enum.KeyCode.A, right = Enum.KeyCode.D },
+			},
+			sticks = { Enum.KeyCode.Thumbstick1 },
+		})
+		expect(input.jump).toEqual({ Enum.KeyCode.Space, Enum.KeyCode.ButtonA })
+		expect(input.pump).toEqual({ Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonR2 })
+		expect(input.brake).toEqual({ Enum.KeyCode.LeftControl, Enum.KeyCode.ButtonR1 })
+		expect(input.attach).toEqual({ Enum.KeyCode.F, Enum.KeyCode.ButtonL1 })
+	end)
+
 	it("match the spec's scoring values", function()
 		local s = Config.defaults().Scoring
 		expect(s.points).toEqual({
@@ -333,6 +348,12 @@ describe("Config.forMode", function()
 				Fixtures.config(case.overrides)
 			end).toThrow(case.message)
 		end
+	end)
+
+	it("rejects a key bound to two actions", function()
+		expect(function()
+			Fixtures.config({ Input = { pump = { Enum.KeyCode.Space } } })
+		end).toThrow("Input: Space is bound to more than one action")
 	end)
 
 	it("rejects team spawns that would not fit on a straight", function()
