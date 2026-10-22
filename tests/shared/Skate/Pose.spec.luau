@@ -79,4 +79,41 @@ describe("Pose", function()
 		Pose.compute(pose, input, out)
 		expect(math.abs(anglesOf(out, "rightShoulder")[3])).toBeCloseTo(75, 4)
 	end)
+
+	-- In body axes (x right, y up, -z forward), which an R15 avatar's joint frames match: a turn writes where a part
+	-- that hangs below its joint (a thigh, a shin, an arm) or stands above it (the torso) ends up pointing.
+	it("bends each joint the way a body bends", function()
+		local DOWN = -Vector3.yAxis
+		local function points(turn: CFrame, along: Vector3): Vector3
+			return turn.Rotation * along
+		end
+		local out = {} :: Pose.Frame
+		local pumping = still()
+		pumping.pumping = true
+		Pose.compute(pose, pumping, out)
+		expect(points(out.root, Vector3.yAxis).Z).toBeLessThan(0) -- the body leans forward
+		expect(points(out.waist, Vector3.yAxis).Z).toBeLessThan(0) -- and the chest with it
+		expect(points(out.leftHip, DOWN).Z).toBeLessThan(0) -- the thighs come forward
+		expect(points(out.rightHip, DOWN).Z).toBeLessThan(0)
+		expect(points(out.leftKnee, DOWN).Z).toBeGreaterThan(0) -- the shins fold back
+		expect(points(out.rightKnee, DOWN).Z).toBeGreaterThan(0)
+
+		local tucked = still()
+		tucked.airborne = true
+		Pose.compute(pose, tucked, out)
+		expect(points(out.rightHip, DOWN).Z).toBeLessThan(0)
+		expect(points(out.rightKnee, DOWN).Z).toBeGreaterThan(0)
+
+		local braking = still()
+		braking.braking = true
+		Pose.compute(pose, braking, out)
+		expect(points(out.root, Vector3.yAxis).Z).toBeGreaterThan(0) -- the body leans back
+
+		local turningRight = still()
+		turningRight.lean = 10
+		turningRight.carrying = true
+		Pose.compute(pose, turningRight, out)
+		expect(points(out.root, Vector3.yAxis).X).toBeGreaterThan(0) -- into a right turn
+		expect(points(out.rightShoulder, DOWN).X).toBeGreaterThan(0) -- the right arm rises out to the side
+	end)
 end)

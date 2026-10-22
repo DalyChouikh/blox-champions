@@ -1,7 +1,8 @@
 --!strict
 -- One skater's body pose (spec §7.1): how far each joint turns, from the lean, the pump, the brake, the air and the
 -- carried ball. Pure: it writes into a table the caller reuses, so a pose allocates only the CFrames it returns.
--- Forward is the negative X turn and back is the positive one; the signs are checked in the playtest.
+-- Every turn is in body axes (x right, y up, -z forward), which R15 joint frames match; PoseController turns them
+-- into each joint's own frame. A positive turn about x tips the torso back and swings a hanging limb forward.
 
 local Config = require(script.Parent.Parent.Config)
 
@@ -44,8 +45,9 @@ function Pose.compute(pose: Config.PoseConfig, input: PoseInput, out: Frame)
 	out.root = CFrame.new(0, input.bodyOffset, 0) * CFrame.Angles(math.rad(rootPitch), 0, math.rad(-input.lean))
 	out.waist = if pumping then CFrame.Angles(math.rad(-crouch / 2), 0, 0) else CFrame.identity
 
-	local hip = if pumping then -crouch elseif airborne then -pose.tuckDeg else 0
-	local knee = if pumping then 2 * crouch elseif airborne then pose.tuckDeg else 0
+	-- The thighs come forward and the shins fold back, in a crouch and in the air's tuck alike.
+	local hip = if pumping then crouch elseif airborne then pose.tuckDeg else 0
+	local knee = if pumping then -2 * crouch elseif airborne then -pose.tuckDeg else 0
 	local hipTurn = CFrame.Angles(math.rad(hip), 0, 0)
 	local kneeTurn = CFrame.Angles(math.rad(knee), 0, 0)
 	out.leftHip = hipTurn

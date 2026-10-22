@@ -17,12 +17,15 @@ local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
+local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
 type PlayerId = Types.PlayerId
 -- A Motor6D or an AnimationConstraint: both take a Transform.
 type Joint = Instance & { Transform: CFrame }
 -- One joint of one character, with the pose role it takes.
-type JointEntry = { role: Pose.Role, joint: Joint }
+-- `axes` is the joint frame's turn and `inverse` its inverse, both nil when the frame lines up with the body (R15):
+-- an R6 joint frame is turned, so the body-axes pose is carried into it.
+type JointEntry = { role: Pose.Role, joint: Joint, axes: CFrame?, inverse: CFrame? }
 
 -- One character this client poses. Its pose records are shared by every character, see `self._input`.
 type Tracked = {
@@ -79,6 +82,23 @@ local function standingHeight(character: Model, humanoid: Humanoid, root: BasePa
 	return height
 end
 
+-- The turn of the frame a joint's Transform works in, in the axes of the part it hangs from: a Motor6D's C0, an
+-- AnimationConstraint's first attachment.
+local function frameOf(joint: Instance): CFrame
+	if joint:IsA("Motor6D") then
+		return joint.C0.Rotation
+	elseif joint:IsA("AnimationConstraint") then
+		local attachment = joint.Attachment0
+		return if attachment ~= nil then attachment.CFrame.Rotation else CFrame.identity
+	end
+	return CFrame.identity
+end
+
+local function alignsWithBody(axes: CFrame): boolean
+	return (axes.XVector - Vector3.xAxis).Magnitude < Vectors.EPSILON
+		and (axes.YVector - Vector3.yAxis).Magnitude < Vectors.EPSILON
+end
+
 -- Each joint of this rig type that the character has, paired with its role.
 local function findJoints(character: Model, humanoid: Humanoid): { JointEntry }
 	local names: { [Pose.Role]: string } = if humanoid.RigType == Enum.HumanoidRigType.R6
@@ -88,7 +108,14 @@ local function findJoints(character: Model, humanoid: Humanoid): { JointEntry }
 	for role: Pose.Role, name in names do
 		local joint = character:FindFirstChild(name, true)
 		if joint ~= nil and (joint:IsA("Motor6D") or joint:IsA("AnimationConstraint")) then
-			table.insert(entries, { role = role, joint = joint :: Joint })
+			local axes = frameOf(joint)
+			local turned = not alignsWithBody(axes)
+			table.insert(entries, {
+				role = role,
+				joint = joint :: Joint,
+				axes = if turned then axes else nil,
+				inverse = if turned then axes:Inverse() else nil,
+			})
 		end
 	end
 	return entries
@@ -148,7 +175,9 @@ local function poseOne(self: PoseController, tracked: Tracked, dt: number)
 	local out = self._out
 	Pose.compute(self._config.Pose, input, out)
 	for _, entry in tracked.joints do
-		entry.joint.Transform = out[entry.role]
+		local turn = out[entry.role]
+		local axes, inverse = entry.axes, entry.inverse
+		entry.joint.Transform = if axes ~= nil and inverse ~= nil then inverse * turn * axes else turn
 	end
 end
 
@@ -256,8 +285,13 @@ local PoseController: PoseController = {
 	end,
 
 	step = function(self: PoseController, dt: number)
-		for _, tracked in self._tracked do
-			poseOne(self, tracked, dt)
+		for character, tracked in self._tracked do
+			-- A character can leave without CharacterRemoving (destroyed, or removed while track waited for it).
+			if character.Parent == nil then
+				self._tracked[character] = nil
+			else
+				poseOne(self, tracked, dt)
+			end
 		end
 	end,
 }
