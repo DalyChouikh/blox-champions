@@ -19,6 +19,7 @@ local Draft = require(ReplicatedStorage.Shared.Skate.Draft)
 local InputController = require(script.Parent.InputController)
 local NormalFilter = require(ReplicatedStorage.Shared.Skate.NormalFilter)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
+local PlayerList = require(ReplicatedStorage.Shared.Util.PlayerList)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
@@ -67,7 +68,12 @@ export type SkateController = {
 	_sources: { Draft.Source },
 	_teammates: { Attach.Candidate },
 	_views: { SkaterView },
+	-- The game's players, followed from start on.
+	_playerList: PlayerList.PlayerList?,
 }
+
+-- Who playersAround walks before start.
+local NO_PLAYERS: { Player } = table.freeze({})
 
 local function worldUp(self: SkateController): Vector3
 	return -self._gravity.Unit
@@ -83,13 +89,15 @@ local function playersAround(self: SkateController): { SkaterView }
 	local views = self._views
 	local count = 0
 	local localPlayer = Players.LocalPlayer
-	for _, player in Players:GetPlayers() do
+	local playerList = self._playerList
+	local players: { Player } = if playerList ~= nil then playerList.list else NO_PLAYERS
+	for _, player in players do
 		local character = player.Character
 		local root = if character ~= nil then character:FindFirstChild(SkaterRig.root) :: BasePart? else nil
 		if player ~= localPlayer and root ~= nil then
 			count += 1
 			local view = views[count]
-			local team: string? = player:GetAttribute(Attributes.Team)
+			local team = player:GetAttribute(Attributes.Team) :: string?
 			if view == nil then
 				views[count] = { player = PlayerIds.of(player), team = team, root = root }
 			else
@@ -270,6 +278,7 @@ local SkateController: SkateController = {
 	_sources = {},
 	_teammates = {},
 	_views = {},
+	_playerList = nil,
 
 	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.Gravity, deps.Team and deps.Raycast replace the live game
 	-- in tests.
@@ -312,6 +321,7 @@ local SkateController: SkateController = {
 	end,
 
 	start = function(self: SkateController)
+		self._playerList = PlayerList.new(Players)
 		CollectionService:GetInstanceAddedSignal(Tags.RideSurface):Connect(function()
 			refreshSurfaces(self)
 		end)
