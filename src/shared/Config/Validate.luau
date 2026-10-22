@@ -178,6 +178,30 @@ function Validate.list(item: Validator): Validator
 	end
 end
 
+-- A table whose `field` names one of `variants`; that variant checks the whole table. For messages whose shape
+-- depends on one field, such as a request naming its action.
+function Validate.tagged(field: string, variants: { [string]: Validator }): Validator
+	local tags: { string } = {}
+	for tag in variants do
+		table.insert(tags, tag)
+	end
+	table.sort(tags)
+	local known = table.concat(tags, ", ")
+
+	return function(value: any, path: string): { string }
+		if type(value) ~= "table" then
+			return typeError(path, "table", value)
+		end
+		local tag = value[field]
+		local variant = if type(tag) == "string" then variants[tag] else nil
+		if variant == nil then
+			local shown = if type(tag) == "string" then `"{tag}"` else tostring(tag)
+			return { atPath(joinPath(path, field), `must be one of {known} (got {shown})`) }
+		end
+		return variant(value, path)
+	end
+end
+
 function Validate.check(inner: Validator, predicate: (value: any) -> boolean, message: string): Validator
 	return function(value: any, path: string): { string }
 		local errors = inner(value, path)

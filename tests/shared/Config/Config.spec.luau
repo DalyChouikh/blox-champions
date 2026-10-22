@@ -46,6 +46,85 @@ describe("Config defaults", function()
 			speedTolerance = 1.2,
 			guardStrikes = 3,
 			guardTeleportFactor = 2,
+			maxActionsPerSecond = 15,
+			hitLagToleranceStuds = 3,
+			actionCooldownTolerance = 0.1,
+		})
+	end)
+
+	it("match the spec's actions, plus this phase's", function()
+		local requires = function(ball: string): any
+			return { ball = ball, grounded = "any", notKnockedDown = true }
+		end
+		expect(Config.defaults().Actions).toEqual({
+			airMultiplier = 0.8,
+			callPassWindow = 3,
+			Tackle = {
+				phases = { windup = 0.05, active = 0.25, recovery = 0.35 },
+				cooldown = 0.8,
+				requires = requires("without"),
+				effect = "Knockdown",
+				pose = "Lunge",
+				hit = { range = 7, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
+				motion = { lungeSpeed = 40 },
+				followUp = { action = "Dive", window = "Active" },
+			},
+			Dive = {
+				phases = { windup = 0, active = 0.35, recovery = 0.9 },
+				cooldown = 0.8,
+				requires = requires("without"),
+				effect = "Knockdown",
+				pose = "Lunge",
+				hit = { range = 11, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
+				motion = { lungeSpeed = 60 },
+			},
+			Dodge = {
+				phases = { windup = 0, active = 0.3, recovery = 0.2 },
+				cooldown = 1.5,
+				requires = requires("with"),
+				effect = "Dodge",
+				pose = "None",
+				motion = { sideSpeed = 45 },
+			},
+			Uppercut = {
+				phases = { windup = 0.05, active = 0.2, recovery = 0.4 },
+				cooldown = 1.2,
+				requires = requires("without"),
+				effect = "Knockdown",
+				pose = "None",
+				hit = { range = 6, coneDeg = 60, aimUpDeg = 30, knockdownSeconds = 1.5 },
+				motion = { wallLeapDistance = 5, wallLeapImpulse = 110 },
+			},
+			ChargeThrow = {
+				phases = { windup = 0, active = 0, recovery = 0 },
+				cooldown = 0,
+				requires = requires("with"),
+				effect = "Throw",
+				pose = "None",
+				throw = { chargeMaxSeconds = 1, minSpeed = 60, maxSpeed = 160, inheritCarrierVelocity = 0.5 },
+			},
+			Pass = {
+				phases = { windup = 0, active = 0, recovery = 0 },
+				cooldown = 0,
+				requires = requires("with"),
+				effect = "Pass",
+				pose = "None",
+				pass = {
+					speed = 90,
+					homingAccel = 60,
+					coneDeg = 70,
+					maxRange = 120,
+					angleWeight = 0.6,
+					distanceWeight = 0.4,
+				},
+			},
+			CallPass = {
+				phases = { windup = 0, active = 0, recovery = 0 },
+				cooldown = 1,
+				requires = requires("without"),
+				effect = "CallPass",
+				pose = "None",
+			},
 		})
 	end)
 
@@ -377,6 +456,28 @@ describe("Config.forMode", function()
 		for _, case in cases do
 			expect(function()
 				Fixtures.config(case.overrides)
+			end).toThrow(case.message)
+		end
+	end)
+
+	it("rejects actions that contradict themselves", function()
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{
+				overrides = { ChargeThrow = { throw = { maxSpeed = 50 } } },
+				message = "Actions.ChargeThrow.throw: maxSpeed must be at least minSpeed",
+			},
+			{
+				overrides = { Tackle = { followUp = { action = "Tackle" } } },
+				message = "Actions.Tackle.followUp.action: must name another action",
+			},
+			{
+				overrides = { Dodge = { hit = { range = 1, coneDeg = 1, aimUpDeg = 0, knockdownSeconds = 1 } } },
+				message = "Actions.Dodge.hit: unknown key",
+			},
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config({ Actions = case.overrides })
 			end).toThrow(case.message)
 		end
 	end)

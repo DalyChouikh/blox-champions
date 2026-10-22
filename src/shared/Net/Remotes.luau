@@ -4,6 +4,8 @@
 --   MatchSnapshot  server → client   the match's state, on joining and when a new match starts
 --   BallCarrier    server → clients  { carrier = PlayerId? } whenever the ball changes hands
 --   SkateState     client → server   { pump, brake } whenever either changes (Net/Schemas checks it)
+--   ActionRequest  client → server   { action, aim?, charge? } when a player starts an action (Net/Schemas)
+--   ActionRejected server → client   { action } when the server refuses it, so the client cancels it
 
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 
@@ -17,6 +19,8 @@ local names: { [string]: string } = {
 	MatchSnapshot = "MatchSnapshot",
 	BallCarrier = "BallCarrier",
 	SkateState = "SkateState",
+	ActionRequest = "ActionRequest",
+	ActionRejected = "ActionRejected",
 }
 Remotes.names = Freeze.deep(names)
 

@@ -136,6 +136,24 @@ describe("Validate", function()
 		expect(key("F", "k")).toEqual({ 'k: must be a KeyCode (got "F")' })
 	end)
 
+	it("tagged picks the variant named by the tag", function()
+		local v = Validate.tagged("kind", {
+			A = Validate.record({ kind = Validate.string() }),
+			B = Validate.record({ kind = Validate.string(), n = Validate.number() }),
+		})
+		expect(v({ kind = "A" }, "M")).toEqual({})
+		expect(v({ kind = "B", n = 1 }, "M")).toEqual({})
+		expect(v({ kind = "A", n = 1 }, "M")).toEqual({ "M.n: unknown key" })
+		expect(v({ kind = "B" }, "M")).toEqual({ "M.n: missing" })
+	end)
+
+	it("tagged rejects a missing or unknown tag by name", function()
+		local v = Validate.tagged("kind", { A = Validate.record({ kind = Validate.string() }) })
+		expect(v({}, "M")).toEqual({ "M.kind: must be one of A (got nil)" })
+		expect(v({ kind = "Fly" }, "M")).toEqual({ 'M.kind: must be one of A (got "Fly")' })
+		expect(v(5, "M")).toEqual({ "M: expected table, got number" })
+	end)
+
 	it("rejects non-tables and tables that are not lists", function()
 		local v = Validate.list(Validate.number())
 		expect(v(5, "L")).toEqual({ "L: expected table, got number" })

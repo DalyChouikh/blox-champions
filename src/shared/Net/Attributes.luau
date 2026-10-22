@@ -8,4 +8,10 @@ return table.freeze({
 	-- On a seated player's character: whether they are pumping and braking, so every client can pose them.
 	Pumping = "Pumping",
 	Braking = "Braking",
+	-- On a character: knocked down by a strike (no control, cannot catch), set and cleared by the server.
+	KnockedDown = "KnockedDown",
+	-- On a character: the action it is running (a Config.Actions name), absent when none.
+	Action = "Action",
+	-- On a character: calling for a pass, for Actions.callPassWindow.
+	CallingPass = "CallingPass",
 })
