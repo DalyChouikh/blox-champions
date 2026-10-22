@@ -1,9 +1,10 @@
 --!strict
 -- Seated players' characters (spec §4.5, §10.1): loaded only for players with a seat (spectators watch without
 -- one), stood on their team spawn slot at kickoff and held still through the countdown, and loaded again after a
--- death. Loading yields, so it always runs on its own thread: whoever seats a player never waits for it. It lists the
--- characters that can catch the ball, and announces any that goes away so a carrier's ball drops. Phase 5 adds the
--- skating collider, hover and poses here.
+-- death. Loading yields, so it always runs on its own thread: whoever seats a player never waits for it. The loaded
+-- character is registered by that thread, not by CharacterAdded: Roblox defers that event until after the load has
+-- returned. It lists the characters that can catch the ball, and announces any that goes away so a carrier's ball
+-- drops. Phase 5 adds the skating collider, hover and poses here.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,6 +26,7 @@ export type CharacterService = {
 	start: (self: CharacterService) -> (),
 	requestLoad: (self: CharacterService, player: PlayerId) -> (),
 	adopt: (self: CharacterService, player: PlayerId, character: Model) -> (),
+	onDied: (self: CharacterService, player: PlayerId, character: Model) -> (),
 	place: (self: CharacterService, player: PlayerId, frozen: boolean) -> (),
 	placeAll: (self: CharacterService, frozen: boolean) -> (),
 	freezeAll: (self: CharacterService, frozen: boolean) -> (),
@@ -35,12 +37,14 @@ export type CharacterService = {
 	_config: Config.GameConfig,
 	_teamSpawns: { [string]: { CFrame } },
 	_teams: TeamService.TeamService,
-	-- Loads the player's character and returns once it exists (Player:LoadCharacterAsync; a fake in tests).
-	_loadCharacter: (player: PlayerId) -> (),
+	-- Loads the player's character and returns it, or nil when the player is gone (Player:LoadCharacterAsync; a fake
+	-- in tests).
+	_loadCharacter: (player: PlayerId) -> Model?,
 	-- Whether kickoff placement currently freezes characters, so one that loads mid-countdown is frozen too.
 	_frozen: boolean,
 	_loading: { [PlayerId]: boolean },
-	_watched: { [Player]: boolean },
+	-- One respawn wait per player: a later death starts it over.
+	_respawns: { [PlayerId]: thread },
 	_characters: { [PlayerId]: Model },
 	-- Adoption order, so the catch candidates are listed the same way every frame.
 	_order: { PlayerId },
@@ -66,27 +70,6 @@ local function standingHeight(character: Model): number
 	return height
 end
 
--- Registers each character the player gets, and loads them again after a death. Idempotent, so loading can make
--- sure of it first and never miss the CharacterAdded it causes.
-local function watch(self: CharacterService, player: Player)
-	if self._watched[player] then
-		return
-	end
-	self._watched[player] = true
-	local id = PlayerIds.of(player)
-	player.CharacterAdded:Connect(function(character: Model)
-		self:adopt(id, character)
-		local humanoid = character:WaitForChild("Humanoid") :: Humanoid
-		humanoid.Died:Connect(function()
-			task.delay(self._config.Match.respawnSeconds, function()
-				if self._teams:teamOf(id) ~= nil then
-					self:requestLoad(id)
-				end
-			end)
-		end)
-	end)
-end
-
 local function forget(self: CharacterService, player: PlayerId)
 	local watchers = self._watchers[player]
 	if watchers ~= nil then
@@ -102,6 +85,14 @@ local function forget(self: CharacterService, player: PlayerId)
 	end
 end
 
+-- Forgets the player's character and announces it, unless a newer one has replaced it.
+local function removed(self: CharacterService, player: PlayerId, character: Model)
+	if self._characters[player] == character then
+		forget(self, player)
+		self.characterRemoved:Fire(player)
+	end
+end
+
 local CharacterService: CharacterService = {
 	name = "CharacterService",
 	dependencies = { "Config", "ArenaService", "TeamService" },
@@ -109,10 +100,12 @@ local CharacterService: CharacterService = {
 	_config = nil :: any,
 	_teamSpawns = {},
 	_teams = nil :: any,
-	_loadCharacter = function(_player: PlayerId) end,
+	_loadCharacter = function(_player: PlayerId): Model?
+		return nil
+	end,
 	_frozen = false,
 	_loading = {},
-	_watched = {},
+	_respawns = {},
 	_characters = {},
 	_order = {},
 	_watchers = {},
@@ -124,16 +117,17 @@ local CharacterService: CharacterService = {
 		self._teamSpawns = deps.ArenaService.arena.teamSpawns
 		self._teams = deps.TeamService
 		self._loadCharacter = deps.LoadCharacter
-			or function(id: PlayerId)
+			or function(id: PlayerId): Model?
 				local player = PlayerIds.player(id)
-				if player ~= nil then
-					watch(self, player)
-					player:LoadCharacterAsync()
+				if player == nil then
+					return nil
 				end
+				player:LoadCharacterAsync()
+				return player.Character
 			end
 		self._frozen = false
 		self._loading = {}
-		self._watched = {}
+		self._respawns = {}
 		self._characters = {}
 		self._order = {}
 		self._watchers = {}
@@ -143,15 +137,6 @@ local CharacterService: CharacterService = {
 
 	start = function(self: CharacterService)
 		Players.CharacterAutoLoads = false
-		Players.PlayerAdded:Connect(function(player: Player)
-			watch(self, player)
-		end)
-		Players.PlayerRemoving:Connect(function(player: Player)
-			self._watched[player] = nil
-		end)
-		for _, player in Players:GetPlayers() do
-			watch(self, player)
-		end
 		self._teams.seated:Connect(function(id: PlayerId)
 			self:requestLoad(id)
 		end)
@@ -179,9 +164,12 @@ local CharacterService: CharacterService = {
 		end
 		self._loading[player] = true
 		task.spawn(function()
-			self._loadCharacter(player)
+			local character = self._loadCharacter(player)
 			self._loading[player] = nil
-			self:place(player, self._frozen)
+			if character ~= nil then
+				self:adopt(player, character)
+				self:place(player, self._frozen)
+			end
 		end)
 	end,
 
@@ -189,18 +177,37 @@ local CharacterService: CharacterService = {
 		forget(self, player)
 		self._characters[player] = character
 		table.insert(self._order, player)
-		local function removed()
-			if self._characters[player] == character then
-				forget(self, player)
-				self.characterRemoved:Fire(player)
-			end
-		end
-		local watchers = { character.Destroying:Connect(removed) }
+		local watchers = {
+			character.Destroying:Connect(function()
+				removed(self, player, character)
+			end),
+		}
 		local humanoid = character:FindFirstChildOfClass("Humanoid")
 		if humanoid ~= nil then
-			table.insert(watchers, humanoid.Died:Connect(removed))
+			table.insert(
+				watchers,
+				humanoid.Died:Connect(function()
+					self:onDied(player, character)
+				end)
+			)
 		end
 		self._watchers[player] = watchers
+	end,
+
+	-- A dead character stops counting at once (a carrier's ball drops); a player who still has a seat gets a new one
+	-- on their team spawn after Match.respawnSeconds.
+	onDied = function(self: CharacterService, player: PlayerId, character: Model)
+		removed(self, player, character)
+		local pending = self._respawns[player]
+		if pending ~= nil then
+			task.cancel(pending)
+		end
+		self._respawns[player] = task.delay(self._config.Match.respawnSeconds, function()
+			self._respawns[player] = nil
+			if self._teams:teamOf(player) ~= nil then
+				self:requestLoad(player)
+			end
+		end)
 	end,
 
 	place = function(self: CharacterService, player: PlayerId, frozen: boolean)
