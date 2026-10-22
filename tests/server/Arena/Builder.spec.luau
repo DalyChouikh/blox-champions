@@ -69,6 +69,17 @@ describe("Builder.build", function()
 		end
 	end)
 
+	-- A roof that casts shadows keeps the whole track in its shade (seen in a playtest).
+	it("lets the light into the tube: the roof casts no shadow, while the track still does", function()
+		local arena = Builder.build(Geometry.build(config), config, parent)
+		for _, part in folder(arena, "Roof"):GetChildren() do
+			if (part :: BasePart).CastShadow then
+				error(`{part.Name} casts a shadow`)
+			end
+		end
+		expect((folder(arena, "Surface"):GetChildren()[1] :: BasePart).CastShadow).toBe(true)
+	end)
+
 	it("tags the riding surfaces so skaters' rays find only them", function()
 		local arena = Builder.build(Geometry.build(config), config, parent)
 		local tagged: { string } = {}
