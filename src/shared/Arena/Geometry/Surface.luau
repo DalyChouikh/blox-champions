@@ -91,7 +91,7 @@ function Surface.pieces(arena: ArenaConfig): { Piece }
 			runStart, runEnd = nil, nil
 		end
 		for index, ring in rings do
-			-- The last station pairs with the first; runs do not continue across that seam.
+			-- The last station pairs with the first; a run never wraps past it, since one starts fresh at the first.
 			local nextRing = rings[index % #rings + 1]
 			local p00, p10, p01, p11 = ring[point], nextRing[point], ring[point + 1], nextRing[point + 1]
 			if not isRectangle(p00, p10, p01, p11) then
@@ -101,7 +101,6 @@ function Surface.pieces(arena: ArenaConfig): { Piece }
 				local start = runStart
 				if
 					start == nil
-					or index == 1
 					or not continues(start[point], start[point + 1], (runEnd :: { Vector3 })[point], p00, p01, p10)
 				then
 					flush()

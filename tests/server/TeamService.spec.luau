@@ -55,13 +55,18 @@ describe("TeamService", function()
 		local a, b = Fixtures.stubPlayer(1), Fixtures.stubPlayer(2)
 		TeamService:join(a)
 		TeamService:join(b)
-		local seated: { string } = {}
+		local seated: { string }, unseated: { string } = {}, {}
 		TeamService.seated:Connect(function(id: string)
 			table.insert(seated, id)
+		end)
+		TeamService.unseated:Connect(function(id: string)
+			table.insert(unseated, id)
 		end)
 		TeamService:newMatch()
 		table.sort(seated)
 		expect(seated).toEqual({ "1", "2" })
+		-- Everyone seated before still fits: a new match never takes a seat away.
+		expect(unseated).toEqual({})
 		expect(a:GetAttribute(Attributes.Team)).toBe(TeamService:teamOf("1"))
 	end)
 
