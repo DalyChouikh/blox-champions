@@ -87,6 +87,17 @@ function Validate.datatype(name: string): Validator
 	end
 end
 
+-- An item of one Roblox enum, e.g. Validate.enumItem(Enum.KeyCode).
+function Validate.enumItem(enumType: Enum): Validator
+	return function(value: any, path: string): { string }
+		if typeof(value) == "EnumItem" and value.EnumType == enumType then
+			return {}
+		end
+		local shown = if type(value) == "string" then `"{value}"` else tostring(value)
+		return { atPath(path, `must be a {tostring(enumType)} (got {shown})`) }
+	end
+end
+
 function Validate.table(): Validator
 	return function(value: any, path: string): { string }
 		if type(value) ~= "table" then

@@ -20,6 +20,14 @@ function Fixtures.expectNear(actual: Vector3, expected: Vector3, tolerance: numb
 	JestGlobals.expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-3)
 end
 
+-- A binding tests can drive with Fire, added to an input action.
+function Fixtures.scriptedBinding(action: InputAction): InputBinding
+	local binding = Instance.new("InputBinding")
+	binding.Type = Enum.InputBindingType.Scriptable
+	binding.Parent = action
+	return binding
+end
+
 local GATE_SPACING = 100
 local GATE_SIZE = 40
 
