@@ -36,20 +36,6 @@ local fakeNet = {
 	end,
 }
 
--- Roblox cannot create a Player in Edit, so tests use a table with the members TeamService reads.
-local function stubPlayer(userId: number): any
-	local attributes: { [string]: any } = {}
-	return {
-		UserId = userId,
-		SetAttribute = function(_self: any, key: string, value: any)
-			attributes[key] = value
-		end,
-		GetAttribute = function(_self: any, key: string): any
-			return attributes[key]
-		end,
-	}
-end
-
 beforeAll(function()
 	ArenaService:init({ Config = Fixtures.config() })
 end)
@@ -95,7 +81,7 @@ end
 local function seat(count: number): ({ Model }, { any })
 	local rigs: { Model }, players: { any } = {}, {}
 	for index = 1, count do
-		local player = stubPlayer(index)
+		local player = Fixtures.stubPlayer(index)
 		TeamService:join(player)
 		local rig = Fixtures.rig(folder, tostring(index), CFrame.new(0, 50 + 5 * index, 0))
 		CharacterService:adopt(tostring(index), rig)

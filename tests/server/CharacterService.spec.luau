@@ -96,6 +96,81 @@ describe("CharacterService", function()
 		expect(players).toEqual({ "A" })
 	end)
 
+	it("never makes whoever seats a player wait for the character to load", function()
+		local loads = 0
+		CharacterService:init({
+			Config = Fixtures.config(),
+			ArenaService = fakeArena,
+			TeamService = fakeTeams,
+			LoadCharacter = function(_id: string)
+				task.wait(0.1)
+				loads += 1
+			end,
+		})
+		local returned = false
+		local caller = coroutine.create(function()
+			CharacterService:requestLoad("A")
+			returned = true
+		end)
+		coroutine.resume(caller)
+		expect(returned).toBe(true)
+		task.wait(0.2)
+		expect(loads).toBe(1)
+	end)
+
+	it("loads a character once, and only for a player who has none", function()
+		local loads: { string } = {}
+		CharacterService:init({
+			Config = Fixtures.config(),
+			ArenaService = fakeArena,
+			TeamService = fakeTeams,
+			LoadCharacter = function(id: string)
+				table.insert(loads, id)
+				task.wait(0.05)
+			end,
+		})
+		CharacterService:adopt("A", Fixtures.rig(folder, "A", CFrame.new(0, 3, 0)))
+		CharacterService:requestLoad("A")
+		CharacterService:requestLoad("B")
+		CharacterService:requestLoad("B")
+		task.wait(0.1)
+		expect(loads).toEqual({ "B" })
+	end)
+
+	it("stands a character that loads during the kickoff countdown on its spawn, frozen", function()
+		CharacterService:init({
+			Config = Fixtures.config(),
+			ArenaService = fakeArena,
+			TeamService = fakeTeams,
+			LoadCharacter = function(id: string)
+				CharacterService:adopt(id, Fixtures.rig(folder, id, CFrame.new(0, 50, 0)))
+			end,
+		})
+		CharacterService:placeAll(true)
+		CharacterService:requestLoad("A")
+		task.wait()
+		local rigA = folder:FindFirstChild("A") :: Model
+		near((rigA.PrimaryPart :: BasePart).Position, Vector3.new(0, 3, -53))
+		expect((rigA.PrimaryPart :: BasePart).Anchored).toBe(true)
+		CharacterService:freezeAll(false)
+		CharacterService:requestLoad("B")
+		task.wait()
+		expect(((folder:FindFirstChild("B") :: Model).PrimaryPart :: BasePart).Anchored).toBe(false)
+	end)
+
+	it("skips a character missing its Humanoid or root when placing everyone", function()
+		local broken = Instance.new("Model")
+		broken.Name = "Broken"
+		local torso = Instance.new("Part")
+		torso.Parent = broken
+		broken.Parent = folder
+		CharacterService:adopt("A", broken)
+		expect(function()
+			CharacterService:placeAll(true)
+		end).never.toThrow()
+		expect(#CharacterService:holders()).toBe(0)
+	end)
+
 	it("announces a character that goes away and stops listing it", function()
 		local rig = Fixtures.rig(folder, "A", CFrame.new(0, 3, 0))
 		CharacterService:adopt("A", rig)

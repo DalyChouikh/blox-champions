@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Config = require(ReplicatedStorage.Shared.Config)
+local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Roster = require(ReplicatedStorage.Shared.Rules.Roster)
 local Signal = require(ReplicatedStorage.Shared.Util.Signal)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
@@ -34,10 +35,6 @@ export type TeamService = {
 	_roster: Roster.Roster,
 	_players: { [PlayerId]: Player },
 }
-
-local function idOf(player: Player): PlayerId
-	return tostring(player.UserId)
-end
 
 -- Marks each seat on its player and announces it.
 local function announceSeats(self: TeamService, seats: { Roster.Seat })
@@ -83,8 +80,13 @@ local TeamService: TeamService = {
 		end
 	end,
 
+	-- A second session of the same user (joining before the old one has left) replaces it.
 	join = function(self: TeamService, player: Player)
-		local id = idOf(player)
+		local id = PlayerIds.of(player)
+		local current: Player? = self._players[id]
+		if current ~= nil and current ~= player then
+			self:leave(current)
+		end
 		self._players[id] = player
 		local team: Team? = self._roster:join(id)
 		player:SetAttribute(Attributes.Team, team)
@@ -94,8 +96,12 @@ local TeamService: TeamService = {
 		end
 	end,
 
+	-- A session that a newer one already replaced changes nothing.
 	leave = function(self: TeamService, player: Player)
-		local id = idOf(player)
+		local id = PlayerIds.of(player)
+		if self._players[id] ~= player then
+			return
+		end
 		local wasSeated = self._roster:teamOf(id) ~= nil
 		local promoted = self._roster:leave(id)
 		player:SetAttribute(Attributes.Team, nil)
