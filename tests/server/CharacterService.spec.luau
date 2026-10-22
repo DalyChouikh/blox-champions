@@ -7,6 +7,7 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local CharacterService = require(game:GetService("ServerScriptService").Server.CharacterService)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 
 local SLOTS: { [string]: { any } } = { A = { "Blue", 2 }, B = { "Orange", 1 }, C = { "Blue", 1 } }
 
@@ -45,16 +46,15 @@ afterEach(function()
 end)
 
 describe("CharacterService", function()
-	it("stands a character on its slot's team spawn, root at standing height, R15 and R6 alike", function()
+	it("stands a character on its slot's team spawn with its root at hoverHeight, whatever its rig", function()
 		local r15 = Fixtures.rig(folder, "A", CFrame.new(0, 50, 0))
 		local r6 = Fixtures.rig(folder, "B", CFrame.new(0, 50, 0), Enum.HumanoidRigType.R6)
 		CharacterService:adopt("A", r15)
 		CharacterService:adopt("B", r6)
 		CharacterService:place("A", false)
 		CharacterService:place("B", false)
-		Fixtures.expectNear((r15.PrimaryPart :: BasePart).Position, Vector3.new(0, 3, -53))
-		Fixtures.expectNear((r6.PrimaryPart :: BasePart).Position, Vector3.new(-10, 3, 53))
-		expect(CharacterService.standingHeight(r6)).toBe(3)
+		Fixtures.expectNear((r15.PrimaryPart :: BasePart).Position, Vector3.new(0, 2.5, -53))
+		Fixtures.expectNear((r6.PrimaryPart :: BasePart).Position, Vector3.new(-10, 2.5, 53))
 	end)
 
 	it("freezes characters for the kickoff countdown and frees them after", function()
@@ -148,12 +148,51 @@ describe("CharacterService", function()
 		CharacterService:requestLoad("A")
 		task.wait()
 		local rigA = folder:FindFirstChild("A") :: Model
-		Fixtures.expectNear((rigA.PrimaryPart :: BasePart).Position, Vector3.new(0, 3, -53))
+		Fixtures.expectNear((rigA.PrimaryPart :: BasePart).Position, Vector3.new(0, 2.5, -53))
 		expect((rigA.PrimaryPart :: BasePart).Anchored).toBe(true)
 		CharacterService:freezeAll(false)
 		CharacterService:requestLoad("B")
 		task.wait()
 		expect(((folder:FindFirstChild("B") :: Model).PrimaryPart :: BasePart).Anchored).toBe(false)
+	end)
+
+	it("gives every loaded character a skater body and no default animations", function()
+		CharacterService:init({
+			Config = Fixtures.config(),
+			ArenaService = fakeArena,
+			TeamService = fakeTeams,
+			LoadCharacter = function(id: string): Model
+				local rig = Fixtures.rig(folder, id, CFrame.new(0, 50, 0))
+				local animate = Instance.new("LocalScript")
+				animate.Name = "Animate"
+				animate.Parent = rig
+				return rig
+			end,
+		})
+		CharacterService:requestLoad("A")
+		task.wait()
+		local rig = folder:FindFirstChild("A") :: Model
+		local root = rig.PrimaryPart :: BasePart
+		expect(rig:FindFirstChild("Animate") == nil).toBe(true)
+		local collider = rig:FindFirstChild(SkaterRig.collider) :: Part
+		expect(collider.Shape).toBe(Enum.PartType.Ball)
+		expect(collider.Size).toEqual(Vector3.one * 2)
+		expect(collider.CanQuery).toBe(false)
+		expect((collider:FindFirstChildOfClass("WeldConstraint") :: WeldConstraint).Part0 == root).toBe(true)
+		expect((root:FindFirstChild(SkaterRig.velocity) :: LinearVelocity).ForceLimitsEnabled).toBe(false)
+		expect((root:FindFirstChild(SkaterRig.align) :: AlignOrientation).RigidityEnabled).toBe(true)
+		-- The server keeps the humanoid's state machine: without it a death never fires Died.
+		expect((rig:FindFirstChildOfClass("Humanoid") :: Humanoid).EvaluateStateMachine).toBe(true)
+	end)
+
+	it("announces each placement, so the movement guard trusts the server's own jumps", function()
+		local placed: { string } = {}
+		CharacterService.placed:Connect(function(id: string)
+			table.insert(placed, id)
+		end)
+		CharacterService:adopt("A", Fixtures.rig(folder, "A", CFrame.new(0, 50, 0)))
+		CharacterService:place("A", false)
+		expect(placed).toEqual({ "A" })
 	end)
 
 	it("skips a character missing its Humanoid or root when placing everyone", function()

@@ -10,6 +10,7 @@ local Builder = require(game:GetService("ServerScriptService").Server.Arena.Buil
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
+local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
 local config = Config.defaults()
 local parent: Folder
@@ -54,6 +55,18 @@ describe("Builder.build", function()
 				error(`{solid.Name} is not an anchored, colliding, smooth part`)
 			end
 		end
+	end)
+
+	it("tags the riding surfaces so skaters' rays find only them", function()
+		local arena = Builder.build(Geometry.build(config), config, parent)
+		local tagged: { string } = {}
+		for _, instance in arena:GetDescendants() do
+			if instance:HasTag(Tags.RideSurface) then
+				table.insert(tagged, instance.Name)
+			end
+		end
+		table.sort(tagged)
+		expect(tagged).toEqual({ "Infield", "Surface" })
 	end)
 
 	it("sends the whole arena to every client and never streams it out", function()
