@@ -38,6 +38,13 @@ export type MatchService = {
 	_carrier: PlayerId?,
 }
 
+local function setGoalOpen(self: MatchService, open: boolean)
+	local panel: BasePart = self._arena.arena.goalPanel
+	panel.CanCollide = not open
+	panel.CanQuery = not open
+	panel.Transparency = if open then 1 else self._config.Arena.goal.panelTransparency
+end
+
 local function newEngine(self: MatchService)
 	self.engine = MatchEngine.new({
 		config = self._config,
@@ -47,13 +54,8 @@ local function newEngine(self: MatchService)
 	self._inEngine = {}
 	self._waiting = true
 	self._postMatchLeft = nil
-end
-
-local function setGoalOpen(self: MatchService, open: boolean)
-	local panel: BasePart = self._arena.arena.goalPanel
-	panel.CanCollide = not open
-	panel.CanQuery = not open
-	panel.Transparency = if open then 1 else self._config.Arena.goal.panelTransparency
+	-- A new engine's goal is closed; the panel must say so even if the last match ended with it open.
+	setGoalOpen(self, false)
 end
 
 local function dropIfCarrier(self: MatchService, player: PlayerId)
