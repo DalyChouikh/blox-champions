@@ -2,9 +2,9 @@
 -- The ball in the arena (spec §9.3): one server-owned physics part, in its own model that streams to every client,
 -- that BallState says what to do with. It is hidden (in ServerStorage, so its next spawn is never replicated early)
 -- until a kickoff ends, then spawns at a random ball spawn. A ball that leaves the arena is recovered in any state,
--- and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each frame `step` reports how it really moved, a throw since the last frame, and who caught it. Jumps the
--- server makes (a spawn, a respawn, the snap into a catcher's hand) are never reported as movement, so they can never
--- cross a gate or the ring.
+-- and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each frame `step` reports how it really
+-- moved, a throw since the last frame, and who caught it. Jumps the server makes (a spawn, a respawn, the snap to a
+-- catcher's side) are never reported as movement, so they can never cross a gate or the ring.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")

@@ -136,7 +136,8 @@ describe("Loader.start", function()
 		end)
 		expect(ok).toBe(false)
 		expect(string.find(message, "deep failure", 1, true) ~= nil).toBe(true)
-		-- A traceback frame reads "<script>:<line> function init"; the bare error line reads "<script>:<line>: deep failure".
+		-- A traceback frame reads "<script>:<line> function init"; the bare error line reads
+		-- "<script>:<line>: deep failure".
 		expect(string.match(message, ":%d+ function init") ~= nil).toBe(true)
 	end)
 end)
