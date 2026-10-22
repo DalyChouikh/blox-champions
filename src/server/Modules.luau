@@ -7,6 +7,11 @@ local Loader = require(ReplicatedStorage.Shared.Util.Loader)
 
 local modules: { Loader.LoadableModule } = {
 	require(script.Parent.ArenaService),
+	require(script.Parent.NetService),
+	require(script.Parent.BallService),
+	require(script.Parent.TeamService),
+	require(script.Parent.CharacterService),
+	require(script.Parent.MatchService),
 }
 
 return modules

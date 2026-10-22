@@ -187,7 +187,8 @@ local CharacterService: CharacterService = {
 		end
 	end,
 
-	-- Living characters with a root and a hand, in adoption order; one reused list of reused records.
+	-- Seated players' living characters with a root and a hand, in adoption order; one reused list of reused records.
+	-- Only seated players: a catch the match would not count leaves the ball in the wrong hand.
 	holders = function(self: CharacterService): { BallService.Holder }
 		local holders = self._holders
 		local count = 0
@@ -195,7 +196,8 @@ local CharacterService: CharacterService = {
 			local character = self._characters[player]
 			local humanoid = character:FindFirstChildOfClass("Humanoid")
 			local root, hand = rootOf(character), handOf(character)
-			if humanoid ~= nil and humanoid.Health > 0 and root ~= nil and hand ~= nil then
+			local team = self._teams:teamOf(player)
+			if team ~= nil and humanoid ~= nil and humanoid.Health > 0 and root ~= nil and hand ~= nil then
 				count += 1
 				local holder = holders[count]
 				if holder == nil then
