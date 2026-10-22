@@ -5,9 +5,11 @@
 
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Types)
+local Vectors = require(script.Parent.Parent.Util.Vectors)
 
--- Below this a vector has no usable direction.
-local EPSILON = 1e-6
+local EPSILON = Vectors.EPSILON
+local alongSurface = Vectors.alongSurface
+local rotateToward = Vectors.rotateToward
 
 local SkateMath = {}
 SkateMath.__index = SkateMath
@@ -43,24 +45,6 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_flatPull = gravity.Magnitude * math.sin(math.rad(movement.pumpFlatSlopeDeg)),
 	}
 	return setmetatable(self, SkateMath)
-end
-
--- `vector` without its part along `normal`.
-local function alongSurface(vector: Vector3, normal: Vector3): Vector3
-	return vector - normal * vector:Dot(normal)
-end
-
--- `from` turned toward `to` (both unit vectors) by at most `maxAngle` radians, about `fallbackAxis` when they are
--- exactly opposite.
-local function rotateToward(from: Vector3, to: Vector3, maxAngle: number, fallbackAxis: Vector3): Vector3
-	local angle = math.acos(math.clamp(from:Dot(to), -1, 1))
-	if angle <= maxAngle then
-		return to
-	end
-	local axis = from:Cross(to)
-	axis = if axis.Magnitude > EPSILON then axis.Unit else fallbackAxis
-	local cos, sin = math.cos(maxAngle), math.sin(maxAngle)
-	return from * cos + axis:Cross(from) * sin + axis * (axis:Dot(from) * (1 - cos))
 end
 
 -- The way the skater faces, laid onto the surface. A facing straight into it (head-on against a wall, or straight
