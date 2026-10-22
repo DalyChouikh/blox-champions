@@ -167,21 +167,16 @@ describe("CharacterService", function()
 		expect(((folder:FindFirstChild("B") :: Model).PrimaryPart :: BasePart).Anchored).toBe(false)
 	end)
 
-	it("gives every loaded character a skater body and no default animations", function()
+	it("gives every loaded character a skater body", function()
 		init({
 			LoadCharacter = function(id: string): Model
-				local rig = Fixtures.rig(folder, id, CFrame.new(0, 50, 0))
-				local animate = Instance.new("LocalScript")
-				animate.Name = "Animate"
-				animate.Parent = rig
-				return rig
+				return Fixtures.rig(folder, id, CFrame.new(0, 50, 0))
 			end,
 		})
 		CharacterService:requestLoad("A")
 		task.wait()
 		local rig = folder:FindFirstChild("A") :: Model
 		local root = rig.PrimaryPart :: BasePart
-		expect(rig:FindFirstChild("Animate") == nil).toBe(true)
 		local collider = rig:FindFirstChild(SkaterRig.collider) :: Part
 		expect(collider.Shape).toBe(Enum.PartType.Ball)
 		expect(collider.Size).toEqual(Vector3.one * 2)

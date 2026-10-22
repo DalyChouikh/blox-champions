@@ -1,0 +1,4 @@
+--!strict
+-- Takes the place of the Animate script Roblox gives every character (a LocalScript of this name in
+-- StarterCharacterScripts replaces it), so no default animation ever plays: skater poses are code-driven by
+-- PoseController (spec §7.1). Authored animations come in the art pass.

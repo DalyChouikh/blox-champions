@@ -28,6 +28,11 @@
 				"Client": {
 					"$path": "src/client"
 				}
+			},
+			"StarterCharacterScripts": {
+				"Animate": {
+					"$path": "src/character/Animate.client.luau"
+				}
 			}
 		}
 	}

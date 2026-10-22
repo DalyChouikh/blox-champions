@@ -2,9 +2,8 @@
 -- The skater body (spec §7.1), added by the server to each character it loads:
 -- - one collider of the same size for every avatar, welded to the root;
 -- - avatar parts that touch nothing;
--- - the velocity and facing constraints the owning client drives;
--- - no default animations, since poses are code-driven.
--- Destroying Animate as the load returns keeps the client from ever starting it (probed in Studio).
+-- - the velocity and facing constraints the owning client drives.
+-- Default animations never start: StarterCharacterScripts holds our own Animate (src/character).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -64,10 +63,6 @@ local function addConstraints(root: BasePart)
 end
 
 function SkaterBody.build(character: Model, movement: Config.MovementConfig)
-	local animate = character:FindFirstChild(SkaterRig.animate)
-	if animate ~= nil then
-		animate:Destroy()
-	end
 	for _, part in character:GetDescendants() do
 		if part:IsA("BasePart") then
 			part.CollisionGroup = SkaterRig.groups.body
