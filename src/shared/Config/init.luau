@@ -30,12 +30,20 @@ export type Mode = {
 
 local Config = {}
 
-Config.schema = Validate.record({
-	Arena = Arena.schema,
-	Match = Match.schema,
-	Scoring = Scoring.schema,
-	UI = UI.schema,
-})
+-- Checks spanning two areas run once each area is valid on its own.
+Config.schema = Validate.check(
+	Validate.record({
+		Arena = Arena.schema,
+		Match = Match.schema,
+		Scoring = Scoring.schema,
+		UI = UI.schema,
+	}),
+	function(config: GameConfig): boolean
+		-- Each team lines up on its own straight (spec §9.1).
+		return (config.Match.teamSize - 1) * config.Arena.teamSpawnSpacing <= config.Arena.straightLength
+	end,
+	"Arena: Match.teamSize spawns teamSpawnSpacing apart must fit on a straight"
+)
 
 local modeSchema = Validate.record({
 	id = Validate.string({ nonEmpty = true }),

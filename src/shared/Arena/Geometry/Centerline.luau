@@ -12,6 +12,9 @@ local SECTION_COUNT = 4
 
 local Centerline = {}
 
+-- A lap gate stands at the start of each section.
+Centerline.gateCount = SECTION_COUNT
+
 -- Odd sections are straights, even ones the half circles around each curved end.
 local function isStraight(index: number): boolean
 	return index % 2 == 1
