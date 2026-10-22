@@ -18,6 +18,10 @@ local fakeTeams = {
 		end
 		return nil, nil
 	end,
+	teamOf = function(_self: any, id: string): string?
+		local slot = SLOTS[id]
+		return if slot ~= nil then slot[1] else nil
+	end,
 }
 
 local fakeArena = {
@@ -80,6 +84,16 @@ describe("CharacterService", function()
 			hands[holder.player] = holder.hand.Name
 		end
 		expect(hands).toEqual({ A = "RightHand", B = "Right Arm" })
+	end)
+
+	it("lists only seated players, so nobody the match does not count can catch the ball", function()
+		CharacterService:adopt("A", Fixtures.rig(folder, "A", CFrame.new(0, 3, 0)))
+		CharacterService:adopt("Z", Fixtures.rig(folder, "Z", CFrame.new(5, 3, 0)))
+		local players: { string } = {}
+		for _, holder in CharacterService:holders() do
+			table.insert(players, holder.player)
+		end
+		expect(players).toEqual({ "A" })
 	end)
 
 	it("announces a character that goes away and stops listing it", function()
