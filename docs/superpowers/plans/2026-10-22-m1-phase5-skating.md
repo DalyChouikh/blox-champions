@@ -225,7 +225,7 @@ return { success = s.success, passed = s.numPassedTests, total = s.numTotalTests
 
 ### Task 1: Movement config and skating on the ground
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-skate-ground` · **Labels:** `feature`, `skate`
+**Issue:** #72 · **Branch:** `feat/72-skate-ground` · **Labels:** `feature`, `skate`
 
 **Files:**
 - Create: `src/shared/Config/Movement.luau`, `src/shared/Skate/Types.luau`, `src/shared/Skate/SkateMath.luau`
@@ -493,7 +493,7 @@ git add src/shared/Config src/shared/Skate tests && git commit -m "feat(skate): 
 
 ### Task 2: Hovering, the air, landing, jumping and wall riding
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-skate-air` · **Labels:** `feature`, `skate`
+**Issue:** #73 · **Branch:** `feat/73-skate-air` · **Labels:** `feature`, `skate`
 
 **Files:**
 - Modify: `src/shared/Skate/SkateMath.luau`
@@ -614,7 +614,7 @@ end)
 
 ### Task 3: Filtering ground normals
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-normal-filter` · **Labels:** `feature`, `skate`
+**Issue:** #74 · **Branch:** `feat/74-normal-filter` · **Labels:** `feature`, `skate`
 
 **Files:**
 - Create: `src/shared/Skate/NormalFilter.luau`
@@ -674,7 +674,7 @@ end)
 
 ### Task 4: Drafting
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-draft` · **Labels:** `feature`, `skate`
+**Issue:** #75 · **Branch:** `feat/75-draft` · **Labels:** `feature`, `skate`
 
 **Files:**
 - Create: `src/shared/Skate/Draft.luau`
@@ -730,7 +730,7 @@ end)
 
 ### Task 5: Attaching behind a teammate
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-attach` · **Labels:** `feature`, `skate`
+**Issue:** #76 · **Branch:** `feat/76-attach` · **Labels:** `feature`, `skate`
 
 **Files:**
 - Create: `src/shared/Skate/Attach.luau`
@@ -836,7 +836,7 @@ end)
 
 ### Task 6: The skater body on the server
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-skater-body` · **Labels:** `feature`, `skate`
+**Issue:** #77 · **Branch:** `feat/77-skater-body` · **Labels:** `feature`, `skate`
 
 **Files:**
 - Create:
@@ -987,7 +987,7 @@ In `Builder.spec`, a test `tags the riding surfaces so skaters' rays find only t
 
 ### Task 7: Sharing pump and brake (the first client → server remote)
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-skate-state` · **Labels:** `feature`, `infra`
+**Issue:** #78 · **Branch:** `feat/78-skate-state` · **Labels:** `feature`, `infra`
 
 **Files:**
 - Create: `src/shared/Net/RateLimiter.luau`, `src/shared/Net/Schemas.luau`
@@ -1109,7 +1109,7 @@ In `Builder.spec`, a test `tags the riding surfaces so skaters' rays find only t
 
 ### Task 8: Skating keys (`Config.Input` and `InputController`)
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-skate-input` · **Labels:** `feature`, `input`
+**Issue:** #79 · **Branch:** `feat/79-skate-input` · **Labels:** `feature`, `input`
 
 **Files:**
 - Create: `src/shared/Config/Input.luau`, `src/client/InputController.luau`
@@ -1235,7 +1235,7 @@ In `Builder.spec`, a test `tags the riding surfaces so skaters' rays find only t
 
 ### Task 9: `SkateController` (the client moves its own skater)
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-skate-controller` · **Labels:** `feature`, `skate`
+**Issue:** #80 · **Branch:** `feat/80-skate-controller` · **Labels:** `feature`, `skate`
 
 **Files:**
 - Create: `src/client/SkateController.luau`
@@ -1328,7 +1328,7 @@ Fixture for every test:
 
 ### Task 10: Poses (`Config.Pose`, `Skate/Pose`, `PoseController`)
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-poses` · **Labels:** `feature`, `skate`
+**Issue:** #81 · **Branch:** `feat/81-poses` · **Labels:** `feature`, `skate`
 
 **Files:**
 - Create: `src/shared/Config/Pose.luau`, `src/shared/Skate/Pose.luau`, `src/client/PoseController.luau`
@@ -1431,7 +1431,7 @@ Fixture for every test:
 
 ### Task 11: `MovementGuard`
 
-**Issue:** (created on approval) · **Branch:** `feat/<issue>-movement-guard` · **Labels:** `feature`, `skate`
+**Issue:** #82 · **Branch:** `feat/82-movement-guard` · **Labels:** `feature`, `skate`
 
 **Files:**
 - Create: `src/shared/Skate/MovementCheck.luau`, `src/server/MovementGuard.luau`
