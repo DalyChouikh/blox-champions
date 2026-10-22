@@ -7,6 +7,7 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
+local BallCarrier = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local PoseController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.PoseController)
@@ -20,6 +21,8 @@ local folder: Folder
 local skate: { skater: any, pumping: boolean, braking: boolean }
 -- Which rig belongs to which player: a rig has no Player in a test.
 local playerIds: { [string]: string }
+-- The local skater's running action's pose, as ActionController would give it.
+local actions: { current: string, pose: (self: any) -> string }
 
 local function jointOf(model: Model, name: string): Motor6D
 	return model:FindFirstChild(name, true) :: Motor6D
@@ -50,6 +53,8 @@ local function setup()
 	PoseController:init({
 		Config = config,
 		SkateController = skate,
+		BallCarrier = BallCarrier,
+		ActionController = actions,
 		Gravity = Fixtures.GRAVITY.Magnitude,
 		PlayerIdOf = function(character: Model): string?
 			return playerIds[character.Name]
@@ -71,6 +76,13 @@ beforeEach(function()
 	CollectionService:AddTag(floor, Tags.RideSurface)
 	skate = { skater = nil, pumping = false, braking = false }
 	playerIds = {}
+	actions = {
+		current = "None",
+		pose = function(self: any): string
+			return self.current
+		end,
+	}
+	BallCarrier:init({})
 	setup()
 end)
 afterEach(function()
@@ -109,7 +121,7 @@ describe("PoseController", function()
 		local carrier = Fixtures.jointedRig(folder, "Carrier", HOVER_CFRAME)
 		playerIds.Carrier = "7"
 		PoseController:track(carrier, false)
-		PoseController:setCarrier("7")
+		BallCarrier:set("7")
 		carrier:SetAttribute(Attributes.Pumping, true)
 		PoseController:step(1 / 60)
 		local _, _, shoulderRoll = jointOf(carrier, "RightShoulder").Transform:ToEulerAnglesXYZ()
@@ -142,6 +154,32 @@ describe("PoseController", function()
 		expect(math.abs(math.deg(roll))).toBeCloseTo(1.3347, 3)
 	end)
 
+	it("poses another skater's lunge and knockdown from their attributes", function()
+		local other = Fixtures.jointedRig(folder, "Other", HOVER_CFRAME)
+		PoseController:track(other, false)
+		local function pitch(): number
+			PoseController:step(1 / 60)
+			return jointOf(other, "Root").Transform.LookVector.Y
+		end
+		other:SetAttribute(Attributes.Action, "Tackle")
+		expect(pitch()).toBeCloseTo(-math.sin(math.rad(config.Pose.lungeDeg)), 5)
+		other:SetAttribute(Attributes.KnockedDown, true)
+		expect(pitch()).toBeCloseTo(math.sin(math.rad(config.Pose.knockdownTiltDeg)), 5)
+		-- An action that is not a lunge poses nothing.
+		other:SetAttribute(Attributes.KnockedDown, nil)
+		other:SetAttribute(Attributes.Action, "Uppercut")
+		expect(pitch()).toBeCloseTo(0, 5)
+	end)
+
+	it("poses the local skater's lunge from its own actions", function()
+		local own = Fixtures.jointedRig(folder, "Own", HOVER_CFRAME)
+		PoseController:track(own, true)
+		-- The attribute arrives later from the server; the local skater lunges at once.
+		actions.current = "Lunge"
+		PoseController:step(1 / 60)
+		expect(jointOf(own, "Root").Transform.LookVector.Y).toBeCloseTo(-math.sin(math.rad(config.Pose.lungeDeg)), 5)
+	end)
+
 	it("poses six skaters in under 0.3 ms a frame", function()
 		for index = 1, 6 do
 			local name = `Skater{index}`
@@ -152,7 +190,7 @@ describe("PoseController", function()
 			playerIds[name] = tostring(index)
 			PoseController:track(avatar, false)
 		end
-		PoseController:setCarrier("3")
+		BallCarrier:set("3")
 		local frames = 600
 		local started = os.clock()
 		for _ = 1, frames do

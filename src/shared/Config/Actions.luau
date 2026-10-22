@@ -83,6 +83,16 @@ for _, name in names do
 	table.insert(nameStrings, name)
 end
 
+-- The action called `name`, or nil: a name read back as a plain string (an attribute, a message) typed again.
+local function nameOf(name: string?): ActionName?
+	for _, action: ActionName in names do
+		if action == name then
+			return action
+		end
+	end
+	return nil
+end
+
 local function requires(ball: "with" | "without" | "any"): Requires
 	return { ball = ball, grounded = "any", notKnockedDown = true }
 end
@@ -246,4 +256,5 @@ return {
 	defaults = defaults,
 	schema = schema,
 	names = names,
+	nameOf = nameOf,
 }

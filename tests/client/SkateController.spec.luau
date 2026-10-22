@@ -6,6 +6,7 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.InputController)
@@ -157,6 +158,36 @@ describe("SkateController", function()
 			Fixtures.expectNear(alignOf(rig).PrimaryAxis, Vector3.zAxis)
 		end
 	)
+
+	it("locks a knocked-down skater's input and lets go of the attach", function()
+		local skater = SkateController.skater :: any
+		skater.velocity = Vector3.new(0, 0, -60)
+		local stick = Fixtures.scriptedBinding(action("Move"))
+		stick:Fire(Vector2.new(1, 0))
+		rig:SetAttribute(Attributes.KnockedDown, true)
+		SkateController:step(0.1)
+		expect(SkateController.knockedDown).toBe(true)
+		-- No steering: 60 − (4 + 0.02 × 60) × 0.1 − knockdownDecel 75 × 0.1, still along -Z.
+		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -51.98))
+
+		stick:Fire(Vector2.zero)
+		rig:SetAttribute(Attributes.KnockedDown, nil)
+		local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
+		table.insert(others, { player = "2", team = "Blue", root = root(leader) })
+		local attachKey = Fixtures.scriptedBinding(action("Attach"))
+		attachKey:Fire(true)
+		SkateController:step(1 / 60)
+		expect(skater.mode).toBe("Attached")
+		rig:SetAttribute(Attributes.KnockedDown, true)
+		SkateController:step(1 / 60)
+		SkateController:step(1 / 60)
+		expect(skater.mode).never.toBe("Attached")
+		-- Let go while down: the attach ended with the knockdown, so no release boost comes once it is over.
+		attachKey:Fire(false)
+		rig:SetAttribute(Attributes.KnockedDown, nil)
+		SkateController:step(1 / 60)
+		expect(velocityOf(rig).Magnitude).toBeLessThan(movement.attachBoostSpeed)
+	end)
 
 	it("keeps telling the server about pump and brake during the freeze", function()
 		root(rig).Anchored = true
