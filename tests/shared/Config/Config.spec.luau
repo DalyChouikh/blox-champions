@@ -64,6 +64,7 @@ describe("Config defaults", function()
 			ringRadius = 7,
 			heightAboveFloor = 18,
 			panelThickness = 0.5,
+			panelTransparency = 0.3,
 			rimThickness = 1,
 			rimSegments = 16,
 			wallGap = 1,
@@ -71,6 +72,13 @@ describe("Config defaults", function()
 		expect(a.marker).toEqual({ width = 2, height = 8 })
 		expect(a.teamSpawnSpacing).toBe(10)
 		expect(a.ballSpawnHeight).toBe(6)
+	end)
+
+	it("size and shade the arena parts that only carry a tag", function()
+		local a = Config.defaults().Arena
+		expect(a.gateThickness).toBe(0.2)
+		expect(a.spawnPad).toEqual({ width = 4, thickness = 0.2, transparency = 0.4 })
+		expect(a.ballSpawnSize).toBe(1)
 	end)
 
 	it("give each team and each arena part a color", function()

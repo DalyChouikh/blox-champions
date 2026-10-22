@@ -8,6 +8,7 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local Builder = require(game:GetService("ServerScriptService").Server.Arena.Builder)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
 
 local config = Config.defaults()
@@ -53,6 +54,24 @@ describe("Builder.build", function()
 				error(`{solid.Name} is not an anchored, colliding, smooth part`)
 			end
 		end
+	end)
+
+	it("takes the tag-only parts' sizes and the goal panel's transparency from config", function()
+		local custom = Fixtures.config({
+			Arena = {
+				gateThickness = 0.5,
+				spawnPad = { width = 6, thickness = 0.3, transparency = 0.2 },
+				ballSpawnSize = 2,
+				goal = { panelTransparency = 0.6 },
+			},
+		})
+		local arena = Builder.build(Geometry.build(custom), custom, parent)
+		expect((folder(arena, "Gates"):FindFirstChild("Gate1") :: Part).Size.Z).toBeCloseTo(0.5, 4)
+		local pad = folder(arena, "Spawns"):FindFirstChild("Orange2") :: Part
+		expect(pad.Size).toEqual(Vector3.new(6, 0.3, 6))
+		expect(pad.Transparency).toBeCloseTo(0.2, 4)
+		expect((folder(arena, "Spawns"):FindFirstChild("Ball1") :: Part).Size).toEqual(Vector3.new(2, 2, 2))
+		expect((folder(arena, "Goal"):FindFirstChild("GoalPanel") :: Part).Transparency).toBeCloseTo(0.6, 4)
 	end)
 
 	it("leaves nothing behind when a piece is invalid", function()

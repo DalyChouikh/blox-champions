@@ -33,6 +33,8 @@ export type ArenaConfig = {
 		ringRadius: number,
 		heightAboveFloor: number,
 		panelThickness: number,
+		-- The panel starts closed: see-through enough to show the ring is shut.
+		panelTransparency: number,
 		rimThickness: number,
 		rimSegments: number,
 		-- Gap between the ring's outer edge and the outer wall.
@@ -41,6 +43,11 @@ export type ArenaConfig = {
 	marker: { width: number, height: number },
 	teamSpawnSpacing: number,
 	ballSpawnHeight: number,
+	-- Parts that only carry a tag: lap gates (invisible; only their plane counts), team spawn pads (a square in the
+	-- team's color) and ball spawns (invisible).
+	gateThickness: number,
+	spawnPad: { width: number, thickness: number, transparency: number },
+	ballSpawnSize: number,
 	colors: { surface: Color3, infield: Color3, goal: Color3, marker: Color3 },
 }
 
@@ -63,6 +70,7 @@ local defaults: ArenaConfig = {
 		ringRadius = 7,
 		heightAboveFloor = 18,
 		panelThickness = 0.5,
+		panelTransparency = 0.3,
 		rimThickness = 1,
 		rimSegments = 16,
 		wallGap = 1,
@@ -70,6 +78,9 @@ local defaults: ArenaConfig = {
 	marker = { width = 2, height = 8 },
 	teamSpawnSpacing = 10,
 	ballSpawnHeight = 6,
+	gateThickness = 0.2,
+	spawnPad = { width = 4, thickness = 0.2, transparency = 0.4 },
+	ballSpawnSize = 1,
 	colors = {
 		surface = Color3.fromRGB(163, 162, 165),
 		infield = Color3.fromRGB(99, 95, 98),
@@ -83,6 +94,7 @@ local size = Validate.number({ above = 0 })
 -- builds as given instead of clamping.
 local partSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
 local nonNegative = Validate.number({ min = 0 })
+local transparency = Validate.number({ min = 0, max = 1 })
 local color = Validate.datatype("Color3")
 
 local fields = Validate.record({
@@ -107,6 +119,7 @@ local fields = Validate.record({
 		ringRadius = size,
 		heightAboveFloor = size,
 		panelThickness = partSize,
+		panelTransparency = transparency,
 		rimThickness = partSize,
 		rimSegments = Validate.number({ min = 3, integer = true }),
 		-- A ring touching the wall would put a rim face in the wall's plane, where the two flicker.
@@ -115,6 +128,9 @@ local fields = Validate.record({
 	marker = Validate.record({ width = partSize, height = partSize }),
 	teamSpawnSpacing = size,
 	ballSpawnHeight = size,
+	gateThickness = partSize,
+	spawnPad = Validate.record({ width = partSize, thickness = partSize, transparency = transparency }),
+	ballSpawnSize = partSize,
 	colors = Validate.record({ surface = color, infield = color, goal = color, marker = color }),
 })
 
