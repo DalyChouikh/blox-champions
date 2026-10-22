@@ -74,7 +74,7 @@ end
 local function standingHeight(character: Model, humanoid: Humanoid, root: BasePart): number
 	local height = 0.5 * root.Size.Y + humanoid.HipHeight
 	if humanoid.RigType == Enum.HumanoidRigType.R6 then
-		local leftLeg = character:FindFirstChild("Left Leg") :: BasePart?
+		local leftLeg = character:FindFirstChild(SkaterRig.leftLeg) :: BasePart?
 		if leftLeg ~= nil then
 			height += leftLeg.Size.Y
 		end
@@ -262,8 +262,8 @@ local PoseController: PoseController = {
 	end,
 
 	track = function(self: PoseController, character: Model, isLocal: boolean)
-		local humanoid = character:WaitForChild("Humanoid") :: Humanoid
-		local root = character:WaitForChild("HumanoidRootPart") :: BasePart
+		local humanoid = character:WaitForChild(SkaterRig.humanoid) :: Humanoid
+		local root = character:WaitForChild(SkaterRig.root) :: BasePart
 		self._tracked[character] = {
 			character = character,
 			root = root,

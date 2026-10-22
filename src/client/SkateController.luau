@@ -85,7 +85,7 @@ local function playersAround(self: SkateController): { SkaterView }
 	local localPlayer = Players.LocalPlayer
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
-		local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+		local root = if character ~= nil then character:FindFirstChild(SkaterRig.root) :: BasePart? else nil
 		if player ~= localPlayer and root ~= nil then
 			count += 1
 			local view = views[count]
@@ -334,8 +334,8 @@ local SkateController: SkateController = {
 	end,
 
 	bind = function(self: SkateController, character: Model)
-		local humanoid = character:WaitForChild("Humanoid") :: Humanoid
-		local root = character:WaitForChild("HumanoidRootPart") :: BasePart
+		local humanoid = character:WaitForChild(SkaterRig.humanoid) :: Humanoid
+		local root = character:WaitForChild(SkaterRig.root) :: BasePart
 		local velocity = root:WaitForChild(SkaterRig.velocity) :: LinearVelocity
 		local align = root:WaitForChild(SkaterRig.align) :: AlignOrientation
 		humanoid.EvaluateStateMachine = false
