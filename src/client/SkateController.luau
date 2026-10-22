@@ -220,6 +220,24 @@ local function shareState(self: SkateController)
 	end
 end
 
+-- The kickoff freeze (the server anchors every root while it places them): the skater starts from rest, upright and
+-- facing where the server put them, with no attach held over and no jump pressed during the countdown. Pump and brake
+-- are still shared, so other players see what this one holds.
+local function freeze(self: SkateController, root: BasePart, skater: SkateMath.Skater)
+	self._inputController:read(self._keys)
+	skater:stop()
+	local up = worldUp(self)
+	skater.up = up
+	local facing = Vectors.alongSurface(root.CFrame.LookVector, up)
+	if facing.Magnitude > Vectors.EPSILON then
+		skater.forward = facing.Unit
+	end
+	self._filter:reset(up)
+	self._attach:reset()
+	apply(self, skater)
+	shareState(self)
+end
+
 local SkateController: SkateController = {
 	name = "SkateController",
 	dependencies = { "Config", "InputController" },
@@ -329,6 +347,8 @@ local SkateController: SkateController = {
 		self._align = align
 		self._filter:reset(worldUp(self))
 		self._attach = Attach.new(self._config.Movement)
+		-- Jump presses made while there was no character to jump are spent here, not on the new one.
+		self._inputController:read(self._keys)
 		self.pumping = false
 		self.braking = false
 	end,
@@ -340,9 +360,7 @@ local SkateController: SkateController = {
 			return
 		end
 		if root.Anchored then
-			-- The kickoff freeze: no speed builds up, and the skater starts from rest when it ends.
-			skater:stop()
-			self._filter:reset(worldUp(self))
+			freeze(self, root, skater)
 			return
 		end
 

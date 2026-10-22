@@ -121,6 +121,60 @@ describe("SkateController", function()
 		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -2.594))
 	end)
 
+	-- The kickoff freeze anchors every root while the server places them (spec §4.5). Nothing held or pressed during
+	-- it may carry into the kickoff.
+	it(
+		"starts the kickoff from rest, upright, facing its spawn, whatever was held or pressed during the freeze",
+		function()
+			local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
+			table.insert(others, { player = "2", team = "Blue", root = root(leader) })
+			local attachKey = Fixtures.scriptedBinding(action("Attach"))
+			attachKey:Fire(true)
+			SkateController:step(1 / 60)
+			local skater = SkateController.skater :: any
+			expect(skater.mode).toBe("Attached")
+			-- Riding a wall when the point is scored.
+			skater.up = Vector3.xAxis
+
+			root(rig).Anchored = true
+			local spawn = Vector3.new(0, movement.hoverHeight, 0)
+			rig:PivotTo(CFrame.lookAt(spawn, spawn + Vector3.xAxis))
+			attachKey:Fire(false)
+			local jumpKey = Fixtures.scriptedBinding(action("Jump"))
+			jumpKey:Fire(true)
+			task.wait()
+			jumpKey:Fire(false)
+			for _ = 1, 3 do
+				SkateController:step(1 / 60)
+			end
+
+			root(rig).Anchored = false
+			SkateController:step(1 / 60)
+			expect(skater.mode).toBe("Grounded")
+			expect(velocityOf(rig).Magnitude).toBeLessThan(1)
+			Fixtures.expectNear(alignOf(rig).SecondaryAxis, Vector3.yAxis)
+			-- Facing +X, so the skater's right is +Z.
+			Fixtures.expectNear(alignOf(rig).PrimaryAxis, Vector3.zAxis)
+		end
+	)
+
+	it("keeps telling the server about pump and brake during the freeze", function()
+		root(rig).Anchored = true
+		Fixtures.scriptedBinding(action("Pump")):Fire(true)
+		SkateController:step(1 / 60)
+		expect(sent).toEqual({ { true, false } })
+	end)
+
+	it("drops a jump pressed while it had no character", function()
+		local jumpKey = Fixtures.scriptedBinding(action("Jump"))
+		jumpKey:Fire(true)
+		task.wait()
+		jumpKey:Fire(false)
+		SkateController:bind(skaterAt("Respawned", Vector3.new(50, 0, 0)))
+		SkateController:step(1 / 60)
+		expect((SkateController.skater :: any).mode).toBe("Grounded")
+	end)
+
 	it("falls when no riding surface is below", function()
 		rig:PivotTo(CFrame.new(1000, 50, 1000))
 		SkateController:step(0.1)

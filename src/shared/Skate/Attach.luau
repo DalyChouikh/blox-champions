@@ -64,6 +64,14 @@ function Attach.target(movement: Config.MovementConfig, leader: Candidate): Vect
 	return leader.position - leader.forward * movement.attachFollowDistance
 end
 
+-- Let go with no boost and no cooldown: everyone starts a kickoff unattached and free to attach.
+function Attach.reset(self: Attach)
+	self.leader = nil
+	self.attachedFor = 0
+	self.cooldownLeft = 0
+	self.releaseDirection = Vector3.zero
+end
+
 -- `leader` is the best candidate while not attached, and the current leader's record (nil once gone) while attached.
 function Attach.update(self: Attach, dt: number, holding: boolean, leader: Candidate?): Change
 	local movement = self._movement
