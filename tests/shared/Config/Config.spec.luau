@@ -39,7 +39,7 @@ describe("Config defaults", function()
 			outOfBoundsMargin = 2,
 			carryOffset = Vector3.new(2.5, 0, -0.5),
 		})
-		expect(d.Network).toEqual({ pickupLagToleranceStuds = 2 })
+		expect(d.Network).toEqual({ pickupLagToleranceStuds = 2, maxSkateStatesPerSecond = 20 })
 	end)
 
 	it("match the spec's skating values, plus this phase's", function()

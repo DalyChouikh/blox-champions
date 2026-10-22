@@ -35,6 +35,7 @@ local function ballAt(): string?
 end
 
 local fakeNet = {
+	listen = function() end,
 	fireAll = function(_self: any, name: string, payload: any)
 		table.insert(fired, { name = name, payload = payload, ballAt = ballAt() })
 	end,
@@ -67,7 +68,12 @@ local function setup(match: { [string]: any }?)
 	folder.Parent = workspace
 	BallService:init({ Config = config, ArenaService = ArenaService, Random = Random.new(1) })
 	TeamService:init({ Config = config })
-	CharacterService:init({ Config = config, ArenaService = ArenaService, TeamService = TeamService })
+	CharacterService:init({
+		Config = config,
+		ArenaService = ArenaService,
+		TeamService = TeamService,
+		NetService = fakeNet,
+	})
 	MatchService:init({
 		Config = config,
 		ArenaService = ArenaService,

@@ -6,7 +6,9 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local CharacterService = require(game:GetService("ServerScriptService").Server.CharacterService)
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 
 local SLOTS: { [string]: { any } } = { A = { "Blue", 2 }, B = { "Orange", 1 }, C = { "Blue", 1 } }
@@ -34,12 +36,30 @@ local fakeArena = {
 	},
 }
 
+-- Keeps the handlers CharacterService listens with, so a test can deliver a client's message.
+local fakeNet = {
+	handlers = {} :: { [string]: (player: string, payload: any) -> () },
+	listen = function(self: any, name: string, _schema: any, _perSecond: number, handler: (string, any) -> ())
+		self.handlers[name] = handler
+	end,
+}
+
+local function init(overrides: { [string]: any }?)
+	local deps: { [string]: any } =
+		{ Config = Fixtures.config(), ArenaService = fakeArena, TeamService = fakeTeams, NetService = fakeNet }
+	local extra: { [string]: any } = overrides or {}
+	for key, value in extra do
+		deps[key] = value
+	end
+	CharacterService:init(deps)
+end
+
 local folder: Folder
 beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "CharacterServiceTest"
 	folder.Parent = workspace
-	CharacterService:init({ Config = Fixtures.config(), ArenaService = fakeArena, TeamService = fakeTeams })
+	init()
 end)
 afterEach(function()
 	folder:Destroy()
@@ -94,10 +114,7 @@ describe("CharacterService", function()
 
 	it("never makes whoever seats a player wait for the character to load", function()
 		local loads = 0
-		CharacterService:init({
-			Config = Fixtures.config(),
-			ArenaService = fakeArena,
-			TeamService = fakeTeams,
+		init({
 			LoadCharacter = function(_id: string)
 				task.wait(0.1)
 				loads += 1
@@ -116,10 +133,7 @@ describe("CharacterService", function()
 
 	it("loads a character once, and only for a player who has none", function()
 		local loads: { string } = {}
-		CharacterService:init({
-			Config = Fixtures.config(),
-			ArenaService = fakeArena,
-			TeamService = fakeTeams,
+		init({
 			LoadCharacter = function(id: string)
 				table.insert(loads, id)
 				task.wait(0.05)
@@ -134,10 +148,7 @@ describe("CharacterService", function()
 	end)
 
 	it("stands a character that loads during the kickoff countdown on its spawn, frozen", function()
-		CharacterService:init({
-			Config = Fixtures.config(),
-			ArenaService = fakeArena,
-			TeamService = fakeTeams,
+		init({
 			-- Like Player:LoadCharacterAsync: the character exists when it returns, but Roblox announces it
 			-- (CharacterAdded, deferred) only later.
 			LoadCharacter = function(id: string): Model
@@ -157,10 +168,7 @@ describe("CharacterService", function()
 	end)
 
 	it("gives every loaded character a skater body and no default animations", function()
-		CharacterService:init({
-			Config = Fixtures.config(),
-			ArenaService = fakeArena,
-			TeamService = fakeTeams,
+		init({
 			LoadCharacter = function(id: string): Model
 				local rig = Fixtures.rig(folder, id, CFrame.new(0, 50, 0))
 				local animate = Instance.new("LocalScript")
@@ -221,6 +229,18 @@ describe("CharacterService", function()
 		expect(#CharacterService:holders()).toBe(0)
 	end)
 
+	it("shows a seated player's pump and brake on their character for everyone", function()
+		local seated = Fixtures.rig(folder, "A", CFrame.new(0, 3, 0))
+		local spectator = Fixtures.rig(folder, "Z", CFrame.new(5, 3, 0))
+		CharacterService:adopt("A", seated)
+		CharacterService:adopt("Z", spectator)
+		fakeNet.handlers[Remotes.names.SkateState]("A", { pump = true, brake = false })
+		fakeNet.handlers[Remotes.names.SkateState]("Z", { pump = true, brake = true })
+		expect(seated:GetAttribute(Attributes.Pumping)).toBe(true)
+		expect(seated:GetAttribute(Attributes.Braking)).toBe(false)
+		expect(spectator:GetAttribute(Attributes.Pumping)).toBeNil()
+	end)
+
 	-- Humanoid.Died never fires in Edit, so these call what it runs.
 	it("announces a character that dies, so a carrier's ball drops", function()
 		local rig = Fixtures.rig(folder, "A", CFrame.new(0, 3, 0))
@@ -235,10 +255,8 @@ describe("CharacterService", function()
 
 	it("loads a dead character again after respawnSeconds, only while its player is seated", function()
 		local loads: { string } = {}
-		CharacterService:init({
+		init({
 			Config = Fixtures.config({ Match = { respawnSeconds = 0.2 } }),
-			ArenaService = fakeArena,
-			TeamService = fakeTeams,
 			LoadCharacter = function(id: string): Model?
 				table.insert(loads, id)
 				return nil
@@ -260,10 +278,8 @@ describe("CharacterService", function()
 		"waits the full respawnSeconds after the latest death, even if an earlier character's wait is still running",
 		function()
 			local loads: { string } = {}
-			CharacterService:init({
+			init({
 				Config = Fixtures.config({ Match = { respawnSeconds = 0.4 } }),
-				ArenaService = fakeArena,
-				TeamService = fakeTeams,
 				LoadCharacter = function(id: string): Model?
 					table.insert(loads, id)
 					return nil

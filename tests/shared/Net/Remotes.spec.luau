@@ -21,7 +21,7 @@ describe("Remotes", function()
 	it("creates one RemoteEvent per name in a Remotes folder", function()
 		local folder = Remotes.create(parent)
 		expect(folder.Name).toBe("Remotes")
-		expect(#folder:GetChildren()).toBe(3)
+		expect(#folder:GetChildren()).toBe(4)
 		for _, name in Remotes.names do
 			expect((folder:FindFirstChild(name) :: Instance).ClassName).toBe("RemoteEvent")
 		end
