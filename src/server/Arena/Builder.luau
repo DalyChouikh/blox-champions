@@ -106,6 +106,13 @@ local function addSolids(pieces: { Piece }, prefix: string, color: Color3, paren
 	end
 end
 
+-- A folder of surfaces skaters ride, tagged so their rays hit nothing else.
+local function addRideSurface(pieces: { Piece }, name: string, color: Color3, parent: Instance)
+	local folder = newFolder(name, parent)
+	folder:AddTag(Tags.RideSurface)
+	addSolids(pieces, name, color, folder)
+end
+
 local function buildGoal(goal: Types.Goal, arena: ArenaConfig, parent: Instance)
 	local color = arena.colors.goal
 	local hoop = Instance.new("Model")
@@ -147,8 +154,8 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 	-- Every client gets the whole arena soon after joining and never loses it, so client code can rely on it.
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 
-	addSolids(geometry.surface, "Surface", colors.surface, newFolder("Surface", model))
-	addSolids(geometry.infield, "Infield", colors.infield, newFolder("Infield", model))
+	addRideSurface(geometry.surface, "Surface", colors.surface, model)
+	addRideSurface(geometry.infield, "Infield", colors.infield, model)
 
 	local gates = newFolder("Gates", model)
 	for index, gate in geometry.gates do

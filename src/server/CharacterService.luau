@@ -3,9 +3,11 @@
 -- one), stood on their team spawn slot at kickoff and held still through the countdown, and loaded again after a
 -- death. Loading yields, so it always runs on its own thread: whoever seats a player never waits for it. The loaded
 -- character is registered by that thread, not by CharacterAdded: Roblox defers that event until after the load has
--- returned. It lists the characters that can catch the ball, and announces any that goes away so a carrier's ball
--- drops. Phase 5 adds the skating collider, hover and poses here.
+-- returned. Each loaded character gets its skater body (SkaterBody) and is stood with its root at
+-- Movement.hoverHeight above its spawn, where its own client's skating takes over. It lists the characters that can
+-- catch the ball, and announces any that goes away so a carrier's ball drops.
 
+local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -13,6 +15,7 @@ local BallService = require(script.Parent.BallService)
 local Config = require(ReplicatedStorage.Shared.Config)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Signal = require(ReplicatedStorage.Shared.Util.Signal)
+local SkaterBody = require(script.Parent.SkaterBody)
 local TeamService = require(script.Parent.TeamService)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
@@ -31,9 +34,10 @@ export type CharacterService = {
 	placeAll: (self: CharacterService, frozen: boolean) -> (),
 	freezeAll: (self: CharacterService, frozen: boolean) -> (),
 	holders: (self: CharacterService) -> { BallService.Holder },
-	standingHeight: (character: Model) -> number,
 	-- A registered character that died or was destroyed.
 	characterRemoved: Signal.Signal<PlayerId>,
+	-- The server moved a character to its spawn: a jump the movement guard must not judge.
+	placed: Signal.Signal<PlayerId>,
 	_config: Config.GameConfig,
 	_teamSpawns: { [string]: { CFrame } },
 	_teams: TeamService.TeamService,
@@ -54,20 +58,6 @@ export type CharacterService = {
 
 local function rootOf(character: Model): BasePart?
 	return character:FindFirstChild("HumanoidRootPart") :: BasePart?
-end
-
--- The root's height above the floor when standing (Roblox: R15 and R6 measure HipHeight differently).
-local function standingHeight(character: Model): number
-	local humanoid = character:FindFirstChildOfClass("Humanoid") :: Humanoid
-	local root = rootOf(character) :: BasePart
-	local height = 0.5 * root.Size.Y + humanoid.HipHeight
-	if humanoid.RigType == Enum.HumanoidRigType.R6 then
-		local leg = character:FindFirstChild("Left Leg") :: BasePart?
-		if leg ~= nil then
-			height += leg.Size.Y
-		end
-	end
-	return height
 end
 
 local function forget(self: CharacterService, player: PlayerId)
@@ -97,6 +87,7 @@ local CharacterService: CharacterService = {
 	name = "CharacterService",
 	dependencies = { "Config", "ArenaService", "TeamService" },
 	characterRemoved = Signal.new(),
+	placed = Signal.new(),
 	_config = nil :: any,
 	_teamSpawns = {},
 	_teams = nil :: any,
@@ -133,9 +124,11 @@ local CharacterService: CharacterService = {
 		self._watchers = {}
 		self._holders = {}
 		self.characterRemoved = Signal.new()
+		self.placed = Signal.new()
 	end,
 
 	start = function(self: CharacterService)
+		SkaterBody.registerGroups(PhysicsService)
 		Players.CharacterAutoLoads = false
 		self._teams.seated:Connect(function(id: PlayerId)
 			self:requestLoad(id)
@@ -167,6 +160,8 @@ local CharacterService: CharacterService = {
 			local character = self._loadCharacter(player)
 			self._loading[player] = nil
 			if character ~= nil then
+				-- In the resumption the load returns in, before the client can start the default animations.
+				SkaterBody.build(character, self._config.Movement)
 				self:adopt(player, character)
 				self:place(player, self._frozen)
 			end
@@ -223,11 +218,12 @@ local CharacterService: CharacterService = {
 			return
 		end
 		local spawn = self._teamSpawns[team][slot]
-		character:PivotTo(spawn * CFrame.new(0, standingHeight(character), 0))
+		character:PivotTo(spawn * CFrame.new(0, self._config.Movement.hoverHeight, 0))
 		local root = rootOf(character)
 		if root ~= nil then
 			root.Anchored = frozen
 		end
+		self.placed:Fire(player)
 	end,
 
 	placeAll = function(self: CharacterService, frozen: boolean)
@@ -273,8 +269,6 @@ local CharacterService: CharacterService = {
 		end
 		return holders
 	end,
-
-	standingHeight = standingHeight,
 }
 
 return CharacterService
