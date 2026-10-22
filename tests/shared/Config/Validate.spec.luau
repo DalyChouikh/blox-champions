@@ -76,6 +76,28 @@ describe("Validate", function()
 		expect(v({ low = 3 }, "R")).toEqual({ "R.high: missing" })
 	end)
 
+	it("applies a list of rules in order and reports only the first that fails", function()
+		local inner = Validate.record({ low = Validate.number(), high = Validate.number() })
+		local v = Validate.checkAll(inner, {
+			{
+				message = "high must be greater than low",
+				holds = function(value: any): boolean
+					return value.high > value.low
+				end,
+			},
+			{
+				message = "high must be below 10",
+				holds = function(value: any): boolean
+					return value.high < 10
+				end,
+			},
+		})
+		expect(v({ low = 1, high = 2 }, "R")).toEqual({})
+		expect(v({ low = 3, high = 20 }, "R")).toEqual({ "R: high must be below 10" })
+		expect(v({ low = 30, high = 20 }, "R")).toEqual({ "R: high must be greater than low" })
+		expect(v({ low = 3 }, "R")).toEqual({ "R.high: missing" })
+	end)
+
 	it("assertValid throws a message listing every error, and passes silently when valid", function()
 		local v = Validate.record({ a = Validate.number(), b = Validate.number() })
 		expect(function()

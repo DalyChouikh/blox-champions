@@ -180,6 +180,17 @@ function Validate.check(inner: Validator, predicate: (value: any) -> boolean, me
 	end
 end
 
+export type Rule = { message: string, holds: (value: any) -> boolean }
+
+-- Rules checked in order once the inner validator passes; only the first that fails is reported.
+function Validate.checkAll(inner: Validator, rules: { Rule }): Validator
+	local validator = inner
+	for _, rule in rules do
+		validator = Validate.check(validator, rule.holds, rule.message)
+	end
+	return validator
+end
+
 function Validate.assertValid(value: any, validator: Validator, rootPath: string, heading: string?)
 	local errors = validator(value, rootPath)
 	if #errors > 0 then

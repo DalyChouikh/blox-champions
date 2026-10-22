@@ -23,6 +23,22 @@ describe("Config defaults", function()
 		expect(m.clockPausesDuringKickoff).toBe(true)
 		expect(m.postMatchSeconds).toBe(15)
 		expect(m.lastChance).toEqual({ enabled = true, maxDeficit = 1 })
+		expect(m.respawnSeconds).toBe(3)
+	end)
+
+	it("match the spec's ball and network values", function()
+		local d = Config.defaults()
+		expect(d.Ball).toEqual({
+			radius = 1.5,
+			density = 0.7,
+			friction = 0.3,
+			elasticity = 0.5,
+			pickupRadius = 5,
+			rethrowPickupDelay = 0.4,
+			ballIdleResetSeconds = 15,
+			outOfBoundsMargin = 2,
+		})
+		expect(d.Network).toEqual({ pickupLagToleranceStuds = 2 })
 	end)
 
 	it("match the spec's scoring values", function()
@@ -217,6 +233,27 @@ describe("Config.forMode", function()
 		for _, case in cases do
 			expect(function()
 				Fixtures.config({ Arena = case.overrides })
+			end).toThrow(case.message)
+		end
+	end)
+
+	it("rejects ball physics Roblox would clamp, and a ball too big for the goal", function()
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{ overrides = { Ball = { elasticity = 1.5 } }, message = "Ball.elasticity: must be <= 1 (got 1.5)" },
+			{ overrides = { Ball = { friction = -0.1 } }, message = "Ball.friction: must be >= 0 (got -0.1)" },
+			{ overrides = { Ball = { density = 0 } }, message = "Ball.density: must be >= 0.0001 (got 0)" },
+			{
+				overrides = { Network = { pickupLagToleranceStuds = -1 } },
+				message = "Network.pickupLagToleranceStuds: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { Ball = { radius = 7 } },
+				message = "Ball: radius must be smaller than the goal ring's opening (Arena.goal.ringRadius)",
+			},
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config(case.overrides)
 			end).toThrow(case.message)
 		end
 	end)

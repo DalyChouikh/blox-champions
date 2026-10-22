@@ -3,20 +3,26 @@
 -- Adding a tunable means adding it to an area file (defaults + schema); modes only list what they change.
 
 local Arena = require(script.Arena)
+local Ball = require(script.Ball)
 local Freeze = require(script.Parent.Util.Freeze)
 local Match = require(script.Match)
+local Network = require(script.Network)
 local Scoring = require(script.Scoring)
 local UI = require(script.UI)
 local Validate = require(script.Validate)
 
 export type ArenaConfig = Arena.ArenaConfig
+export type BallConfig = Ball.BallConfig
 export type MatchConfig = Match.MatchConfig
+export type NetworkConfig = Network.NetworkConfig
 export type ScoringConfig = Scoring.ScoringConfig
 export type UIConfig = UI.UIConfig
 
 export type GameConfig = {
 	Arena: ArenaConfig,
+	Ball: BallConfig,
 	Match: MatchConfig,
+	Network: NetworkConfig,
 	Scoring: ScoringConfig,
 	UI: UIConfig,
 }
@@ -30,19 +36,33 @@ export type Mode = {
 
 local Config = {}
 
--- Checks spanning two areas run once each area is valid on its own.
-Config.schema = Validate.check(
+-- Checks spanning two areas, in order, once each area is valid on its own.
+local crossAreaRules: { Validate.Rule } = {
+	{
+		-- Each team lines up on its own straight (spec §9.1).
+		message = "Arena: Match.teamSize spawns teamSpawnSpacing apart must fit on a straight",
+		holds = function(config: GameConfig): boolean
+			return (config.Match.teamSize - 1) * config.Arena.teamSpawnSpacing <= config.Arena.straightLength
+		end,
+	},
+	{
+		message = "Ball: radius must be smaller than the goal ring's opening (Arena.goal.ringRadius)",
+		holds = function(config: GameConfig): boolean
+			return config.Ball.radius < config.Arena.goal.ringRadius
+		end,
+	},
+}
+
+Config.schema = Validate.checkAll(
 	Validate.record({
 		Arena = Arena.schema,
+		Ball = Ball.schema,
 		Match = Match.schema,
+		Network = Network.schema,
 		Scoring = Scoring.schema,
 		UI = UI.schema,
 	}),
-	function(config: GameConfig): boolean
-		-- Each team lines up on its own straight (spec §9.1).
-		return (config.Match.teamSize - 1) * config.Arena.teamSpawnSpacing <= config.Arena.straightLength
-	end,
-	"Arena: Match.teamSize spawns teamSpawnSpacing apart must fit on a straight"
+	crossAreaRules
 )
 
 local modeSchema = Validate.record({
@@ -77,8 +97,14 @@ local function deepMerge(target: { [any]: any }, overrides: { [any]: any })
 end
 
 local function build(overrides: { [string]: any }): GameConfig
-	local config =
-		deepCopy({ Arena = Arena.defaults, Match = Match.defaults, Scoring = Scoring.defaults, UI = UI.defaults })
+	local config = deepCopy({
+		Arena = Arena.defaults,
+		Ball = Ball.defaults,
+		Match = Match.defaults,
+		Network = Network.defaults,
+		Scoring = Scoring.defaults,
+		UI = UI.defaults,
+	})
 	deepMerge(config, overrides)
 	Validate.assertValid(config, Config.schema, "")
 	return Freeze.deep(config)
