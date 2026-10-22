@@ -64,6 +64,44 @@ function Fixtures.wedgeFace(piece: GeometryTypes.Piece, normal: Vector3): { Vect
 	}
 end
 
+-- A stand-in for a player's character: a Humanoid rig whose hand is welded to its root, R15 unless R6 is asked
+-- for. R15: RightHand, HipHeight 2. R6: Right Arm and Left Leg, HipHeight 0. Nothing is anchored.
+function Fixtures.rig(parent: Instance, name: string, cframe: CFrame, rigType: Enum.HumanoidRigType?): Model
+	local model = Instance.new("Model")
+	model.Name = name
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = Vector3.new(2, 2, 1)
+	root.CFrame = cframe
+	root.Parent = model
+	local function limb(limbName: string, size: Vector3, offset: CFrame)
+		local part = Instance.new("Part")
+		part.Name = limbName
+		part.Size = size
+		part.CFrame = cframe * offset
+		part.Parent = model
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = root
+		weld.Part1 = part
+		weld.Parent = part
+	end
+	local humanoid = Instance.new("Humanoid")
+	if rigType == Enum.HumanoidRigType.R6 then
+		limb("Right Arm", Vector3.new(1, 2, 1), CFrame.new(1.5, 0, 0))
+		limb("Left Leg", Vector3.new(1, 2, 1), CFrame.new(-0.5, -2, 0))
+		humanoid.RigType = Enum.HumanoidRigType.R6
+		humanoid.HipHeight = 0
+	else
+		limb("RightHand", Vector3.new(1, 1, 1), CFrame.new(1.5, -0.5, -0.5))
+		humanoid.RigType = Enum.HumanoidRigType.R15
+		humanoid.HipHeight = 2
+	end
+	humanoid.Parent = model
+	model.PrimaryPart = root
+	model.Parent = parent
+	return model
+end
+
 -- Also crosses Gate 2, whose rectangle contains the ring.
 function Fixtures.throughRing(): (Vector3, Vector3)
 	local x = 2 * GATE_SPACING
