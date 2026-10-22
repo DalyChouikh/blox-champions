@@ -28,6 +28,8 @@ type Fields = {
 	_stickCos: number,
 	-- Gravity's pull along a surface no steeper than pumpFlatSlopeDeg: pumping there counts as on the flat.
 	_flatPull: number,
+	-- The ground normal the last grounded step rode on: the curve the surface makes is measured from it (A3).
+	_lastNormal: Vector3?,
 }
 
 export type Skater = typeof(setmetatable({} :: Fields, SkateMath))
@@ -43,6 +45,7 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_worldUp = -gravity.Unit,
 		_stickCos = math.cos(math.rad(movement.maxStickAngle)),
 		_flatPull = gravity.Magnitude * math.sin(math.rad(movement.pumpFlatSlopeDeg)),
+		_lastNormal = nil,
 	}
 	return setmetatable(self, SkateMath)
 end
@@ -160,8 +163,38 @@ local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
 	end
 end
 
+-- How sharply the surface bends around the skater, 1/radius, positive on the inside of a loop: how far the normal
+-- turned along the heading in one step, per stud travelled. Zero until a grounded step has measured it, and while
+-- the skater is still.
+local function curvature(self: Skater, normal: Vector3, heading: Vector3, speed: number, dt: number): number
+	local last = self._lastNormal
+	if last == nil or speed * dt <= EPSILON then
+		return 0
+	end
+	return -(normal - last):Dot(heading) / (speed * dt)
+end
+
+-- Past straight up the surface overhangs, and gravity pulls the skater off it: they stay on only while speed² ×
+-- curvature reaches that pull. A flat ceiling has no curvature, so it never holds (spec §7.2, A3).
+local function loopBreaks(self: Skater, normal: Vector3, dt: number): boolean
+	local pull = self._gravity:Dot(normal)
+	if pull <= 0 then
+		return false
+	end
+	local along = alongSurface(self.velocity, normal)
+	local speed = along.Magnitude
+	local heading = if speed > EPSILON then along / speed else Vector3.zero
+	return speed * speed * curvature(self, normal, heading, speed, dt) < pull
+end
+
+-- A surface steeper than maxStickAngle holds only a skater moving at least minWallSpeed along it.
+local function tooSlowOnWall(self: Skater, normal: Vector3): boolean
+	local steep = normal:Dot(self._worldUp) < self._stickCos
+	return steep and alongSurface(self.velocity, normal).Magnitude < self._movement.minWallSpeed
+end
+
 -- The mode changes first, so a jump or a fall is stepped in the air at once.
-local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.Ground)
+local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
 	local movement = self._movement
 	if self.mode == "Grounded" then
 		if ground.hit and input.jump then
@@ -169,11 +202,9 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 			self.mode = "Airborne"
 		elseif
 			not ground.hit
-			-- Too slow to ride a surface this steep.
-			or (
-				ground.normal:Dot(self._worldUp) < self._stickCos
-				and alongSurface(self.velocity, ground.normal).Magnitude < movement.minWallSpeed
-			)
+			or tooSlowOnWall(self, ground.normal)
+			-- Past straight up, the curve of the surface must hold the skater (A3).
+			or loopBreaks(self, ground.normal, dt)
 		then
 			self.mode = "Airborne"
 		end
@@ -183,10 +214,12 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 end
 
 function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
-	resolveMode(self, input, ground)
+	resolveMode(self, input, ground, dt)
 	if self.mode == "Grounded" then
+		self._lastNormal = ground.normal
 		stepGrounded(self, input, ground, dt)
 	else
+		self._lastNormal = nil
 		stepAirborne(self, input, dt)
 	end
 end
@@ -221,6 +254,7 @@ end
 function SkateMath.stop(self: Skater)
 	self.velocity = Vector3.zero
 	self.mode = "Grounded"
+	self._lastNormal = nil
 end
 
 return SkateMath

@@ -11,6 +11,7 @@ local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.InputController)
 local SkateController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.SkateController)
 local SkaterBody = require(ServerScriptService.Server.SkaterBody)
+local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
@@ -192,5 +193,38 @@ describe("SkateController", function()
 			SkateController:step(1 / 60)
 		end
 		expect((os.clock() - started) / 600).toBeLessThan(0.0005)
+	end)
+end)
+
+-- The controller over an arc of roof (A3): its ray returns the arc's normal, and the test drives the skater along it.
+describe("SkateController over the roof", function()
+	local RADIUS = 22
+	local DT = 1 / 60
+
+	-- Whether the skater stays on from level up to the top of the arc at `speed`.
+	local function holdsOverTheTop(speed: number): boolean
+		local phi = 0
+		setup({
+			Raycast = function(): any
+				return { Normal = Vector3.new(-math.cos(phi), -math.sin(phi), 0), Distance = movement.hoverHeight }
+			end,
+		})
+		SkateController:bind(rig)
+		local skater = SkateController.skater :: SkateMath.Skater
+		local step = speed * DT / RADIUS
+		for frame = 0, math.ceil((math.pi / 2) / step) do
+			phi = frame * step
+			skater.velocity = Vector3.new(-math.sin(phi), math.cos(phi), 0) * speed
+			SkateController:step(DT)
+			if skater.mode == "Airborne" then
+				return false
+			end
+		end
+		return true
+	end
+
+	it("holds a skater over the top of the roof at 70 studs/s and drops one at 60, as the loop rule says", function()
+		expect(holdsOverTheTop(70)).toBe(true)
+		expect(holdsOverTheTop(60)).toBe(false)
 	end)
 end)
