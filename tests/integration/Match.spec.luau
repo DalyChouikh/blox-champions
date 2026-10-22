@@ -149,11 +149,14 @@ local function events(): { string }
 	return names
 end
 
-local function eventsNamed(name: string): { string }
-	local found: { string } = {}
-	for _, eventName in events() do
-		if eventName == name then
-			table.insert(found, eventName)
+-- The fired rule events named `name`, in order.
+local function eventsNamed(name: string): { any }
+	local found: { any } = {}
+	for _, batch in firedNamed(Remotes.names.RuleEvents) do
+		for _, event in batch.payload do
+			if event.name == name then
+				table.insert(found, event)
+			end
 		end
 	end
 	return found
@@ -211,11 +214,17 @@ local function scoreOnce(count: number?): (Model, { Model })
 	return rig, rigs
 end
 
--- Stands player 2 four studs in front of player 1, both facing -Z, at an arbitrary spot on the track.
-local function faceOff(rigs: { Model })
-	local at = Centerline.at(config.Arena, Centerline.gateDistance(config.Arena, 1) + 10, 22, 3).Position
-	rigs[1]:PivotTo(CFrame.new(at))
-	rigs[2]:PivotTo(CFrame.new(at - Vector3.zAxis * 4))
+-- Stands `attacker` on the track facing the way of travel, `victim` `gap` studs ahead of it, at an arbitrary spot.
+-- Returns the attacker's frame.
+local function lineUp(attacker: Model, victim: Model, gap: number): CFrame
+	local frame = Centerline.at(config.Arena, Centerline.gateDistance(config.Arena, 1) + 10, 22, 3)
+	attacker:PivotTo(frame)
+	victim:PivotTo(frame * CFrame.new(0, 0, -gap))
+	return frame
+end
+
+local function rootOf(rig: Model): BasePart
+	return rig.PrimaryPart :: BasePart
 end
 
 describe("A match on the generated arena", function()
@@ -289,18 +298,12 @@ describe("A match on the generated arena", function()
 		setup()
 		local rigs = seat(2)
 		kickoff()
-		faceOff(rigs)
+		lineUp(rigs[1], rigs[2], 4)
 		ActionService:request("1", { action = "Tackle" })
 		frames(0.2)
-		local knockdowns: { { attacker: string, victim: string } } = {}
-		for _, batch in firedNamed(Remotes.names.RuleEvents) do
-			for _, event in batch.payload do
-				if event.name == "TackleKnockdown" then
-					table.insert(knockdowns, { attacker = event.attacker, victim = event.victim })
-				end
-			end
-		end
-		expect(knockdowns).toEqual({ { attacker = "1", victim = "2" } })
+		expect(eventsNamed("TackleKnockdown")).toEqual({
+			{ name = "TackleKnockdown", attacker = "1", victim = "2" },
+		})
 	end)
 
 	it("clears actions and knockdowns at the next kickoff", function()
@@ -308,7 +311,7 @@ describe("A match on the generated arena", function()
 		local _, rigs = scoreOnce(2)
 		-- A knockdown half a second before the celebration ends would outlast it by a second.
 		frames(config.Match.celebrationSeconds - 0.5)
-		faceOff(rigs)
+		lineUp(rigs[1], rigs[2], 4)
 		ActionService:request("1", { action = "Tackle" })
 		frames(0.1)
 		expect(rigs[2]:GetAttribute(Attributes.KnockedDown)).toBe(true)
@@ -322,6 +325,63 @@ describe("A match on the generated arena", function()
 		expect(#eventsNamed("KickoffStarted")).toBe(2)
 		expect(rigs[2]:GetAttribute(Attributes.KnockedDown)).toBeNil()
 		expect(rigs[1]:GetAttribute(Attributes.Action)).toBeNil()
+	end)
+
+	it("knocks the carrier down; the ball keeps their momentum and the tackler takes it", function()
+		setup()
+		local rigs = seat(2)
+		kickoff()
+		catchWith(rigs[1])
+		-- 8 studs behind the carrier: inside the tackle's reach (range plus lag tolerance), outside the pickup reach.
+		local frame = lineUp(rigs[2], rigs[1], 8)
+		local momentum = frame.LookVector * 30
+		rootOf(rigs[1]).AssemblyLinearVelocity = momentum
+		ActionService:request("2", { action = "Tackle" })
+		frames(0.2)
+		expect(eventsNamed("TackleKnockdown")).toEqual({
+			{ name = "TackleKnockdown", attacker = "2", victim = "1" },
+		})
+		expect(BallService.state.status).toBe("Loose")
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, momentum)
+		-- Beside the knocked-down carrier, the ball stays loose.
+		BallService.part.CFrame = CFrame.new(rootOf(rigs[1]).Position)
+		frames(FRAME)
+		expect(BallService.state.carrier).toBeNil()
+		-- Beside the tackler, it is theirs: a steal.
+		BallService.part.CFrame = CFrame.new(rootOf(rigs[2]).Position)
+		frames(FRAME)
+		expect(BallService.state.carrier).toBe("2")
+		expect(#eventsNamed("Steal")).toBe(1)
+		expect(eventsNamed("PossessionChanged")[2].player).toBe("2")
+	end)
+
+	it("passes to a teammate who called; the passer cannot take it back at once", function()
+		setup()
+		local rigs = seat(3)
+		kickoff()
+		-- Of three players, the third shares a team with one of the first two: that one passes.
+		local passerIndex = if TeamService:teamOf("3") == TeamService:teamOf("1") then 1 else 2
+		local passer = tostring(passerIndex)
+		local passerRig, receiverRig = rigs[passerIndex], rigs[3]
+		catchWith(passerRig)
+		local frame = lineUp(passerRig, receiverRig, 30)
+		-- The opponent waits high above the infield, out of every reach.
+		rigs[if passerIndex == 1 then 2 else 1]:PivotTo(CFrame.new(0, 200, 0))
+		local possessions = #eventsNamed("PossessionChanged")
+		ActionService:request("3", { action = "CallPass" })
+		-- Aimed away from the caller: the call decides.
+		ActionService:request(passer, { action = "Pass", aim = frame.RightVector })
+		expect(BallService.state.status).toBe("Flying")
+		-- Beside the passer, inside rethrowPickupDelay: nobody takes it.
+		BallService.part.CFrame = CFrame.new(rootOf(passerRig).Position)
+		frames(FRAME)
+		expect(BallService.state.carrier).toBeNil()
+		-- Beside the caller: theirs, and the team keeps possession, so no steal.
+		BallService.part.CFrame = CFrame.new(rootOf(receiverRig).Position)
+		frames(FRAME)
+		expect(BallService.state.carrier).toBe("3")
+		expect(#eventsNamed("PossessionChanged")).toBe(possessions)
+		expect(eventsNamed("Steal")).toEqual({})
 	end)
 
 	it("drops the ball where a leaving carrier was, and the team keeps possession", function()
