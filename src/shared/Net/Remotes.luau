@@ -3,6 +3,7 @@
 --   RuleEvents     server → clients  each frame's rule events, in order (one batch per frame that has any)
 --   MatchSnapshot  server → client   the match's state, on joining and when a new match starts
 --   BallCarrier    server → clients  { carrier = PlayerId? } whenever the ball changes hands
+--   SkateState     client → server   { pump, brake } whenever either changes (Net/Schemas checks it)
 
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 
@@ -15,6 +16,7 @@ local names: { [string]: string } = {
 	RuleEvents = "RuleEvents",
 	MatchSnapshot = "MatchSnapshot",
 	BallCarrier = "BallCarrier",
+	SkateState = "SkateState",
 }
 Remotes.names = Freeze.deep(names)
 

@@ -12,8 +12,12 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BallService = require(script.Parent.BallService)
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Config = require(ReplicatedStorage.Shared.Config)
+local NetService = require(script.Parent.NetService)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
+local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 local Signal = require(ReplicatedStorage.Shared.Util.Signal)
 local SkaterBody = require(script.Parent.SkaterBody)
 local TeamService = require(script.Parent.TeamService)
@@ -34,6 +38,8 @@ export type CharacterService = {
 	placeAll: (self: CharacterService, frozen: boolean) -> (),
 	freezeAll: (self: CharacterService, frozen: boolean) -> (),
 	holders: (self: CharacterService) -> { BallService.Holder },
+	-- A seated player's pump and brake, shown on their character for every client to pose.
+	setSkateState: (self: CharacterService, player: PlayerId, pump: boolean, brake: boolean) -> (),
 	-- A registered character that died or was destroyed.
 	characterRemoved: Signal.Signal<PlayerId>,
 	-- The server moved a character to its spawn: a jump the movement guard must not judge.
@@ -85,7 +91,7 @@ end
 
 local CharacterService: CharacterService = {
 	name = "CharacterService",
-	dependencies = { "Config", "ArenaService", "TeamService" },
+	dependencies = { "Config", "ArenaService", "TeamService", "NetService" },
 	characterRemoved = Signal.new(),
 	placed = Signal.new(),
 	_config = nil :: any,
@@ -125,6 +131,15 @@ local CharacterService: CharacterService = {
 		self._holders = {}
 		self.characterRemoved = Signal.new()
 		self.placed = Signal.new()
+		local net: NetService.NetService = deps.NetService
+		net:listen(
+			Remotes.names.SkateState,
+			Schemas.SkateState,
+			self._config.Network.maxSkateStatesPerSecond,
+			function(player: PlayerId, payload: any)
+				self:setSkateState(player, payload.pump, payload.brake)
+			end
+		)
 	end,
 
 	start = function(self: CharacterService)
@@ -240,6 +255,14 @@ local CharacterService: CharacterService = {
 			if root ~= nil then
 				root.Anchored = frozen
 			end
+		end
+	end,
+
+	setSkateState = function(self: CharacterService, player: PlayerId, pump: boolean, brake: boolean)
+		local character: Model? = self._characters[player]
+		if character ~= nil and self._teams:teamOf(player) ~= nil then
+			character:SetAttribute(Attributes.Pumping, pump)
+			character:SetAttribute(Attributes.Braking, brake)
 		end
 	end,
 
