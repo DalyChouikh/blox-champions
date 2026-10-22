@@ -76,10 +76,11 @@ local function byGateIndex(root: Instance, tag: string): ({ BasePart }, { number
 	local indexOf: { [BasePart]: number } = {}
 	for _, part in parts do
 		local index = part:GetAttribute(Tags.Attribute.GateIndex)
-		if type(index) == "number" then
+		-- `% 1 == 0` is false for NaN and the infinities too.
+		if type(index) == "number" and index % 1 == 0 then
 			indexOf[part] = index
 		else
-			fail(`{tag} "{part.Name}" needs a number {Tags.Attribute.GateIndex} attribute`)
+			fail(`{tag} "{part.Name}" needs a whole-number {Tags.Attribute.GateIndex} attribute`)
 		end
 	end
 	table.sort(parts, function(a: BasePart, b: BasePart): boolean

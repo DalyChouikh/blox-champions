@@ -132,11 +132,16 @@ describe("TaggedLayout.read", function()
 		expect(function()
 			TaggedLayout.read(root)
 		end).toThrow('TaggedLayout: LapGate "Gate9" must be a part (got Folder)')
-		local unnumbered = arenaRoot()
-		child(unnumbered, "Gate2"):SetAttribute(Tags.Attribute.GateIndex, nil)
-		expect(function()
-			TaggedLayout.read(unnumbered)
-		end).toThrow('TaggedLayout: LapGate "Gate2" needs a number GateIndex attribute')
+		local function withGate2Index(index: any): Folder
+			local unnumbered = arenaRoot()
+			child(unnumbered, "Gate2"):SetAttribute(Tags.Attribute.GateIndex, index)
+			return unnumbered
+		end
+		for _, unnumbered in { withGate2Index(nil), withGate2Index(0 / 0), withGate2Index(2.5) } do
+			expect(function()
+				TaggedLayout.read(unnumbered)
+			end).toThrow('TaggedLayout: LapGate "Gate2" needs a whole-number GateIndex attribute')
+		end
 		local gateless = arenaRoot()
 		for index = 1, 4 do
 			child(gateless, "Gate" .. index):Destroy()
