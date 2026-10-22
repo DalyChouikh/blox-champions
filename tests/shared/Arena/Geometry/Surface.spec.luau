@@ -82,4 +82,22 @@ describe("Surface.build", function()
 		expect(lowerFloor).never.toBeNil()
 		expect(((lowerFloor :: Types.Piece).size - Vector3.new(10, 1, 160)).Magnitude).toBeLessThan(1e-3)
 	end)
+
+	-- The roof's axis is the centerline at the wall tops' height (the walls are level): its strips lie 22 studs from
+	-- it, and a slab that hangs behind a strip, outside the tube, lies farther. A roof facing away from the track would
+	-- hang its slabs inside.
+	it("hangs every roof piece behind the roof, outside the tube, so the roof faces the track", function()
+		local arena = Config.defaults().Arena
+		local half = arena.straightLength / 2
+		local radius = arena.trackWidth / 2
+		local roof = Surface.build(arena).roof
+		expect(#roof > 0).toBe(true)
+		for _, piece in roof do
+			local position = piece.cframe.Position
+			local along = math.clamp(position.X, -half, half)
+			local fromCenterline = Vector2.new(position.X - along, position.Z).Magnitude - arena.endRadius
+			local fromAxis = Vector2.new(fromCenterline, position.Y - arena.outerWallHeight).Magnitude
+			expect(fromAxis).toBeGreaterThan(radius)
+		end
+	end)
 end)
