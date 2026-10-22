@@ -39,7 +39,14 @@ describe("Config defaults", function()
 			outOfBoundsMargin = 2,
 			carryOffset = Vector3.new(2.5, 0, -0.5),
 		})
-		expect(d.Network).toEqual({ pickupLagToleranceStuds = 2, maxSkateStatesPerSecond = 20 })
+		expect(d.Network).toEqual({
+			pickupLagToleranceStuds = 2,
+			maxSkateStatesPerSecond = 20,
+			guardSampleSeconds = 0.25,
+			speedTolerance = 1.2,
+			guardStrikes = 3,
+			guardTeleportFactor = 2,
+		})
 	end)
 
 	it("match the spec's skating values, plus this phase's", function()
@@ -202,6 +209,17 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Match = { lapsToOpenGaol = 3 } })
 		end).toThrow("Match.lapsToOpenGaol: unknown key")
+	end)
+
+	it("rejects a movement guard that could never return a skater", function()
+		expect(function()
+			Config.forMode({
+				id = "guard",
+				displayName = "Guard",
+				itemsEnabled = false,
+				overrides = { Network = { guardStrikes = 0 } },
+			})
+		end).toThrow()
 	end)
 
 	it("rejects an override with the wrong type", function()
