@@ -16,6 +16,15 @@ local rotateToward = Vectors.rotateToward
 local HISTORY = 32
 -- A ground normal turning less than this in a step (radians) has not turned: float noise on a flat surface.
 local TURN_EPSILON = 1e-6
+-- What a knocked-down skater's input becomes: no stick, pump, brake, jump or draft. They only slide.
+local LOCKED: Types.SkateInput = table.freeze({
+	move = Vector3.zero,
+	pump = false,
+	brake = false,
+	jump = false,
+	draftAccel = 0,
+	knockedDown = true,
+})
 
 local SkateMath = {}
 SkateMath.__index = SkateMath
@@ -134,7 +143,9 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	velocity = heading * speed + acceleration * dt
 	speed = velocity.Magnitude
 	local direction = if speed > EPSILON then velocity / speed else heading
-	speed = math.max(0, speed - (movement.rollingFriction + movement.airDrag * speed) * dt)
+	-- Friction and drag, and a knocked-down skater's slowing on top.
+	local knockdown = if input.knockedDown then movement.knockdownDecel else 0
+	speed = math.max(0, speed - (movement.rollingFriction + knockdown + movement.airDrag * speed) * dt)
 	if input.brake then
 		local tiptoe = movement.tiptoeSpeed * stick
 		if speed > tiptoe then
@@ -285,17 +296,18 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 end
 
 function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
+	local controls = if input.knockedDown then LOCKED else input
 	local travel, turn = 0, 0
 	if self.mode == "Grounded" and ground.hit then
 		travel, turn = measure(self, ground.normal, dt)
 	end
-	resolveMode(self, input, ground, travel, turn)
+	resolveMode(self, controls, ground, travel, turn)
 	if self.mode == "Grounded" then
 		remember(self, ground.normal, travel, turn)
-		stepGrounded(self, input, ground, dt)
+		stepGrounded(self, controls, ground, dt)
 	else
 		forget(self)
-		stepAirborne(self, input, dt)
+		stepAirborne(self, controls, dt)
 	end
 end
 
@@ -323,6 +335,15 @@ end
 function SkateMath.release(self: Skater, direction: Vector3)
 	self.velocity = capped(self, self.velocity + direction * self._movement.attachBoostSpeed)
 	self.mode = "Airborne"
+end
+
+-- An action's push (a lunge, a dodge, a wall leap) added to the velocity, never past hardCap. A launch leaves the
+-- ground.
+function SkateMath.push(self: Skater, change: Vector3, launch: boolean)
+	self.velocity = capped(self, self.velocity + change)
+	if launch then
+		self.mode = "Airborne"
+	end
 end
 
 -- Still and on the ground: the kickoff freeze and a fresh character start from rest.

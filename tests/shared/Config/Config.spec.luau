@@ -164,6 +164,7 @@ describe("Config defaults", function()
 			attachMaxSeconds = 3,
 			attachBoostSpeed = 40,
 			attachCooldown = 3,
+			knockdownDecel = 75,
 		})
 	end)
 
@@ -176,6 +177,8 @@ describe("Config defaults", function()
 			tuckDeg = 60,
 			carryArmDeg = 75,
 			airborneProbe = 1.5,
+			lungeDeg = 35,
+			knockdownTiltDeg = 60,
 		})
 	end)
 

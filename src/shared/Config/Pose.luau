@@ -1,7 +1,7 @@
 --!strict
--- How far each skater's body bends (spec §7.1): the lean into a turn, the crouch, the brake, the tuck in the air
--- and the arm that carries the ball. Angles are in degrees. Every pose number lives here, so tuning a pose is a config
--- change.
+-- How far each skater's body bends (spec §7.1): the lean into a turn, the crouch, the brake, the tuck in the air,
+-- the arm that carries the ball, the lunge and the knockdown. Angles are in degrees. Every pose number lives here,
+-- so tuning a pose is a config change.
 
 local Validate = require(script.Parent.Validate)
 
@@ -20,6 +20,10 @@ export type PoseConfig = {
 	carryArmDeg: number,
 	-- How far past hoverHeight a remote skater's ground ray reaches before the skater counts as airborne.
 	airborneProbe: number,
+	-- A tackle or dive tips the body forward by this much.
+	lungeDeg: number,
+	-- A knocked-down skater tips back by this much.
+	knockdownTiltDeg: number,
 }
 
 local defaults: PoseConfig = {
@@ -30,6 +34,8 @@ local defaults: PoseConfig = {
 	tuckDeg = 60,
 	carryArmDeg = 75,
 	airborneProbe = 1.5,
+	lungeDeg = 35,
+	knockdownTiltDeg = 60,
 }
 
 local angle = Validate.number({ min = 0, max = 180 })
@@ -42,6 +48,8 @@ local schema = Validate.record({
 	tuckDeg = angle,
 	carryArmDeg = angle,
 	airborneProbe = Validate.number({ min = 0 }),
+	lungeDeg = angle,
+	knockdownTiltDeg = angle,
 })
 
 return {
