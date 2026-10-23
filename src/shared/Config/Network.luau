@@ -21,8 +21,9 @@ export type NetworkConfig = {
 	maxActionsPerSecond: number,
 	-- Extra reach for strikes judged on the server, which sees each player slightly behind their own screen.
 	hitLagToleranceStuds: number,
-	-- How early an action may reach the server before its cooldown ends: network jitter, not cheating.
-	actionCooldownTolerance: number,
+	-- How far network jitter may move an action's timing on the server: it may arrive this early before its cooldown
+	-- or the running action ends, or this close to its follow-up window.
+	actionTimingTolerance: number,
 }
 
 local defaults: NetworkConfig = {
@@ -34,7 +35,7 @@ local defaults: NetworkConfig = {
 	guardTeleportFactor = 2,
 	maxActionsPerSecond = 15,
 	hitLagToleranceStuds = 3,
-	actionCooldownTolerance = 0.1,
+	actionTimingTolerance = 0.1,
 }
 
 local schema = Validate.record({
@@ -46,7 +47,7 @@ local schema = Validate.record({
 	guardTeleportFactor = Validate.number({ above = 0 }),
 	maxActionsPerSecond = Validate.number({ above = 0 }),
 	hitLagToleranceStuds = Validate.number({ min = 0 }),
-	actionCooldownTolerance = Validate.number({ min = 0 }),
+	actionTimingTolerance = Validate.number({ min = 0 }),
 })
 
 return {

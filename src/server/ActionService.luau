@@ -286,8 +286,8 @@ local ActionService: ActionService = {
 		end)
 	end,
 
-	-- Refused when the player has no seated, living character, is frozen, or their runner says no; a cooldown may end
-	-- up to Network.actionCooldownTolerance late, for lag.
+	-- Refused when the player has no seated, living character, is frozen, or their runner says no, with
+	-- Network.actionTimingTolerance of slack on its timing, for lag.
 	request = function(self: ActionService, player: PlayerId, payload: any)
 		local name: Config.ActionName = payload.action
 		refreshHolders(self)
@@ -300,7 +300,7 @@ local ActionService: ActionService = {
 		local context = self._context
 		context.hasBall = self._ball.state.carrier == player
 		context.knockedDown = knockedDown(self, player)
-		if record.runner:start(name, context, self._config.Network.actionCooldownTolerance) ~= "Started" then
+		if record.runner:start(name, context, self._config.Network.actionTimingTolerance) ~= "Started" then
 			reject(self, player, name)
 			return
 		end

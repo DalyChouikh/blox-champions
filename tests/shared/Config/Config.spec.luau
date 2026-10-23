@@ -58,7 +58,7 @@ describe("Config defaults", function()
 			guardTeleportFactor = 2,
 			maxActionsPerSecond = 15,
 			hitLagToleranceStuds = 3,
-			actionCooldownTolerance = 0.1,
+			actionTimingTolerance = 0.1,
 		})
 	end)
 

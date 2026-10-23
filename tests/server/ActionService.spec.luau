@@ -258,7 +258,7 @@ describe("ActionService", function()
 		expect(attribute(a, Attributes.Action)).toBeNil()
 	end)
 
-	it("accepts an action that arrives up to actionCooldownTolerance early, and rejects one earlier", function()
+	it("accepts an action that arrives up to actionTimingTolerance early, and rejects one earlier", function()
 		local a, b = blue[1], orange[1]
 		stand(a, Vector3.zero)
 		stand(b, Vector3.new(50, 0, 0))
@@ -272,6 +272,33 @@ describe("ActionService", function()
 		expect(rejected(a)).toEqual({})
 		expect(attribute(a, Attributes.Action)).toBe("Tackle")
 		expect(rejected(b)).toEqual({ "Tackle" })
+	end)
+
+	it("rejects a dive that does not follow a tackle", function()
+		local a, b = blue[1], orange[1]
+		stand(a, Vector3.zero)
+		-- Inside a dive's reach (11 + the lag tolerance), outside a tackle's.
+		stand(b, Vector3.new(0, 0, -12))
+		ActionService:request(a, { action = "Dive" })
+		expect(rejected(a)).toEqual({ "Dive" })
+		expect(attribute(a, Attributes.Action)).toBeNil()
+		expect(advance(0.4)).toEqual({})
+	end)
+
+	it("accepts a next action that arrives within actionTimingTolerance of the running one's end", function()
+		local a, b = blue[1], orange[1]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(50, 0, 0))
+		ActionService:request(a, { action = "Tackle" })
+		ActionService:request(b, { action = "Tackle" })
+		-- B: 0.5 s in, 0.15 s of its tackle left. A: 0.58 s in, 0.07 s left.
+		advance(0.5)
+		ActionService:request(b, { action = "Uppercut" })
+		advance(0.08)
+		ActionService:request(a, { action = "Uppercut" })
+		expect(rejected(b)).toEqual({ "Uppercut" })
+		expect(rejected(a)).toEqual({})
+		expect(attribute(a, Attributes.Action)).toBe("Uppercut")
 	end)
 
 	it("clears every action, knockdown and call at a kickoff", function()
