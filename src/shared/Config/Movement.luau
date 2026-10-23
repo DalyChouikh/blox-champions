@@ -1,6 +1,6 @@
 --!strict
--- Skating (spec §7.2): the skater's body, momentum, steering, wall riding, pump, brake, jump, draft and attach, and
--- the slide of a knocked-down skater.
+-- Skating (spec §7.2): the skater's body, momentum, steering, wall riding, pump, brake, jump, draft and attach, the
+-- slide of a knocked-down skater, and the speedometer's scale.
 -- Speeds are in studs/s, accelerations in studs/s², turn rates in rad/s, angles in degrees. The values the spec
 -- doesn't give (hoverSpring, strideAccel, airTurnRate, airUprightRate, pumpFlatSlopeDeg, normalFilter, attachSpring)
 -- are starting points for tuning, like the spec's own.
@@ -60,6 +60,8 @@ export type MovementConfig = {
 	attachCooldown: number,
 	-- A knocked-down skater slides, losing this much speed per second on top of friction.
 	knockdownDecel: number,
+	-- The speedometer reads a skater's speed times this, in km/h.
+	speedometerScale: number,
 }
 
 local defaults: MovementConfig = {
@@ -98,6 +100,7 @@ local defaults: MovementConfig = {
 	attachBoostSpeed = 40,
 	attachCooldown = 3,
 	knockdownDecel = 75,
+	speedometerScale = 1.2,
 }
 
 local positive = Validate.number({ above = 0 })
@@ -142,6 +145,7 @@ local fields = Validate.record({
 	attachBoostSpeed = nonNegative,
 	attachCooldown = nonNegative,
 	knockdownDecel = nonNegative,
+	speedometerScale = positive,
 })
 
 local rules: { Validate.Rule } = {

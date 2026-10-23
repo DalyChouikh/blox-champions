@@ -36,8 +36,11 @@ export type TouchStyle = {
 	knobTransparency: number,
 }
 
--- Every string the HUD shows. %d stands for a number and %s for a name; a text takes exactly the values noted.
+-- Every string the HUD shows. %d stands for a number (%02d pads it to two digits) and %s for a name; a text takes
+-- exactly the values noted.
 export type UIText = {
+	-- The clock's minutes and seconds (two values).
+	clock: string,
 	-- The possessing team's completed laps, of Match.lapsToOpenGoal (two values).
 	lap: string,
 	-- Their streak once the goal is open for them, of Match.lapsForStreakPoint (two values).
@@ -185,6 +188,7 @@ local defaults: UIConfig = {
 		knobTransparency = 0,
 	},
 	text = {
+		clock = "%d:%02d",
 		lap = "Lap %d/%d",
 		streak = "Streak %d/%d",
 		overtime = "OVERTIME",
@@ -275,9 +279,9 @@ local function noDuplicates(values: { number }): boolean
 	return true
 end
 
--- How many values `text` takes: its %d and %s.
+-- How many values `text` takes: its %d and %s, each with an optional width (%02d).
 local function placeholders(text: string): number
-	local _, count = string.gsub(text, "%%[ds]", "")
+	local _, count = string.gsub(text, "%%%d*[ds]", "")
 	return count
 end
 
@@ -356,6 +360,7 @@ local schema = Validate.record({
 		knobTransparency = transparency,
 	}),
 	text = Validate.record({
+		clock = template(2),
 		lap = template(2),
 		streak = template(2),
 		overtime = label,
