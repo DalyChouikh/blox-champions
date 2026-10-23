@@ -5,9 +5,13 @@
 -- swings back behind the skater once the look rests; its view widens with speed. One ray through the ride surfaces
 -- pulls it in in front of the arena, so it never sees through a wall or the roof. With a mouse it keeps the mouse
 -- locked to the screen's center, except while Roblox's menu is open. At a kickoff, and for a new character, it starts
--- behind the skater's facing.
+-- behind the skater's facing. Ball Focus (§8.2) turns it toward the ball while the player doesn't carry it: held on
+-- PC and gamepad, toggled by a tap on touch (Config.Input). A player with no character watches the ball, from the
+-- spectator's distance and height above it; with no ball either, the camera holds still.
 
+local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
@@ -15,8 +19,13 @@ local BallCarrier = require(script.Parent.BallCarrier)
 local ChaseCamera = require(ReplicatedStorage.Shared.Camera.ChaseCamera)
 local Config = require(ReplicatedStorage.Shared.Config)
 local InputController = require(script.Parent.InputController)
+local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local RideSurfaces = require(script.Parent.RideSurfaces)
 local SkateController = require(script.Parent.SkateController)
+local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
+local Types = require(ReplicatedStorage.Shared.Rules.Types)
+
+type PlayerId = Types.PlayerId
 
 -- What the controller sets on the camera and the mouse: workspace.CurrentCamera and UserInputService, or fakes.
 type CameraLike = { CFrame: CFrame, FieldOfView: number, CameraType: Enum.CameraType }
@@ -27,7 +36,7 @@ export type CameraController = {
 	name: string,
 	dependencies: { string },
 	init: (self: CameraController, deps: { [string]: any }) -> (),
-	start: ((self: CameraController) -> ())?,
+	start: (self: CameraController) -> (),
 	step: (self: CameraController, dt: number) -> (),
 	chase: ChaseCamera.ChaseCamera,
 	_config: Config.GameConfig,
@@ -40,11 +49,18 @@ export type CameraController = {
 	_preferredInput: () -> Enum.PreferredInput,
 	_menuOpen: () -> boolean,
 	_raycast: (origin: Vector3, direction: Vector3, params: RaycastParams) -> RaycastResult?,
+	-- The ball's part, or nil while there is none in the arena.
+	_ball: () -> BasePart?,
+	_localId: PlayerId,
 	-- Records reused every step.
 	_keys: InputController.CameraKeys,
 	_target: ChaseCamera.Target,
 	-- The root the camera last followed: a new one starts behind its skater.
 	_root: BasePart?,
+	-- Ball Focus turned on by a tap (toggle mode).
+	_focusToggled: boolean,
+	-- The tagged ball part in the workspace, kept by start()'s tag signals.
+	_ballPart: BasePart?,
 }
 
 -- The mouse stays at the screen's center while a mouse plays, so it turns the camera; it is free otherwise and
@@ -58,14 +74,55 @@ local function lockMouse(self: CameraController, usingMouse: boolean)
 	end
 end
 
+-- Whether Ball Focus is on this step. Hold mode follows the key; toggle mode flips on each press. Carrying the ball
+-- switches it off.
+local function focusing(self: CameraController, device: Enum.PreferredInput): boolean
+	if self._carrier.carrier == self._localId then
+		self._focusToggled = false
+		return false
+	end
+	local input = self._config.Input
+	local mode: Config.FocusMode = if device == Enum.PreferredInput.Touch
+		then input.touchBallFocusMode
+		else input.ballFocusMode
+	local keys = self._keys
+	if mode == "Hold" then
+		self._focusToggled = false
+		return keys.ballFocus
+	end
+	if keys.ballFocusPressed then
+		self._focusToggled = not self._focusToggled
+	end
+	return self._focusToggled
+end
+
+-- Steps the chase toward `up` with this frame's look input, turning toward `aimAt` or swinging back behind `travel`.
+local function follow(
+	self: CameraController,
+	up: Vector3,
+	travel: Vector3,
+	speed: number,
+	aimAt: Vector3?,
+	recenter: boolean,
+	dt: number
+)
+	local target = self._target
+	target.up = up
+	target.travel = travel
+	target.look = self._keys.look * dt
+	target.recenter = recenter
+	target.aimAt = aimAt
+	target.speed = speed
+	self.chase:step(target, dt)
+end
+
 -- Sets the camera `distance` behind the point `height` above `anchor`, pulled in in front of any ride surface.
-local function place(self: CameraController, anchor: Vector3, distance: number)
-	local settings = self._config.Camera
+local function place(self: CameraController, anchor: Vector3, height: number, distance: number)
 	local chase = self.chase
-	local focus = anchor + chase.up * settings.height
+	local focus = anchor + chase.up * height
 	local look = chase:lookVector()
 	local hit = self._raycast(focus, -look * distance, self._surfaces.params)
-	local back = ChaseCamera.pullIn(settings, distance, if hit ~= nil then hit.Distance else nil)
+	local back = ChaseCamera.pullIn(self._config.Camera, distance, if hit ~= nil then hit.Distance else nil)
 	local camera = self._camera
 	camera.CFrame = CFrame.lookAlong(focus - look * back, look, chase.up)
 	camera.FieldOfView = chase.fov
@@ -91,11 +148,18 @@ local CameraController: CameraController = {
 	_raycast = function(_origin: Vector3, _direction: Vector3, _params: RaycastParams): RaycastResult?
 		return nil
 	end,
+	_ball = function(): BasePart?
+		return nil
+	end,
+	_localId = "",
 	_keys = nil :: any,
 	_target = nil :: any,
 	_root = nil,
+	_focusToggled = false,
+	_ballPart = nil,
 
-	-- deps.Camera, deps.Mouse, deps.PreferredInput, deps.MenuOpen and deps.Raycast replace the live game in tests.
+	-- deps.Camera, deps.Mouse, deps.PreferredInput, deps.MenuOpen, deps.Raycast, deps.Ball and deps.LocalId replace
+	-- the live game in tests.
 	init = function(self: CameraController, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -116,6 +180,12 @@ local CameraController: CameraController = {
 			or function(origin: Vector3, direction: Vector3, params: RaycastParams): RaycastResult?
 				return workspace:Raycast(origin, direction, params)
 			end
+		self._ball = deps.Ball
+			or function(): BasePart?
+				local part = self._ballPart
+				return if part ~= nil and part.Parent ~= nil then part else nil
+			end
+		self._localId = deps.LocalId or PlayerIds.of(Players.LocalPlayer :: Player)
 		self.chase = ChaseCamera.new(config.Camera, config.Movement.hardCap, Vector3.yAxis, -Vector3.zAxis)
 		self._keys = InputController.newCameraKeys()
 		self._target = {
@@ -127,6 +197,26 @@ local CameraController: CameraController = {
 			speed = 0,
 		}
 		self._root = nil
+		self._focusToggled = false
+		self._ballPart = nil
+	end,
+
+	-- Keeps the ball's part: the server tags it (Tags.Ball), and it reaches a client only while in the workspace.
+	start = function(self: CameraController)
+		local function found(instance: Instance)
+			if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
+				self._ballPart = instance
+			end
+		end
+		CollectionService:GetInstanceAddedSignal(Tags.Ball):Connect(found)
+		CollectionService:GetInstanceRemovedSignal(Tags.Ball):Connect(function(instance: Instance)
+			if instance == self._ballPart then
+				self._ballPart = nil
+			end
+		end)
+		for _, instance in CollectionService:GetTagged(Tags.Ball) do
+			found(instance)
+		end
 	end,
 
 	step = function(self: CameraController, dt: number)
@@ -134,15 +224,23 @@ local CameraController: CameraController = {
 		if camera.CameraType ~= Enum.CameraType.Scriptable then
 			camera.CameraType = Enum.CameraType.Scriptable
 		end
-		local usingMouse = self._preferredInput() == Enum.PreferredInput.KeyboardAndMouse
+		local device = self._preferredInput()
+		local usingMouse = device == Enum.PreferredInput.KeyboardAndMouse
 		lockMouse(self, usingMouse)
-		local keys = self._keys
-		self._input:readCamera(keys)
+		self._input:readCamera(self._keys)
+		local focused = focusing(self, device)
+		local ball = self._ball()
+		local settings = self._config.Camera
 
 		local skate = self._skate
 		local skater, root = skate.skater, skate.root
 		if skater == nil or root == nil then
+			-- A spectator watches the ball, upright; with no ball either, the camera holds still.
 			self._root = nil
+			if ball ~= nil then
+				follow(self, Vector3.yAxis, ball.AssemblyLinearVelocity, 0, nil, not usingMouse, dt)
+				place(self, ball.Position, settings.spectator.height, settings.spectator.distance)
+			end
 			return
 		end
 		local chase = self.chase
@@ -151,15 +249,12 @@ local CameraController: CameraController = {
 			chase:reset(skater.up, skater.forward)
 		end
 		if not skate.frozen then
-			local target = self._target
-			target.up = skater.up
-			target.travel = skater.velocity
-			target.look = keys.look * dt
-			target.recenter = not usingMouse
-			target.speed = skater.velocity.Magnitude
-			chase:step(target, dt)
+			local aimAt = if focused and ball ~= nil
+				then ball.Position - (root.Position + chase.up * settings.height)
+				else nil
+			follow(self, skater.up, skater.velocity, skater.velocity.Magnitude, aimAt, not usingMouse, dt)
 		end
-		place(self, root.Position, self._config.Camera.distance)
+		place(self, root.Position, settings.height, settings.distance)
 	end,
 }
 
