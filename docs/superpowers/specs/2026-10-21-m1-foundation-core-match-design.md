@@ -57,6 +57,7 @@ M1 does include the **registries** (ball skin, skate skin) holding one default e
 | A2 | Enclosed arena (2026-10-22) | **The track is a closed tube**: a roof spans the track (half-circle, radius `trackWidth / 2`, top at 50 studs), and both walls rise to **28 studs** (`infieldWallHeight` 20 → 28). The skater's pump on a bank can no longer carry them out of the arena. |
 | A3 | Riding the roof (2026-10-22) | **Walls by speed, roof by loop physics.** Walls keep `minWallSpeed`. Past straight up, a skater stays on only while `speed² × curvature ≥ gravity's pull off the surface`. A flat ceiling never holds, at any speed. |
 | A4 | Future art and maps (2026-10-22) | **Glass walls** in the art pass (ground stays opaque). **More maps, picked at random each game**, later: the arena stays data-driven. |
+| A5 | Packages (2026-10-23) | **Roblox's own maintained packages:** React Luau (`roblox/react`, `roblox/react-roblox` 17.3.13) for the HUD and Jest Roblox (`roblox/jest`, `roblox/jest-globals` 3.20.1) for tests. They replace the `jsdotlua` copies, which had not changed since December 2024. |
 
 ---
 
@@ -396,11 +397,11 @@ Samples each character every `Network.guardSampleSeconds = 0.25`. If the upward 
 
 ---
 
-## 11. HUD and UI (React-lua)
+## 11. HUD and UI (React Luau)
 
 ### 11.1 Components (`client/Hud/`)
 
-React-lua (`jsdotlua/react` 17.2.1 + `jsdotlua/react-roblox` 17.2.1) components rendered from a client `HudStore` that applies `MatchSnapshot` and `RuleEvents`.
+React Luau (Roblox's `roblox/react` 17.3.13 + `roblox/react-roblox` 17.3.13, A5) components rendered from a client `HudStore` that applies `MatchSnapshot` and `RuleEvents`.
 
 - **Scoreboard (top center):** Blue score | timer | Orange score; `Match.pointsToWin` pips per team; ball-carrier name; **lap bar** for the possessing team — 4 segments per lap, "Lap n/4" until the goal opens, then "Streak n/12"; glows while the goal is open.
 - **Banners (center):** kickoff 3-2-1, GOAL!, DENIED! (on a save), 60/30 SECONDS, LAST CHANCE, OVERTIME.
@@ -419,7 +420,7 @@ All strings and colors in `Config/UI` (team colors: Blue and Orange).
 
 ## 12. Tooling, testing, CI, workflow
 
-### 12.1 Toolchain (versions verified on GitHub releases, 2026-10-21)
+### 12.1 Toolchain (versions verified on GitHub releases, 2026-10-21; Jest Roblox and React Luau on the Wally index, 2026-10-23)
 
 | Tool | Version | Use |
 |---|---|---|
@@ -429,15 +430,15 @@ All strings and colors in `Config/UI` (team colors: Blue and Orange).
 | StyLua | 2.6.0 | Formatting |
 | selene | 0.32.0 | Linting |
 | luau-lsp | 1.70.1 | Type checking (`--!strict`) |
-| Jest-Lua | 3.10.0 (`jsdotlua/jest`, `jsdotlua/jest-globals`) | Tests (dev dependency; runs only inside Roblox per its README) |
-| React-lua | 17.2.1 | HUD |
+| Jest Roblox | 3.20.1 (`roblox/jest`, `roblox/jest-globals`) | Tests (dev dependency; runs inside Roblox, in Studio and through Open Cloud Luau Execution) |
+| React Luau | 17.3.13 (`roblox/react`, `roblox/react-roblox`) | HUD |
 
 ### 12.2 Testing
 
 - **TDD:** every behavior starts as a failing test, then the minimal code to pass it, then refactor.
 - **Unit tests** (`tests/**/*.spec.luau`): Rules (every clause in §4–§6), SkateMath (each behavior in §7.2 with exact numbers), ActionRunner and each action's requirements, BallState transitions, Trajectory, Arena Geometry, Config validation, Input mapping, Loader, Signal, HudStore reducers, React components (render + props).
 - **Integration tests** (`tests/integration/`), run in a Roblox server context: generate the arena from config; move a ball part through gates and the ring and assert emitted events; simulate pickups/throws/tackles with test characters and assert possession, laps, goal, save, assist, and score.
-- **Runner:** `test.project.json` places tests and dev packages in the DataModel; a runner script calls Jest-Lua and prints results. During development the suite is executed in the open Studio session through the Roblox Studio MCP connection.
+- **Runner:** `test.project.json` places tests and dev packages in the DataModel; a runner script calls Jest Roblox and prints results. During development the suite is executed in the open Studio session through the Roblox Studio MCP connection.
 - **Manual playtest checklists** on movement/feel issues (Studio multi-client local test + device emulation).
 - **Performance targets (measured in integration tests / MicroProfiler):** server match logic < 1 ms average per Heartbeat with 6 players; client `SkateController` step < 0.5 ms.
 
@@ -480,7 +481,7 @@ M1 is large, so the implementation plan is written and executed **per phase**, e
 5. **Skating:** SkateMath, SkateController, MovementGuard, CharacterService (collider, hover, poses).
 6. **Actions:** ActionRunner, each action, ActionService validation.
 7. **Input + camera:** Config/Input bindings for PC/gamepad/mobile, CameraController, Ball Focus, §8.5 defaults.
-8. **HUD:** React-lua HUD, score tab, end screen, MVP.
+8. **HUD:** React Luau HUD, score tab, end screen, MVP.
 9. **CI test execution + tuning:** Open Cloud Luau Execution job, multi-client playtests, config tuning pass.
 
 ---
@@ -501,4 +502,5 @@ M1 is large, so the implementation plan is written and executed **per phase**, e
 - Luau Execution (Open Cloud): https://create.roblox.com/docs/en-us/cloud/reference/features/luau-execution.md
 - ControllerManager (`UpDirection`; GroundController wall behavior undocumented): https://create.roblox.com/docs/en-us/reference/engine/classes/ControllerManager.md
 - EditableMesh (published-game toggle, 60k vertices / 20k triangles): https://create.roblox.com/docs/en-us/reference/engine/classes/EditableMesh.md
-- Jest-Lua (runs only inside Roblox): https://github.com/jsdotlua/jest-lua
+- Jest Roblox (Roblox's Jest; Wally `roblox/jest`): https://github.com/Roblox/jest-roblox
+- React Luau (Roblox's React; Wally `roblox/react`): https://github.com/Roblox/react-lua
