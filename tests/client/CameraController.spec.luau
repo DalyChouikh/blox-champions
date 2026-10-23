@@ -1,0 +1,236 @@
+--!strict
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
+local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
+local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
+
+local Client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
+local BallCarrier = require(Client.BallCarrier)
+local CameraController = require(Client.CameraController)
+local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local InputController = require(Client.InputController)
+local RideSurfaces = require(Client.RideSurfaces)
+local SkateController = require(Client.SkateController)
+local SkaterBody = require(ServerScriptService.Server.SkaterBody)
+local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
+
+local config = Config.defaults()
+local movement = config.Movement
+local DT = 1 / 60
+
+type FakeCamera = { CFrame: CFrame, FieldOfView: number, CameraType: Enum.CameraType }
+
+local folder: Folder
+local rig: Model
+local camera: FakeCamera
+local mouse: { MouseBehavior: Enum.MouseBehavior }
+local preferred: Enum.PreferredInput
+local menuOpen: boolean
+
+-- A rig with its skater body standing on the floor at `position`, facing `facing`.
+local function skaterAt(name: string, position: Vector3, facing: Vector3): Model
+	local at = position + Vector3.new(0, movement.hoverHeight, 0)
+	local model = Fixtures.rig(folder, name, CFrame.lookAt(at, at + facing))
+	SkaterBody.build(model, movement)
+	return model
+end
+
+local function skater(): any
+	return SkateController.skater
+end
+
+-- Where the camera looks past: the root, `height` up along the camera's up.
+local function focus(): Vector3
+	return Fixtures.root(rig).Position + CameraController.chase.up * config.Camera.height
+end
+
+beforeEach(function()
+	folder = Instance.new("Folder")
+	folder.Name = "CameraControllerTest"
+	folder.Parent = workspace
+	local floor = Instance.new("Part")
+	floor.Anchored = true
+	floor.Size = Vector3.new(400, 1, 400)
+	floor.CFrame = CFrame.new(0, -0.5, 0)
+	floor.Parent = folder
+	floor:AddTag(Tags.RideSurface)
+	camera = { CFrame = CFrame.new(), FieldOfView = 70, CameraType = Enum.CameraType.Custom }
+	mouse = { MouseBehavior = Enum.MouseBehavior.Default }
+	preferred = Enum.PreferredInput.KeyboardAndMouse
+	menuOpen = false
+	InputController:init({
+		Config = config,
+		Parent = folder,
+		LookSettings = function(): (number, number, boolean)
+			return 1, 1, false
+		end,
+	})
+	BallCarrier:init({})
+	RideSurfaces:init({})
+	SkateController:init({
+		Config = config,
+		InputController = InputController,
+		RideSurfaces = RideSurfaces,
+		Camera = { CFrame = CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)) },
+		Skaters = function(): { any }
+			return {}
+		end,
+		SendSkateState = function() end,
+		Gravity = Fixtures.GRAVITY,
+		Team = function(): string?
+			return "Blue"
+		end,
+	})
+	rig = skaterAt("Skater", Vector3.zero, -Vector3.zAxis)
+	SkateController:bind(rig)
+	CameraController:init({
+		Config = config,
+		InputController = InputController,
+		RideSurfaces = RideSurfaces,
+		SkateController = SkateController,
+		BallCarrier = BallCarrier,
+		Camera = camera,
+		Mouse = mouse,
+		PreferredInput = function(): Enum.PreferredInput
+			return preferred
+		end,
+		MenuOpen = function(): boolean
+			return menuOpen
+		end,
+	})
+end)
+
+afterEach(function()
+	InputController:destroy()
+	folder:Destroy()
+end)
+
+describe("CameraController", function()
+	it("takes over the camera: behind and above the skater, level", function()
+		CameraController:step(DT)
+		expect(camera.CameraType).toBe(Enum.CameraType.Scriptable)
+		Fixtures.expectNear(camera.CFrame.Position, Fixtures.root(rig).Position + Vector3.new(0, 4, 12))
+		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1))
+		expect(camera.FieldOfView).toBeCloseTo(70, 3)
+	end)
+
+	it("turns with the look input", function()
+		local look = Fixtures.scriptedBinding(InputController.context, "Look")
+		look:Fire(Vector2.new((math.pi / 2) / DT, 0))
+		CameraController:step(DT)
+		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(1, 0, 0))
+	end)
+
+	it(
+		"locks the mouse to the center with a mouse, and frees it on other devices or while Roblox's menu is open",
+		function()
+			CameraController:step(DT)
+			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.LockCenter)
+			menuOpen = true
+			CameraController:step(DT)
+			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.Default)
+			menuOpen = false
+			preferred = Enum.PreferredInput.Touch
+			CameraController:step(DT)
+			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.Default)
+			preferred = Enum.PreferredInput.KeyboardAndMouse
+			CameraController:step(DT)
+			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.LockCenter)
+		end
+	)
+
+	it("pulls in in front of a wall behind the skater", function()
+		CameraController:step(DT)
+		-- Its near face 5.5 studs behind the focus: the camera stops collisionMargin in front of it.
+		local wall = Instance.new("Part")
+		wall.Anchored = true
+		wall.Size = Vector3.new(40, 40, 1)
+		wall.CFrame = CFrame.new(focus() + Vector3.new(0, 0, 6))
+		wall.Parent = folder
+		wall:AddTag(Tags.RideSurface)
+		RideSurfaces:refresh()
+		CameraController:step(DT)
+		expect((camera.CFrame.Position - focus()).Magnitude).toBeCloseTo(5, 3)
+	end)
+
+	it("rolls with the skater riding a wall", function()
+		CameraController:step(DT)
+		skater().up = Vector3.xAxis
+		CameraController:step(10)
+		Fixtures.expectNear(camera.CFrame.UpVector, Vector3.new(1, 0, 0))
+	end)
+
+	it("swings behind the travel on a gamepad but not with a mouse", function()
+		skater().velocity = Vector3.new(50, 0, 0)
+		preferred = Enum.PreferredInput.Gamepad
+		for _ = 1, 60 do
+			CameraController:step(DT)
+		end
+		expect(camera.CFrame.LookVector:Dot(Vector3.xAxis)).toBeGreaterThan(0.5)
+
+		CameraController:init({
+			Config = config,
+			InputController = InputController,
+			RideSurfaces = RideSurfaces,
+			SkateController = SkateController,
+			BallCarrier = BallCarrier,
+			Camera = camera,
+			Mouse = mouse,
+			PreferredInput = function(): Enum.PreferredInput
+				return Enum.PreferredInput.KeyboardAndMouse
+			end,
+			MenuOpen = function(): boolean
+				return false
+			end,
+		})
+		for _ = 1, 60 do
+			CameraController:step(DT)
+		end
+		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1))
+	end)
+
+	it("faces down the skater's facing during the kickoff freeze", function()
+		local look = Fixtures.scriptedBinding(InputController.context, "Look")
+		look:Fire(Vector2.new((math.pi / 2) / DT, 0))
+		CameraController:step(DT)
+		look:Fire(Vector2.zero)
+		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(1, 0, 0))
+		Fixtures.root(rig).Anchored = true
+		SkateController:step(DT)
+		CameraController:step(DT)
+		Fixtures.expectNear(camera.CFrame.LookVector, skater().forward)
+		expect(camera.CFrame.LookVector:Dot(Vector3.xAxis)).toBeLessThan(0.5)
+	end)
+
+	it("starts behind a new character", function()
+		CameraController:step(DT)
+		local second = skaterAt("Second", Vector3.new(30, 0, 0), Vector3.xAxis)
+		SkateController:bind(second)
+		rig = second
+		CameraController:step(DT)
+		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(1, 0, 0))
+	end)
+
+	it("widens the view with speed", function()
+		CameraController:step(DT)
+		skater().velocity = Vector3.new(0, 0, -140)
+		CameraController:step(10)
+		expect(camera.FieldOfView).toBeCloseTo(90, 3)
+	end)
+
+	it("steps in under 0.1 ms", function()
+		local look = Fixtures.scriptedBinding(InputController.context, "Look")
+		local total = 0
+		for step = 1, 600 do
+			-- The look held for the first half, then still.
+			look:Fire(if step <= 300 then Vector2.new(1, 0) else Vector2.zero)
+			local started = os.clock()
+			CameraController:step(DT)
+			total += os.clock() - started
+		end
+		expect(total / 600).toBeLessThan(0.0001)
+	end)
+end)

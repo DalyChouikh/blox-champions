@@ -45,6 +45,8 @@ export type SkateController = {
 	step: (self: SkateController, dt: number) -> (),
 	-- The bound character's skater; PoseController reads its mode.
 	skater: SkateMath.Skater?,
+	-- The bound character's root; the camera follows it.
+	root: BasePart?,
 	pumping: boolean,
 	braking: boolean,
 	-- The last step's stick as a world direction (length 0..1).
@@ -71,7 +73,6 @@ export type SkateController = {
 	-- workspace:Raycast; a fake in tests, which can then hand the controller a seam's side face.
 	_raycast: (origin: Vector3, direction: Vector3, params: RaycastParams) -> RaycastResult?,
 	_character: Model?,
-	_root: BasePart?,
 	_velocity: LinearVelocity?,
 	_align: AlignOrientation?,
 	_filter: NormalFilter.NormalFilter,
@@ -299,7 +300,7 @@ local SkateController: SkateController = {
 		return nil
 	end,
 	_character = nil,
-	_root = nil,
+	root = nil,
 	_velocity = nil,
 	_align = nil,
 	_filter = nil :: any,
@@ -351,7 +352,7 @@ local SkateController: SkateController = {
 		self._views = {}
 		self.skater = nil
 		self._character = nil
-		self._root = nil
+		self.root = nil
 		self.pumping = false
 		self.braking = false
 		self.move = Vector3.zero
@@ -383,7 +384,7 @@ local SkateController: SkateController = {
 		skater.forward = root.CFrame.LookVector
 		self.skater = skater
 		self._character = character
-		self._root = root
+		self.root = root
 		self._velocity = velocity
 		self._align = align
 		self._filter:reset(worldUp(self))
@@ -397,7 +398,7 @@ local SkateController: SkateController = {
 
 	step = function(self: SkateController, dt: number)
 		local skater = self.skater
-		local root = self._root
+		local root = self.root
 		if skater == nil or root == nil or root.Parent == nil then
 			return
 		end
@@ -436,7 +437,7 @@ local SkateController: SkateController = {
 
 	wallAhead = function(self: SkateController, distance: number): boolean
 		local skater = self.skater
-		local root = self._root
+		local root = self.root
 		if skater == nil or root == nil then
 			return false
 		end
