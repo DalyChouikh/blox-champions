@@ -10,6 +10,7 @@ local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.InputController)
+local RideSurfaces = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.RideSurfaces)
 local SkateController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.SkateController)
 local SkaterBody = require(ServerScriptService.Server.SkaterBody)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
@@ -43,9 +44,11 @@ local function skaterAt(name: string, ground: Vector3): Model
 end
 
 local function setup(overrides: { [string]: any }?)
+	RideSurfaces:init({})
 	local deps: { [string]: any } = {
 		Config = config,
 		InputController = InputController,
+		RideSurfaces = RideSurfaces,
 		Camera = CAMERA,
 		Skaters = function(): { any }
 			return others

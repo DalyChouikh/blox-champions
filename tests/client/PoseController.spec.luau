@@ -11,6 +11,7 @@ local BallCarrier = require(game:GetService("StarterPlayer").StarterPlayerScript
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local PoseController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.PoseController)
+local RideSurfaces = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.RideSurfaces)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
 local config = Config.defaults()
@@ -50,8 +51,10 @@ local function inParentAxes(joint: Motor6D): CFrame
 end
 
 local function setup()
+	RideSurfaces:init({})
 	PoseController:init({
 		Config = config,
+		RideSurfaces = RideSurfaces,
 		SkateController = skate,
 		BallCarrier = BallCarrier,
 		ActionController = actions,

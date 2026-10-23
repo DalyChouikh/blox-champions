@@ -6,17 +6,16 @@
 -- carrier comes from BallCarrier. The joints it writes are local to this client: the server never sees them, and every
 -- client poses its own view.
 
-local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Actions = require(ReplicatedStorage.Shared.Config.Actions)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
+local RideSurfaces = require(script.Parent.RideSurfaces)
 local Pose = require(ReplicatedStorage.Shared.Skate.Pose)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
-local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
@@ -64,15 +63,11 @@ export type PoseController = {
 	_carrier: Carrier,
 	_actions: LocalActions,
 	_tracked: { [Model]: Tracked },
-	_surfaces: RaycastParams,
+	_surfaces: RideSurfaces.RideSurfaces,
 	-- Records reused for every character, one at a time: each is composed and written before the next starts.
 	_input: Pose.PoseInput,
 	_out: Pose.Frame,
 }
-
-local function refreshSurfaces(self: PoseController)
-	self._surfaces.FilterDescendantsInstances = CollectionService:GetTagged(Tags.RideSurface)
-end
 
 -- Standing height is what the avatar's feet stand: half the root plus the hips, and an R6 adds its leg.
 local function standingHeight(character: Model, humanoid: Humanoid, root: BasePart): number
@@ -157,7 +152,7 @@ local function isAirborne(self: PoseController, tracked: Tracked): boolean
 	local movement = self._config.Movement
 	local reach = movement.hoverHeight + self._config.Pose.airborneProbe
 	local down = -tracked.root.CFrame.UpVector * reach
-	return workspace:Raycast(tracked.root.Position, down, self._surfaces) == nil
+	return workspace:Raycast(tracked.root.Position, down, self._surfaces.params) == nil
 end
 
 local function poseOne(self: PoseController, tracked: Tracked, dt: number)
@@ -208,7 +203,7 @@ end
 
 local PoseController: PoseController = {
 	name = "PoseController",
-	dependencies = { "Config", "SkateController", "BallCarrier", "ActionController" },
+	dependencies = { "Config", "RideSurfaces", "SkateController", "BallCarrier", "ActionController" },
 	_config = nil :: any,
 	_skate = nil :: any,
 	_gravity = 0,
@@ -246,18 +241,10 @@ local PoseController: PoseController = {
 			knockedDown = false,
 			bodyOffset = 0,
 		}
-		self._surfaces = RaycastParams.new()
-		self._surfaces.FilterType = Enum.RaycastFilterType.Include
-		refreshSurfaces(self)
+		self._surfaces = deps.RideSurfaces
 	end,
 
 	start = function(self: PoseController)
-		CollectionService:GetInstanceAddedSignal(Tags.RideSurface):Connect(function()
-			refreshSurfaces(self)
-		end)
-		CollectionService:GetInstanceRemovedSignal(Tags.RideSurface):Connect(function()
-			refreshSurfaces(self)
-		end)
 		for _, player in Players:GetPlayers() do
 			listen(self, player)
 		end

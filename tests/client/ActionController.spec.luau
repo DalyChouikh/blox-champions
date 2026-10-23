@@ -13,6 +13,7 @@ local BallCarrier = require(Client.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(Client.InputController)
+local RideSurfaces = require(Client.RideSurfaces)
 local SkateController = require(Client.SkateController)
 local SkaterBody = require(ServerScriptService.Server.SkaterBody)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
@@ -65,9 +66,11 @@ local function setup(surfaces: { BasePart }?)
 	end
 	InputController:init({ Config = config, Parent = folder })
 	BallCarrier:init({})
+	RideSurfaces:init({})
 	SkateController:init({
 		Config = config,
 		InputController = InputController,
+		RideSurfaces = RideSurfaces,
 		Camera = CAMERA,
 		Skaters = function(): { any }
 			return {}
