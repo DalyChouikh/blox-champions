@@ -87,9 +87,8 @@ local function addEntry(self: HudState, kind: FeedKind, team: Team, player: Play
 	end
 end
 
--- The team `player` played for in the latest snapshot's score tab.
-local function teamOf(self: HudState, player: PlayerId): Team?
-	local match = self.match
+-- The team `player` plays for in `match`'s score tab; nil without a match or for a player it doesn't list.
+function HudState.teamOf(match: MatchEngine.Snapshot?, player: PlayerId): Team?
 	if match ~= nil then
 		for _, stats in match.stats.players do
 			if stats.player == player then
@@ -144,7 +143,7 @@ function HudState.applyEvents(self: HudState, events: { Types.Event })
 			showBanner(self, "StreakPoint", event.team, nil)
 			addEntry(self, "StreakPoint", event.team, event.holder, nil)
 		elseif event.name == "SaveMade" then
-			showBanner(self, "Denied", teamOf(self, event.player), nil)
+			showBanner(self, "Denied", HudState.teamOf(self.match, event.player), nil)
 		elseif event.name == "ClockWarning" then
 			showBanner(self, "ClockWarning", nil, event.secondsLeft)
 			local match = self.match

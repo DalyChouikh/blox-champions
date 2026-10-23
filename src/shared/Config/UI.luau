@@ -109,6 +109,10 @@ export type HudSettings = {
 	feedSeconds: number,
 	feedMaxEntries: number,
 	glowThickness: number,
+	-- Pixels between the parts of a panel, and inside its edge.
+	spacing: number,
+	-- A score pip's side and the lap bar's height, in pixels.
+	pipSize: number,
 	layout: HudLayout,
 }
 
@@ -233,6 +237,8 @@ local defaults: UIConfig = {
 		feedSeconds = 6,
 		feedMaxEntries = 5,
 		glowThickness = 3,
+		spacing = 6,
+		pipSize = 10,
 		layout = {
 			scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
 			banner = { position = UDim2.fromScale(0.5, 0.3), size = UDim2.fromOffset(640, 110) },
@@ -403,6 +409,8 @@ local schema = Validate.record({
 		feedSeconds = positive,
 		feedMaxEntries = Validate.number({ min = 1, integer = true }),
 		glowThickness = Validate.number({ min = 0 }),
+		spacing = Validate.number({ min = 0 }),
+		pipSize = positive,
 		layout = Validate.record({
 			scoreboard = place,
 			banner = place,
