@@ -9,7 +9,6 @@
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
 -- humanoid's state machine off here, on the owning client only: the server keeps it on so deaths still fire Died.
 
-local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -22,11 +21,11 @@ local NormalFilter = require(ReplicatedStorage.Shared.Skate.NormalFilter)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local PlayerList = require(ReplicatedStorage.Shared.Util.PlayerList)
 local RateLimiter = require(ReplicatedStorage.Shared.Net.RateLimiter)
+local RideSurfaces = require(script.Parent.RideSurfaces)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
-local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
@@ -77,7 +76,8 @@ export type SkateController = {
 	_align: AlignOrientation?,
 	_filter: NormalFilter.NormalFilter,
 	_attach: Attach.Attach,
-	_rayParams: RaycastParams,
+	-- The ride surfaces every ray goes through.
+	_surfaces: RideSurfaces.RideSurfaces,
 	-- Records reused every step, so a step allocates nothing.
 	_keys: InputController.SkateKeys,
 	_input: SkateTypes.SkateInput,
@@ -94,11 +94,6 @@ local NO_PLAYERS: { Player } = table.freeze({})
 
 local function worldUp(self: SkateController): Vector3
 	return -self._gravity.Unit
-end
-
--- Rays hit only what the arena tags as ride surfaces: never gates, markers, the goal, characters or the ball.
-local function refreshSurfaces(self: SkateController)
-	self._rayParams.FilterDescendantsInstances = CollectionService:GetTagged(Tags.RideSurface)
 end
 
 -- Every other player's character with a root, into one reused list of reused records.
@@ -196,7 +191,7 @@ end
 local function castGround(self: SkateController, root: BasePart, skater: SkateMath.Skater, dt: number)
 	local ground = self._ground
 	local direction = -skater.up * self._config.Movement.groundProbeLength
-	local result = self._raycast(root.Position, direction, self._rayParams)
+	local result = self._raycast(root.Position, direction, self._surfaces.params)
 	if result == nil then
 		ground.hit = false
 		return
@@ -279,7 +274,7 @@ end
 
 local SkateController: SkateController = {
 	name = "SkateController",
-	dependencies = { "Config", "InputController" },
+	dependencies = { "Config", "InputController", "RideSurfaces" },
 	skater = nil,
 	pumping = false,
 	braking = false,
@@ -309,7 +304,7 @@ local SkateController: SkateController = {
 	_align = nil,
 	_filter = nil :: any,
 	_attach = nil :: any,
-	_rayParams = nil :: any,
+	_surfaces = nil :: any,
 	_keys = nil :: any,
 	_input = nil :: any,
 	_ground = nil :: any,
@@ -346,9 +341,7 @@ local SkateController: SkateController = {
 			end
 		self._filter = NormalFilter.new(config.Movement.normalFilter, worldUp(self))
 		self._attach = Attach.new(config.Movement)
-		self._rayParams = RaycastParams.new()
-		self._rayParams.FilterType = Enum.RaycastFilterType.Include
-		refreshSurfaces(self)
+		self._surfaces = deps.RideSurfaces
 		self._keys = InputController.newKeys()
 		self._input =
 			{ move = Vector3.zero, pump = false, brake = false, jump = false, draftAccel = 0, knockedDown = false }
@@ -368,12 +361,6 @@ local SkateController: SkateController = {
 
 	start = function(self: SkateController)
 		self._playerList = PlayerList.new(Players)
-		CollectionService:GetInstanceAddedSignal(Tags.RideSurface):Connect(function()
-			refreshSurfaces(self)
-		end)
-		CollectionService:GetInstanceRemovedSignal(Tags.RideSurface):Connect(function()
-			refreshSurfaces(self)
-		end)
 		local player = Players.LocalPlayer :: Player
 		player.CharacterAdded:Connect(function(character: Model)
 			self:bind(character)
@@ -453,7 +440,7 @@ local SkateController: SkateController = {
 		if skater == nil or root == nil then
 			return false
 		end
-		local result = self._raycast(root.Position, skater.forward * distance, self._rayParams)
+		local result = self._raycast(root.Position, skater.forward * distance, self._surfaces.params)
 		return result ~= nil and skater:isSteep(result.Normal)
 	end,
 }
