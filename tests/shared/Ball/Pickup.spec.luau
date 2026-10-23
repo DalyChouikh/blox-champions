@@ -10,6 +10,21 @@ local function always(_player: string): boolean
 	return true
 end
 
+describe("Pickup candidate lists", function()
+	it("refills a reused list in place, keeping its records", function()
+		local list: { Pickup.Candidate } = {}
+		Pickup.setCandidate(list, 1, "A", Vector3.zero)
+		Pickup.setCandidate(list, 2, "B", Vector3.xAxis)
+		local first = list[1]
+		Pickup.setCandidate(list, 1, "C", Vector3.yAxis)
+		Pickup.trimCandidates(list, 1)
+		expect(#list).toBe(1)
+		expect(list[1] == first).toBe(true)
+		expect(list[1].player).toBe("C")
+		expect(list[1].position).toEqual(Vector3.yAxis)
+	end)
+end)
+
 describe("Pickup.choose", function()
 	it("picks the nearest candidate within reach, counting the edge of the reach as in", function()
 		local candidates: { Pickup.Candidate } = {

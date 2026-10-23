@@ -1,0 +1,381 @@
+--!strict
+-- The server's side of actions (spec §3.3, §8.1, §13). Every request a client sends is checked again in that player's
+-- own ActionRunner and applied here, or refused with ActionRejected. Throws and passes go through BallService. Strikes
+-- are judged each frame against the server's positions and knock down the nearest opponent they reach. Knockdowns, the
+-- running action and calls for a pass show as character attributes every client reads. MatchService steps it first in
+-- each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the sum of the frames it is stepped,
+-- so a request between frames counts as the last frame's.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local ActionRunner = require(ReplicatedStorage.Shared.Actions.ActionRunner)
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
+local BallService = require(script.Parent.BallService)
+local CharacterService = require(script.Parent.CharacterService)
+local Config = require(ReplicatedStorage.Shared.Config)
+local NetService = require(script.Parent.NetService)
+local PassTarget = require(ReplicatedStorage.Shared.Actions.PassTarget)
+local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
+local Reach = require(ReplicatedStorage.Shared.Actions.Reach)
+local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
+local Team = require(ReplicatedStorage.Shared.Rules.Team)
+local TeamService = require(script.Parent.TeamService)
+local Throw = require(ReplicatedStorage.Shared.Actions.Throw)
+local Types = require(ReplicatedStorage.Shared.Rules.Types)
+
+type PlayerId = Types.PlayerId
+type Holder = BallService.Holder
+
+export type Knockdown = { attacker: PlayerId, victim: PlayerId }
+
+-- One player's actions, made on first use and kept until the player is forgotten.
+type Record = {
+	runner: ActionRunner.Runner,
+	-- The running strike already knocked someone down: each use strikes once.
+	struck: boolean,
+	-- Seconds left knocked down; 0 when on their feet.
+	knockdownLeft: number,
+	-- The action the character's Action attribute shows.
+	shown: Config.ActionName?,
+}
+
+-- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
+export type ActionService = {
+	name: string,
+	dependencies: { string },
+	init: (self: ActionService, deps: { [string]: any }) -> (),
+	start: ((self: ActionService) -> ())?,
+	-- What a validated ActionRequest runs (tests call it directly).
+	request: (self: ActionService, player: PlayerId, payload: any) -> (),
+	-- One frame: phases, strikes, knockdowns and calls. Returns this frame's knockdowns in a list it reuses.
+	step: (self: ActionService, dt: number) -> { Knockdown },
+	-- The kickoff: no action, knockdown or call left, on the server or on any character.
+	reset: (self: ActionService) -> (),
+	forget: (self: ActionService, player: PlayerId) -> (),
+	-- In a dodge's active phase: no strike reaches them.
+	isImmune: (self: ActionService, player: PlayerId) -> boolean,
+	_config: Config.GameConfig,
+	_net: NetService.NetService,
+	_ball: BallService.BallService,
+	_teams: TeamService.TeamService,
+	_characters: CharacterService.CharacterService,
+	_now: number,
+	_records: { [PlayerId]: Record },
+	-- Players with a record, in the order they got it, so a frame's strikes resolve the same way every time.
+	_order: { PlayerId },
+	-- This frame's holders, in CharacterService's order and by player.
+	_holderList: { Holder },
+	_holderOf: { [PlayerId]: Holder },
+	-- When each player last called for a pass.
+	_calls: { [PlayerId]: number },
+	_candidates: { Reach.Candidate },
+	_context: ActionRunner.Context,
+	_knockdowns: { Knockdown },
+	-- Every Knockdown record ever made, reused frame after frame.
+	_knockdownPool: { Knockdown },
+}
+
+-- What a started action does on the server, by its effect.
+type Effect = (self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig) -> ()
+
+-- Reads this frame's seated, living characters; every lookup of a player's root goes through it.
+local function refreshHolders(self: ActionService)
+	local list = self._characters:holders()
+	local byPlayer = self._holderOf
+	table.clear(byPlayer)
+	for _, holder in list do
+		byPlayer[holder.player] = holder
+	end
+	self._holderList = list
+end
+
+local function setAttribute(self: ActionService, player: PlayerId, name: string, value: any)
+	local holder = self._holderOf[player]
+	local character = if holder ~= nil then holder.root.Parent else nil
+	if character ~= nil then
+		character:SetAttribute(name, value)
+	end
+end
+
+local function recordOf(self: ActionService, player: PlayerId): Record
+	local record = self._records[player]
+	if record == nil then
+		record = { runner = ActionRunner.new(self._config.Actions), struck = false, knockdownLeft = 0, shown = nil }
+		self._records[player] = record
+		table.insert(self._order, player)
+	end
+	return record
+end
+
+-- Keeps the character's Action attribute on the running action, writing it only when it changes.
+local function show(self: ActionService, player: PlayerId, record: Record)
+	local action: Config.ActionName? = record.runner.action
+	if action ~= record.shown then
+		record.shown = action
+		setAttribute(self, player, Attributes.Action, action)
+	end
+end
+
+local function reject(self: ActionService, player: PlayerId, action: Config.ActionName)
+	self._net:fireTo(player, Remotes.names.ActionRejected, { action = action })
+end
+
+local function knockedDown(self: ActionService, player: PlayerId): boolean
+	local record = self._records[player]
+	return record ~= nil and record.knockdownLeft > 0
+end
+
+-- A teammate who can catch a pass, or an opponent a strike can reach: on their feet and not dodging.
+local function reachable(self: ActionService, other: Holder, team: Team.Team?, teammates: boolean): boolean
+	local otherTeam: Team.Team? = self._teams:teamOf(other.player)
+	if teammates then
+		return otherTeam == team and other.canCatch
+	end
+	if otherTeam == nil or otherTeam == team then
+		return false
+	end
+	return not knockedDown(self, other.player) and not self:isImmune(other.player)
+end
+
+-- Fills the reused candidate list with the other holders a player's action can reach (`reachable`).
+local function candidates(self: ActionService, player: PlayerId, teammates: boolean): { Reach.Candidate }
+	local list = self._candidates
+	local team: Team.Team? = self._teams:teamOf(player)
+	local count = 0
+	for _, holder in self._holderList do
+		if holder.player ~= player and reachable(self, holder, team, teammates) then
+			count += 1
+			Pickup.setCandidate(list, count, holder.player, holder.root.Position)
+		end
+	end
+	Pickup.trimCandidates(list, count)
+	return list
+end
+
+local function addKnockdown(self: ActionService, attacker: PlayerId, victim: PlayerId)
+	local list = self._knockdowns
+	local index = #list + 1
+	local knockdown = self._knockdownPool[index]
+	if knockdown == nil then
+		knockdown = { attacker = attacker, victim = victim }
+		self._knockdownPool[index] = knockdown
+	else
+		knockdown.attacker = attacker
+		knockdown.victim = victim
+	end
+	list[index] = knockdown
+end
+
+-- Down for `seconds`: their action stops without a refund, and a carried ball drops with their momentum.
+local function knockDown(self: ActionService, attacker: PlayerId, victim: PlayerId, seconds: number)
+	local record = recordOf(self, victim)
+	record.knockdownLeft = seconds
+	local running: Config.ActionName? = record.runner.action
+	if running ~= nil then
+		record.runner:cancel(running, false)
+	end
+	show(self, victim, record)
+	setAttribute(self, victim, Attributes.KnockedDown, true)
+	local holder = self._holderOf[victim]
+	if holder ~= nil and self._ball.state.carrier == victim then
+		self._ball:drop(holder.root.AssemblyLinearVelocity)
+	end
+	addKnockdown(self, attacker, victim)
+end
+
+-- A strike in its active phase that has not landed yet knocks down the nearest opponent it reaches.
+local function strike(self: ActionService, attacker: PlayerId, record: Record)
+	local action: Config.ActionName? = record.runner.action
+	local holder = self._holderOf[attacker]
+	if action == nil or record.struck or record.runner.phase ~= "Active" or holder == nil then
+		return
+	end
+	local config = self._config.Actions[action]
+	local hit = config.hit
+	if config.effect ~= "Knockdown" or hit == nil then
+		return
+	end
+	local frame = holder.root.CFrame
+	local extra = self._config.Network.hitLagToleranceStuds
+	local victim =
+		Reach.nearest(frame.Position, frame.LookVector, frame.UpVector, hit, extra, candidates(self, attacker, false))
+	if victim ~= nil then
+		record.struck = true
+		knockDown(self, attacker, victim, hit.knockdownSeconds)
+	end
+end
+
+local function noEffect() end
+
+local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Pass: Effect, CallPass: Effect } = {
+	-- Strikes land in `step`, during their active phase.
+	Knockdown = noEffect,
+	-- A dodge only makes its player immune (isImmune).
+	Dodge = noEffect,
+	Throw = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
+		local throw = action.throw :: Config.ThrowSettings
+		self._ball:throw(player, Throw.charged(throw, payload.aim, payload.charge, holder.root.AssemblyLinearVelocity))
+	end,
+	Pass = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
+		local pass = action.pass :: Config.PassSettings
+		local window = self._config.Actions.callPassWindow
+		local teammates = candidates(self, player, true)
+		local target =
+			PassTarget.choose(pass, window, holder.root.Position, payload.aim, teammates, self._calls, self._now)
+		local targetHolder = if target ~= nil then self._holderOf[target] else nil
+		local targetAt = if targetHolder ~= nil then targetHolder.root.Position else nil
+		self._ball:pass(player, Throw.pass(pass, self._ball.part.Position, payload.aim, targetAt), target)
+	end,
+	CallPass = function(self: ActionService, player: PlayerId)
+		self._calls[player] = self._now
+		setAttribute(self, player, Attributes.CallingPass, true)
+	end,
+}
+
+local ActionService: ActionService = {
+	name = "ActionService",
+	dependencies = { "Config", "NetService", "BallService", "TeamService", "CharacterService" },
+	_config = nil :: any,
+	_net = nil :: any,
+	_ball = nil :: any,
+	_teams = nil :: any,
+	_characters = nil :: any,
+	_now = 0,
+	_records = {},
+	_order = {},
+	_holderList = {},
+	_holderOf = {},
+	_calls = {},
+	_candidates = {},
+	_context = { hasBall = false, airborne = false, knockedDown = false },
+	_knockdowns = {},
+	_knockdownPool = {},
+
+	init = function(self: ActionService, deps: { [string]: any })
+		local config: Config.GameConfig = deps.Config
+		self._config = config
+		self._net = deps.NetService
+		self._ball = deps.BallService
+		self._teams = deps.TeamService
+		self._characters = deps.CharacterService
+		self._now = 0
+		self._records = {}
+		self._order = {}
+		self._holderList = {}
+		self._holderOf = {}
+		self._calls = {}
+		self._candidates = {}
+		-- The server never judges `airborne`: it cannot see the client's ground ray.
+		self._context = { hasBall = false, airborne = false, knockedDown = false }
+		self._knockdowns = {}
+		self._knockdownPool = {}
+		self._net:listen(
+			Remotes.names.ActionRequest,
+			Schemas.ActionRequest,
+			config.Network.maxActionsPerSecond,
+			function(player: PlayerId, payload: any)
+				self:request(player, payload)
+			end
+		)
+		self._characters.characterRemoved:Connect(function(player: PlayerId)
+			self:forget(player)
+		end)
+		self._teams.unseated:Connect(function(player: PlayerId)
+			self:forget(player)
+		end)
+	end,
+
+	-- Refused when the player has no seated, living character, is frozen, or their runner says no; a cooldown may end
+	-- up to Network.actionCooldownTolerance late, for lag.
+	request = function(self: ActionService, player: PlayerId, payload: any)
+		local name: Config.ActionName = payload.action
+		refreshHolders(self)
+		local holder = self._holderOf[player]
+		if holder == nil or holder.root.Anchored then
+			reject(self, player, name)
+			return
+		end
+		local record = recordOf(self, player)
+		local context = self._context
+		context.hasBall = self._ball.state.carrier == player
+		context.knockedDown = knockedDown(self, player)
+		if record.runner:start(name, context, self._config.Network.actionCooldownTolerance) ~= "Started" then
+			reject(self, player, name)
+			return
+		end
+		record.struck = false
+		local action = self._config.Actions[name]
+		effects[action.effect](self, player, holder, payload, action)
+		show(self, player, record)
+	end,
+
+	step = function(self: ActionService, dt: number): { Knockdown }
+		self._now += dt
+		table.clear(self._knockdowns)
+		refreshHolders(self)
+		local window = self._config.Actions.callPassWindow
+		for player, at in self._calls do
+			if self._now - at > window then
+				self._calls[player] = nil
+				setAttribute(self, player, Attributes.CallingPass, nil)
+			end
+		end
+		for _, player in self._order do
+			local record = self._records[player]
+			record.runner:step(dt)
+			if record.knockdownLeft > 0 then
+				record.knockdownLeft -= dt
+				if record.knockdownLeft <= 0 then
+					record.knockdownLeft = 0
+					setAttribute(self, player, Attributes.KnockedDown, nil)
+				end
+			end
+			show(self, player, record)
+		end
+		for _, player in self._order do
+			strike(self, player, self._records[player])
+		end
+		return self._knockdowns
+	end,
+
+	reset = function(self: ActionService)
+		refreshHolders(self)
+		for _, player in self._order do
+			local record = self._records[player]
+			record.runner:reset()
+			record.struck = false
+			record.knockdownLeft = 0
+			record.shown = nil
+		end
+		for _, holder in self._holderList do
+			local character = holder.root.Parent
+			if character ~= nil then
+				character:SetAttribute(Attributes.Action, nil)
+				character:SetAttribute(Attributes.KnockedDown, nil)
+				character:SetAttribute(Attributes.CallingPass, nil)
+			end
+		end
+		table.clear(self._calls)
+	end,
+
+	forget = function(self: ActionService, player: PlayerId)
+		self._records[player] = nil
+		self._calls[player] = nil
+		local index = table.find(self._order, player)
+		if index ~= nil then
+			table.remove(self._order, index)
+		end
+	end,
+
+	isImmune = function(self: ActionService, player: PlayerId): boolean
+		local record = self._records[player]
+		if record == nil then
+			return false
+		end
+		local action: Config.ActionName? = record.runner.action
+		return action ~= nil and record.runner.phase == "Active" and self._config.Actions[action].effect == "Dodge"
+	end,
+}
+
+return ActionService

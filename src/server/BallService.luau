@@ -227,17 +227,9 @@ local function candidatesFrom(self: BallService, holders: { Holder }): { Pickup.
 	table.clear(catchers)
 	for index, holder in holders do
 		catchers[holder.player] = holder.canCatch
-		local candidate = candidates[index]
-		if candidate == nil then
-			candidates[index] = { player = holder.player, position = holder.root.Position }
-		else
-			candidate.player = holder.player
-			candidate.position = holder.root.Position
-		end
+		Pickup.setCandidate(candidates, index, holder.player, holder.root.Position)
 	end
-	for index = #candidates, #holders + 1, -1 do
-		candidates[index] = nil
-	end
+	Pickup.trimCandidates(candidates, #holders)
 	return candidates
 end
 

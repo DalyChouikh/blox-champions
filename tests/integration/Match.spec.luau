@@ -6,6 +6,7 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 local beforeAll, afterAll, afterEach = JestGlobals.beforeAll, JestGlobals.afterAll, JestGlobals.afterEach
 
+local ActionService = require(ServerScriptService.Server.ActionService)
 local ArenaService = require(ServerScriptService.Server.ArenaService)
 local BallService = require(ServerScriptService.Server.BallService)
 local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
@@ -75,6 +76,13 @@ local function setup(match: { [string]: any }?)
 		TeamService = TeamService,
 		NetService = fakeNet,
 	})
+	ActionService:init({
+		Config = config,
+		NetService = fakeNet,
+		BallService = BallService,
+		TeamService = TeamService,
+		CharacterService = CharacterService,
+	})
 	MatchService:init({
 		Config = config,
 		ArenaService = ArenaService,
@@ -82,6 +90,7 @@ local function setup(match: { [string]: any }?)
 		BallService = BallService,
 		TeamService = TeamService,
 		CharacterService = CharacterService,
+		ActionService = ActionService,
 	})
 end
 
@@ -190,15 +199,23 @@ local function throughRing(goal: CFrame)
 	MatchService:step(FRAME)
 end
 
--- Opens the goal, carries the ball back to just before the goal gate (crossing gates backwards counts nothing),
--- throws it and sends it through the ring.
-local function scoreOnce(): Model
-	local rig, at = openGoal()
+-- Opens the goal with `count` players seated (1 by default), carries the ball back to just before the goal gate
+-- (crossing gates backwards counts nothing), throws it and sends it through the ring. Returns the scorer's rig and
+-- every rig.
+local function scoreOnce(count: number?): (Model, { Model })
+	local rig, at, rigs = openGoal(count)
 	carry(rig, at, Centerline.gateDistance(config.Arena, config.Arena.goalGateIndex) - 3)
 	local goal = tagged().layout.goal.frame
 	BallService:throw("1", goal.LookVector * 60)
 	throughRing(goal)
-	return rig
+	return rig, rigs
+end
+
+-- Stands player 2 four studs in front of player 1, both facing -Z, at an arbitrary spot on the track.
+local function faceOff(rigs: { Model })
+	local at = Centerline.at(config.Arena, Centerline.gateDistance(config.Arena, 1) + 10, 22, 3).Position
+	rigs[1]:PivotTo(CFrame.new(at))
+	rigs[2]:PivotTo(CFrame.new(at - Vector3.zAxis * 4))
 end
 
 describe("A match on the generated arena", function()
@@ -266,6 +283,45 @@ describe("A match on the generated arena", function()
 		expect(saves).toEqual({ { player = "2", kind = "Block" } })
 		-- The save came from the touch: a knocked-down defender never takes the ball (a catch would also block).
 		expect(BallService.state.carrier).never.toBe("2")
+	end)
+
+	it("reports a tackle's knockdown to the rules", function()
+		setup()
+		local rigs = seat(2)
+		kickoff()
+		faceOff(rigs)
+		ActionService:request("1", { action = "Tackle" })
+		frames(0.2)
+		local knockdowns: { { attacker: string, victim: string } } = {}
+		for _, batch in firedNamed(Remotes.names.RuleEvents) do
+			for _, event in batch.payload do
+				if event.name == "TackleKnockdown" then
+					table.insert(knockdowns, { attacker = event.attacker, victim = event.victim })
+				end
+			end
+		end
+		expect(knockdowns).toEqual({ { attacker = "1", victim = "2" } })
+	end)
+
+	it("clears actions and knockdowns at the next kickoff", function()
+		setup()
+		local _, rigs = scoreOnce(2)
+		-- A knockdown half a second before the celebration ends would outlast it by a second.
+		frames(config.Match.celebrationSeconds - 0.5)
+		faceOff(rigs)
+		ActionService:request("1", { action = "Tackle" })
+		frames(0.1)
+		expect(rigs[2]:GetAttribute(Attributes.KnockedDown)).toBe(true)
+		expect(rigs[1]:GetAttribute(Attributes.Action)).toBe("Tackle")
+		for _ = 1, 60 do
+			if #eventsNamed("KickoffStarted") == 2 then
+				break
+			end
+			MatchService:step(FRAME)
+		end
+		expect(#eventsNamed("KickoffStarted")).toBe(2)
+		expect(rigs[2]:GetAttribute(Attributes.KnockedDown)).toBeNil()
+		expect(rigs[1]:GetAttribute(Attributes.Action)).toBeNil()
 	end)
 
 	it("drops the ball where a leaving carrier was, and the team keeps possession", function()
