@@ -1,16 +1,21 @@
 --!strict
 -- The whole HUD as one React element: a full-screen frame, "Root", that holds every part of the HUD. The scoreboard
--- shows from the first snapshot on; the hints wherever the Hud gives their keys. A plain function of its props.
+-- shows from the first snapshot on; the hints wherever the Hud gives their keys; the score tab while it is open, except
+-- once the match is over, when the end screen (which holds its own) shows until the next match; the score button on
+-- touch. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Banner = require(script.Parent.Banner)
 local Config = require(ReplicatedStorage.Shared.Config)
 local ControlHints = require(script.Parent.ControlHints)
+local EndScreen = require(script.Parent.EndScreen)
 local Feed = require(script.Parent.Feed)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local React = require(ReplicatedStorage.Packages.React)
+local ScoreButton = require(script.Parent.ScoreButton)
+local ScoreTab = require(script.Parent.ScoreTab)
 local Scoreboard = require(script.Parent.Scoreboard)
 local Speedometer = require(script.Parent.Speedometer)
 local Style = require(script.Parent.Style)
@@ -36,12 +41,15 @@ export type AppProps = {
 	hasSkater: boolean,
 	-- Each hint's key on this device; nil where no hints show.
 	keys: ControlHints.HintKeys?,
+	-- Its key held, or its touch button toggled on.
+	scoreTabOpen: boolean,
+	onScoreButton: () -> (),
 	bindings: HudBindings,
 }
 
 local function App(props: AppProps): React.ReactElement
 	local config, text, state, bindings = props.config, props.text, props.state, props.bindings
-	local match, keys = state.match, props.keys
+	local match, keys, ended = state.match, props.keys, state.ended
 	return React.createElement(React.Fragment, nil, {
 		Root = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1) }), {
 			Scoreboard = if match ~= nil
@@ -65,6 +73,29 @@ local function App(props: AppProps): React.ReactElement
 				device = props.device,
 				visible = props.hasSkater,
 			}),
+			ScoreTab = if props.scoreTabOpen
+					and match ~= nil
+					and ended == nil
+				then React.createElement(ScoreTab, {
+					config = config,
+					text = text,
+					stats = match.stats,
+					names = state.names,
+					localId = props.localId,
+				})
+				else nil,
+			EndScreen = if ended ~= nil
+				then React.createElement(EndScreen, {
+					config = config,
+					text = text,
+					ended = ended,
+					names = state.names,
+					localId = props.localId,
+				})
+				else nil,
+			ScoreButton = if props.device == Enum.PreferredInput.Touch
+				then React.createElement(ScoreButton, { config = config, onActivated = props.onScoreButton })
+				else nil,
 		}),
 	})
 end

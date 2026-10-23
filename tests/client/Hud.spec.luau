@@ -65,6 +65,7 @@ beforeEach(function()
 	Hud:init({
 		Config = config,
 		HudStore = HudStore,
+		InputController = InputController,
 		SkateController = SkateController,
 		ActionController = ActionController,
 		BallCarrier = BallCarrier,
@@ -184,6 +185,51 @@ describe("Hud", function()
 		Hud:step(0)
 		expect(speedometer.Visible).toBe(true)
 		expect(speedometer.Text).toBe("120 km/h")
+	end)
+
+	it("opens the score tab while its key is held, and toggles it with the touch button", function()
+		local held = Fixtures.scriptedBinding(InputController.context, "ScoreTab")
+		Hud:step(0)
+		expect(part("ScoreTab")).toBeNil()
+		expect(part("ScoreButton")).toBeNil()
+		held:Fire(true)
+		Hud:step(0)
+		expect(part("ScoreTab") ~= nil).toBe(true)
+		held:Fire(false)
+		Hud:step(0)
+		expect(part("ScoreTab")).toBeNil()
+
+		-- On touch a button toggles it (the button's Activated calls toggleScoreTab; a test cannot fire it).
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		expect((part("ScoreButton") :: TextButton).Selectable).toBe(false)
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect(part("ScoreTab") ~= nil).toBe(true)
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect(part("ScoreTab")).toBeNil()
+		-- A toggle left on closes once the device stops being touch.
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		preferred = Enum.PreferredInput.KeyboardAndMouse
+		Hud:step(0)
+		expect(part("ScoreTab")).toBeNil()
+		expect(part("ScoreButton")).toBeNil()
+	end)
+
+	it("shows the end screen once the match ends, until the next starts", function()
+		local stats = (HudStore.state.match :: any).stats
+		HudStore:onEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } })
+		Hud:step(0)
+		expect(part("EndScreen") ~= nil).toBe(true)
+		-- Its own score tab stands in for the held one.
+		Fixtures.scriptedBinding(InputController.context, "ScoreTab"):Fire(true)
+		Hud:step(0)
+		expect(part("ScoreTab")).toBeNil()
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
+		Hud:step(0)
+		expect(part("EndScreen")).toBeNil()
 	end)
 
 	it("steps in under 0.1 ms", function()

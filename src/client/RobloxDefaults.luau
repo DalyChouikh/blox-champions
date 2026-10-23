@@ -1,11 +1,14 @@
 --!strict
--- Switches off what Roblox gives every game by default and ours replaces (spec §8.5): the player list (Tab opens our
--- score tab), Roblox's touch controls (ours draw their own stick and buttons), and its character and camera input
--- contexts (our skating, actions and camera own those keys, and Roblox's abilities would still fire on the keys we
--- don't sink). Roblox's shift lock is off in the place itself (the project files set
--- StarterPlayer.EnableMouseLockOption). The player list and the touch controls go off at once. Roblox adds its
--- PlayerModule, which holds the input contexts, to StarterPlayer once the client runs, so the contexts go off in a
--- thread of their own once they appear; a context never found is reported by name.
+-- Switches off what Roblox gives every game by default and ours replaces (spec §8.5):
+-- - the player list (Tab opens our score tab);
+-- - a gamepad's Select (or Backslash) jumping into gui navigation (Select also opens the score tab);
+-- - Roblox's touch controls (ours draw their own stick and buttons);
+-- - its character and camera input contexts (our skating, actions and camera own those keys, and Roblox's abilities
+--   would still fire on the keys we don't sink).
+-- Roblox's shift lock is off in the place itself (the project files set StarterPlayer.EnableMouseLockOption). The
+-- player list, the gui navigation and the touch controls go off at once. Roblox adds its PlayerModule, which holds the
+-- input contexts, to StarterPlayer once the client runs, so the contexts go off in a thread of their own once they
+-- appear; a context never found is reported by name.
 
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -64,6 +67,7 @@ local RobloxDefaults: RobloxDefaults = {
 	start = function(self: RobloxDefaults)
 		self._starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
 		self._guiService.TouchControlsEnabled = false
+		self._guiService.AutoSelectGuiEnabled = false
 		task.spawn(function()
 			local contexts = self._findContexts()
 			for _, name in CONTEXTS do

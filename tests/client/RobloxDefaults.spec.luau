@@ -12,7 +12,7 @@ local folder: Folder
 -- What the module logged, and what it asked of the fake StarterGui and GuiService.
 local lines: { string } = {}
 local calls: { { coreGui: Enum.CoreGuiType, enabled: boolean } } = {}
-local guiService: { TouchControlsEnabled: boolean }
+local guiService: { TouchControlsEnabled: boolean, AutoSelectGuiEnabled: boolean }
 local starterGui = {
 	SetCoreGuiEnabled = function(_self: any, coreGui: Enum.CoreGuiType, enabled: boolean)
 		table.insert(calls, { coreGui = coreGui, enabled = enabled })
@@ -43,7 +43,7 @@ end
 beforeEach(function()
 	table.clear(lines)
 	table.clear(calls)
-	guiService = { TouchControlsEnabled = true }
+	guiService = { TouchControlsEnabled = true, AutoSelectGuiEnabled = true }
 	folder = Instance.new("Folder")
 	folder.Name = "RobloxDefaultsTest"
 	folder.Parent = workspace
@@ -54,24 +54,29 @@ afterEach(function()
 end)
 
 describe("RobloxDefaults", function()
-	it("turns off the player list and Roblox's touch controls at once, its input once it appears", function()
-		local character, camera = newContext("CharacterContext"), newContext("CameraContext")
-		local appear = Instance.new("BindableEvent")
-		start(function(): Instance?
-			appear.Event:Wait()
-			return folder
-		end)
-		expect(calls).toEqual({ { coreGui = Enum.CoreGuiType.PlayerList, enabled = false } })
-		expect(guiService.TouchControlsEnabled).toBe(false)
-		expect(character.Enabled).toBe(true)
+	it(
+		"turns off the player list, Roblox's touch controls and Select's jump into menus at once, its input later",
+		function()
+			local character, camera = newContext("CharacterContext"), newContext("CameraContext")
+			local appear = Instance.new("BindableEvent")
+			start(function(): Instance?
+				appear.Event:Wait()
+				return folder
+			end)
+			expect(calls).toEqual({ { coreGui = Enum.CoreGuiType.PlayerList, enabled = false } })
+			expect(guiService.TouchControlsEnabled).toBe(false)
+			-- Select opens the score tab, not Roblox's gui navigation.
+			expect(guiService.AutoSelectGuiEnabled).toBe(false)
+			expect(character.Enabled).toBe(true)
 
-		appear:Fire()
-		task.wait() -- the waiting thread resumes
-		expect(character.Enabled).toBe(false)
-		expect(camera.Enabled).toBe(false)
-		expect(lines).toEqual({})
-		appear:Destroy()
-	end)
+			appear:Fire()
+			task.wait() -- the waiting thread resumes
+			expect(character.Enabled).toBe(false)
+			expect(camera.Enabled).toBe(false)
+			expect(lines).toEqual({})
+			appear:Destroy()
+		end
+	)
 
 	it("still turns off the rest when Roblox's input contexts never appear, and says which", function()
 		start(function(): Instance?

@@ -110,6 +110,24 @@ describe("InputController", function()
 		expect(actions.throw).toBe(false)
 	end)
 
+	it("reads the score tab held on Tab or Select", function()
+		local context = InputController.context
+		local action = context:FindFirstChild("ScoreTab") :: InputAction
+		expect(action.Type).toBe(Enum.InputActionType.Bool)
+		local keys: { string } = {}
+		for _, binding in action:GetChildren() do
+			table.insert(keys, (binding :: InputBinding).KeyCode.Name)
+		end
+		table.sort(keys)
+		expect(keys).toEqual({ "ButtonSelect", "Tab" })
+		local held = Fixtures.scriptedBinding(context, "ScoreTab")
+		expect(InputController:scoreTabHeld()).toBe(false)
+		held:Fire(true)
+		expect(InputController:scoreTabHeld()).toBe(true)
+		held:Fire(false)
+		expect(InputController:scoreTabHeld()).toBe(false)
+	end)
+
 	it("keeps the skating keys and the action keys apart", function()
 		local context = InputController.context
 		local jump = Fixtures.scriptedBinding(context, "Jump")

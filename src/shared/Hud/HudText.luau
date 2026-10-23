@@ -87,6 +87,11 @@ function HudText.team(self: HudText, team: Team.Team): string
 	return self._config.UI.teamNames[team]
 end
 
+-- The end screen's headline: the winning team.
+function HudText.wins(self: HudText, team: Team.Team): string
+	return string.format(self._config.UI.text.wins, self:team(team))
+end
+
 function HudText.feed(self: HudText, entry: HudState.FeedEntry, names: { [PlayerId]: string }): string
 	local text = self._config.UI.text
 	local kind = entry.kind

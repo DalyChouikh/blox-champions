@@ -383,7 +383,12 @@ describe("Config defaults", function()
 					size = UDim2.fromOffset(160, 40),
 				},
 				reticle = { size = 6 },
-				scoreTab = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(640, 360), rowHeight = 28 },
+				scoreTab = {
+					position = UDim2.fromScale(0.5, 0.5),
+					size = UDim2.fromOffset(640, 360),
+					rowHeight = 28,
+					columnWidth = 80,
+				},
 				scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
 				endScreen = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(720, 520) },
 			},
@@ -749,6 +754,10 @@ describe("Config.forMode", function()
 			},
 			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
 			{ overrides = { UI = { hud = { pipSize = 0 } } }, message = "UI.hud.pipSize: must be > 0" },
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { columnWidth = 0 } } } } },
+				message = "UI.hud.layout.scoreTab.columnWidth: must be > 0",
+			},
 			{ overrides = { UI = { hud = { spacing = -1 } } }, message = "UI.hud.spacing: must be >= 0" },
 			{ overrides = { UI = { keyNames = { Banana = "B" } } }, message = "UI.keyNames: Banana must name a key" },
 		}
