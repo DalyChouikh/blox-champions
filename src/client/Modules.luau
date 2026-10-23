@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Loader = require(ReplicatedStorage.Shared.Util.Loader)
 
 local modules: { Loader.LoadableModule } = {
+	require(script.Parent.RobloxDefaults),
 	require(script.Parent.InputController),
 	require(script.Parent.RideSurfaces),
 	require(script.Parent.BallCarrier),

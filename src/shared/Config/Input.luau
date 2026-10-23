@@ -41,6 +41,8 @@ export type TouchLayout = {
 export type InputConfig = {
 	-- Above Roblox's own character controls (priority 150), whose defaults on our keys this context sinks.
 	contextPriority: number,
+	-- How long the client waits for Roblox's own input contexts (its PlayerModule's) to switch them off.
+	robloxContextsWaitSeconds: number,
 	move: { composites: { Composite }, sticks: { Enum.KeyCode } },
 	jump: { Enum.KeyCode },
 	pump: { Enum.KeyCode },
@@ -70,6 +72,7 @@ export type InputConfig = {
 
 local defaults: InputConfig = {
 	contextPriority = 1000,
+	robloxContextsWaitSeconds = 10,
 	move = {
 		composites = { { up = Enum.KeyCode.W, down = Enum.KeyCode.S, left = Enum.KeyCode.A, right = Enum.KeyCode.D } },
 		sticks = { Enum.KeyCode.Thumbstick1 },
@@ -137,6 +140,7 @@ local actionList = Validate.check(
 
 local fields = Validate.record({
 	contextPriority = Validate.number({ min = 0, integer = true }),
+	robloxContextsWaitSeconds = Validate.number({ above = 0 }),
 	move = Validate.record({
 		composites = Validate.list(Validate.record({ up = key, down = key, left = key, right = key })),
 		sticks = keys,
