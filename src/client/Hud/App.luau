@@ -1,22 +1,26 @@
 --!strict
--- The whole HUD as one React element: a full-screen frame, "Root", that holds every part of the HUD. The match's parts
--- show from the first snapshot on. A plain function of its props.
+-- The whole HUD as one React element: a full-screen frame, "Root", that holds every part of the HUD. The scoreboard
+-- shows from the first snapshot on; the hints wherever the Hud gives their keys. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Banner = require(script.Parent.Banner)
 local Config = require(ReplicatedStorage.Shared.Config)
+local ControlHints = require(script.Parent.ControlHints)
+local Feed = require(script.Parent.Feed)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
-local Banner = require(script.Parent.Banner)
-local Feed = require(script.Parent.Feed)
 local React = require(ReplicatedStorage.Packages.React)
 local Scoreboard = require(script.Parent.Scoreboard)
+local Speedometer = require(script.Parent.Speedometer)
 local Style = require(script.Parent.Style)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 -- What changes every frame, written straight to the instances that show it, without a render.
 export type HudBindings = {
 	clock: React.Binding<string>,
+	speed: React.Binding<string>,
+	labels: ControlHints.HintLabels,
 }
 
 -- Everything the HUD shows; the Hud renders App again whenever one of them changes.
@@ -30,30 +34,36 @@ export type AppProps = {
 	carrier: Types.PlayerId?,
 	-- Whether the local player has a skater: a spectator has no speed and no hints.
 	hasSkater: boolean,
+	-- Each hint's key on this device; nil where no hints show.
+	keys: ControlHints.HintKeys?,
 	bindings: HudBindings,
 }
 
 local function App(props: AppProps): React.ReactElement
-	local state = props.state
-	local match = state.match
+	local config, text, state, bindings = props.config, props.text, props.state, props.bindings
+	local match, keys = state.match, props.keys
 	return React.createElement(React.Fragment, nil, {
 		Root = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1) }), {
 			Scoreboard = if match ~= nil
 				then React.createElement(Scoreboard, {
-					config = props.config,
-					text = props.text,
+					config = config,
+					text = text,
 					match = match,
 					names = state.names,
 					carrier = props.carrier,
-					clock = props.bindings.clock,
+					clock = bindings.clock,
 				})
 				else nil,
-			Banner = React.createElement(Banner, { config = props.config, text = props.text, banner = state.banner }),
-			Feed = React.createElement(Feed, {
-				config = props.config,
-				text = props.text,
-				feed = state.feed,
-				names = state.names,
+			Banner = React.createElement(Banner, { config = config, text = text, banner = state.banner }),
+			Feed = React.createElement(Feed, { config = config, text = text, feed = state.feed, names = state.names }),
+			ControlHints = if keys ~= nil
+				then React.createElement(ControlHints, { config = config, keys = keys, labels = bindings.labels })
+				else nil,
+			Speedometer = React.createElement(Speedometer, {
+				config = config,
+				speed = bindings.speed,
+				device = props.device,
+				visible = props.hasSkater,
 			}),
 		}),
 	})

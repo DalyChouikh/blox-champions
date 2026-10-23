@@ -4,10 +4,9 @@
 -- own stick math (TouchStick) and sizes. One button per control sits in the lower right, placed in pixels from the
 -- corner (Config.Input.touch), each working its control through InputController as its keys do; the throw button also
 -- works Ball Focus. On a big screen the stick and the buttons grow, as Roblox's own do, and they follow the screen's
--- size. Before each frame is drawn (FrameController), every action button reads what it would start now
--- (ActionController:keyAction): Tackle, Dive or Dodge; Pass or Call; Throw with the ball and Focus without. Uppercut
--- shows only when it can start, and Attach only right behind a teammate. A property is written only when it changes.
--- Hiding the controls under a thumb ends that touch.
+-- size. Before each frame is drawn (FrameController), every button reads what its control does now (ControlLabels),
+-- hiding while it would do nothing, and the throw button rings while Ball Focus is on (CameraController.focusing). A
+-- property is written only when it changes. Hiding the controls under a thumb ends that touch.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -16,12 +15,11 @@ local UserInputService = game:GetService("UserInputService")
 
 local ActionController = require(script.Parent.ActionController)
 local Config = require(ReplicatedStorage.Shared.Config)
+local ControlLabels = require(script.Parent.ControlLabels)
 local InputController = require(script.Parent.InputController)
 local SkateController = require(script.Parent.SkateController)
 local TouchStick = require(ReplicatedStorage.Shared.Input.TouchStick)
 
--- Every control with a button, in the order the buttons are built.
-local CONTROLS: { Config.TouchControl } = { "jump", "pump", "brake", "attach", "tackle", "uppercut", "pass", "throw" }
 -- Where Roblox reports a touch on the pad that has ended (or none yet).
 local NO_TOUCH = Vector2.new(-1, -1)
 
@@ -42,16 +40,20 @@ export type TouchControls = {
 	-- Drawn while a touch on the pad lasts: the ring where it began, the knob under the thumb.
 	ring: Frame,
 	knob: Frame,
+	-- Outlines the throw button while Ball Focus is on.
+	focusRing: UIStroke,
 	_config: Config.GameConfig,
 	_input: InputController.InputController,
 	_actions: ActionController.ActionController,
 	_skate: SkateController.SkateController,
+	_camera: { focusing: boolean },
 	_preferredInput: () -> Enum.PreferredInput,
 	_screenSize: () -> Vector2,
 	-- What the gui and each button last showed, so a step writes only what changed.
 	_enabled: boolean,
 	_texts: { [string]: string },
 	_shown: { [string]: boolean },
+	_focusShown: boolean,
 	-- The touch on the pad: where it began, nil while none lasts.
 	_origin: Vector2?,
 	-- How much larger than Config.Input.touch the stick and the buttons are on this screen.
@@ -105,12 +107,6 @@ local function show(self: TouchControls, control: Config.TouchControl, label: st
 	end
 end
 
--- The label of what `key` would start now; nil when it would start nothing.
-local function actionLabel(self: TouchControls, key: Config.ActionKey): string?
-	local action = self._actions:keyAction(key)
-	return if action ~= nil then self._config.UI.controlLabels[action] else nil
-end
-
 -- A screen point as a place on the pad, as Roblox's own stick places its ring and knob.
 local function onPad(self: TouchControls, point: Vector2): UDim2
 	local offset = point + GuiService:GetInsetArea(Enum.ScreenInsets.None).Min - self.pad.AbsolutePosition
@@ -153,16 +149,18 @@ end
 
 local TouchControls: TouchControls = {
 	name = "TouchControls",
-	dependencies = { "Config", "InputController", "ActionController", "SkateController" },
+	dependencies = { "Config", "InputController", "ActionController", "SkateController", "CameraController" },
 	gui = nil :: any,
 	buttons = {},
 	pad = nil :: any,
 	ring = nil :: any,
 	knob = nil :: any,
+	focusRing = nil :: any,
 	_config = nil :: any,
 	_input = nil :: any,
 	_actions = nil :: any,
 	_skate = nil :: any,
+	_camera = { focusing = false },
 	_preferredInput = function(): Enum.PreferredInput
 		return Enum.PreferredInput.KeyboardAndMouse
 	end,
@@ -172,6 +170,7 @@ local TouchControls: TouchControls = {
 	_enabled = false,
 	_texts = {},
 	_shown = {},
+	_focusShown = false,
 	_origin = nil,
 	_stickScale = 1,
 	_buttonScale = 0,
@@ -185,6 +184,7 @@ local TouchControls: TouchControls = {
 		self._input = deps.InputController
 		self._actions = deps.ActionController
 		self._skate = deps.SkateController
+		self._camera = deps.CameraController
 		self._preferredInput = deps.PreferredInput
 			or function(): Enum.PreferredInput
 				return UserInputService.PreferredInput
@@ -195,6 +195,7 @@ local TouchControls: TouchControls = {
 		self._enabled = false
 		self._texts = {}
 		self._shown = {}
+		self._focusShown = false
 		self._origin = nil
 		self._stickScale = 1
 		self._buttonScale = 0
@@ -235,18 +236,21 @@ local TouchControls: TouchControls = {
 
 		local input = self._input
 		local buttons: { [string]: TextButton } = {}
-		for _, control: Config.TouchControl in CONTROLS do
+		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
 			local button = newButton(control, config, gui)
 			buttons[control] = button
 			input:bindButton(control, button)
 		end
 		input:bindButton("ballFocus", buttons.throw)
 		self.buttons = buttons
-		local labels = config.UI.controlLabels
-		show(self, "jump", labels.Jump)
-		show(self, "pump", labels.Pump)
-		show(self, "brake", labels.Brake)
-		show(self, "attach", nil)
+		local focusRing = Instance.new("UIStroke")
+		focusRing.Name = "Focus"
+		focusRing.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		focusRing.Color = style.foreground
+		focusRing.Thickness = config.UI.hud.glowThickness
+		focusRing.Enabled = false
+		focusRing.Parent = buttons.throw
+		self.focusRing = focusRing
 		input:bindTouchStick(pad).StateChanged:Connect(function(position: Vector2)
 			onTouch(self, position)
 		end)
@@ -272,7 +276,7 @@ local TouchControls: TouchControls = {
 		end
 		self._buttonScale = scale
 		local size = scaled(touch.buttonSize, scale)
-		for _, control: Config.TouchControl in CONTROLS do
+		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
 			local button = self.buttons[control]
 			button.Position = scaled(touch.buttons[control], scale)
 			button.Size = size
@@ -292,12 +296,15 @@ local TouchControls: TouchControls = {
 		if not enabled then
 			return
 		end
-		local labels = self._config.UI.controlLabels
-		show(self, "tackle", actionLabel(self, "tackle"))
-		show(self, "uppercut", actionLabel(self, "uppercut"))
-		show(self, "pass", actionLabel(self, "pass"))
-		show(self, "throw", actionLabel(self, "throw") or labels.BallFocus)
-		show(self, "attach", if self._skate.attachable then labels.Attach else nil)
+		local config, actions, skate = self._config, self._actions, self._skate
+		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
+			show(self, control, ControlLabels.label(control, config, actions, skate))
+		end
+		local focusing = self._camera.focusing
+		if focusing ~= self._focusShown then
+			self._focusShown = focusing
+			self.focusRing.Enabled = focusing
+		end
 	end,
 }
 

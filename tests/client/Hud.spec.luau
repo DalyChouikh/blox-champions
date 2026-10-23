@@ -1,33 +1,57 @@
 --!strict
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerScriptService = game:GetService("ServerScriptService")
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local Client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
+local ActionController = require(Client.ActionController)
 local BallCarrier = require(Client.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Hud = require(Client.Hud)
 local HudStore = require(Client.HudStore)
 local InputController = require(Client.InputController)
-local RideSurfaces = require(Client.RideSurfaces)
 local SkateController = require(Client.SkateController)
-local SkaterBody = require(ServerScriptService.Server.SkaterBody)
 
 local config = Config.defaults()
 local LOCAL_ID = "1"
+local DT = 1 / 60
 
 local folder: Folder
 local preferred: Enum.PreferredInput
 
--- The local player's skater, built as the server builds it and taken by the skating.
-local function spawnSkater()
-	local rig = Fixtures.rig(folder, "Skater", CFrame.new(0, config.Movement.hoverHeight, 0))
-	SkaterBody.build(rig, config.Movement)
-	SkateController:bind(rig)
+-- Roblox's key names, as GetStringForKeyCode gives them: a letter key its letter, Space a space, a gamepad button its
+-- KeyCode's name, and nothing for Shift, Ctrl, Tab or a mouse button.
+local function keyString(key: Enum.KeyCode): string
+	local name = key.Name
+	if key == Enum.KeyCode.Space then
+		return " "
+	elseif #name == 1 or string.sub(name, 1, 6) == "Button" then
+		return name
+	end
+	return ""
+end
+
+-- Roblox's glyphs, as GetImageForKeyCode gives them: one for each gamepad button, none for other keys.
+local function keyImage(key: Enum.KeyCode): string
+	local name = key.Name
+	return if string.sub(name, 1, 6) == "Button"
+		then `rbxasset://textures/ui/Controls/DefaultController/{name}@2x.png`
+		else ""
+end
+
+-- The HUD's part called `name`, wherever it sits; nil while it is not drawn.
+local function part(name: string): any
+	return Hud.gui:FindFirstChild(name, true)
+end
+
+-- The key a hint row shows: its key's text, or its glyph.
+local function hintKey(control: string): (string?, string?)
+	local row = part("ControlHints"):FindFirstChild(control)
+	local key, glyph = row:FindFirstChild("Key"), row:FindFirstChild("Glyph")
+	return if key ~= nil then key.Text else nil, if glyph ~= nil then glyph.Image else nil
 end
 
 beforeEach(function()
@@ -35,35 +59,22 @@ beforeEach(function()
 	folder.Name = "HudTest"
 	folder.Parent = workspace
 	preferred = Enum.PreferredInput.KeyboardAndMouse
-	InputController:init({ Config = config, Parent = folder })
-	BallCarrier:init({})
-	RideSurfaces:init({})
-	SkateController:init({
-		Config = config,
-		InputController = InputController,
-		RideSurfaces = RideSurfaces,
-		Camera = { CFrame = CFrame.new() },
-		Skaters = function(): { any }
-			return {}
-		end,
-		SendSkateState = function() end,
-		Gravity = Fixtures.GRAVITY,
-		Team = function(): string?
-			return "Blue"
-		end,
-	})
+	Fixtures.startSkating(folder, config, LOCAL_ID)
 	HudStore:init({ Config = config })
 	HudStore:onSnapshot(Fixtures.matchSnapshot())
 	Hud:init({
 		Config = config,
 		HudStore = HudStore,
 		SkateController = SkateController,
+		ActionController = ActionController,
 		BallCarrier = BallCarrier,
 		Parent = folder,
 		LocalId = LOCAL_ID,
 		PreferredInput = function(): Enum.PreferredInput
 			return preferred
 		end,
+		KeyString = keyString,
+		KeyImage = keyImage,
 	})
 end)
 
@@ -73,7 +84,7 @@ afterEach(function()
 end)
 
 describe("Hud", function()
-	it("renders the HUD into its own ScreenGui as soon as it steps", function()
+	it("renders the HUD into its own ScreenGuis, the reticle's spanning the whole screen", function()
 		local gui = Hud.gui
 		expect(gui.Name).toBe("Hud")
 		expect(gui.ResetOnSpawn).toBe(false)
@@ -82,6 +93,13 @@ describe("Hud", function()
 		Hud:step(0)
 		local root = gui:FindFirstChild("Root")
 		expect(root ~= nil and root.ClassName).toBe("Frame")
+		-- Below the top bar the HUD's centre is not the screen's: the reticle has a gui without insets.
+		local centre = Hud.centre
+		expect(centre.Name).toBe("HudCentre")
+		expect(centre.ResetOnSpawn).toBe(false)
+		expect(centre.ScreenInsets).toBe(Enum.ScreenInsets.None)
+		expect(centre.Parent == folder).toBe(true)
+		expect(centre:FindFirstChild("Reticle") ~= nil).toBe(true)
 	end)
 
 	it("renders again only when what it shows changes", function()
@@ -97,7 +115,7 @@ describe("Hud", function()
 		BallCarrier:set("1")
 		Hud:step(0)
 		expect(Hud.renders).toBe(4)
-		spawnSkater()
+		Fixtures.spawnSkater(folder, config)
 		Hud:step(0)
 		expect(Hud.renders).toBe(5)
 		Hud:step(0)
@@ -107,20 +125,79 @@ describe("Hud", function()
 	it("shows the banner and the feed from the HUD's state", function()
 		HudStore:onEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } })
 		Hud:step(0)
-		local banner = Hud.gui:FindFirstChild("Banner", true) :: TextLabel
+		local banner = part("Banner") :: TextLabel
 		expect(banner.Visible).toBe(true)
 		expect(banner.Text).toBe("GOAL!")
-		local feed = Hud.gui:FindFirstChild("Feed", true) :: Frame
+		local feed = part("Feed") :: Frame
 		expect((feed:FindFirstChild("1") :: TextLabel).Text).toBe("Ana scored!")
 	end)
 
 	it("counts the clock down on the scoreboard without rendering again", function()
 		Hud:step(0)
-		local clock = Hud.gui:FindFirstChild("Clock", true) :: TextLabel
+		local clock = part("Clock") :: TextLabel
 		expect(clock.Text).toBe("2:00")
 		HudStore:step(1)
 		Hud:step(1)
 		expect(clock.Text).toBe("1:59")
 		expect(Hud.renders).toBe(1)
+	end)
+
+	it("shows control hints with a keyboard or a gamepad, none on touch or without a character", function()
+		Hud:step(0)
+		expect(part("ControlHints")).toBeNil()
+
+		local rig = Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		expect((hintKey("pump"))).toBe("Shift")
+		expect((hintKey("jump"))).toBe("Space")
+		expect((hintKey("tackle"))).toBe("E")
+		expect(part("ControlHints").tackle.Label.Text).toBe(config.UI.controlLabels.Tackle)
+		expect(part("ControlHints").attach.Visible).toBe(false)
+		-- Without the ball the throw's row works Ball Focus, on its own key; with it, the throw's.
+		expect((hintKey("throw"))).toBe("RMB")
+		BallCarrier:set(LOCAL_ID)
+		Hud:step(0)
+		expect((hintKey("throw"))).toBe("LMB")
+
+		preferred = Enum.PreferredInput.Gamepad
+		Hud:step(0)
+		local _, glyph = hintKey("tackle")
+		expect(glyph).toBe(keyImage(Enum.KeyCode.ButtonX))
+
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		expect(part("ControlHints")).toBeNil()
+
+		preferred = Enum.PreferredInput.KeyboardAndMouse
+		rig:Destroy()
+		Hud:step(0)
+		expect(part("ControlHints")).toBeNil()
+	end)
+
+	it("shows the skater's speed in km/h, and none without a character", function()
+		Hud:step(0)
+		local speedometer = part("Speedometer") :: TextLabel
+		expect(speedometer.Visible).toBe(false)
+		Fixtures.spawnSkater(folder, config)
+		local skater = SkateController.skater :: any
+		skater.velocity = Vector3.new(0, 0, -100)
+		Hud:step(0)
+		expect(speedometer.Visible).toBe(true)
+		expect(speedometer.Text).toBe("120 km/h")
+	end)
+
+	it("steps in under 0.1 ms", function()
+		Fixtures.spawnSkater(folder, config)
+		local total = 0
+		for step = 1, 600 do
+			-- The ball changes hands every 100 steps.
+			if step % 100 == 1 then
+				BallCarrier:set(if BallCarrier.carrier == nil then LOCAL_ID else nil)
+			end
+			local started = os.clock()
+			Hud:step(DT)
+			total += os.clock() - started
+		end
+		expect(total / 600).toBeLessThan(0.0001)
 	end)
 end)
