@@ -1,6 +1,6 @@
 --!strict
--- The skating keys (spec §8.3) for keyboard and gamepad, bound through Roblox's Input Action System. Phase 7 adds the
--- action keys, mobile buttons and the on-screen hints here, so bindings and hints come from one place.
+-- The skating and action keys (spec §8.3) for keyboard and gamepad, bound through Roblox's Input Action System.
+-- Phase 7 adds the mobile buttons and the on-screen hints here, so bindings and hints come from one place.
 
 local Validate = require(script.Parent.Validate)
 
@@ -15,6 +15,13 @@ export type InputConfig = {
 	pump: { Enum.KeyCode },
 	brake: { Enum.KeyCode },
 	attach: { Enum.KeyCode },
+	-- Tackle, a Dive during a tackle, or a Dodge with the ball.
+	tackle: { Enum.KeyCode },
+	uppercut: { Enum.KeyCode },
+	-- A Pass with the ball, a Call Pass without.
+	pass: { Enum.KeyCode },
+	-- Held to charge a throw, released to throw.
+	throw: { Enum.KeyCode },
 }
 
 local defaults: InputConfig = {
@@ -27,6 +34,10 @@ local defaults: InputConfig = {
 	pump = { Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonR2 },
 	brake = { Enum.KeyCode.LeftControl, Enum.KeyCode.ButtonR1 },
 	attach = { Enum.KeyCode.F, Enum.KeyCode.ButtonL1 },
+	tackle = { Enum.KeyCode.E, Enum.KeyCode.ButtonX },
+	uppercut = { Enum.KeyCode.Q, Enum.KeyCode.ButtonB },
+	pass = { Enum.KeyCode.R, Enum.KeyCode.ButtonY },
+	throw = { Enum.KeyCode.MouseLeftButton, Enum.KeyCode.ButtonL2 },
 }
 
 local key = Validate.enumItem(Enum.KeyCode)
@@ -42,6 +53,10 @@ local fields = Validate.record({
 	pump = keys,
 	brake = keys,
 	attach = keys,
+	tackle = keys,
+	uppercut = keys,
+	pass = keys,
+	throw = keys,
 })
 
 -- Every key the bindings use, in order.
@@ -53,7 +68,18 @@ local function boundKeys(input: InputConfig): { Enum.KeyCode }
 		table.insert(all, composite.left)
 		table.insert(all, composite.right)
 	end
-	for _, list in { input.move.sticks, input.jump, input.pump, input.brake, input.attach } do
+	local lists = {
+		input.move.sticks,
+		input.jump,
+		input.pump,
+		input.brake,
+		input.attach,
+		input.tackle,
+		input.uppercut,
+		input.pass,
+		input.throw,
+	}
+	for _, list in lists do
 		for _, bound in list do
 			table.insert(all, bound)
 		end
