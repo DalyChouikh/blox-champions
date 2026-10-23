@@ -1,6 +1,6 @@
 --!strict
--- CollectionService tags and attribute names of the arena's features (spec §9.2), spelled only here. Gameplay
--- code finds the arena through them, so any model carrying the same tags (a later art pass) drops in.
+-- CollectionService tags and attribute names of the arena's features (spec §9.2) and the ball, spelled only here.
+-- Gameplay code finds them through these tags, so any model carrying the same tags (a later art pass) drops in.
 
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 
@@ -13,6 +13,8 @@ local Tags = {
 	CornerMarker = "CornerMarker",
 	-- On the folders of surfaces skaters ride (the track, its roof, the infield top): the only things their rays hit.
 	RideSurface = "RideSurface",
+	-- On the ball's part, so clients find the ball the server built.
+	Ball = "Ball",
 	Attribute = {
 		-- On LapGate and CornerMarker parts: which gate, 1..4 in travel order.
 		GateIndex = "GateIndex",

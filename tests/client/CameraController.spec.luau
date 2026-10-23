@@ -29,6 +29,8 @@ local camera: FakeCamera
 local mouse: { MouseBehavior: Enum.MouseBehavior }
 local preferred: Enum.PreferredInput
 local menuOpen: boolean
+local ball: BasePart?
+local LOCAL_ID = "1"
 
 -- A rig with its skater body standing on the floor at `position`, facing `facing`.
 local function skaterAt(name: string, position: Vector3, facing: Vector3): Model
@@ -47,6 +49,47 @@ local function focus(): Vector3
 	return Fixtures.root(rig).Position + CameraController.chase.up * config.Camera.height
 end
 
+-- A ball part at `position`, which the controller sees as the ball.
+local function ballAt(position: Vector3): BasePart
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.Shape = Enum.PartType.Ball
+	part.Position = position
+	part.Parent = folder
+	ball = part
+	return part
+end
+
+-- Presses the Ball Focus key once (Pressed is deferred).
+local function tapBallFocus(binding: InputBinding)
+	binding:Fire(true)
+	task.wait()
+	binding:Fire(false)
+end
+
+-- (Re)builds the controller on the fakes above, with a fresh chase.
+local function initCamera()
+	CameraController:init({
+		Config = config,
+		InputController = InputController,
+		RideSurfaces = RideSurfaces,
+		SkateController = SkateController,
+		BallCarrier = BallCarrier,
+		Camera = camera,
+		Mouse = mouse,
+		PreferredInput = function(): Enum.PreferredInput
+			return preferred
+		end,
+		MenuOpen = function(): boolean
+			return menuOpen
+		end,
+		Ball = function(): BasePart?
+			return ball
+		end,
+		LocalId = LOCAL_ID,
+	})
+end
+
 beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "CameraControllerTest"
@@ -61,6 +104,7 @@ beforeEach(function()
 	mouse = { MouseBehavior = Enum.MouseBehavior.Default }
 	preferred = Enum.PreferredInput.KeyboardAndMouse
 	menuOpen = false
+	ball = nil
 	InputController:init({
 		Config = config,
 		Parent = folder,
@@ -86,21 +130,7 @@ beforeEach(function()
 	})
 	rig = skaterAt("Skater", Vector3.zero, -Vector3.zAxis)
 	SkateController:bind(rig)
-	CameraController:init({
-		Config = config,
-		InputController = InputController,
-		RideSurfaces = RideSurfaces,
-		SkateController = SkateController,
-		BallCarrier = BallCarrier,
-		Camera = camera,
-		Mouse = mouse,
-		PreferredInput = function(): Enum.PreferredInput
-			return preferred
-		end,
-		MenuOpen = function(): boolean
-			return menuOpen
-		end,
-	})
+	initCamera()
 end)
 
 afterEach(function()
@@ -171,21 +201,8 @@ describe("CameraController", function()
 		end
 		expect(camera.CFrame.LookVector:Dot(Vector3.xAxis)).toBeGreaterThan(0.5)
 
-		CameraController:init({
-			Config = config,
-			InputController = InputController,
-			RideSurfaces = RideSurfaces,
-			SkateController = SkateController,
-			BallCarrier = BallCarrier,
-			Camera = camera,
-			Mouse = mouse,
-			PreferredInput = function(): Enum.PreferredInput
-				return Enum.PreferredInput.KeyboardAndMouse
-			end,
-			MenuOpen = function(): boolean
-				return false
-			end,
-		})
+		preferred = Enum.PreferredInput.KeyboardAndMouse
+		initCamera()
 		for _ = 1, 60 do
 			CameraController:step(DT)
 		end
@@ -232,5 +249,61 @@ describe("CameraController", function()
 			total += os.clock() - started
 		end
 		expect(total / 600).toBeLessThan(0.0001)
+	end)
+
+	it("turns toward the ball while Ball Focus is held", function()
+		CameraController:step(DT)
+		local target = ballAt(focus() + Vector3.new(30, 0, 0))
+		local hold = Fixtures.scriptedBinding(InputController.context, "BallFocus")
+		hold:Fire(true)
+		CameraController:step(10)
+		Fixtures.expectNear(camera.CFrame.LookVector, (target.Position - focus()).Unit, 1e-2)
+		hold:Fire(false)
+		CameraController:step(1)
+		Fixtures.expectNear(camera.CFrame.LookVector, (target.Position - focus()).Unit, 1e-2)
+	end)
+
+	it("ignores Ball Focus while carrying the ball", function()
+		CameraController:step(DT)
+		ballAt(focus() + Vector3.new(30, 0, 0))
+		BallCarrier:set(LOCAL_ID)
+		Fixtures.scriptedBinding(InputController.context, "BallFocus"):Fire(true)
+		CameraController:step(10)
+		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1))
+	end)
+
+	it("toggles Ball Focus with a tap on touch", function()
+		preferred = Enum.PreferredInput.Touch
+		CameraController:step(DT)
+		local target = ballAt(focus() + Vector3.new(30, 0, 0))
+		local tap = Fixtures.scriptedBinding(InputController.context, "BallFocus")
+		tapBallFocus(tap)
+		CameraController:step(10)
+		Fixtures.expectNear(camera.CFrame.LookVector, (target.Position - focus()).Unit, 1e-2)
+		-- A second tap lets the camera go: turned away by hand, it stays away.
+		tapBallFocus(tap)
+		local look = Fixtures.scriptedBinding(InputController.context, "Look")
+		look:Fire(Vector2.new(-(math.pi / 2) / DT, 0))
+		CameraController:step(DT)
+		look:Fire(Vector2.zero)
+		CameraController:step(1)
+		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1), 1e-2)
+	end)
+
+	it("follows the ball when the player has no character", function()
+		SkateController.skater = nil
+		SkateController.root = nil
+		ballAt(Vector3.new(0, 10, 0))
+		CameraController:step(DT)
+		Fixtures.expectNear(camera.CFrame.Position, Vector3.new(0, 16, 30))
+		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1))
+	end)
+
+	it("holds still with neither a character nor a ball", function()
+		SkateController.skater = nil
+		SkateController.root = nil
+		camera.CFrame = CFrame.new(1, 2, 3)
+		CameraController:step(DT)
+		Fixtures.expectNear(camera.CFrame.Position, Vector3.new(1, 2, 3))
 	end)
 end)

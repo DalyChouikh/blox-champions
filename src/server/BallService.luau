@@ -20,6 +20,7 @@ local Homing = require(ReplicatedStorage.Shared.Ball.Homing)
 local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
+local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
@@ -105,6 +106,7 @@ local function newBallPart(config: Config.GameConfig): Part
 	local skin = BallSkins.get(BallSkins.DEFAULT)
 	local part = Instance.new("Part")
 	part.Name = "Ball"
+	part:AddTag(Tags.Ball)
 	-- Before Size, and a uniform Size: a Ball part keeps whatever non-uniform size it is given.
 	part.Shape = Enum.PartType.Ball
 	part.Size = Vector3.one * (2 * ball.radius)

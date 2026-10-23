@@ -1,4 +1,5 @@
 --!strict
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
@@ -10,6 +11,7 @@ local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local SkaterBody = require(game:GetService("ServerScriptService").Server.SkaterBody)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
+local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
 local config = Fixtures.config()
 local SPAWNS = { CFrame.new(-140, 6, 0), CFrame.new(140, 6, 0) }
@@ -81,6 +83,10 @@ describe("BallService", function()
 		expect(ballAt()).toBe("ServerStorage")
 		expect(BallService.state.status).toBe("Dead")
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
+	end)
+
+	it("tags its ball part so clients can find it", function()
+		expect(CollectionService:HasTag(BallService.part, Tags.Ball)).toBe(true)
 	end)
 
 	it("spawns the ball loose at a ball spawn and reports only real movement", function()
