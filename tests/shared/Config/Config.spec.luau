@@ -195,6 +195,7 @@ describe("Config defaults", function()
 	it("bind the skating and action keys of spec §8.3", function()
 		local input = Config.defaults().Input
 		expect(input.contextPriority).toBe(1000)
+		expect(input.robloxContextsWaitSeconds).toBe(10)
 		expect(input.move).toEqual({
 			composites = {
 				{ up = Enum.KeyCode.W, down = Enum.KeyCode.S, left = Enum.KeyCode.A, right = Enum.KeyCode.D },
