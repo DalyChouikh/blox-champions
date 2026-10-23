@@ -22,14 +22,14 @@ A 3v3 roller-skate ball game for Roblox, inspired by Ubisoft's Roller Champions:
 From the repository folder:
 
 ```bash
-rokit trust rojo-rbx/rojo && rokit trust UpliftGames/wally && rokit trust JohnnyMorganz/StyLua && rokit trust Kampfkarren/selene && rokit trust JohnnyMorganz/luau-lsp
+rokit trust rojo-rbx/rojo && rokit trust UpliftGames/wally && rokit trust JohnnyMorganz/StyLua && rokit trust Kampfkarren/selene && rokit trust JohnnyMorganz/luau-lsp && rokit trust JohnnyMorganz/wally-package-types
 rokit install
-wally install
+bash scripts/install-packages.sh
 bash scripts/install-rojo-plugin.sh
 ```
 
-- `rokit install` installs the exact tool versions pinned in `rokit.toml` (Rojo, Wally, StyLua, selene, luau-lsp).
-- `wally install` downloads the test framework (Jest-Lua) into `DevPackages/`.
+- `rokit install` installs the exact tool versions pinned in `rokit.toml` (Rojo, Wally, StyLua, selene, luau-lsp, wally-package-types).
+- `scripts/install-packages.sh` runs `wally install`, which downloads React Luau (it draws the HUD) into `Packages/` and the test framework (Jest Roblox) into `DevPackages/`; a few of Jest's helpers land in `Packages/` too. Both come from Roblox (`roblox/*` on Wally). It then makes each package's link file re-export the package's types, so the type checker knows names like `React.ReactElement`. Stop `rojo serve` before running it: it recreates folders Rojo watches.
 - `scripts/install-rojo-plugin.sh` builds and installs the Rojo Studio plugin (restart Studio if it was open). It applies an upstream fix ([rojo#1344](https://github.com/rojo-rbx/rojo/pull/1344)) that stops the stock plugin from printing three `rbxassetid://203785492` errors on every playtest; once a Rojo release includes that fix, this step goes back to `rojo plugin install`.
 
 ## Daily workflow
@@ -43,7 +43,7 @@ bash scripts/install-rojo-plugin.sh
 2. In Roblox Studio, open the **Plugins** tab, click **Rojo**, then **Connect** (`localhost:34872`).
 3. Edit files in `src/` and `tests/`; Rojo updates Studio automatically.
 
-`test.project.json` includes the tests and test framework. `default.project.json` is the game without any test code.
+`test.project.json` includes the tests and test framework. `default.project.json` is the game without any test code. Both map `Packages/` to `ReplicatedStorage.Packages`.
 
 ## Running tests
 
@@ -53,9 +53,9 @@ With Rojo connected, paste this into Studio's command bar (View → Command Bar)
 require(game:GetService("ServerStorage").RunTests:Clone())()
 ```
 
-The Output window shows one summary line, such as `[RunTests] PASS 49/49 tests`, or a `[RunTests] FAIL …` warning naming the first failure, followed by Jest's full report. `:Clone()` makes Studio load the latest version of the runner instead of a cached copy.
+The Output window shows one summary line, such as `[RunTests] PASS 49/49 tests`, or a `[RunTests] FAIL …` warning naming the first failure, followed by Jest's full report. `:Clone()` makes Studio load the latest version of the runner instead of a cached copy. Studio caches the Jest package the same way: after `wally install` changes its version, restart Studio (or replace `ReplicatedStorage.DevPackages.Jest` with a clone of itself) before the next run.
 
-To run only some tests, pass a filter, e.g. `require(game:GetService("ServerStorage").RunTests:Clone())({ testPathPattern = "Freeze" })`. A filter that matches no tests is reported as a failure. To match several files, wrap the alternatives in parentheses, e.g. `testPathPattern = "(Possession|LapTracker)"`: in Jest-Lua 3.10 a bare `Possession|LapTracker` only matches the first alternative.
+To run only some tests, pass a filter, e.g. `require(game:GetService("ServerStorage").RunTests:Clone())({ testPathPattern = "Freeze" })`. A filter that matches no tests is reported as a failure. To match several files, wrap the alternatives in parentheses, e.g. `testPathPattern = "(Possession|LapTracker)"`: in Jest Roblox (3.20.1, as in 3.10) a bare `Possession|LapTracker` only matches the first alternative.
 
 Tests under `tests/server` and `tests/integration` build parts (a whole arena, for example) in the open place, under a temporary folder they remove when they finish, so a run leaves the place as it found it.
 
@@ -67,7 +67,7 @@ Tests under `tests/server` and `tests/integration` build parts (a whole arena, f
 | `src/server/` | Server scripts (synced to `ServerScriptService.Server`) |
 | `src/client/` | Client scripts (synced to `StarterPlayer.StarterPlayerScripts.Client`) |
 | `src/character/` | Scripts every character gets (synced to `StarterPlayer.StarterCharacterScripts`); `Animate` replaces Roblox's default animations |
-| `tests/` | Jest-Lua tests (`*.spec.luau`), mirroring the `src/` folders, plus shared test data in `tests/Fixtures.luau` |
+| `tests/` | Jest Roblox tests (`*.spec.luau`), mirroring the `src/` folders, plus shared test data in `tests/Fixtures.luau` |
 | `scripts/` | Development scripts, such as the in-Studio test runner |
 | `docs/` | Design specs and implementation plans |
 
