@@ -10,6 +10,7 @@ local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 
 local config = Config.defaults().Camera
 local HARD_CAP = 140
+local DT = 1 / 60
 
 -- A camera behind a skater on level ground facing -Z.
 local function camera(): ChaseCamera.ChaseCamera
@@ -43,14 +44,15 @@ describe("ChaseCamera", function()
 	end)
 
 	it("turns right and tips down with the look input, within the pitch limits", function()
+		-- The look is a rate, in radians per second: one step turns it for that step's dt.
 		local chase = camera()
-		chase:step(target({ look = Vector2.new(math.pi / 2, 0) }), 1 / 60)
+		chase:step(target({ look = Vector2.new(math.pi / 2, 0) / DT }), DT)
 		Fixtures.expectNear(chase.forward, Vector3.new(1, 0, 0))
-		chase:step(target({ look = Vector2.new(0, math.rad(30)) }), 1 / 60)
+		chase:step(target({ look = Vector2.new(0, math.rad(30)) / DT }), DT)
 		Fixtures.expectNear(chase:lookVector(), Vector3.new(math.cos(math.rad(30)), -0.5, 0))
-		chase:step(target({ look = Vector2.new(0, math.rad(100)) }), 1 / 60)
+		chase:step(target({ look = Vector2.new(0, math.rad(100)) / DT }), DT)
 		expect(chase.pitch).toBeCloseTo(math.rad(-70), 5)
-		chase:step(target({ look = Vector2.new(0, -math.rad(500)) }), 1 / 60)
+		chase:step(target({ look = Vector2.new(0, -math.rad(500)) / DT }), DT)
 		expect(chase.pitch).toBeCloseTo(math.rad(60), 5)
 	end)
 
@@ -117,18 +119,32 @@ describe("ChaseCamera", function()
 		expect(chase.fov).toBeCloseTo(70 + 20 * (1 - math.exp(-0.6)), 3)
 	end)
 
-	it("pulls in in front of a hit, never closer than minDistance", function()
+	it("pulls in in front of a hit, never past it", function()
 		expect(ChaseCamera.pullIn(config, 12, nil)).toBe(12)
 		expect(ChaseCamera.pullIn(config, 12, 8)).toBe(7.5)
-		expect(ChaseCamera.pullIn(config, 12, 1)).toBe(2)
+		expect(ChaseCamera.pullIn(config, 12, 1)).toBe(0.5)
+		-- A hit nearer than collisionMargin: the camera stays at its focus.
+		expect(ChaseCamera.pullIn(config, 12, 0.2)).toBe(0)
 	end)
 
-	it("resets behind a facing, level", function()
+	it("rests only while Ball Focus is not turning it", function()
 		local chase = camera()
-		chase:step(target({ look = Vector2.new(1, 0.5) }), 1 / 60)
+		chase:step(target({ aimAt = Vector3.new(-1, 0, 0) }), 10)
+		Fixtures.expectNear(chase.forward, Vector3.new(-1, 0, 0))
+		expect(chase.idle).toBe(0)
+		-- Let go on a gamepad: it stays where it turned until the look has rested recenterDelay.
+		chase:step(target({ travel = Vector3.new(50, 0, 0), recenter = true }), 0.4)
+		Fixtures.expectNear(chase.forward, Vector3.new(-1, 0, 0))
+	end)
+
+	it("resets behind a facing, level, at fovBase", function()
+		local chase = camera()
+		chase:step(target({ look = Vector2.new(1, 0.5) / DT, speed = 140 }), 10)
+		expect(chase.fov).toBeCloseTo(90, 3)
 		chase:reset(Vector3.yAxis, Vector3.xAxis)
 		Fixtures.expectNear(chase.forward, Vector3.new(1, 0, 0))
 		expect(chase.pitch).toBe(0)
 		expect(chase.idle).toBe(0)
+		expect(chase.fov).toBe(70)
 	end)
 end)

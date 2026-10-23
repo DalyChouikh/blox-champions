@@ -169,6 +169,7 @@ describe("TouchControls", function()
 		expect(TouchControls.ring.Visible).toBe(true)
 		expect(TouchControls.knob.Visible).toBe(true)
 		expect(TouchControls.ring.Size).toEqual(UDim2.fromOffset(touch.stickRingSize, touch.stickRingSize))
+		expect(TouchControls.knob.BackgroundTransparency).toBe(style.knobTransparency)
 
 		touchAt(finger, Vector2.new(-1, -1))
 		Fixtures.expectNear2(move(), Vector2.zero)
@@ -176,14 +177,41 @@ describe("TouchControls", function()
 		expect(TouchControls.knob.Visible).toBe(false)
 	end)
 
-	it("doubles the stick on a big screen, as Roblox's own stick does", function()
+	it("grows the stick and the buttons on a big screen, as Roblox's own controls do", function()
 		screen = Vector2.new(1280, 800)
+		TouchControls:layout()
+		local grow = touch.bigScreenButtonScale
+		local size, place = touch.buttonSize, touch.buttons.jump
+		expect(button("jump").Size).toEqual(UDim2.fromOffset(size.X.Offset * grow, size.Y.Offset * grow))
+		expect(button("jump").Position).toEqual(
+			UDim2.new(place.X.Scale, place.X.Offset * grow, place.Y.Scale, place.Y.Offset * grow)
+		)
 		local finger = Fixtures.scriptedBinding(InputController.context, "TouchMove")
 		touchAt(finger, Vector2.new(100, 300))
 		touchAt(finger, Vector2.new(100, 280))
 		Fixtures.expectNear2(move(), Vector2.new(0, 0.5))
-		local ring = touch.stickRingSize * touch.bigScreenScale
+		local ring = touch.stickRingSize * touch.bigScreenStickScale
 		expect(TouchControls.ring.Size).toEqual(UDim2.fromOffset(ring, ring))
+		touchAt(finger, Vector2.new(-1, -1))
+
+		-- Back on a phone-sized screen (a window resized, a device turned).
+		screen = Vector2.new(800, 400)
+		TouchControls:layout()
+		expect(button("jump").Size).toEqual(size)
+		expect(button("jump").Position).toEqual(place)
+	end)
+
+	it("lets go of the stick when the touch controls hide mid-touch", function()
+		TouchControls:step(DT)
+		local finger = Fixtures.scriptedBinding(InputController.context, "TouchMove")
+		touchAt(finger, Vector2.new(100, 300))
+		touchAt(finger, Vector2.new(100, 280))
+		Fixtures.expectNear2(move(), Vector2.new(0, 1))
+		-- A gamepad plugged in while the thumb is still down.
+		preferred = Enum.PreferredInput.Gamepad
+		TouchControls:step(DT)
+		Fixtures.expectNear2(move(), Vector2.zero)
+		expect(TouchControls.ring.Visible).toBe(false)
 	end)
 
 	it("names and shows each button for what it does now", function()

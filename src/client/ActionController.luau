@@ -50,6 +50,8 @@ export type ActionController = {
 	_context: ActionRunner.Context,
 	-- Seconds the throw has been held with the ball; nil while not charging.
 	_charge: number?,
+	-- The throw key was seen up while the player held the ball, so holding it now charges a throw.
+	_throwReady: boolean,
 }
 
 -- The action a key starts: its own, or the running action's follow-up when that runs in its window (a dive during a
@@ -83,8 +85,9 @@ local function holdsBall(self: ActionController): boolean
 end
 
 -- At most one action a step, in this order: the tackle key, the uppercut, the pass key, then a throw, each starting
--- what `actionFor` names. The throw charges while held with the ball and goes when it is let go, or as soon after as
--- the runner allows; losing the ball drops the charge.
+-- what `actionFor` names. The throw charges while held with the ball, from a press made while holding it (a key held
+-- through the catch, for Ball Focus, throws nothing), and goes when it is let go, or as soon after as the runner
+-- allows. Losing the ball, or Roblox's menu letting go of the key, drops the charge.
 local function chosen(
 	self: ActionController,
 	keys: InputController.ActionKeys,
@@ -92,12 +95,16 @@ local function chosen(
 	dt: number
 ): Config.ActionName?
 	local throwReleased = false
-	if not hasBall then
+	if not hasBall or self._input.paused then
 		self._charge = nil
+		self._throwReady = false
 	elseif keys.throw then
-		self._charge = (self._charge or 0) + dt
+		if self._throwReady then
+			self._charge = (self._charge or 0) + dt
+		end
 	else
 		throwReleased = self._charge ~= nil
+		self._throwReady = true
 	end
 	if keys.tackle then
 		return actionFor(self, "tackle", hasBall)
@@ -202,6 +209,7 @@ local ActionController: ActionController = {
 	_keys = nil :: any,
 	_context = nil :: any,
 	_charge = nil,
+	_throwReady = false,
 
 	-- deps.Camera, deps.SendRequest and deps.LocalId replace the live game in tests.
 	init = function(self: ActionController, deps: { [string]: any })
@@ -220,6 +228,7 @@ local ActionController: ActionController = {
 		self._keys = InputController.newActionKeys()
 		self._context = { hasBall = false, airborne = false, knockedDown = false }
 		self._charge = nil
+		self._throwReady = false
 	end,
 
 	start = function(self: ActionController)
@@ -250,6 +259,7 @@ local ActionController: ActionController = {
 			self._input:readActions(keys)
 			self.runner:reset()
 			self._charge = nil
+			self._throwReady = false
 			return
 		end
 		self.runner:step(dt)

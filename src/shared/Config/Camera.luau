@@ -11,8 +11,8 @@ export type CameraConfig = {
 	distance: number,
 	-- The point the camera looks past sits this far above the root, along the camera's up.
 	height: number,
-	-- In front of a wall the camera pulls in, never closer than minDistance, and stays collisionMargin off it.
-	minDistance: number,
+	-- The camera, and the point it looks past, stay this far in front of any arena surface between them and the
+	-- skater: they never pass through the arena, however close that brings them (the owner's choice, 2026-10-23).
 	collisionMargin: number,
 	fovBase: number,
 	fovMax: number,
@@ -33,7 +33,6 @@ export type CameraConfig = {
 local defaults: CameraConfig = {
 	distance = 12,
 	height = 4,
-	minDistance = 2,
 	collisionMargin = 0.5,
 	fovBase = 70,
 	fovMax = 90,
@@ -56,7 +55,6 @@ local schema = Validate.checkAll(
 	Validate.record({
 		distance = positive,
 		height = positive,
-		minDistance = positive,
 		collisionMargin = nonNegative,
 		fovBase = fov,
 		fovMax = fov,
@@ -71,12 +69,6 @@ local schema = Validate.checkAll(
 		spectator = Validate.record({ distance = positive, height = nonNegative }),
 	}),
 	{
-		{
-			message = "minDistance must be at most distance",
-			holds = function(camera: CameraConfig): boolean
-				return camera.minDistance <= camera.distance
-			end,
-		},
 		{
 			message = "fovMax must be at least fovBase",
 			holds = function(camera: CameraConfig): boolean

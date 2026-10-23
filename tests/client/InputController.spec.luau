@@ -264,4 +264,20 @@ describe("InputController", function()
 		InputController:read(keys)
 		expect(keys.pump).toBe(true)
 	end)
+
+	it("starts paused when Roblox's menu is already open", function()
+		InputController:destroy()
+		local menu = { MenuOpened = Signal.new(), MenuClosed = Signal.new(), MenuIsOpen = true }
+		InputController:init({
+			Config = Fixtures.config(),
+			Parent = folder,
+			LookSettings = defaultLookSettings,
+			GuiService = menu,
+		})
+		expect(InputController.paused).toBe(true)
+		expect(InputController.context.Enabled).toBe(false)
+		menu.MenuClosed:Fire()
+		expect(InputController.paused).toBe(false)
+		expect(InputController.context.Enabled).toBe(true)
+	end)
 end)

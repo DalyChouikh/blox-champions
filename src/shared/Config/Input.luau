@@ -38,9 +38,11 @@ export type TouchLayout = {
 	-- Pixels: the ring drawn where the touch began, and the knob under the thumb.
 	stickRingSize: number,
 	stickKnobSize: number,
-	-- On a screen whose shorter side exceeds bigScreenSide pixels, the stick's sizes are bigScreenScale times larger.
+	-- On a screen whose shorter side exceeds bigScreenSide pixels, the stick is bigScreenStickScale times larger and
+	-- the buttons (their sizes and places) bigScreenButtonScale times, as Roblox grows its own stick and jump button.
 	bigScreenSide: number,
-	bigScreenScale: number,
+	bigScreenStickScale: number,
+	bigScreenButtonScale: number,
 	-- Pixels: a button's size, kept on every screen, so buttons placed apart never overlap.
 	buttonSize: UDim2,
 	-- Each button's center: pixels from the screen's bottom-right corner, as Roblox places its own jump button.
@@ -109,7 +111,8 @@ local defaults: InputConfig = {
 		pass = { "Pass", "CallPass" },
 		throw = { "ChargeThrow" },
 	},
-	-- Roblox's own stick area and sizes; the buttons in the owner's arrangement (2026-10-23), 80 pixels apart.
+	-- Roblox's own stick area and sizes; the buttons in the owner's arrangement (2026-10-23), 80 pixels apart. Grown
+	-- 1.5 times, the buttons' top (266 px from the bottom) and Roblox's 58 px top bar still fit any big screen.
 	touch = {
 		stickArea = UDim2.fromScale(0.4, 2 / 3),
 		stickDeadZone = 2,
@@ -117,7 +120,8 @@ local defaults: InputConfig = {
 		stickRingSize = 74,
 		stickKnobSize = 36,
 		bigScreenSide = 500,
-		bigScreenScale = 2,
+		bigScreenStickScale = 2,
+		bigScreenButtonScale = 1.5,
 		buttonSize = UDim2.fromOffset(72, 72),
 		buttons = {
 			uppercut = UDim2.new(1, -50, 1, -230),
@@ -194,37 +198,48 @@ local fields = Validate.record({
 	ballFocusMode = focusMode,
 	touchBallFocusMode = focusMode,
 	actions = Validate.record({ tackle = actionList, uppercut = actionList, pass = actionList, throw = actionList }),
-	touch = Validate.check(
-		Validate.check(
-			Validate.record({
-				stickArea = udim2,
-				stickDeadZone = Validate.number({ min = 0 }),
-				stickRadius = Validate.number({ above = 0 }),
-				stickRingSize = Validate.number({ above = 0 }),
-				stickKnobSize = Validate.number({ above = 0 }),
-				bigScreenSide = Validate.number({ above = 0 }),
-				bigScreenScale = Validate.number({ above = 0 }),
-				buttonSize = udim2,
-				buttons = Validate.record({
-					jump = udim2,
-					pump = udim2,
-					brake = udim2,
-					attach = udim2,
-					tackle = udim2,
-					uppercut = udim2,
-					pass = udim2,
-					throw = udim2,
-				}),
+	touch = Validate.checkAll(
+		Validate.record({
+			stickArea = udim2,
+			stickDeadZone = Validate.number({ min = 0 }),
+			stickRadius = Validate.number({ above = 0 }),
+			stickRingSize = Validate.number({ above = 0 }),
+			stickKnobSize = Validate.number({ above = 0 }),
+			bigScreenSide = Validate.number({ above = 0 }),
+			bigScreenStickScale = Validate.number({ above = 0 }),
+			bigScreenButtonScale = Validate.number({ above = 0 }),
+			buttonSize = udim2,
+			buttons = Validate.record({
+				jump = udim2,
+				pump = udim2,
+				brake = udim2,
+				attach = udim2,
+				tackle = udim2,
+				uppercut = udim2,
+				pass = udim2,
+				throw = udim2,
 			}),
-			function(touch: TouchLayout): boolean
-				return touch.stickRadius > touch.stickDeadZone
-			end,
-			"stickRadius must be above stickDeadZone"
-		),
-		function(touch: TouchLayout): boolean
-			return not buttonsOverlap(touch)
-		end,
-		"buttons must not overlap"
+		}),
+		{
+			{
+				message = "stickRadius must be above stickDeadZone",
+				holds = function(touch: TouchLayout): boolean
+					return touch.stickRadius > touch.stickDeadZone
+				end,
+			},
+			{
+				message = "buttonSize must be in pixels",
+				holds = function(touch: TouchLayout): boolean
+					return touch.buttonSize.X.Scale == 0 and touch.buttonSize.Y.Scale == 0
+				end,
+			},
+			{
+				message = "buttons must not overlap",
+				holds = function(touch: TouchLayout): boolean
+					return not buttonsOverlap(touch)
+				end,
+			},
+		}
 	),
 })
 
