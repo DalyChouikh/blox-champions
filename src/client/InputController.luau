@@ -4,8 +4,9 @@
 -- skating keys once per physics step, ActionController the action keys, and CameraController the look and Ball Focus.
 -- A press is counted when it happens, so one that starts and ends between two reads still counts; a hold is read as
 -- it is now, and the look as the rate Roblox's own camera reads (turn = state × dt). Touch controls hook their stick
--- pad and buttons in here. Every key stops while Roblox's menu is open: the keys fire then too (measured), and a hold
--- lets go.
+-- pad and buttons in here. Every key stops while Roblox's menu is open (also when it is open as this starts): the keys
+-- fire then too (measured), and a hold lets go. `paused` tells the skating and the actions that a hold let go because
+-- of the menu, not the player.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -47,6 +48,8 @@ export type InputController = {
 	-- The touch stick, as a move (x right, y forward, length 0..1).
 	setStick: (self: InputController, stick: Vector2) -> (),
 	setPaused: (self: InputController, paused: boolean) -> (),
+	-- Roblox's menu is open: every key is stopped.
+	paused: boolean,
 	destroy: (self: InputController) -> (),
 	_input: Config.InputConfig,
 	_move: InputAction,
@@ -145,16 +148,18 @@ local function lookScale(look: Config.LookBinding, invertY: boolean): Vector2
 	return Vector2.new(math.rad(degrees.X), math.rad(if invertY then -degrees.Y else degrees.Y))
 end
 
--- The player's settings as Roblox's own camera reads them (UserGameSettings).
-local function robloxLookSettings(): (number, number, boolean)
-	local settings = UserSettings():GetService("UserGameSettings")
-	return settings.MouseSensitivity, settings.GamepadCameraSensitivity, settings:GetCameraYInvertValue() < 0
+-- The player's settings as Roblox's own camera reads them, from its UserGameSettings (looked up once).
+local function lookSettingsOf(settings: UserGameSettings): () -> (number, number, boolean)
+	return function(): (number, number, boolean)
+		return settings.MouseSensitivity, settings.GamepadCameraSensitivity, settings:GetCameraYInvertValue() < 0
+	end
 end
 
 local InputController: InputController = {
 	name = "InputController",
 	dependencies = { "Config" },
 	context = nil :: any,
+	paused = false,
 	_input = nil :: any,
 	_move = nil :: any,
 	_pump = nil :: any,
@@ -167,7 +172,9 @@ local InputController: InputController = {
 	_stick = nil :: any,
 	_presses = { jump = 0, tackle = 0, uppercut = 0, pass = 0, ballFocus = 0 },
 	_connections = {},
-	_lookSettings = robloxLookSettings,
+	_lookSettings = function(): (number, number, boolean)
+		return 1, 1, false
+	end,
 	_mouseSensitivity = 1,
 	_stickSensitivity = 1,
 	_invertY = false,
@@ -184,7 +191,7 @@ local InputController: InputController = {
 		self.context = context
 		self._presses = { jump = 0, tackle = 0, uppercut = 0, pass = 0, ballFocus = 0 }
 		self._connections = {}
-		self._lookSettings = deps.LookSettings or robloxLookSettings
+		self._lookSettings = deps.LookSettings or lookSettingsOf(UserSettings():GetService("UserGameSettings"))
 
 		local move = newAction(context, NAMES.move, Enum.InputActionType.Direction2D)
 		for _, composite in input.move.composites do
@@ -235,6 +242,7 @@ local InputController: InputController = {
 				self:setPaused(false)
 			end)
 		)
+		self:setPaused(menu.MenuIsOpen == true)
 		context.Parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerScripts")
 	end,
 
@@ -306,6 +314,7 @@ local InputController: InputController = {
 	end,
 
 	setPaused = function(self: InputController, paused: boolean)
+		self.paused = paused
 		self.context.Enabled = not paused
 	end,
 

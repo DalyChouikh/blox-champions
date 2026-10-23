@@ -186,6 +186,25 @@ describe("CameraController", function()
 		expect((camera.CFrame.Position - focus()).Magnitude).toBeCloseTo(5, 3)
 	end)
 
+	it("keeps its focus inside the arena, under a roof just above the skater", function()
+		local root = Fixtures.root(rig)
+		local roof = Instance.new("Part")
+		roof.Anchored = true
+		roof.Size = Vector3.new(400, 1, 400)
+		-- Its underside 2 studs above the root: the focus, 4 up, would be past it.
+		roof.CFrame = CFrame.new(root.Position + Vector3.new(0, 2.5, 0))
+		roof.Parent = folder
+		roof:AddTag(Tags.RideSurface)
+		RideSurfaces:refresh()
+		CameraController:step(DT)
+		local underside = roof.Position.Y - roof.Size.Y / 2
+		expect(camera.CFrame.Position.Y < underside).toBe(true)
+		Fixtures.expectNear(
+			camera.CFrame.Position,
+			root.Position + Vector3.new(0, 2 - config.Camera.collisionMargin, 12)
+		)
+	end)
+
 	it("rolls with the skater riding a wall", function()
 		CameraController:step(DT)
 		skater().up = Vector3.xAxis
@@ -270,6 +289,32 @@ describe("CameraController", function()
 		Fixtures.scriptedBinding(InputController.context, "BallFocus"):Fire(true)
 		CameraController:step(10)
 		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1))
+	end)
+
+	it("ignores Ball Focus while there is no ball in the arena", function()
+		CameraController:step(DT)
+		Fixtures.scriptedBinding(InputController.context, "BallFocus"):Fire(true)
+		CameraController:step(10)
+		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1))
+	end)
+
+	it("forgets a touch toggle once the device holds Ball Focus instead", function()
+		preferred = Enum.PreferredInput.Touch
+		CameraController:step(DT)
+		local target = ballAt(focus() + Vector3.new(30, 0, 0))
+		tapBallFocus(Fixtures.scriptedBinding(InputController.context, "BallFocus"))
+		CameraController:step(10)
+		Fixtures.expectNear(camera.CFrame.LookVector, (target.Position - focus()).Unit, 1e-2)
+		-- A gamepad, its key up, ends the toggle: turned back by hand and on touch again, the camera stays.
+		preferred = Enum.PreferredInput.Gamepad
+		CameraController:step(DT)
+		local look = Fixtures.scriptedBinding(InputController.context, "Look")
+		look:Fire(Vector2.new(-(math.pi / 2) / DT, 0))
+		CameraController:step(DT)
+		look:Fire(Vector2.zero)
+		preferred = Enum.PreferredInput.Touch
+		CameraController:step(1)
+		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1), 1e-2)
 	end)
 
 	it("toggles Ball Focus with a tap on touch", function()

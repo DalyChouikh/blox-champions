@@ -22,8 +22,8 @@ export type ControlLabels = {
 }
 
 -- How the touch controls look: the stick's ring and the buttons on `background`, the knob and the labels in
--- `foreground`, rounded by `corner`. A label is at most textSize pixels tall, shrinking to fit within textPadding
--- pixels of its button's sides.
+-- `foreground` (the knob knobTransparency see-through), rounded by `corner`. A label is at most textSize pixels tall,
+-- shrinking to fit within textPadding pixels of its button's sides.
 export type TouchStyle = {
 	background: Color3,
 	backgroundTransparency: number,
@@ -32,6 +32,7 @@ export type TouchStyle = {
 	corner: UDim,
 	textSize: number,
 	textPadding: number,
+	knobTransparency: number,
 }
 
 export type UIConfig = {
@@ -67,6 +68,7 @@ local defaults: UIConfig = {
 		corner = UDim.new(0.5, 0),
 		textSize = 18,
 		textPadding = 6,
+		knobTransparency = 0,
 	},
 }
 
@@ -113,6 +115,7 @@ local schema = Validate.record({
 		-- Roblox clamps text sizes to 1..100 (measured).
 		textSize = Validate.number({ min = 1, max = 100, integer = true }),
 		textPadding = Validate.number({ min = 0 }),
+		knobTransparency = Validate.number({ min = 0, max = 1 }),
 	}),
 })
 

@@ -4,8 +4,8 @@
 -- - filters the ray's normal;
 -- - works out the draft and the attach;
 -- - steps SkateMath and writes the result into the skater body the server built.
--- A knocked-down skater (the server's KnockedDown attribute) lets go of any attach and only slides. Actions push the
--- skater through `push`.
+-- A knocked-down skater (the server's KnockedDown attribute) lets go of any attach and only slides; while Roblox's menu
+-- holds the keys the skater lets go of any attach too, with no release boost. Actions push the skater through `push`.
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
 -- humanoid's state machine off here, on the owning client only: the server keeps it on so deaths still fire Died.
 
@@ -177,11 +177,12 @@ local function currentLeader(self: SkateController): Attach.Candidate?
 	return nil
 end
 
--- The stick as a world direction from the camera, level with the ground.
-local function stickDirection(self: SkateController, stick: Vector2): Vector3
+-- The stick as a direction on the surface the skater rides, as the camera shows it: the camera rolls with that surface
+-- (CameraController), so on a wall the stick's right is the screen's right along the wall.
+local function stickDirection(self: SkateController, stick: Vector2, up: Vector3): Vector3
 	local camera = self._camera.CFrame
-	local right = Vectors.alongSurface(camera.RightVector, worldUp(self))
-	local forward = Vectors.alongSurface(camera.LookVector, worldUp(self))
+	local right = Vectors.alongSurface(camera.RightVector, up)
+	local forward = Vectors.alongSurface(camera.LookVector, up)
 	if right.Magnitude > Vectors.EPSILON then
 		right = right.Unit
 	end
@@ -208,7 +209,7 @@ local function moveSkater(self: SkateController, root: BasePart, skater: SkateMa
 	local movement = self._config.Movement
 	local keys = self._keys
 	local attach = self._attach
-	if self.knockedDown then
+	if self.knockedDown or self._inputController.paused then
 		if attach.leader ~= nil then
 			attach:reset()
 			skater:release(Vector3.zero)
@@ -423,7 +424,7 @@ local SkateController: SkateController = {
 		local keys = self._keys
 		self._inputController:read(keys)
 		local input = self._input
-		input.move = stickDirection(self, keys.move)
+		input.move = stickDirection(self, keys.move, skater.up)
 		input.pump = keys.pump
 		input.brake = keys.brake
 		input.jump = keys.jump

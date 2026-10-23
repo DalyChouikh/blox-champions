@@ -207,6 +207,30 @@ describe("SkateController", function()
 		expect(SkateController.attachable).toBe(false)
 	end)
 
+	it("steers along the screen on a wall, as the rolled camera shows it", function()
+		-- A camera rolled onto a wall whose up is -X, looking along -Z: its right is +Y, up the wall.
+		setup({ Camera = { CFrame = CFrame.lookAlong(Vector3.zero, -Vector3.zAxis, -Vector3.xAxis) } })
+		SkateController:bind(rig)
+		local skater = SkateController.skater :: any
+		skater.up = -Vector3.xAxis
+		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(1, 0))
+		SkateController:step(1 / 60)
+		Fixtures.expectNear(SkateController.move, Vector3.new(0, 1, 0))
+	end)
+
+	it("lets go of an attach without its boost when Roblox's menu opens", function()
+		local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
+		table.insert(others, { player = "2", team = "Blue", root = Fixtures.root(leader) })
+		Fixtures.scriptedBinding(InputController.context, "Attach"):Fire(true)
+		SkateController:step(1 / 60)
+		expect((SkateController.skater :: any).mode).toBe("Attached")
+		-- The menu lets go of the key, not the player: no release boost.
+		InputController:setPaused(true)
+		SkateController:step(1 / 60)
+		expect((SkateController.skater :: any).mode).never.toBe("Attached")
+		expect(velocityOf(rig).Magnitude).toBeLessThan(movement.attachBoostSpeed)
+	end)
+
 	it("keeps telling the server about pump and brake during the freeze", function()
 		Fixtures.root(rig).Anchored = true
 		Fixtures.scriptedBinding(InputController.context, "Pump"):Fire(true)

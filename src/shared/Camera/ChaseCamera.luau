@@ -15,7 +15,8 @@ export type Target = {
 	up: Vector3,
 	-- The velocity the swing-back turns behind.
 	travel: Vector3,
-	-- This frame's turn in radians: x > 0 turns right, y > 0 tips down.
+	-- The look input as a rate, in radians per second, as Roblox's own camera reads it (a step turns it for dt): x > 0
+	-- turns right, y > 0 tips down.
 	look: Vector2,
 	-- The device swings back behind the travel (gamepad and touch; never a mouse).
 	recenter: boolean,
@@ -91,7 +92,8 @@ local function roll(self: ChaseCamera, toward: Vector3, dt: number)
 	self.forward = onPlane(Vectors.rotateAbout(self.forward, axis, turn), self.up, self.forward)
 end
 
--- Turns right by look.X and tips down by look.Y within the pitch limits; no input counts toward the swing-back.
+-- Turns right at look.X and tips down at look.Y radians per second, within the pitch limits; no input counts toward
+-- the swing-back.
 local function applyLook(self: ChaseCamera, look: Vector2, dt: number)
 	if look.X == 0 and look.Y == 0 then
 		self.idle += dt
@@ -99,9 +101,9 @@ local function applyLook(self: ChaseCamera, look: Vector2, dt: number)
 	end
 	self.idle = 0
 	if look.X ~= 0 then
-		self.forward = onPlane(Vectors.rotateAbout(self.forward, self.up, -look.X), self.up, self.forward)
+		self.forward = onPlane(Vectors.rotateAbout(self.forward, self.up, -look.X * dt), self.up, self.forward)
 	end
-	self.pitch = math.clamp(self.pitch - look.Y, self._minPitch, self._maxPitch)
+	self.pitch = math.clamp(self.pitch - look.Y * dt, self._minPitch, self._maxPitch)
 end
 
 -- Any unit vector perpendicular to the unit `up`.
@@ -127,12 +129,13 @@ function ChaseCamera.new(camera: Config.CameraConfig, hardCap: number, up: Vecto
 	return chase
 end
 
--- Behind `forward` on `up`, level, as at a kickoff or for a new character.
+-- Behind `forward` on `up`, level, at the resting field of view, as at a kickoff or for a new character.
 function ChaseCamera.reset(self: ChaseCamera, up: Vector3, forward: Vector3)
 	self.up = up.Unit
 	self.forward = onPlane(forward, self.up, perpendicular(self.up))
 	self.pitch = 0
 	self.idle = 0
+	self.fov = self._camera.fovBase
 end
 
 function ChaseCamera.step(self: ChaseCamera, target: Target, dt: number)
@@ -141,6 +144,8 @@ function ChaseCamera.step(self: ChaseCamera, target: Target, dt: number)
 	applyLook(self, target.look, dt)
 	local aimAt = target.aimAt
 	if aimAt ~= nil and aimAt.Magnitude > Vectors.EPSILON then
+		-- Ball Focus turns the camera: the look has not rested, so no swing-back follows it at once.
+		self.idle = 0
 		local share = closed(camera.ballFocusResponse, dt)
 		turnToward(self, aimAt, share)
 		local wanted = math.asin(math.clamp(aimAt.Unit:Dot(self.up), -1, 1))
@@ -165,12 +170,13 @@ function ChaseCamera.targetFov(camera: Config.CameraConfig, speed: number, hardC
 	return camera.fovBase + (camera.fovMax - camera.fovBase) * math.clamp(speed / hardCap, 0, 1)
 end
 
--- How far back the camera sits: `desired`, or in front of a hit `hit` studs away, never closer than minDistance.
+-- How far along a ray a point may go: `desired`, or collisionMargin in front of a hit `hit` studs away, never past
+-- it (nor behind the ray's start).
 function ChaseCamera.pullIn(camera: Config.CameraConfig, desired: number, hit: number?): number
 	if hit == nil then
 		return desired
 	end
-	return math.max(camera.minDistance, math.min(desired, hit - camera.collisionMargin))
+	return math.max(0, math.min(desired, hit - camera.collisionMargin))
 end
 
 return ChaseCamera

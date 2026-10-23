@@ -163,6 +163,7 @@ describe("ActionController", function()
 	it("charges a throw for as long as it is held", function()
 		setup()
 		BallCarrier:set(LOCAL_ID)
+		frame() -- the throw key seen up while holding the ball
 		local throw = bindingOf("Throw")
 		throw:Fire(true)
 		for _ = 1, 30 do
@@ -181,6 +182,7 @@ describe("ActionController", function()
 	it("keeps a throw released during a dodge for when the dodge ends", function()
 		setup()
 		BallCarrier:set(LOCAL_ID)
+		frame() -- the throw key seen up while holding the ball
 		local throw = bindingOf("Throw")
 		throw:Fire(true)
 		for _ = 1, 15 do
@@ -202,6 +204,49 @@ describe("ActionController", function()
 		expect(#requests).toBe(2)
 		expect(requests[2].action).toBe("ChargeThrow")
 		expect(requests[2].charge).toBeCloseTo(16 * DT, 6)
+	end)
+
+	it("starts a charge only from a press made while holding the ball", function()
+		setup()
+		local throw = bindingOf("Throw")
+		-- Held for Ball Focus without the ball, through the catch, then let go: nothing is thrown.
+		throw:Fire(true)
+		frame()
+		BallCarrier:set(LOCAL_ID)
+		for _ = 1, 10 do
+			frame()
+		end
+		throw:Fire(false)
+		frame()
+		expect(requests).toEqual({})
+		-- A new press with the ball charges, and letting go throws.
+		throw:Fire(true)
+		for _ = 1, 10 do
+			frame()
+		end
+		throw:Fire(false)
+		frame()
+		expect(#requests).toBe(1)
+		expect(requests[1].action).toBe("ChargeThrow")
+		expect(requests[1].charge).toBeCloseTo(10 * DT, 6)
+	end)
+
+	it("drops a charge, without throwing, when Roblox's menu opens", function()
+		setup()
+		BallCarrier:set(LOCAL_ID)
+		frame()
+		local throw = bindingOf("Throw")
+		throw:Fire(true)
+		for _ = 1, 10 do
+			frame()
+		end
+		-- The menu lets go of the key, not the player.
+		InputController:setPaused(true)
+		frame()
+		frame()
+		InputController:setPaused(false)
+		frame()
+		expect(requests).toEqual({})
 	end)
 
 	it("predicts the ball leaving with a pass, and takes it back if the pass is refused", function()

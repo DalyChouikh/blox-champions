@@ -232,7 +232,8 @@ describe("Config defaults", function()
 			stickRingSize = 74,
 			stickKnobSize = 36,
 			bigScreenSide = 500,
-			bigScreenScale = 2,
+			bigScreenStickScale = 2,
+			bigScreenButtonScale = 1.5,
 			buttonSize = UDim2.fromOffset(72, 72),
 			-- Pixels from the bottom-right corner, 80 apart: three columns, the right one a step higher.
 			buttons = {
@@ -252,7 +253,6 @@ describe("Config defaults", function()
 		expect(Config.defaults().Camera).toEqual({
 			distance = 12,
 			height = 4,
-			minDistance = 2,
 			collisionMargin = 0.5,
 			fovBase = 70,
 			fovMax = 90,
@@ -309,6 +309,7 @@ describe("Config defaults", function()
 			corner = UDim.new(0.5, 0),
 			textSize = 18,
 			textPadding = 6,
+			knobTransparency = 0,
 		})
 	end)
 
@@ -607,7 +608,6 @@ describe("Config.forMode", function()
 	it("rejects a camera or touch layout that contradicts itself", function()
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			{ overrides = { Camera = { fovMax = 60 } }, message = "Camera: fovMax must be at least fovBase" },
-			{ overrides = { Camera = { minDistance = 20 } }, message = "Camera: minDistance must be at most distance" },
 			{
 				overrides = { Input = { touch = { stickRadius = 1 } } },
 				message = "Input.touch: stickRadius must be above stickDeadZone",
@@ -625,6 +625,11 @@ describe("Config.forMode", function()
 			{
 				overrides = { Input = { touch = { buttons = { brake = UDim2.new(1, -130, 1, -110) } } } },
 				message = "Input.touch: buttons must not overlap",
+			},
+			-- The overlap rule measures pixels, so a button's size must be in pixels.
+			{
+				overrides = { Input = { touch = { buttonSize = UDim2.fromScale(0.1, 0.1) } } },
+				message = "Input.touch: buttonSize must be in pixels",
 			},
 		}
 		for _, case in cases do

@@ -1,14 +1,15 @@
 --!strict
 -- The camera (spec §8.4), rendered before each frame is drawn (FrameController). It takes Roblox's camera over
--- (Scriptable turns Roblox's own camera off) and sits `distance` behind and `height` above the skater along its own
--- up, which rolls with the surface the skater rides (ChaseCamera). The look input turns it; on a gamepad or touch it
--- swings back behind the skater once the look rests; its view widens with speed. One ray through the ride surfaces
--- pulls it in in front of the arena, so it never sees through a wall or the roof. With a mouse it keeps the mouse
--- locked to the screen's center, except while Roblox's menu is open. At a kickoff, and for a new character, it starts
--- behind the skater's facing. Ball Focus (§8.2) turns it toward the ball while the player doesn't carry it: held on
--- PC and gamepad, toggled by a tap on touch (Config.Input). A player with no character (or whose character is gone
--- before the next is bound) watches the ball, from the spectator's distance and height above it; with no ball either,
--- the camera holds still.
+-- (Scriptable turns Roblox's own camera off) and sits `distance` behind and `height` above the skater along its own up,
+-- which rolls with the surface the skater rides (ChaseCamera). The look input turns it; on a gamepad or touch it swings
+-- back behind the skater once the look rests; its view widens with speed. Two rays through the ride surfaces keep it
+-- inside the arena: the point it looks past stops below a roof, and the camera stops in front of a wall, so it never
+-- sees through either, however close that brings it (the owner's choice). With a mouse it keeps the mouse locked to the
+-- screen's center, except while Roblox's menu is open. At a kickoff, and for a new character, it starts behind the
+-- skater's facing, at its resting view. Ball Focus (§8.2) turns it toward the ball while the player doesn't carry it:
+-- held on PC and gamepad, toggled by a tap on touch (Config.Input). A player with no character (or whose character is
+-- gone before the next is bound) watches the ball, from the spectator's distance and height above it; with no ball
+-- either, the camera holds still.
 
 local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
@@ -110,22 +111,29 @@ local function follow(
 	local target = self._target
 	target.up = up
 	target.travel = travel
-	target.look = self._keys.look * dt
+	target.look = self._keys.look
 	target.recenter = recenter
 	target.aimAt = aimAt
 	target.speed = speed
 	self.chase:step(target, dt)
 end
 
--- Sets the camera `distance` behind the point `height` above `anchor`, pulled in in front of any ride surface.
+-- How far along a ray from `origin` the camera may go before a ride surface: `desired`, or pulled in front of a hit.
+local function reach(self: CameraController, origin: Vector3, direction: Vector3, desired: number): number
+	local hit = self._raycast(origin, direction * desired, self._surfaces.params)
+	return ChaseCamera.pullIn(self._config.Camera, desired, if hit ~= nil then hit.Distance else nil)
+end
+
+-- Sets the camera `distance` behind the point `height` above `anchor`. Two rays keep both inside the arena: the
+-- point stops in front of any ride surface above the anchor (a roof over a leaping skater), and the camera in front
+-- of any behind the point.
 local function place(self: CameraController, anchor: Vector3, height: number, distance: number)
 	local chase = self.chase
-	local focus = anchor + chase.up * height
+	local up = chase.up
+	local focus = anchor + up * reach(self, anchor, up, height)
 	local look = chase:lookVector()
-	local hit = self._raycast(focus, -look * distance, self._surfaces.params)
-	local back = ChaseCamera.pullIn(self._config.Camera, distance, if hit ~= nil then hit.Distance else nil)
 	local camera = self._camera
-	camera.CFrame = CFrame.lookAlong(focus - look * back, look, chase.up)
+	camera.CFrame = CFrame.lookAlong(focus - look * reach(self, focus, -look, distance), look, up)
 	camera.FieldOfView = chase.fov
 end
 
