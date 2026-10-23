@@ -13,8 +13,8 @@ export type Control = "jump" | "pump" | "brake" | "attach" | "tackle" | "uppercu
 -- The controls that start actions.
 export type ActionKey = "tackle" | "uppercut" | "pass" | "throw"
 -- A look input and how far it turns the camera: degrees per pixel for a mouse or a swipe, per second at full tilt for
--- a stick. A negative y turns the other way.
-export type LookBinding = { key: Enum.KeyCode, degPerUnit: Vector2 }
+-- a stick. A negative y turns the other way. A stick's responseCurve (1..10) gives finer control near its center.
+export type LookBinding = { key: Enum.KeyCode, degPerUnit: Vector2, responseCurve: number }
 -- Ball Focus while held, or switched on and off by presses.
 export type FocusMode = "Hold" | "Toggle"
 export type TouchButtons = {
@@ -84,9 +84,9 @@ local defaults: InputConfig = {
 	throw = { Enum.KeyCode.MouseLeftButton, Enum.KeyCode.ButtonL2 },
 	-- Roblox's own camera scales.
 	look = {
-		mouse = { key = Enum.KeyCode.MouseDelta, degPerUnit = Vector2.new(0.5, 0.385) },
-		stick = { key = Enum.KeyCode.Thumbstick2, degPerUnit = Vector2.new(240, -185) },
-		touch = { key = Enum.KeyCode.TouchDelta, degPerUnit = Vector2.new(1, 0.66) },
+		mouse = { key = Enum.KeyCode.MouseDelta, degPerUnit = Vector2.new(0.5, 0.385), responseCurve = 1 },
+		stick = { key = Enum.KeyCode.Thumbstick2, degPerUnit = Vector2.new(240, -185), responseCurve = 2 },
+		touch = { key = Enum.KeyCode.TouchDelta, degPerUnit = Vector2.new(1, 0.66), responseCurve = 1 },
 	},
 	ballFocus = { Enum.KeyCode.MouseRightButton, Enum.KeyCode.ButtonL2 },
 	ballFocusMode = "Hold",
@@ -119,7 +119,11 @@ local defaults: InputConfig = {
 local key = Validate.enumItem(Enum.KeyCode)
 local keys = Validate.list(key)
 local udim2 = Validate.datatype("UDim2")
-local lookBinding = Validate.record({ key = key, degPerUnit = Validate.datatype("Vector2") })
+local lookBinding = Validate.record({
+	key = key,
+	degPerUnit = Validate.datatype("Vector2"),
+	responseCurve = Validate.number({ min = 1, max = 10 }),
+})
 local focusMode = Validate.string({ oneOf = { "Hold", "Toggle" } })
 local actionList = Validate.check(
 	Validate.list(Validate.check(Validate.string(), function(name: string): boolean

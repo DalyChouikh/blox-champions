@@ -211,9 +211,9 @@ describe("Config defaults", function()
 		expect(input.throw).toEqual({ Enum.KeyCode.MouseLeftButton, Enum.KeyCode.ButtonL2 })
 		-- Roblox's own camera scales (degrees per pixel, per second at full tilt, per pixel).
 		expect(input.look).toEqual({
-			mouse = { key = Enum.KeyCode.MouseDelta, degPerUnit = Vector2.new(0.5, 0.385) },
-			stick = { key = Enum.KeyCode.Thumbstick2, degPerUnit = Vector2.new(240, -185) },
-			touch = { key = Enum.KeyCode.TouchDelta, degPerUnit = Vector2.new(1, 0.66) },
+			mouse = { key = Enum.KeyCode.MouseDelta, degPerUnit = Vector2.new(0.5, 0.385), responseCurve = 1 },
+			stick = { key = Enum.KeyCode.Thumbstick2, degPerUnit = Vector2.new(240, -185), responseCurve = 2 },
+			touch = { key = Enum.KeyCode.TouchDelta, degPerUnit = Vector2.new(1, 0.66), responseCurve = 1 },
 		})
 		expect(input.ballFocus).toEqual({ Enum.KeyCode.MouseRightButton, Enum.KeyCode.ButtonL2 })
 		expect(input.ballFocusMode).toBe("Hold")
