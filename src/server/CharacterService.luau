@@ -280,11 +280,13 @@ local CharacterService: CharacterService = {
 			if team ~= nil and humanoid ~= nil and humanoid.Health > 0 and root ~= nil then
 				count += 1
 				local holder = holders[count]
+				local canCatch = character:GetAttribute(Attributes.KnockedDown) ~= true
 				if holder == nil then
-					holders[count] = { player = player, root = root }
+					holders[count] = { player = player, root = root, canCatch = canCatch }
 				else
 					holder.player = player
 					holder.root = root
+					holder.canCatch = canCatch
 				end
 			end
 		end

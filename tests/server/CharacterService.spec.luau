@@ -102,6 +102,18 @@ describe("CharacterService", function()
 		expect(roots).toEqual({ A = "HumanoidRootPart", B = "HumanoidRootPart" })
 	end)
 
+	it("marks knocked-down players unable to catch", function()
+		local a = Fixtures.rig(folder, "A", CFrame.new(0, 3, 0))
+		CharacterService:adopt("A", a)
+		CharacterService:adopt("B", Fixtures.rig(folder, "B", CFrame.new(5, 3, 0)))
+		a:SetAttribute(Attributes.KnockedDown, true)
+		local canCatch: { [string]: boolean } = {}
+		for _, holder in CharacterService:holders() do
+			canCatch[holder.player] = holder.canCatch
+		end
+		expect(canCatch).toEqual({ A = false, B = true })
+	end)
+
 	it("lists only seated players, so nobody the match does not count can catch the ball", function()
 		CharacterService:adopt("A", Fixtures.rig(folder, "A", CFrame.new(0, 3, 0)))
 		CharacterService:adopt("Z", Fixtures.rig(folder, "Z", CFrame.new(5, 3, 0)))

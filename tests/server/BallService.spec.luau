@@ -31,8 +31,13 @@ local function ballAt(): string?
 	return if parent ~= nil then parent.Name else nil
 end
 
-local function holder(name: string, rig: Model): BallService.Holder
-	return { player = name, root = rig:FindFirstChild("HumanoidRootPart") :: BasePart }
+-- A holder who can catch, unless `canCatch` is false (knocked down).
+local function holder(name: string, rig: Model, canCatch: boolean?): BallService.Holder
+	return {
+		player = name,
+		root = rig:FindFirstChild("HumanoidRootPart") :: BasePart,
+		canCatch = canCatch ~= false,
+	}
 end
 
 local function isSpawn(position: Vector3): boolean
@@ -190,6 +195,53 @@ describe("BallService", function()
 		expect(BallService.part.CanTouch).toBe(true)
 		rig:PivotTo(rig:GetPivot() + Vector3.new(10, 0, 0))
 		Fixtures.expectNear(BallService.part.Position, carriedAt)
+	end)
+
+	it("drops the ball with the carrier's momentum", function()
+		caughtBy("A")
+		BallService:drop(Vector3.new(30, 0, 0))
+		expect(BallService.state.status).toBe("Loose")
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(30, 0, 0))
+	end)
+
+	it("homes a pass on its target", function()
+		local a = caughtBy("A")
+		local b = Fixtures.rig(folder, "B", CFrame.new(BallService.part.Position + Vector3.new(20, 0, -30)))
+		BallService:pass("A", Vector3.new(0, 0, -90), "B")
+		expect(BallService.state.status).toBe("Flying")
+		local root = b:FindFirstChild("HumanoidRootPart") :: BasePart
+		local turn = (root.Position - BallService.part.Position).Unit * 60 * 0.1
+		BallService:step(0.1, { holder("A", a), holder("B", b) })
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -90) + turn)
+	end)
+
+	it("stops homing when the target can no longer catch", function()
+		local a = caughtBy("A")
+		local b = Fixtures.rig(folder, "B", CFrame.new(BallService.part.Position + Vector3.new(20, 0, -30)))
+		BallService:pass("A", Vector3.new(0, 0, -90), "B")
+		BallService:step(0.1, { holder("A", a), holder("B", b, false) })
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -90))
+		-- For good: back on their feet, they are no longer homed on.
+		BallService:step(0.1, { holder("A", a), holder("B", b) })
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -90))
+	end)
+
+	it("lets a knocked-down player not catch, but reports their touch", function()
+		BallService:spawn()
+		local at = BallService.part.Position
+		BallService.part.AssemblyLinearVelocity = Vector3.new(0, 0, 12)
+		local down = Fixtures.rig(folder, "B", CFrame.new(at + Vector3.new(2, 0, 0)))
+		local far = Fixtures.rig(folder, "A", CFrame.new(at + Vector3.new(20, 0, 0)))
+		local frame = BallService:step(1 / 60, { holder("A", far), holder("B", down, false) })
+		expect(frame.picker).toBeNil()
+		expect(frame.toucher).toBe("B")
+		Fixtures.expectNear(frame.touchPosition, at)
+		Fixtures.expectNear(frame.touchVelocity, Vector3.new(0, 0, 12))
+
+		far:PivotTo(CFrame.new(at + Vector3.new(6, 0, 0)))
+		frame = BallService:step(1 / 60, { holder("A", far), holder("B", down, false) })
+		expect(frame.picker).toBe("A")
+		expect(frame.toucher).toBeNil()
 	end)
 
 	it("lands a thrown ball when it touches the arena, not a player", function()
