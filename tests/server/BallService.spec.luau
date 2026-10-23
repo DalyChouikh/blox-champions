@@ -8,6 +8,8 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 local BallService = require(game:GetService("ServerScriptService").Server.BallService)
 local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local SkaterBody = require(game:GetService("ServerScriptService").Server.SkaterBody)
+local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 
 local config = Fixtures.config()
 local SPAWNS = { CFrame.new(-140, 6, 0), CFrame.new(140, 6, 0) }
@@ -202,6 +204,39 @@ describe("BallService", function()
 		BallService:drop(Vector3.new(30, 0, 0))
 		expect(BallService.state.status).toBe("Loose")
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(30, 0, 0))
+	end)
+
+	it("lets the ball pass through the player who let go of it until it is clear of them", function()
+		local rig = caughtBy("A")
+		SkaterBody.build(rig, config.Movement)
+		local root = rig:FindFirstChild(SkaterRig.root) :: BasePart
+		local collider = rig:FindFirstChild(SkaterRig.collider) :: BasePart
+		local touch = config.Ball.radius + config.Movement.colliderDiameter / 2 + config.Network.pickupLagToleranceStuds
+		local function passesThroughA(): boolean
+			local grace = BallService.part:FindFirstChildOfClass("NoCollisionConstraint")
+			if grace then
+				return grace.Enabled and grace.Part0 == BallService.part and grace.Part1 == collider
+			end
+			return false
+		end
+		local function ballAtDistance(distance: number)
+			BallService.part.CFrame = CFrame.new(root.Position + Vector3.xAxis * distance)
+			BallService:step(1 / 60, { holder("A", rig) })
+		end
+		-- Thrown across A's body: it leaves from A's side, inside touch distance.
+		BallService:throw("A", Vector3.new(-90, 0, 0))
+		expect(passesThroughA()).toBe(true)
+		ballAtDistance(touch - 0.5)
+		expect(passesThroughA()).toBe(true)
+		-- Clear of A, it can hit A again (a rebound off a wall).
+		ballAtDistance(touch + 0.5)
+		expect(passesThroughA()).toBe(false)
+		-- Caught again after the rethrow delay, then dropped: the same.
+		BallService.part.CFrame = CFrame.new(root.Position)
+		BallService:step(config.Ball.rethrowPickupDelay, { holder("A", rig) })
+		expect(BallService.state.carrier).toBe("A")
+		BallService:drop()
+		expect(passesThroughA()).toBe(true)
 	end)
 
 	it("homes a pass on its target", function()

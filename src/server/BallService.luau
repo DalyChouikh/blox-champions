@@ -5,7 +5,8 @@
 -- and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each frame `step` reports how it really
 -- moved, a throw since the last frame, who caught it, and whose body it touched. Jumps the server makes (a spawn, a
 -- respawn, the snap to a catcher's side) are never reported as movement, so they can never cross a gate or the ring.
--- A pass homes on its target while it flies and the target can catch.
+-- A pass homes on its target while it flies and the target can catch. A ball passes through the player who let go of
+-- it until it is clear of them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -16,6 +17,7 @@ local Bounds = require(ReplicatedStorage.Shared.Arena.Geometry.Bounds)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Homing = require(ReplicatedStorage.Shared.Ball.Homing)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
+local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
@@ -76,6 +78,9 @@ export type BallService = {
 	_last: Vector3,
 	_pendingThrower: PlayerId?,
 	_weld: Weld?,
+	-- Built with each ball part. While enabled, its Part1 is the collider of the player who just let go of the ball,
+	-- until the ball is clear of them.
+	_grace: NoCollisionConstraint,
 	_touched: RBXScriptConnection?,
 	_canPickUp: (PlayerId) -> boolean,
 	-- Every holder this frame, and which of them can catch.
@@ -110,10 +115,15 @@ local function build(self: BallService)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 	local part = newBallPart(self._config)
 	part.Parent = model
+	local grace = Instance.new("NoCollisionConstraint")
+	grace.Part0 = part
+	grace.Enabled = false
+	grace.Parent = part
 	model.Parent = ServerStorage
 	self.model = model
 	self.part = part
 	self._weld = nil
+	self._grace = grace
 	self._hidden = true
 	self._teleported = true
 	self._last = part.Position
@@ -135,11 +145,23 @@ local function rebuiltIfDestroyed(self: BallService): boolean
 end
 
 -- Lets go of the ball if someone carries it: a free physics part again, simulated by the server. The weld goes
--- first: network ownership cannot be set on a part welded to an anchored one (a frozen character).
+-- first: network ownership cannot be set on a part welded to an anchored one (a frozen character). The ball leaves
+-- from the carrier's side, within touch of their collider, so it passes through them until it is clear of them: a
+-- throw across their body would otherwise bounce off it.
 local function release(self: BallService)
 	local weld = self._weld
 	if weld == nil then
 		return
+	end
+	local root = weld.Part0
+	local character = if root then root.Parent else nil
+	local collider = if character then character:FindFirstChild(SkaterRig.collider) :: BasePart? else nil
+	local grace = self._grace
+	if collider then
+		grace.Part1 = collider
+		grace.Enabled = true
+	else
+		grace.Enabled = false
 	end
 	weld:Destroy()
 	self._weld = nil
@@ -233,6 +255,14 @@ local function candidatesFrom(self: BallService, holders: { Holder }): { Pickup.
 	return candidates
 end
 
+-- Once the ball is beyond touch distance of the player who let go of it, it can hit them again.
+local function clearOfReleaser(self: BallService, position: Vector3)
+	local grace = self._grace
+	if grace.Enabled and (position - grace.Part1.Position).Magnitude > self._contact then
+		grace.Enabled = false
+	end
+end
+
 -- Steers a pass toward its target while it flies and the target can catch. Once either stops, it flies on alone.
 local function home(self: BallService, holders: { Holder }, position: Vector3, dt: number)
 	local target = self._passTarget
@@ -265,6 +295,7 @@ local BallService: BallService = {
 	_hidden = true,
 	_teleported = true,
 	_last = Vector3.zero,
+	_grace = nil :: any,
 	_candidates = {},
 	_catchers = {},
 	_canPickUp = function(_player: PlayerId): boolean
@@ -380,6 +411,7 @@ local BallService: BallService = {
 		end
 
 		local position = self.part.Position
+		clearOfReleaser(self, position)
 		if self._teleported then
 			self._teleported = false
 		else
