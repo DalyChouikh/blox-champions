@@ -1,18 +1,19 @@
 --!strict
 -- Poses every character this client can see (spec §7.1, plan decision 10): the lean into a turn, a crouch while
--- pumping, a lean back while braking, a tuck in the air and the arm that carries the ball. The local skater's state
--- comes from SkateController; everyone else's from their character's attributes and the ground under them. The joints
--- it writes are local to this client: the server never sees them, and every client poses its own view.
+-- pumping, a lean back while braking, a tuck in the air, the arm that carries the ball, a lunge and a knockdown. The
+-- local skater's state comes from SkateController and its lunge from ActionController, at once; everyone else's from
+-- their character's attributes and the ground under them. The carrier comes from BallCarrier. The joints it writes
+-- are local to this client: the server never sees them, and every client poses its own view.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Actions = require(ReplicatedStorage.Shared.Config.Actions)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Pose = require(ReplicatedStorage.Shared.Skate.Pose)
-local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
@@ -41,6 +42,10 @@ type Tracked = {
 
 -- The local skater's state, as SkateController publishes it.
 type LocalSkate = { skater: SkateMath.Skater?, pumping: boolean, braking: boolean }
+-- Who carries the ball, as BallCarrier keeps it.
+type Carrier = { carrier: PlayerId? }
+-- The local skater's action pose, as ActionController gives it.
+type LocalActions = { pose: (self: any) -> string }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
 export type PoseController = {
@@ -51,14 +56,13 @@ export type PoseController = {
 	-- Starts posing a character. `isLocal` marks this player's own character, which reads SkateController's state.
 	track: (self: PoseController, character: Model, isLocal: boolean) -> (),
 	untrack: (self: PoseController, character: Model) -> (),
-	-- The player carrying the ball, or nil while it is loose.
-	setCarrier: (self: PoseController, player: PlayerId?) -> (),
 	step: (self: PoseController, dt: number) -> (),
 	_config: any,
 	_skate: LocalSkate,
 	_gravity: number,
 	_playerIdOf: (character: Model) -> PlayerId?,
-	_carrier: PlayerId?,
+	_carrier: Carrier,
+	_actions: LocalActions,
 	_tracked: { [Model]: Tracked },
 	_surfaces: RaycastParams,
 	-- Records reused for every character, one at a time: each is composed and written before the next starts.
@@ -162,15 +166,20 @@ local function poseOne(self: PoseController, tracked: Tracked, dt: number)
 	input.lean = updateLean(self, tracked, tracked.root.AssemblyLinearVelocity, dt)
 	input.bodyOffset = tracked.bodyOffset
 	input.airborne = isAirborne(self, tracked)
+	local character = tracked.character
 	if tracked.isLocal then
 		input.pumping = skate.pumping
 		input.braking = skate.braking
+		input.lunging = self._actions:pose() == "Lunge"
 	else
-		input.pumping = tracked.character:GetAttribute(Attributes.Pumping) == true
-		input.braking = tracked.character:GetAttribute(Attributes.Braking) == true
+		input.pumping = character:GetAttribute(Attributes.Pumping) == true
+		input.braking = character:GetAttribute(Attributes.Braking) == true
+		local action = Actions.nameOf(character:GetAttribute(Attributes.Action) :: string?)
+		input.lunging = action ~= nil and self._config.Actions[action].pose == "Lunge"
 	end
+	input.knockedDown = character:GetAttribute(Attributes.KnockedDown) == true
 	local playerId = tracked.playerId
-	input.carrying = playerId ~= nil and playerId == self._carrier
+	input.carrying = playerId ~= nil and playerId == self._carrier.carrier
 
 	local out = self._out
 	Pose.compute(self._config.Pose, input, out)
@@ -199,14 +208,15 @@ end
 
 local PoseController: PoseController = {
 	name = "PoseController",
-	dependencies = { "Config", "SkateController" },
+	dependencies = { "Config", "SkateController", "BallCarrier", "ActionController" },
 	_config = nil :: any,
 	_skate = nil :: any,
 	_gravity = 0,
 	_playerIdOf = function(_character: Model): PlayerId?
 		return nil
 	end,
-	_carrier = nil,
+	_carrier = nil :: any,
+	_actions = nil :: any,
 	_tracked = {},
 	_surfaces = nil :: any,
 	_input = nil :: any,
@@ -216,13 +226,14 @@ local PoseController: PoseController = {
 	init = function(self: PoseController, deps: { [string]: any })
 		self._config = deps.Config
 		self._skate = deps.SkateController
+		self._carrier = deps.BallCarrier
+		self._actions = deps.ActionController
 		self._gravity = deps.Gravity or workspace.Gravity
 		self._playerIdOf = deps.PlayerIdOf
 			or function(character: Model): PlayerId?
 				local player = Players:GetPlayerFromCharacter(character)
 				return if player ~= nil then PlayerIds.of(player) else nil
 			end
-		self._carrier = nil
 		self._tracked = {}
 		self._out = {} :: Pose.Frame
 		self._input = {
@@ -246,11 +257,6 @@ local PoseController: PoseController = {
 		end)
 		CollectionService:GetInstanceRemovedSignal(Tags.RideSurface):Connect(function()
 			refreshSurfaces(self)
-		end)
-		Remotes.get(ReplicatedStorage, Remotes.names.BallCarrier).OnClientEvent:Connect(function(payload: {
-			carrier: PlayerId?,
-		})
-			self:setCarrier(payload.carrier)
 		end)
 		for _, player in Players:GetPlayers() do
 			listen(self, player)
@@ -280,10 +286,6 @@ local PoseController: PoseController = {
 
 	untrack = function(self: PoseController, character: Model)
 		self._tracked[character] = nil
-	end,
-
-	setCarrier = function(self: PoseController, player: PlayerId?)
-		self._carrier = player
 	end,
 
 	step = function(self: PoseController, dt: number)

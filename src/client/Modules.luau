@@ -7,7 +7,9 @@ local Loader = require(ReplicatedStorage.Shared.Util.Loader)
 
 local modules: { Loader.LoadableModule } = {
 	require(script.Parent.InputController),
+	require(script.Parent.BallCarrier),
 	require(script.Parent.SkateController),
+	require(script.Parent.ActionController),
 	require(script.Parent.PoseController),
 }
 

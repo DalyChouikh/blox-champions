@@ -269,10 +269,14 @@ local function forget(self: Skater)
 	self._historyCount = 0
 end
 
--- A surface steeper than maxStickAngle holds only a skater moving at least minWallSpeed along it.
+-- Steeper than maxStickAngle: a wall, which holds only a skater fast enough along it.
+function SkateMath.isSteep(self: Skater, normal: Vector3): boolean
+	return normal:Dot(self._worldUp) < self._stickCos
+end
+
+-- A steep surface holds only a skater moving at least minWallSpeed along it.
 local function tooSlowOnWall(self: Skater, normal: Vector3): boolean
-	local steep = normal:Dot(self._worldUp) < self._stickCos
-	return steep and alongSurface(self.velocity, normal).Magnitude < self._movement.minWallSpeed
+	return self:isSteep(normal) and alongSurface(self.velocity, normal).Magnitude < self._movement.minWallSpeed
 end
 
 -- The mode changes first, so a jump or a fall is stepped in the air at once.

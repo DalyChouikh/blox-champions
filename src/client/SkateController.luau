@@ -4,6 +4,8 @@
 -- - filters the ray's normal;
 -- - works out the draft and the attach;
 -- - steps SkateMath and writes the result into the skater body the server built.
+-- A knocked-down skater (the server's KnockedDown attribute) lets go of any attach and only slides. Actions push the
+-- skater through `push`.
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
 -- humanoid's state machine off here, on the owning client only: the server keeps it on so deaths still fire Died.
 
@@ -47,6 +49,15 @@ export type SkateController = {
 	skater: SkateMath.Skater?,
 	pumping: boolean,
 	braking: boolean,
+	-- The last step's stick as a world direction (length 0..1).
+	move: Vector3,
+	-- Read each step: the character's KnockedDown attribute, and the root anchored (the kickoff freeze).
+	knockedDown: boolean,
+	frozen: boolean,
+	-- An action's push, written to the skater body at once; `launch` leaves the ground.
+	push: (self: SkateController, change: Vector3, launch: boolean) -> (),
+	-- A steep ride surface (a wall) lies within `distance` ahead.
+	wallAhead: (self: SkateController, distance: number) -> boolean,
 	_config: Config.GameConfig,
 	_inputController: InputController.InputController,
 	_camera: { CFrame: CFrame },
@@ -61,6 +72,7 @@ export type SkateController = {
 	_gravity: Vector3,
 	-- workspace:Raycast; a fake in tests, which can then hand the controller a seam's side face.
 	_raycast: (origin: Vector3, direction: Vector3, params: RaycastParams) -> RaycastResult?,
+	_character: Model?,
 	_root: BasePart?,
 	_velocity: LinearVelocity?,
 	_align: AlignOrientation?,
@@ -199,6 +211,14 @@ local function moveSkater(self: SkateController, root: BasePart, skater: SkateMa
 	local movement = self._config.Movement
 	local keys = self._keys
 	local attach = self._attach
+	if self.knockedDown then
+		if attach.leader ~= nil then
+			attach:reset()
+			skater:release(Vector3.zero)
+		end
+		skater:step(self._input, self._ground, dt)
+		return
+	end
 	local leader: Attach.Candidate? = if attach.leader ~= nil
 		then currentLeader(self)
 		elseif keys.attach then Attach.findLeader(movement, root.Position, self._teammates)
@@ -264,6 +284,9 @@ local SkateController: SkateController = {
 	skater = nil,
 	pumping = false,
 	braking = false,
+	move = Vector3.zero,
+	knockedDown = false,
+	frozen = false,
 	_config = nil :: any,
 	_inputController = nil :: any,
 	_camera = nil :: any,
@@ -281,6 +304,7 @@ local SkateController: SkateController = {
 	_raycast = function(_origin: Vector3, _direction: Vector3, _params: RaycastParams): RaycastResult?
 		return nil
 	end,
+	_character = nil,
 	_root = nil,
 	_velocity = nil,
 	_align = nil,
@@ -334,9 +358,13 @@ local SkateController: SkateController = {
 		self._teammates = {}
 		self._views = {}
 		self.skater = nil
+		self._character = nil
 		self._root = nil
 		self.pumping = false
 		self.braking = false
+		self.move = Vector3.zero
+		self.knockedDown = false
+		self.frozen = false
 	end,
 
 	start = function(self: SkateController)
@@ -371,6 +399,7 @@ local SkateController: SkateController = {
 		local skater = SkateMath.new(self._config.Movement, self._gravity)
 		skater.forward = root.CFrame.LookVector
 		self.skater = skater
+		self._character = character
 		self._root = root
 		self._velocity = velocity
 		self._align = align
@@ -389,7 +418,10 @@ local SkateController: SkateController = {
 		if skater == nil or root == nil or root.Parent == nil then
 			return
 		end
-		if root.Anchored then
+		local character = self._character :: Model
+		self.knockedDown = character:GetAttribute(Attributes.KnockedDown) == true
+		self.frozen = root.Anchored
+		if self.frozen then
 			freeze(self, root, skater)
 			return
 		end
@@ -401,12 +433,32 @@ local SkateController: SkateController = {
 		input.pump = keys.pump
 		input.brake = keys.brake
 		input.jump = keys.jump
+		input.knockedDown = self.knockedDown
+		self.move = input.move
 		castGround(self, root, skater, dt)
 		gatherOthers(self)
 		input.draftAccel = Draft.accel(self._config.Movement, root.Position, self._sources)
 		moveSkater(self, root, skater, dt)
 		apply(self, skater)
 		shareState(self)
+	end,
+
+	push = function(self: SkateController, change: Vector3, launch: boolean)
+		local skater = self.skater
+		if skater ~= nil and self._velocity ~= nil then
+			skater:push(change, launch)
+			apply(self, skater)
+		end
+	end,
+
+	wallAhead = function(self: SkateController, distance: number): boolean
+		local skater = self.skater
+		local root = self._root
+		if skater == nil or root == nil then
+			return false
+		end
+		local result = self._raycast(root.Position, skater.forward * distance, self._rayParams)
+		return result ~= nil and skater:isSteep(result.Normal)
 	end,
 }
 

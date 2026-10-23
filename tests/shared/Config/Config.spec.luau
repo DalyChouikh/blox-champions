@@ -4,9 +4,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
+local Actions = require(ReplicatedStorage.Shared.Config.Actions)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local NormalChampions = require(ReplicatedStorage.Shared.Modes.NormalChampions)
+
+describe("Config.Actions", function()
+	it("names every action once, and finds an action by its name", function()
+		expect(Actions.names).toEqual({ "Tackle", "Dive", "Dodge", "Uppercut", "ChargeThrow", "Pass", "CallPass" })
+		expect(Actions.nameOf("Dive")).toBe("Dive")
+		expect(Actions.nameOf("Fly")).toBeNil()
+		expect(Actions.nameOf(nil)).toBeNil()
+	end)
+end)
 
 describe("Config defaults", function()
 	it("match the spec's match rules", function()
