@@ -17,6 +17,9 @@ type Fields = {
 	-- The running action and its phase; nil when none runs.
 	action: Actions.ActionName?,
 	phase: Phase?,
+	-- The action whose active phase the last `step` ended in, or skipped whole in one long step (the action may have
+	-- ended since); nil otherwise. A step that only leaves the active phase does not count: the step before saw it.
+	lastActive: Actions.ActionName?,
 	_actions: Actions.ActionsConfig,
 	_phaseIndex: number,
 	_phaseLeft: number,
@@ -29,7 +32,7 @@ type Fields = {
 export type Runner = typeof(setmetatable({} :: Fields, ActionRunner))
 
 local PHASES: { Phase } = { "Windup", "Active", "Recovery" }
-local PHASE_INDEX: { [Phase]: number } = { Windup = 1, Active = 2, Recovery = 3 }
+local PHASE_INDEX: { Windup: number, Active: number, Recovery: number } = { Windup = 1, Active = 2, Recovery = 3 }
 
 local function phaseLength(phases: Actions.Phases, index: number): number
 	if index == 1 then
@@ -103,6 +106,7 @@ function ActionRunner.new(actions: Actions.ActionsConfig): Runner
 	local self: Fields = {
 		action = nil,
 		phase = nil,
+		lastActive = nil,
 		_actions = actions,
 		_phaseIndex = 0,
 		_phaseLeft = 0,
@@ -158,13 +162,21 @@ function ActionRunner.step(self: Runner, dt: number)
 			cooldowns[name] = math.max(left - dt, 0)
 		end
 	end
+	self.lastActive = nil
 	local action: Actions.ActionName? = self.action
 	if action ~= nil then
+		local before = self._phaseIndex
 		local left = self._phaseLeft - dt
 		if left > 0 then
 			self._phaseLeft = left
 		else
-			advance(self, action, self._phaseIndex + 1, -left)
+			advance(self, action, before + 1, -left)
+		end
+		local after = if self.action == nil then #PHASES + 1 else self._phaseIndex
+		local active = PHASE_INDEX.Active
+		local skipped = before < active and after > active
+		if (after == active or skipped) and self._actions[action].phases.active > 0 then
+			self.lastActive = action
 		end
 	end
 end
@@ -179,6 +191,9 @@ function ActionRunner.cancel(self: Runner, name: Actions.ActionName, refund: boo
 	if self.action == name then
 		stop(self)
 	end
+	if self.lastActive == name then
+		self.lastActive = nil
+	end
 	if refund then
 		self._cooldowns[name] = 0
 	end
@@ -187,6 +202,7 @@ end
 -- No action runs and every cooldown is over (the kickoff).
 function ActionRunner.reset(self: Runner)
 	stop(self)
+	self.lastActive = nil
 	local cooldowns = self._cooldowns
 	for _, name in Actions.names do
 		cooldowns[name] = 0

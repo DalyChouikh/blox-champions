@@ -274,6 +274,44 @@ describe("ActionService", function()
 		expect(rejected(b)).toEqual({ "Tackle" })
 	end)
 
+	it("knocks both down when two opponents' strikes land on the same frame", function()
+		-- Two head-on pairs, one per team order; in each, the second player's record is the older (they called first).
+		local pairs = { { blue[1], orange[1] }, { orange[2], blue[2] } }
+		for index, pair in pairs do
+			local a, b = pair[1], pair[2]
+			ActionService:request(b, { action = "CallPass" })
+			local at = ON_TRACK + Vector3.new(index * 40, 0, 0)
+			rigs[a]:PivotTo(CFrame.lookAt(at, at - Vector3.zAxis))
+			rigs[b]:PivotTo(CFrame.lookAt(at - Vector3.zAxis * 8, at))
+		end
+		for _, pair in pairs do
+			ActionService:request(pair[1], { action = "Tackle" })
+			ActionService:request(pair[2], { action = "Tackle" })
+		end
+		local knockdowns = advance(0.2)
+		table.sort(knockdowns)
+		local expected: { string } = {}
+		for _, pair in pairs do
+			table.insert(expected, `{pair[1]}>{pair[2]}`)
+			table.insert(expected, `{pair[2]}>{pair[1]}`)
+		end
+		table.sort(expected)
+		expect(knockdowns).toEqual(expected)
+		for _, pair in pairs do
+			expect(attribute(pair[1], Attributes.KnockedDown)).toBe(true)
+			expect(attribute(pair[2], Attributes.KnockedDown)).toBe(true)
+		end
+	end)
+
+	it("strikes even when one long frame passes through the active phase", function()
+		local a, b = blue[1], orange[1]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(0, 0, -5))
+		ActionService:request(a, { action = "Tackle" })
+		-- From the windup straight into the recovery.
+		expect(advance(0.4, 0.4)).toEqual({ `{a}>{b}` })
+	end)
+
 	it("rejects a dive that does not follow a tackle", function()
 		local a, b = blue[1], orange[1]
 		stand(a, Vector3.zero)

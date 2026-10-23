@@ -1,7 +1,8 @@
 --!strict
 -- The server's side of actions (spec §3.3, §8.1, §13). Every request a client sends is checked again in that player's
 -- own ActionRunner and applied here, or refused with ActionRejected. Throws and passes go through BallService. Strikes
--- are judged each frame against the server's positions and knock down the nearest opponent they reach. Knockdowns, the
+-- are judged each frame against the server's positions and knock down the nearest opponent they reach; every strike
+-- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns, the
 -- running action and calls for a pass show as character attributes every client reads. MatchService steps it first in
 -- each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the sum of the frames it is stepped,
 -- so a request between frames counts as the last frame's.
@@ -34,6 +35,9 @@ type Record = {
 	runner: ActionRunner.Runner,
 	-- The running strike already knocked someone down: each use strikes once.
 	struck: boolean,
+	-- Who this frame's strike reaches and for how long it knocks them down, until every strike has aimed.
+	hit: PlayerId?,
+	hitSeconds: number,
 	-- Seconds left knocked down; 0 when on their feet.
 	knockdownLeft: number,
 	-- The action the character's Action attribute shows.
@@ -101,7 +105,14 @@ end
 local function recordOf(self: ActionService, player: PlayerId): Record
 	local record = self._records[player]
 	if record == nil then
-		record = { runner = ActionRunner.new(self._config.Actions), struck = false, knockdownLeft = 0, shown = nil }
+		record = {
+			runner = ActionRunner.new(self._config.Actions),
+			struck = false,
+			hit = nil,
+			hitSeconds = 0,
+			knockdownLeft = 0,
+			shown = nil,
+		}
 		self._records[player] = record
 		table.insert(self._order, player)
 	end
@@ -184,11 +195,13 @@ local function knockDown(self: ActionService, attacker: PlayerId, victim: Player
 	addKnockdown(self, attacker, victim)
 end
 
--- A strike in its active phase that has not landed yet knocks down the nearest opponent it reaches.
-local function strike(self: ActionService, attacker: PlayerId, record: Record)
-	local action: Config.ActionName? = record.runner.action
+-- A strike whose active phase this frame reached, and that has not landed yet, aims at the nearest opponent it
+-- reaches. It lands in `step` once every strike has aimed.
+local function aim(self: ActionService, attacker: PlayerId, record: Record)
+	record.hit = nil
+	local action: Config.ActionName? = record.runner.lastActive
 	local holder = self._holderOf[attacker]
-	if action == nil or record.struck or record.runner.phase ~= "Active" or holder == nil then
+	if action == nil or record.struck or holder == nil then
 		return
 	end
 	local config = self._config.Actions[action]
@@ -198,12 +211,9 @@ local function strike(self: ActionService, attacker: PlayerId, record: Record)
 	end
 	local frame = holder.root.CFrame
 	local extra = self._config.Network.hitLagToleranceStuds
-	local victim =
+	record.hit =
 		Reach.nearest(frame.Position, frame.LookVector, frame.UpVector, hit, extra, candidates(self, attacker, false))
-	if victim ~= nil then
-		record.struck = true
-		knockDown(self, attacker, victim, hit.knockdownSeconds)
-	end
+	record.hitSeconds = hit.knockdownSeconds
 end
 
 local function noEffect() end
@@ -334,7 +344,16 @@ local ActionService: ActionService = {
 			show(self, player, record)
 		end
 		for _, player in self._order do
-			strike(self, player, self._records[player])
+			aim(self, player, self._records[player])
+		end
+		for _, player in self._order do
+			local record = self._records[player]
+			local victim = record.hit
+			if victim ~= nil then
+				record.hit = nil
+				record.struck = true
+				knockDown(self, player, victim, record.hitSeconds)
+			end
 		end
 		return self._knockdowns
 	end,
@@ -345,6 +364,7 @@ local ActionService: ActionService = {
 			local record = self._records[player]
 			record.runner:reset()
 			record.struck = false
+			record.hit = nil
 			record.knockdownLeft = 0
 			record.shown = nil
 		end
