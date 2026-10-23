@@ -209,6 +209,57 @@ describe("Config defaults", function()
 		expect(input.uppercut).toEqual({ Enum.KeyCode.Q, Enum.KeyCode.ButtonB })
 		expect(input.pass).toEqual({ Enum.KeyCode.R, Enum.KeyCode.ButtonY })
 		expect(input.throw).toEqual({ Enum.KeyCode.MouseLeftButton, Enum.KeyCode.ButtonL2 })
+		-- Roblox's own camera scales (degrees per pixel, per second at full tilt, per pixel).
+		expect(input.look).toEqual({
+			mouse = { key = Enum.KeyCode.MouseDelta, degPerUnit = Vector2.new(0.5, 0.385) },
+			stick = { key = Enum.KeyCode.Thumbstick2, degPerUnit = Vector2.new(240, -185) },
+			touch = { key = Enum.KeyCode.TouchDelta, degPerUnit = Vector2.new(1, 0.66) },
+		})
+		expect(input.ballFocus).toEqual({ Enum.KeyCode.MouseRightButton, Enum.KeyCode.ButtonL2 })
+		expect(input.ballFocusMode).toBe("Hold")
+		expect(input.touchBallFocusMode).toBe("Toggle")
+		expect(input.actions).toEqual({
+			tackle = { "Tackle", "Dodge" },
+			uppercut = { "Uppercut" },
+			pass = { "Pass", "CallPass" },
+			throw = { "ChargeThrow" },
+		})
+		expect(input.touch).toEqual({
+			stickArea = UDim2.fromScale(0.4, 2 / 3),
+			stickDeadZone = 2,
+			stickRadius = 20,
+			buttonSize = UDim2.fromOffset(72, 72),
+			buttons = {
+				uppercut = UDim2.fromScale(0.92, 0.42),
+				pass = UDim2.fromScale(0.81, 0.52),
+				tackle = UDim2.fromScale(0.92, 0.62),
+				attach = UDim2.fromScale(0.7, 0.7),
+				throw = UDim2.fromScale(0.81, 0.7),
+				brake = UDim2.fromScale(0.7, 0.88),
+				pump = UDim2.fromScale(0.81, 0.88),
+				jump = UDim2.fromScale(0.92, 0.82),
+			},
+		})
+	end)
+
+	it("set the camera of spec §8.4, plus this phase's", function()
+		expect(Config.defaults().Camera).toEqual({
+			distance = 12,
+			height = 4,
+			minDistance = 2,
+			collisionMargin = 0.5,
+			fovBase = 70,
+			fovMax = 90,
+			fovResponse = 6,
+			minPitchDeg = -70,
+			maxPitchDeg = 60,
+			rollResponse = 8,
+			recenterDelay = 0.5,
+			recenterResponse = 2.5,
+			recenterMinSpeed = 10,
+			ballFocusResponse = 10,
+			spectator = { distance = 30, height = 6 },
+		})
 	end)
 
 	it("match the spec's scoring values", function()
@@ -227,7 +278,22 @@ describe("Config defaults", function()
 	end)
 
 	it("match the spec's UI values", function()
-		expect(Config.defaults().UI.clockWarnings).toEqual({ 60, 30 })
+		local ui = Config.defaults().UI
+		expect(ui.clockWarnings).toEqual({ 60, 30 })
+		expect(ui.controlLabels).toEqual({
+			Jump = "Jump",
+			Pump = "Pump",
+			Brake = "Brake",
+			Attach = "Attach",
+			Tackle = "Tackle",
+			Dive = "Dive",
+			Dodge = "Dodge",
+			Uppercut = "Uppercut",
+			ChargeThrow = "Throw",
+			Pass = "Pass",
+			CallPass = "Call",
+			BallFocus = "Focus",
+		})
 	end)
 
 	it("match the spec's arena layout", function()
@@ -510,6 +576,36 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Input = { throw = { Enum.KeyCode.E } } })
 		end).toThrow("Input: E is bound to more than one action")
+		expect(function()
+			Fixtures.config({ Input = { ballFocus = { Enum.KeyCode.E } } })
+		end).toThrow("Input: E is bound to more than one action")
+		expect(function()
+			Fixtures.config({ Input = { move = { sticks = { Enum.KeyCode.Thumbstick2 } } } })
+		end).toThrow("Input: Thumbstick2 is bound to more than one action")
+		-- Ball Focus may share Charge Throw's keys: one needs the ball, the other works without it.
+		expect(function()
+			Fixtures.config({ Input = { ballFocus = { Enum.KeyCode.MouseLeftButton, Enum.KeyCode.ButtonL2 } } })
+		end).never.toThrow()
+	end)
+
+	it("rejects a camera or touch layout that contradicts itself", function()
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{ overrides = { Camera = { fovMax = 60 } }, message = "Camera: fovMax must be at least fovBase" },
+			{ overrides = { Camera = { minDistance = 20 } }, message = "Camera: minDistance must be at most distance" },
+			{
+				overrides = { Input = { touch = { stickRadius = 1 } } },
+				message = "Input.touch: stickRadius must be above stickDeadZone",
+			},
+			{
+				overrides = { Input = { actions = { tackle = { "Fly" } } } },
+				message = "Input.actions.tackle[1]: must name an action",
+			},
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config(case.overrides)
+			end).toThrow(case.message)
+		end
 	end)
 
 	it("rejects team spawns that would not fit on a straight", function()

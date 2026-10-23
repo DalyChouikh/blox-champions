@@ -5,6 +5,7 @@
 local Actions = require(script.Actions)
 local Arena = require(script.Arena)
 local Ball = require(script.Ball)
+local Camera = require(script.Camera)
 local Input = require(script.Input)
 local Freeze = require(script.Parent.Util.Freeze)
 local Match = require(script.Match)
@@ -25,18 +26,26 @@ export type ThrowSettings = Actions.ThrowSettings
 export type PassSettings = Actions.PassSettings
 export type ArenaConfig = Arena.ArenaConfig
 export type BallConfig = Ball.BallConfig
+export type CameraConfig = Camera.CameraConfig
 export type InputConfig = Input.InputConfig
+export type Control = Input.Control
+export type ActionKey = Input.ActionKey
+export type LookBinding = Input.LookBinding
+export type FocusMode = Input.FocusMode
+export type TouchLayout = Input.TouchLayout
 export type MatchConfig = Match.MatchConfig
 export type MovementConfig = Movement.MovementConfig
 export type NetworkConfig = Network.NetworkConfig
 export type PoseConfig = Pose.PoseConfig
 export type ScoringConfig = Scoring.ScoringConfig
 export type UIConfig = UI.UIConfig
+export type ControlLabels = UI.ControlLabels
 
 export type GameConfig = {
 	Actions: ActionsConfig,
 	Arena: ArenaConfig,
 	Ball: BallConfig,
+	Camera: CameraConfig,
 	Input: InputConfig,
 	Match: MatchConfig,
 	Movement: MovementConfig,
@@ -77,6 +86,7 @@ Config.schema = Validate.checkAll(
 		Actions = Actions.schema,
 		Arena = Arena.schema,
 		Ball = Ball.schema,
+		Camera = Camera.schema,
 		Input = Input.schema,
 		Match = Match.schema,
 		Movement = Movement.schema,
@@ -124,6 +134,7 @@ local function build(overrides: { [string]: any }): GameConfig
 		Actions = Actions.defaults,
 		Arena = Arena.defaults,
 		Ball = Ball.defaults,
+		Camera = Camera.defaults,
 		Input = Input.defaults,
 		Match = Match.defaults,
 		Movement = Movement.defaults,
