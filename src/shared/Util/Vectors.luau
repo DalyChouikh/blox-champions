@@ -20,6 +20,12 @@ function Vectors.clampMagnitude(vector: Vector3, max: number): Vector3
 	return vector * (max / length)
 end
 
+-- `vector` turned `angle` radians about the unit `axis`, right-handed (Rodrigues' rotation).
+function Vectors.rotateAbout(vector: Vector3, axis: Vector3, angle: number): Vector3
+	local cos, sin = math.cos(angle), math.sin(angle)
+	return vector * cos + axis:Cross(vector) * sin + axis * (axis:Dot(vector) * (1 - cos))
+end
+
 -- `from` turned toward `to` (both unit vectors) by at most `maxAngle` radians, about `fallbackAxis` when they are
 -- exactly opposite.
 function Vectors.rotateToward(from: Vector3, to: Vector3, maxAngle: number, fallbackAxis: Vector3): Vector3
@@ -29,8 +35,7 @@ function Vectors.rotateToward(from: Vector3, to: Vector3, maxAngle: number, fall
 	end
 	local axis = from:Cross(to)
 	axis = if axis.Magnitude > Vectors.EPSILON then axis.Unit else fallbackAxis
-	local cos, sin = math.cos(maxAngle), math.sin(maxAngle)
-	return from * cos + axis:Cross(from) * sin + axis * (axis:Dot(from) * (1 - cos))
+	return Vectors.rotateAbout(from, axis, maxAngle)
 end
 
 return table.freeze(Vectors)
