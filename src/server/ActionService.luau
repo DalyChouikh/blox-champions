@@ -1,10 +1,12 @@
 --!strict
 -- The server's side of actions (spec §3.3, §8.1, §13). Every request a client sends is checked again in that player's
 -- own ActionRunner and applied here, or refused with ActionRejected. Throws and passes go through BallService. Strikes
--- are judged each frame against the server's positions and knock down the nearest opponent they reach. Knockdowns, the
--- running action and calls for a pass show as character attributes every client reads. MatchService steps it first in
--- each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the sum of the frames it is stepped,
--- so a request between frames counts as the last frame's.
+-- are judged each frame against the server's positions and knock down the nearest opponent they reach; every strike
+-- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns, the
+-- running action (until its recovery) and calls for a pass show as character attributes every client reads. A throw
+-- keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held for.
+-- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
+-- sum of the frames it is stepped, so a request between frames counts as the last frame's.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -13,6 +15,7 @@ local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallService = require(script.Parent.BallService)
 local CharacterService = require(script.Parent.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
+local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local NetService = require(script.Parent.NetService)
 local PassTarget = require(ReplicatedStorage.Shared.Actions.PassTarget)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
@@ -23,6 +26,7 @@ local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local TeamService = require(script.Parent.TeamService)
 local Throw = require(ReplicatedStorage.Shared.Actions.Throw)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
+local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
 type PlayerId = Types.PlayerId
 type Holder = BallService.Holder
@@ -34,6 +38,9 @@ type Record = {
 	runner: ActionRunner.Runner,
 	-- The running strike already knocked someone down: each use strikes once.
 	struck: boolean,
+	-- Who this frame's strike reaches and for how long it knocks them down, until every strike has aimed.
+	hit: PlayerId?,
+	hitSeconds: number,
 	-- Seconds left knocked down; 0 when on their feet.
 	knockdownLeft: number,
 	-- The action the character's Action attribute shows.
@@ -60,6 +67,8 @@ export type ActionService = {
 	_ball: BallService.BallService,
 	_teams: TeamService.TeamService,
 	_characters: CharacterService.CharacterService,
+	-- The fastest a skater may move: a client-reported velocity is never trusted beyond it.
+	_speedLimit: number,
 	_now: number,
 	_records: { [PlayerId]: Record },
 	-- Players with a record, in the order they got it, so a frame's strikes resolve the same way every time.
@@ -101,16 +110,25 @@ end
 local function recordOf(self: ActionService, player: PlayerId): Record
 	local record = self._records[player]
 	if record == nil then
-		record = { runner = ActionRunner.new(self._config.Actions), struck = false, knockdownLeft = 0, shown = nil }
+		record = {
+			runner = ActionRunner.new(self._config.Actions),
+			struck = false,
+			hit = nil,
+			hitSeconds = 0,
+			knockdownLeft = 0,
+			shown = nil,
+		}
 		self._records[player] = record
 		table.insert(self._order, player)
 	end
 	return record
 end
 
--- Keeps the character's Action attribute on the running action, writing it only when it changes.
+-- Keeps the character's Action attribute on the running action until its recovery, as the player's own pose shows it,
+-- writing it only when it changes.
 local function show(self: ActionService, player: PlayerId, record: Record)
-	local action: Config.ActionName? = record.runner.action
+	local runner = record.runner
+	local action: Config.ActionName? = if runner.phase == "Recovery" then nil else runner.action
 	if action ~= record.shown then
 		record.shown = action
 		setAttribute(self, player, Attributes.Action, action)
@@ -184,11 +202,13 @@ local function knockDown(self: ActionService, attacker: PlayerId, victim: Player
 	addKnockdown(self, attacker, victim)
 end
 
--- A strike in its active phase that has not landed yet knocks down the nearest opponent it reaches.
-local function strike(self: ActionService, attacker: PlayerId, record: Record)
-	local action: Config.ActionName? = record.runner.action
+-- A strike whose active phase this frame reached, and that has not landed yet, aims at the nearest opponent it
+-- reaches. It lands in `step` once every strike has aimed.
+local function aim(self: ActionService, attacker: PlayerId, record: Record)
+	record.hit = nil
+	local action: Config.ActionName? = record.runner.lastActive
 	local holder = self._holderOf[attacker]
-	if action == nil or record.struck or record.runner.phase ~= "Active" or holder == nil then
+	if action == nil or record.struck or holder == nil then
 		return
 	end
 	local config = self._config.Actions[action]
@@ -198,12 +218,9 @@ local function strike(self: ActionService, attacker: PlayerId, record: Record)
 	end
 	local frame = holder.root.CFrame
 	local extra = self._config.Network.hitLagToleranceStuds
-	local victim =
+	record.hit =
 		Reach.nearest(frame.Position, frame.LookVector, frame.UpVector, hit, extra, candidates(self, attacker, false))
-	if victim ~= nil then
-		record.struck = true
-		knockDown(self, attacker, victim, hit.knockdownSeconds)
-	end
+	record.hitSeconds = hit.knockdownSeconds
 end
 
 local function noEffect() end
@@ -213,9 +230,13 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Pass: Effect, 
 	Knockdown = noEffect,
 	-- A dodge only makes its player immune (isImmune).
 	Dodge = noEffect,
+	-- The charge the client claims, up to how long the thrower has held the ball: an honest client only charges
+	-- once it learns it carries, so its hold is never longer than the server's.
 	Throw = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
 		local throw = action.throw :: Config.ThrowSettings
-		self._ball:throw(player, Throw.charged(throw, payload.aim, payload.charge, holder.root.AssemblyLinearVelocity))
+		local charge = math.min(payload.charge, self._ball.state.heldSeconds / throw.chargeMaxSeconds)
+		local carrier = Vectors.clampMagnitude(holder.root.AssemblyLinearVelocity, self._speedLimit)
+		self._ball:throw(player, Throw.charged(throw, payload.aim, charge, carrier))
 	end,
 	Pass = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
 		local pass = action.pass :: Config.PassSettings
@@ -241,6 +262,7 @@ local ActionService: ActionService = {
 	_ball = nil :: any,
 	_teams = nil :: any,
 	_characters = nil :: any,
+	_speedLimit = 0,
 	_now = 0,
 	_records = {},
 	_order = {},
@@ -259,6 +281,7 @@ local ActionService: ActionService = {
 		self._ball = deps.BallService
 		self._teams = deps.TeamService
 		self._characters = deps.CharacterService
+		self._speedLimit = MovementCheck.speedLimit(config.Movement, config.Network)
 		self._now = 0
 		self._records = {}
 		self._order = {}
@@ -286,8 +309,8 @@ local ActionService: ActionService = {
 		end)
 	end,
 
-	-- Refused when the player has no seated, living character, is frozen, or their runner says no; a cooldown may end
-	-- up to Network.actionCooldownTolerance late, for lag.
+	-- Refused when the player has no seated, living character, is frozen, or their runner says no, with
+	-- Network.actionTimingTolerance of slack on its timing, for lag.
 	request = function(self: ActionService, player: PlayerId, payload: any)
 		local name: Config.ActionName = payload.action
 		refreshHolders(self)
@@ -300,7 +323,7 @@ local ActionService: ActionService = {
 		local context = self._context
 		context.hasBall = self._ball.state.carrier == player
 		context.knockedDown = knockedDown(self, player)
-		if record.runner:start(name, context, self._config.Network.actionCooldownTolerance) ~= "Started" then
+		if record.runner:start(name, context, self._config.Network.actionTimingTolerance) ~= "Started" then
 			reject(self, player, name)
 			return
 		end
@@ -315,8 +338,9 @@ local ActionService: ActionService = {
 		table.clear(self._knockdowns)
 		refreshHolders(self)
 		local window = self._config.Actions.callPassWindow
+		local carrier = self._ball.state.carrier
 		for player, at in self._calls do
-			if self._now - at > window then
+			if self._now - at > window or player == carrier then
 				self._calls[player] = nil
 				setAttribute(self, player, Attributes.CallingPass, nil)
 			end
@@ -334,7 +358,16 @@ local ActionService: ActionService = {
 			show(self, player, record)
 		end
 		for _, player in self._order do
-			strike(self, player, self._records[player])
+			aim(self, player, self._records[player])
+		end
+		for _, player in self._order do
+			local record = self._records[player]
+			local victim = record.hit
+			if victim ~= nil then
+				record.hit = nil
+				record.struck = true
+				knockDown(self, player, victim, record.hitSeconds)
+			end
 		end
 		return self._knockdowns
 	end,
@@ -345,6 +378,7 @@ local ActionService: ActionService = {
 			local record = self._records[player]
 			record.runner:reset()
 			record.struck = false
+			record.hit = nil
 			record.knockdownLeft = 0
 			record.shown = nil
 		end

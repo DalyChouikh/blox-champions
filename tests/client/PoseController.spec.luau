@@ -36,10 +36,10 @@ local R6_RIGHT_HIP_FRAME = CFrame.fromMatrix(Vector3.new(1, -1, 0), Vector3.new(
 local function r6Joint(model: Model, name: string, frame: CFrame): Motor6D
 	local joint = Instance.new("Motor6D")
 	joint.Name = name
-	joint.Part0 = model.PrimaryPart
+	joint.Part0 = Fixtures.root(model)
 	joint.Part1 = model:FindFirstChild("Left Leg") :: BasePart
 	joint.C0 = frame
-	joint.Parent = model.PrimaryPart
+	joint.Parent = Fixtures.root(model)
 	return joint
 end
 
@@ -142,7 +142,7 @@ describe("PoseController", function()
 
 	it("leans a character into the turn its velocity makes", function()
 		local turner = Fixtures.jointedRig(folder, "Turner", HOVER_CFRAME)
-		local root = turner.PrimaryPart :: BasePart
+		local root = Fixtures.root(turner)
 		PoseController:track(turner, false)
 		root.AssemblyLinearVelocity = Vector3.new(0, 0, -30)
 		PoseController:step(1 / 60)
@@ -184,7 +184,7 @@ describe("PoseController", function()
 		for index = 1, 6 do
 			local name = `Skater{index}`
 			local avatar = Fixtures.jointedRig(folder, name, HOVER_CFRAME + Vector3.new(index * 4, 0, 0))
-			local root = avatar.PrimaryPart :: BasePart
+			local root = Fixtures.root(avatar)
 			root.AssemblyLinearVelocity = Vector3.new(0, 0, -30)
 			avatar:SetAttribute(Attributes.Pumping, index <= 2)
 			playerIds[name] = tostring(index)

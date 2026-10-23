@@ -40,8 +40,8 @@ describe("InputController", function()
 
 	it("reads the move stick and the held buttons", function()
 		local context = InputController.context
-		Fixtures.scriptedBinding(context:FindFirstChild("Move") :: InputAction):Fire(Vector2.new(0.6, 0.8))
-		Fixtures.scriptedBinding(context:FindFirstChild("Brake") :: InputAction):Fire(true)
+		Fixtures.scriptedBinding(context, "Move"):Fire(Vector2.new(0.6, 0.8))
+		Fixtures.scriptedBinding(context, "Brake"):Fire(true)
 		local keys = InputController.newKeys()
 		InputController:read(keys)
 		expect(keys.move.X).toBeCloseTo(0.6, 5)
@@ -52,7 +52,7 @@ describe("InputController", function()
 	end)
 
 	it("counts a jump press once, however long it is held", function()
-		local jump = Fixtures.scriptedBinding(InputController.context:FindFirstChild("Jump") :: InputAction)
+		local jump = Fixtures.scriptedBinding(InputController.context, "Jump")
 		local keys = InputController.newKeys()
 		jump:Fire(true)
 		task.wait() -- Pressed is deferred
@@ -69,10 +69,9 @@ describe("InputController", function()
 
 	it("reads action presses once and the throw while held", function()
 		local context = InputController.context
-		local function binding(name: string): InputBinding
-			return Fixtures.scriptedBinding(context:FindFirstChild(name) :: InputAction)
-		end
-		local tackle, pass, throw = binding("Tackle"), binding("Pass"), binding("Throw")
+		local tackle = Fixtures.scriptedBinding(context, "Tackle")
+		local pass = Fixtures.scriptedBinding(context, "Pass")
+		local throw = Fixtures.scriptedBinding(context, "Throw")
 		local actions = InputController.newActionKeys()
 		tackle:Fire(true)
 		pass:Fire(true)
@@ -94,8 +93,8 @@ describe("InputController", function()
 
 	it("keeps the skating keys and the action keys apart", function()
 		local context = InputController.context
-		local jump = Fixtures.scriptedBinding(context:FindFirstChild("Jump") :: InputAction)
-		local tackle = Fixtures.scriptedBinding(context:FindFirstChild("Tackle") :: InputAction)
+		local jump = Fixtures.scriptedBinding(context, "Jump")
+		local tackle = Fixtures.scriptedBinding(context, "Tackle")
 		local keys, actions = InputController.newKeys(), InputController.newActionKeys()
 		jump:Fire(true)
 		tackle:Fire(true)

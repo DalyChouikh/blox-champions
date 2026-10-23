@@ -73,17 +73,17 @@ describe("CharacterService", function()
 		CharacterService:adopt("B", r6)
 		CharacterService:place("A", false)
 		CharacterService:place("B", false)
-		Fixtures.expectNear((r15.PrimaryPart :: BasePart).Position, Vector3.new(0, 2.5, -53))
-		Fixtures.expectNear((r6.PrimaryPart :: BasePart).Position, Vector3.new(-10, 2.5, 53))
+		Fixtures.expectNear(Fixtures.root(r15).Position, Vector3.new(0, 2.5, -53))
+		Fixtures.expectNear(Fixtures.root(r6).Position, Vector3.new(-10, 2.5, 53))
 	end)
 
 	it("freezes characters for the kickoff countdown and frees them after", function()
 		local rig = Fixtures.rig(folder, "A", CFrame.new(0, 50, 0))
 		CharacterService:adopt("A", rig)
 		CharacterService:placeAll(true)
-		expect((rig.PrimaryPart :: BasePart).Anchored).toBe(true)
+		expect(Fixtures.root(rig).Anchored).toBe(true)
 		CharacterService:freezeAll(false)
-		expect((rig.PrimaryPart :: BasePart).Anchored).toBe(false)
+		expect(Fixtures.root(rig).Anchored).toBe(false)
 	end)
 
 	it("lists living characters that can hold the ball, with their root", function()
@@ -99,7 +99,7 @@ describe("CharacterService", function()
 		for _, holder in CharacterService:holders() do
 			roots[holder.player] = holder.root.Name
 		end
-		expect(roots).toEqual({ A = "HumanoidRootPart", B = "HumanoidRootPart" })
+		expect(roots).toEqual({ A = SkaterRig.root, B = SkaterRig.root })
 	end)
 
 	it("marks knocked-down players unable to catch", function()
@@ -171,12 +171,12 @@ describe("CharacterService", function()
 		CharacterService:requestLoad("A")
 		task.wait()
 		local rigA = folder:FindFirstChild("A") :: Model
-		Fixtures.expectNear((rigA.PrimaryPart :: BasePart).Position, Vector3.new(0, 2.5, -53))
-		expect((rigA.PrimaryPart :: BasePart).Anchored).toBe(true)
+		Fixtures.expectNear(Fixtures.root(rigA).Position, Vector3.new(0, 2.5, -53))
+		expect(Fixtures.root(rigA).Anchored).toBe(true)
 		CharacterService:freezeAll(false)
 		CharacterService:requestLoad("B")
 		task.wait()
-		expect(((folder:FindFirstChild("B") :: Model).PrimaryPart :: BasePart).Anchored).toBe(false)
+		expect(Fixtures.root(folder:FindFirstChild("B") :: Model).Anchored).toBe(false)
 	end)
 
 	it("gives every loaded character a skater body", function()
@@ -188,7 +188,7 @@ describe("CharacterService", function()
 		CharacterService:requestLoad("A")
 		task.wait()
 		local rig = folder:FindFirstChild("A") :: Model
-		local root = rig.PrimaryPart :: BasePart
+		local root = Fixtures.root(rig)
 		local collider = rig:FindFirstChild(SkaterRig.collider) :: Part
 		expect(collider.Shape).toBe(Enum.PartType.Ball)
 		expect(collider.Size).toEqual(Vector3.one * 2)

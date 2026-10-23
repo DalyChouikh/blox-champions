@@ -1,14 +1,14 @@
 --!strict
--- Poses every character this client can see (spec §7.1, plan decision 10): the lean into a turn, a crouch while
--- pumping, a lean back while braking, a tuck in the air, the arm that carries the ball, a lunge and a knockdown. The
--- local skater's state comes from SkateController and its lunge from ActionController, at once; everyone else's from
--- their character's attributes and the ground under them. The carrier comes from BallCarrier. The joints it writes
--- are local to this client: the server never sees them, and every client poses its own view.
+-- Poses every character this client can see (spec §7.1, plan decision 10), each physics step after the actions
+-- (FrameController): the lean into a turn, a crouch while pumping, a lean back while braking, a tuck in the air, the
+-- arm that carries the ball, a lunge and a knockdown. The local skater's state comes from SkateController and its lunge
+-- from ActionController, at once; everyone else's from their character's attributes and the ground under them. The
+-- carrier comes from BallCarrier. The joints it writes are local to this client: the server never sees them, and every
+-- client poses its own view.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Actions = require(ReplicatedStorage.Shared.Config.Actions)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
@@ -263,9 +263,6 @@ local PoseController: PoseController = {
 		end
 		Players.PlayerAdded:Connect(function(player: Player)
 			listen(self, player)
-		end)
-		RunService.PreSimulation:Connect(function(dt: number)
-			self:step(dt)
 		end)
 	end,
 

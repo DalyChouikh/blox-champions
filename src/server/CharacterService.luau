@@ -4,8 +4,9 @@
 -- death. Loading yields, so it always runs on its own thread: whoever seats a player never waits for it. The loaded
 -- character is registered by that thread, not by CharacterAdded: Roblox defers that event until after the load has
 -- returned. Each loaded character gets its skater body (SkaterBody) and is stood with its root at
--- Movement.hoverHeight above its spawn, where its own client's skating takes over. It lists the characters that can
--- catch the ball, and announces any that goes away so a carrier's ball drops.
+-- Movement.hoverHeight above its spawn, where its own client's skating takes over. It lists every seated living
+-- character, marking who can catch (not while knocked down), for the ball, the actions and the movement guard, and
+-- announces any that goes away so a carrier's ball drops.
 
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
@@ -267,8 +268,9 @@ local CharacterService: CharacterService = {
 		end
 	end,
 
-	-- Seated players' living characters with a root, in adoption order; one reused list of reused records. Only seated
-	-- players: a catch the match would not count leaves the ball in the wrong hands.
+	-- Every seated player's living character with a root, in adoption order, each marked `canCatch` unless knocked
+	-- down; one reused list of reused records. Only seated players: a catch the match would not count leaves the ball
+	-- in the wrong hands.
 	holders = function(self: CharacterService): { BallService.Holder }
 		local holders = self._holders
 		local count = 0

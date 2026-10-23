@@ -26,6 +26,12 @@ MovementCheck.__index = MovementCheck
 
 export type MovementCheck = typeof(setmetatable({} :: Fields, MovementCheck))
 
+-- The fastest a skater may move: hardCap with the speed tolerance. The server trusts no client-reported velocity
+-- beyond it.
+function MovementCheck.speedLimit(movement: Config.MovementConfig, network: Config.NetworkConfig): number
+	return movement.hardCap * network.speedTolerance
+end
+
 function MovementCheck.new(movement: Config.MovementConfig, network: Config.NetworkConfig): MovementCheck
 	local self: Fields = {
 		_movement = movement,
@@ -57,7 +63,7 @@ function MovementCheck.sample(self: MovementCheck, player: string, position: Vec
 		return "Ok"
 	end
 
-	local allowed = self._movement.hardCap * self._network.speedTolerance * (now - record.time)
+	local allowed = MovementCheck.speedLimit(self._movement, self._network) * (now - record.time)
 	local move = position - record.position
 	-- Falling is legal, so only the upward part of the move is judged.
 	local rise = Vector3.new(move.X, math.max(move.Y, 0), move.Z)

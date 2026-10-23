@@ -223,10 +223,6 @@ local function lineUp(attacker: Model, victim: Model, gap: number): CFrame
 	return frame
 end
 
-local function rootOf(rig: Model): BasePart
-	return rig.PrimaryPart :: BasePart
-end
-
 describe("A match on the generated arena", function()
 	it(
 		"starts once a player is seated, keeps the ball hidden through the countdown, then drops it at a ball spawn",
@@ -236,12 +232,12 @@ describe("A match on the generated arena", function()
 			frames(FRAME)
 			expect(events()).toEqual({ "MatchStarted", "KickoffStarted" })
 			expect(ballAt()).toBe("ServerStorage")
-			expect((rigs[1].PrimaryPart :: BasePart).Anchored).toBe(true)
+			expect(Fixtures.root(rigs[1]).Anchored).toBe(true)
 			frames(config.Match.kickoffCountdownSeconds + 0.05)
 			expect(table.find(events(), "KickoffEnded")).never.toBeNil()
 			expect(ballAt()).toBe("Workspace")
 			expect(BallService.state.status).toBe("Loose")
-			expect((rigs[1].PrimaryPart :: BasePart).Anchored).toBe(false)
+			expect(Fixtures.root(rigs[1]).Anchored).toBe(false)
 		end
 	)
 
@@ -281,15 +277,7 @@ describe("A match on the generated arena", function()
 		BallService:throw("1", goal.LookVector * 60)
 		BallService.part.CFrame = CFrame.new(approach)
 		frames(config.Scoring.saveLookaheadSeconds + 0.1)
-		local saves: { { player: string, kind: string } } = {}
-		for _, batch in firedNamed(Remotes.names.RuleEvents) do
-			for _, event in batch.payload do
-				if event.name == "SaveMade" then
-					table.insert(saves, { player = event.player, kind = event.kind })
-				end
-			end
-		end
-		expect(saves).toEqual({ { player = "2", kind = "Block" } })
+		expect(eventsNamed("SaveMade")).toEqual({ { name = "SaveMade", player = "2", kind = "Block" } })
 		-- The save came from the touch: a knocked-down defender never takes the ball (a catch would also block).
 		expect(BallService.state.carrier).never.toBe("2")
 	end)
@@ -335,7 +323,7 @@ describe("A match on the generated arena", function()
 		-- 8 studs behind the carrier: inside the tackle's reach (range plus lag tolerance), outside the pickup reach.
 		local frame = lineUp(rigs[2], rigs[1], 8)
 		local momentum = frame.LookVector * 30
-		rootOf(rigs[1]).AssemblyLinearVelocity = momentum
+		Fixtures.root(rigs[1]).AssemblyLinearVelocity = momentum
 		ActionService:request("2", { action = "Tackle" })
 		frames(0.2)
 		expect(eventsNamed("TackleKnockdown")).toEqual({
@@ -344,11 +332,11 @@ describe("A match on the generated arena", function()
 		expect(BallService.state.status).toBe("Loose")
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, momentum)
 		-- Beside the knocked-down carrier, the ball stays loose.
-		BallService.part.CFrame = CFrame.new(rootOf(rigs[1]).Position)
+		BallService.part.CFrame = CFrame.new(Fixtures.root(rigs[1]).Position)
 		frames(FRAME)
 		expect(BallService.state.carrier).toBeNil()
 		-- Beside the tackler, it is theirs: a steal.
-		BallService.part.CFrame = CFrame.new(rootOf(rigs[2]).Position)
+		BallService.part.CFrame = CFrame.new(Fixtures.root(rigs[2]).Position)
 		frames(FRAME)
 		expect(BallService.state.carrier).toBe("2")
 		expect(#eventsNamed("Steal")).toBe(1)
@@ -373,11 +361,11 @@ describe("A match on the generated arena", function()
 		ActionService:request(passer, { action = "Pass", aim = frame.RightVector })
 		expect(BallService.state.status).toBe("Flying")
 		-- Beside the passer, inside rethrowPickupDelay: nobody takes it.
-		BallService.part.CFrame = CFrame.new(rootOf(passerRig).Position)
+		BallService.part.CFrame = CFrame.new(Fixtures.root(passerRig).Position)
 		frames(FRAME)
 		expect(BallService.state.carrier).toBeNil()
 		-- Beside the caller: theirs, and the team keeps possession, so no steal.
-		BallService.part.CFrame = CFrame.new(rootOf(receiverRig).Position)
+		BallService.part.CFrame = CFrame.new(Fixtures.root(receiverRig).Position)
 		frames(FRAME)
 		expect(BallService.state.carrier).toBe("3")
 		expect(#eventsNamed("PossessionChanged")).toBe(possessions)

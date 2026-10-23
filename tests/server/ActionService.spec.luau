@@ -10,11 +10,13 @@ local ActionService = require(ServerScriptService.Server.ActionService)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallService = require(ServerScriptService.Server.BallService)
 local CharacterService = require(ServerScriptService.Server.CharacterService)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local TeamService = require(ServerScriptService.Server.TeamService)
 
 local config = Fixtures.config()
+local throwSettings = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
 local DT = 1 / 60
 local SPAWNS = { CFrame.new(0, 500, 0) }
 -- Far from each other and from every test's play, until a test moves them.
@@ -42,6 +44,8 @@ local fakeArena = {
 
 local folder: Folder
 local rigs: { [string]: Model } = {}
+-- The stub players TeamService seated, by id.
+local stubs: { [string]: any } = {}
 -- The seated players by team: three each.
 local blue: { string } = {}
 local orange: { string } = {}
@@ -53,6 +57,7 @@ beforeEach(function()
 	table.clear(fakeNet.handlers)
 	table.clear(fakeNet.sent)
 	table.clear(rigs)
+	table.clear(stubs)
 	blue, orange = {}, {}
 	BallService:init({ Config = config, ArenaService = fakeArena })
 	TeamService:init({ Config = config })
@@ -72,7 +77,8 @@ beforeEach(function()
 	-- Teams take turns, with a random first pick: sort the six seated players by the team they got.
 	for index = 1, 6 do
 		local id = tostring(index)
-		TeamService:join(Fixtures.stubPlayer(index))
+		stubs[id] = Fixtures.stubPlayer(index)
+		TeamService:join(stubs[id])
 		local rig = Fixtures.rig(folder, id, CFrame.new(PARKED + Vector3.new(index * 50, 0, 0)))
 		CharacterService:adopt(id, rig)
 		rigs[id] = rig
@@ -84,10 +90,6 @@ afterEach(function()
 	folder:Destroy()
 end)
 
-local function rootOf(id: string): BasePart
-	return rigs[id]:FindFirstChild("HumanoidRootPart") :: BasePart
-end
-
 -- Stands the player `offset` from a spot on the track, facing -Z.
 local function stand(id: string, offset: Vector3)
 	rigs[id]:PivotTo(CFrame.new(ON_TRACK + offset))
@@ -95,7 +97,7 @@ end
 
 local function giveBall(id: string)
 	BallService:spawn()
-	BallService.part.CFrame = CFrame.new(rootOf(id).Position)
+	BallService.part.CFrame = CFrame.new(Fixtures.root(rigs[id]).Position)
 	BallService:step(DT, CharacterService:holders())
 	assert(BallService.state.carrier == id, `{id} should carry the ball`)
 end
@@ -132,6 +134,8 @@ describe("ActionService", function()
 		local a = blue[1]
 		stand(a, Vector3.zero)
 		giveBall(a)
+		-- Held long enough for a full charge.
+		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
 		-- A validated message reaches the request the service listens with.
 		fakeNet.handlers[Remotes.names.ActionRequest](
 			a,
@@ -140,6 +144,47 @@ describe("ActionService", function()
 		expect(BallService.state.status).toBe("Flying")
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -160))
 		expect(rejected(a)).toEqual({})
+	end)
+
+	it("bounds a throw's charge by how long the thrower has held the ball", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		giveBall(a)
+		-- Thrown at once, claiming a full charge: none.
+		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 })
+		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(throwSettings.minSpeed, 3)
+		-- Held for half the charge time, claiming a full charge: half.
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds / 2, CharacterService:holders())
+		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 })
+		local half = (throwSettings.minSpeed + throwSettings.maxSpeed) / 2
+		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(half, 3)
+		-- A smaller claim stands.
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
+		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 0 })
+		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(throwSettings.minSpeed, 3)
+	end)
+
+	it("trusts no client velocity beyond what the movement guard allows", function()
+		local limit = config.Movement.hardCap * config.Network.speedTolerance
+		local a, b = blue[1], orange[1]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(0, 0, -4))
+		-- A thrower whose client claims 10000 studs/s keeps only the allowed speed's share.
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
+		Fixtures.root(rigs[a]).AssemblyLinearVelocity = Vector3.new(0, 0, -10000)
+		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 })
+		local thrown = throwSettings.maxSpeed + throwSettings.inheritCarrierVelocity * limit
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -thrown))
+		-- A knocked-down carrier whose client claims 10000 studs/s drops it at the allowed speed.
+		Fixtures.root(rigs[a]).AssemblyLinearVelocity = Vector3.zero
+		giveBall(b)
+		Fixtures.root(rigs[b]).AssemblyLinearVelocity = Vector3.new(0, 0, 10000)
+		ActionService:request(a, { action = "Tackle" })
+		expect(advance(0.2)).toEqual({ `{a}>{b}` })
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, limit))
 	end)
 
 	it("passes to the teammate who called", function()
@@ -152,7 +197,7 @@ describe("ActionService", function()
 		ActionService:request(a, { action = "Pass", aim = Vector3.xAxis })
 		local velocity = BallService.part.AssemblyLinearVelocity
 		expect(velocity.Magnitude).toBeCloseTo(90, 3)
-		Fixtures.expectNear(velocity.Unit, (rootOf(b).Position - BallService.part.Position).Unit)
+		Fixtures.expectNear(velocity.Unit, (Fixtures.root(rigs[b]).Position - BallService.part.Position).Unit)
 		-- The call ends after its window.
 		advance(config.Actions.callPassWindow + 0.1)
 		expect(attribute(b, Attributes.CallingPass)).toBeNil()
@@ -184,7 +229,7 @@ describe("ActionService", function()
 		stand(a, Vector3.zero)
 		stand(b, Vector3.new(0, 0, -4))
 		giveBall(b)
-		rootOf(b).AssemblyLinearVelocity = Vector3.new(0, 0, 30)
+		Fixtures.root(rigs[b]).AssemblyLinearVelocity = Vector3.new(0, 0, 30)
 		ActionService:request(a, { action = "Tackle" })
 		expect(advance(0.2)).toEqual({ `{a}>{b}` })
 		expect(BallService.state.status).toBe("Loose")
@@ -246,7 +291,7 @@ describe("ActionService", function()
 		ActionService:request(b, { action = "Tackle" })
 		expect(rejected(b)).toEqual({ "Tackle" })
 
-		rootOf(d).Anchored = true
+		Fixtures.root(rigs[d]).Anchored = true
 		ActionService:request(d, { action = "CallPass" })
 		expect(rejected(d)).toEqual({ "CallPass" })
 		expect(attribute(d, Attributes.CallingPass)).toBeNil()
@@ -258,7 +303,7 @@ describe("ActionService", function()
 		expect(attribute(a, Attributes.Action)).toBeNil()
 	end)
 
-	it("accepts an action that arrives up to actionCooldownTolerance early, and rejects one earlier", function()
+	it("accepts an action that arrives up to actionTimingTolerance early, and rejects one earlier", function()
 		local a, b = blue[1], orange[1]
 		stand(a, Vector3.zero)
 		stand(b, Vector3.new(50, 0, 0))
@@ -272,6 +317,115 @@ describe("ActionService", function()
 		expect(rejected(a)).toEqual({})
 		expect(attribute(a, Attributes.Action)).toBe("Tackle")
 		expect(rejected(b)).toEqual({ "Tackle" })
+	end)
+
+	it("knocks both down when two opponents' strikes land on the same frame", function()
+		-- Two head-on pairs, one per team order; in each, the second player's record is the older (they called first).
+		local pairs = { { blue[1], orange[1] }, { orange[2], blue[2] } }
+		for index, pair in pairs do
+			local a, b = pair[1], pair[2]
+			ActionService:request(b, { action = "CallPass" })
+			local at = ON_TRACK + Vector3.new(index * 40, 0, 0)
+			rigs[a]:PivotTo(CFrame.lookAt(at, at - Vector3.zAxis))
+			rigs[b]:PivotTo(CFrame.lookAt(at - Vector3.zAxis * 8, at))
+		end
+		for _, pair in pairs do
+			ActionService:request(pair[1], { action = "Tackle" })
+			ActionService:request(pair[2], { action = "Tackle" })
+		end
+		local knockdowns = advance(0.2)
+		table.sort(knockdowns)
+		local expected: { string } = {}
+		for _, pair in pairs do
+			table.insert(expected, `{pair[1]}>{pair[2]}`)
+			table.insert(expected, `{pair[2]}>{pair[1]}`)
+		end
+		table.sort(expected)
+		expect(knockdowns).toEqual(expected)
+		for _, pair in pairs do
+			expect(attribute(pair[1], Attributes.KnockedDown)).toBe(true)
+			expect(attribute(pair[2], Attributes.KnockedDown)).toBe(true)
+		end
+	end)
+
+	it("strikes even when one long frame passes through the active phase", function()
+		local a, b = blue[1], orange[1]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(0, 0, -5))
+		ActionService:request(a, { action = "Tackle" })
+		-- From the windup straight into the recovery.
+		expect(advance(0.4, 0.4)).toEqual({ `{a}>{b}` })
+	end)
+
+	it("rejects a dive that does not follow a tackle", function()
+		local a, b = blue[1], orange[1]
+		stand(a, Vector3.zero)
+		-- Inside a dive's reach (11 + the lag tolerance), outside a tackle's.
+		stand(b, Vector3.new(0, 0, -12))
+		ActionService:request(a, { action = "Dive" })
+		expect(rejected(a)).toEqual({ "Dive" })
+		expect(attribute(a, Attributes.Action)).toBeNil()
+		expect(advance(0.4)).toEqual({})
+	end)
+
+	it("accepts a next action that arrives within actionTimingTolerance of the running one's end", function()
+		local a, b = blue[1], orange[1]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(50, 0, 0))
+		ActionService:request(a, { action = "Tackle" })
+		ActionService:request(b, { action = "Tackle" })
+		-- B: 0.5 s in, 0.15 s of its tackle left. A: 0.58 s in, 0.07 s left.
+		advance(0.5)
+		ActionService:request(b, { action = "Uppercut" })
+		advance(0.08)
+		ActionService:request(a, { action = "Uppercut" })
+		expect(rejected(b)).toEqual({ "Uppercut" })
+		expect(rejected(a)).toEqual({})
+		expect(attribute(a, Attributes.Action)).toBe("Uppercut")
+	end)
+
+	it("shows a running action only until its recovery", function()
+		local a, b = blue[1], blue[2]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(50, 0, 0))
+		ActionService:request(a, { action = "Tackle" })
+		advance(0.1)
+		expect(attribute(a, Attributes.Action)).toBe("Tackle")
+		-- The tackle recovers from 0.3 s.
+		advance(0.3)
+		expect(attribute(a, Attributes.Action)).toBeNil()
+		-- A dive from a tackle: shown through its active phase (0.35 s), not its recovery.
+		ActionService:request(b, { action = "Tackle" })
+		advance(0.1)
+		ActionService:request(b, { action = "Dive" })
+		advance(0.3)
+		expect(attribute(b, Attributes.Action)).toBe("Dive")
+		advance(0.1)
+		expect(attribute(b, Attributes.Action)).toBeNil()
+	end)
+
+	it("stops a call once the caller has the ball", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		ActionService:request(a, { action = "CallPass" })
+		advance(0.1)
+		expect(attribute(a, Attributes.CallingPass)).toBe(true)
+		giveBall(a)
+		advance(DT)
+		expect(attribute(a, Attributes.CallingPass)).toBeNil()
+	end)
+
+	it("forgets a player who loses their seat, and starts them clean when seated again", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		ActionService:request(a, { action = "Tackle" })
+		advance(0.1)
+		TeamService:leave(stubs[a])
+		TeamService:join(stubs[a])
+		-- Their tackle's cooldown (0.7 s left) went with them.
+		ActionService:request(a, { action = "Tackle" })
+		expect(rejected(a)).toEqual({})
+		expect(attribute(a, Attributes.Action)).toBe("Tackle")
 	end)
 
 	it("clears every action, knockdown and call at a kickoff", function()

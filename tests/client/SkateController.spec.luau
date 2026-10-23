@@ -27,16 +27,12 @@ local rig: Model
 local sent: { { boolean } }
 local others: { any }
 
-local function root(model: Model): BasePart
-	return model.PrimaryPart :: BasePart
-end
-
 local function velocityOf(model: Model): Vector3
-	return (root(model):FindFirstChild(SkaterRig.velocity) :: LinearVelocity).VectorVelocity
+	return (Fixtures.root(model):FindFirstChild(SkaterRig.velocity) :: LinearVelocity).VectorVelocity
 end
 
 local function alignOf(model: Model): AlignOrientation
-	return root(model):FindFirstChild(SkaterRig.align) :: AlignOrientation
+	return Fixtures.root(model):FindFirstChild(SkaterRig.align) :: AlignOrientation
 end
 
 -- A rig with its skater body, its root at hoverHeight above `ground`.
@@ -44,10 +40,6 @@ local function skaterAt(name: string, ground: Vector3): Model
 	local model = Fixtures.rig(folder, name, CFrame.new(ground + Vector3.new(0, movement.hoverHeight, 0)))
 	SkaterBody.build(model, movement)
 	return model
-end
-
-local function action(name: string): InputAction
-	return InputController.context:FindFirstChild(name) :: InputAction
 end
 
 local function setup(overrides: { [string]: any }?)
@@ -102,7 +94,7 @@ end)
 describe("SkateController", function()
 	it("takes over a character and drives its skater body from the stick", function()
 		expect((rig:FindFirstChildOfClass("Humanoid") :: Humanoid).EvaluateStateMachine).toBe(false)
-		Fixtures.scriptedBinding(action("Move")):Fire(Vector2.new(0, 1))
+		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(0, 1))
 		SkateController:step(0.1)
 		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -2.594)) -- SkateMath's first push, at hover height
 		Fixtures.expectNear(alignOf(rig).SecondaryAxis, Vector3.yAxis)
@@ -110,14 +102,14 @@ describe("SkateController", function()
 	end)
 
 	it("holds still while the root is anchored, then starts from rest", function()
-		Fixtures.scriptedBinding(action("Move")):Fire(Vector2.new(0, 1))
+		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(0, 1))
 		for _ = 1, 10 do
 			SkateController:step(0.1)
 		end
-		root(rig).Anchored = true
+		Fixtures.root(rig).Anchored = true
 		SkateController:step(0.1)
 		Fixtures.expectNear((SkateController.skater :: any).velocity, Vector3.zero)
-		root(rig).Anchored = false
+		Fixtures.root(rig).Anchored = false
 		SkateController:step(0.1)
 		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -2.594))
 	end)
@@ -128,8 +120,8 @@ describe("SkateController", function()
 		"starts the kickoff from rest, upright, facing its spawn, whatever was held or pressed during the freeze",
 		function()
 			local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
-			table.insert(others, { player = "2", team = "Blue", root = root(leader) })
-			local attachKey = Fixtures.scriptedBinding(action("Attach"))
+			table.insert(others, { player = "2", team = "Blue", root = Fixtures.root(leader) })
+			local attachKey = Fixtures.scriptedBinding(InputController.context, "Attach")
 			attachKey:Fire(true)
 			SkateController:step(1 / 60)
 			local skater = SkateController.skater :: any
@@ -137,11 +129,11 @@ describe("SkateController", function()
 			-- Riding a wall when the point is scored.
 			skater.up = Vector3.xAxis
 
-			root(rig).Anchored = true
+			Fixtures.root(rig).Anchored = true
 			local spawn = Vector3.new(0, movement.hoverHeight, 0)
 			rig:PivotTo(CFrame.lookAt(spawn, spawn + Vector3.xAxis))
 			attachKey:Fire(false)
-			local jumpKey = Fixtures.scriptedBinding(action("Jump"))
+			local jumpKey = Fixtures.scriptedBinding(InputController.context, "Jump")
 			jumpKey:Fire(true)
 			task.wait()
 			jumpKey:Fire(false)
@@ -149,7 +141,7 @@ describe("SkateController", function()
 				SkateController:step(1 / 60)
 			end
 
-			root(rig).Anchored = false
+			Fixtures.root(rig).Anchored = false
 			SkateController:step(1 / 60)
 			expect(skater.mode).toBe("Grounded")
 			expect(velocityOf(rig).Magnitude).toBeLessThan(1)
@@ -162,7 +154,7 @@ describe("SkateController", function()
 	it("locks a knocked-down skater's input and lets go of the attach", function()
 		local skater = SkateController.skater :: any
 		skater.velocity = Vector3.new(0, 0, -60)
-		local stick = Fixtures.scriptedBinding(action("Move"))
+		local stick = Fixtures.scriptedBinding(InputController.context, "Move")
 		stick:Fire(Vector2.new(1, 0))
 		rig:SetAttribute(Attributes.KnockedDown, true)
 		SkateController:step(0.1)
@@ -173,8 +165,8 @@ describe("SkateController", function()
 		stick:Fire(Vector2.zero)
 		rig:SetAttribute(Attributes.KnockedDown, nil)
 		local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
-		table.insert(others, { player = "2", team = "Blue", root = root(leader) })
-		local attachKey = Fixtures.scriptedBinding(action("Attach"))
+		table.insert(others, { player = "2", team = "Blue", root = Fixtures.root(leader) })
+		local attachKey = Fixtures.scriptedBinding(InputController.context, "Attach")
 		attachKey:Fire(true)
 		SkateController:step(1 / 60)
 		expect(skater.mode).toBe("Attached")
@@ -190,14 +182,14 @@ describe("SkateController", function()
 	end)
 
 	it("keeps telling the server about pump and brake during the freeze", function()
-		root(rig).Anchored = true
-		Fixtures.scriptedBinding(action("Pump")):Fire(true)
+		Fixtures.root(rig).Anchored = true
+		Fixtures.scriptedBinding(InputController.context, "Pump"):Fire(true)
 		SkateController:step(1 / 60)
 		expect(sent).toEqual({ { true, false } })
 	end)
 
 	it("drops a jump pressed while it had no character", function()
-		local jumpKey = Fixtures.scriptedBinding(action("Jump"))
+		local jumpKey = Fixtures.scriptedBinding(InputController.context, "Jump")
 		jumpKey:Fire(true)
 		task.wait()
 		jumpKey:Fire(false)
@@ -214,7 +206,7 @@ describe("SkateController", function()
 	end)
 
 	it("drives a new character after a respawn", function()
-		Fixtures.scriptedBinding(action("Move")):Fire(Vector2.new(0, 1))
+		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(0, 1))
 		SkateController:step(0.1)
 		local before = velocityOf(rig)
 		local respawned = skaterAt("Respawned", Vector3.new(50, 0, 0))
@@ -225,7 +217,7 @@ describe("SkateController", function()
 	end)
 
 	it("tells the server about pump and brake only when they change", function()
-		local pump = Fixtures.scriptedBinding(action("Pump"))
+		local pump = Fixtures.scriptedBinding(InputController.context, "Pump")
 		pump:Fire(true)
 		for _ = 1, 3 do
 			SkateController:step(1 / 60)
@@ -246,7 +238,7 @@ describe("SkateController", function()
 			end,
 		})
 		SkateController:bind(rig)
-		local pump = Fixtures.scriptedBinding(action("Pump"))
+		local pump = Fixtures.scriptedBinding(InputController.context, "Pump")
 		local perSecond = config.Network.maxSkateStatesPerSecond
 		-- An odd count of toggles ends on pump held, unlike the last state the burst sends.
 		for toggle = 1, perSecond + 11 do
@@ -293,11 +285,11 @@ describe("SkateController", function()
 		}
 		for index, spot in spots do
 			local other = skaterAt(`Other{index}`, spot[1])
-			root(other).AssemblyLinearVelocity = Vector3.new(0, 0, -40)
-			table.insert(others, { player = tostring(index + 1), team = spot[2], root = root(other) })
+			Fixtures.root(other).AssemblyLinearVelocity = Vector3.new(0, 0, -40)
+			table.insert(others, { player = tostring(index + 1), team = spot[2], root = Fixtures.root(other) })
 		end
-		Fixtures.scriptedBinding(action("Move")):Fire(Vector2.new(0, 1))
-		Fixtures.scriptedBinding(action("Pump")):Fire(true)
+		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(0, 1))
+		Fixtures.scriptedBinding(InputController.context, "Pump"):Fire(true)
 		local started = os.clock()
 		for _ = 1, 600 do
 			SkateController:step(1 / 60)

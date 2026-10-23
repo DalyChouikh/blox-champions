@@ -14,6 +14,10 @@ local network = config.Network
 -- A 0.25 s sample allows hardCap × speedTolerance × 0.25 = 140 × 1.2 × 0.25 = 42 studs, and a move past twice that
 -- returns at once.
 describe("MovementCheck", function()
+	it("allows hardCap × speedTolerance, the fastest a skater may move", function()
+		expect(MovementCheck.speedLimit(movement, network)).toBeCloseTo(168, 6)
+	end)
+
 	it("returns a skater who is too fast for guardStrikes samples in a row to the last valid place", function()
 		local check = MovementCheck.new(movement, network)
 		check:reset("A", Vector3.zero, 0)

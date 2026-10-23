@@ -1,12 +1,13 @@
 --!strict
--- The local player's actions (spec §3.3, §8.1–8.3). Each physics step, after the skating, it reads the action keys and
--- starts at most one action at once in its own ActionRunner: it pushes the skater, then asks the server, which checks
--- the action again. A refusal (ActionRejected) stops the action and refunds its cooldown; a push already given stays,
--- which the movement guard tolerates. Nothing starts while the skater is frozen for a kickoff or knocked down.
+-- The local player's actions (spec §3.3, §8.1–8.3). Each physics step, after the skating (FrameController), it reads
+-- the action keys and starts at most one action at once in its own ActionRunner: it pushes the skater, then asks the
+-- server, which checks the action again. A throw or pass predicts the ball leaving. A refusal (ActionRejected) stops
+-- the action, refunds its cooldown and gives a refused throw's ball back; a push already given stays, which the
+-- movement guard tolerates. A throw let go while another action runs waits for it. Nothing starts while the skater is
+-- frozen for a kickoff or knocked down.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local ActionRunner = require(ReplicatedStorage.Shared.Actions.ActionRunner)
 local Actions = require(ReplicatedStorage.Shared.Config.Actions)
@@ -63,8 +64,8 @@ local function forKey(self: ActionController, own: Config.ActionName): Config.Ac
 end
 
 -- At most one action a step, in this order: the tackle key (a dodge with the ball), the uppercut, the pass key (a call
--- without the ball), then a throw. The throw charges while held with the ball and goes when it is let go; losing the
--- ball drops the charge.
+-- without the ball), then a throw. The throw charges while held with the ball and goes when it is let go, or as soon
+-- after as the runner allows; losing the ball drops the charge.
 local function chosen(
 	self: ActionController,
 	keys: InputController.ActionKeys,
@@ -124,6 +125,11 @@ local function push(self: ActionController, skater: SkateMath.Skater, action: Co
 	self._skate:push(change, launch)
 end
 
+-- A throw or a pass: the ball leaves the player's hands.
+local function letsGoOfBall(action: Config.ActionConfig): boolean
+	return action.effect == "Throw" or action.effect == "Pass"
+end
+
 -- What the server is told: the action, with the camera's aim for a throw or a pass and the charge for a throw. The
 -- shape follows the action's effect, as Net/Schemas checks it.
 local function request(
@@ -133,7 +139,7 @@ local function request(
 	held: number?
 ): { [string]: any }
 	local payload: { [string]: any } = { action = name }
-	if action.effect == "Throw" or action.effect == "Pass" then
+	if letsGoOfBall(action) then
 		payload.aim = self._camera.CFrame.LookVector
 	end
 	if action.effect == "Throw" then
@@ -148,16 +154,19 @@ local function begin(self: ActionController, skater: SkateMath.Skater, name: Con
 	context.hasBall = hasBall
 	context.airborne = skater.mode == "Airborne"
 	context.knockedDown = self._skate.knockedDown
+	if self.runner:start(name, context) ~= "Started" then
+		return
+	end
 	local held = self._charge
 	if name == "ChargeThrow" then
 		self._charge = nil
 	end
-	if self.runner:start(name, context) ~= "Started" then
-		return
-	end
 	local action = self._config.Actions[name]
 	push(self, skater, action)
 	self._sendRequest(request(self, name, action, held))
+	if letsGoOfBall(action) then
+		self._carrier:predictRelease()
+	end
 end
 
 local ActionController: ActionController = {
@@ -198,9 +207,6 @@ local ActionController: ActionController = {
 		Remotes.get(ReplicatedStorage, Remotes.names.ActionRejected).OnClientEvent:Connect(function(payload: any)
 			self:rejected(payload)
 		end)
-		RunService.PreSimulation:Connect(function(dt: number)
-			self:step(dt)
-		end)
 	end,
 
 	pose = function(self: ActionController): Config.PoseName
@@ -236,6 +242,9 @@ local ActionController: ActionController = {
 		local name: Config.ActionName? = Actions.nameOf(payload.action)
 		if name ~= nil then
 			self.runner:cancel(name, true)
+			if letsGoOfBall(self._config.Actions[name]) then
+				self._carrier:undoPrediction()
+			end
 		end
 	end,
 }

@@ -7,6 +7,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local GeometryTypes = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
+local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 
@@ -20,11 +21,11 @@ function Fixtures.expectNear(actual: Vector3, expected: Vector3, tolerance: numb
 	JestGlobals.expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-3)
 end
 
--- A binding tests can drive with Fire, added to an input action.
-function Fixtures.scriptedBinding(action: InputAction): InputBinding
+-- A binding tests can drive with Fire, added to the context's input action called `name`.
+function Fixtures.scriptedBinding(context: InputContext, name: string): InputBinding
 	local binding = Instance.new("InputBinding")
 	binding.Type = Enum.InputBindingType.Scriptable
-	binding.Parent = action
+	binding.Parent = context:FindFirstChild(name) :: InputAction
 	return binding
 end
 
@@ -99,7 +100,7 @@ function Fixtures.rig(parent: Instance, name: string, cframe: CFrame, rigType: E
 	local model = Instance.new("Model")
 	model.Name = name
 	local root = Instance.new("Part")
-	root.Name = "HumanoidRootPart"
+	root.Name = SkaterRig.root
 	root.Size = Vector3.new(2, 2, 1)
 	root.CFrame = cframe
 	root.Parent = model
@@ -131,6 +132,11 @@ function Fixtures.rig(parent: Instance, name: string, cframe: CFrame, rigType: E
 	return model
 end
 
+-- A rig's root part, found by the name Roblox gives it in every character.
+function Fixtures.root(rig: Model): BasePart
+	return rig:FindFirstChild(SkaterRig.root) :: BasePart
+end
+
 -- An R15 rig whose joints are Motor6Ds, named as the avatar's own joints are. The parts all sit on `cframe`: only the
 -- joints matter to the tests that use it.
 function Fixtures.jointedRig(parent: Instance, name: string, cframe: CFrame): Model
@@ -139,7 +145,7 @@ function Fixtures.jointedRig(parent: Instance, name: string, cframe: CFrame): Mo
 	local parts: { [string]: BasePart } = {}
 	for _, partName in
 		{
-			"HumanoidRootPart",
+			SkaterRig.root,
 			"LowerTorso",
 			"UpperTorso",
 			"LeftUpperLeg",
@@ -151,13 +157,13 @@ function Fixtures.jointedRig(parent: Instance, name: string, cframe: CFrame): Mo
 	do
 		local part = Instance.new("Part")
 		part.Name = partName
-		part.Size = if partName == "HumanoidRootPart" then Vector3.new(2, 2, 1) else Vector3.new(1, 1, 1)
+		part.Size = if partName == SkaterRig.root then Vector3.new(2, 2, 1) else Vector3.new(1, 1, 1)
 		part.CFrame = cframe
 		part.Parent = model
 		parts[partName] = part
 	end
 	local joints = {
-		{ name = "Root", from = "HumanoidRootPart", to = "LowerTorso" },
+		{ name = "Root", from = SkaterRig.root, to = "LowerTorso" },
 		{ name = "Waist", from = "LowerTorso", to = "UpperTorso" },
 		{ name = "LeftHip", from = "LowerTorso", to = "LeftUpperLeg" },
 		{ name = "LeftKnee", from = "LeftUpperLeg", to = "LeftLowerLeg" },
@@ -176,7 +182,7 @@ function Fixtures.jointedRig(parent: Instance, name: string, cframe: CFrame): Mo
 	humanoid.RigType = Enum.HumanoidRigType.R15
 	humanoid.HipHeight = 2
 	humanoid.Parent = model
-	model.PrimaryPart = parts.HumanoidRootPart
+	model.PrimaryPart = parts[SkaterRig.root]
 	model.Parent = parent
 	return model
 end

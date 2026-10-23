@@ -218,13 +218,16 @@ local function followUp(own: ActionName): Validate.Validator
 	})
 end
 
--- An action's record: the fields every action has, plus its own.
-local function action(own: { [string]: Validate.Validator }): Validate.Validator
+-- An action's record: the fields every action has, plus its own. Its effect is the default's and no other: modes
+-- change an action's numbers, never what it does (Net/Schemas shapes each action's request by its effect).
+local function action(default: ActionConfig, own: { [string]: Validate.Validator }): Validate.Validator
+	-- A plain string: luau tables are invariant, so { Effect } is not the { string } oneOf takes.
+	local effect: string = default.effect
 	local fields: { [string]: Validate.Validator } = {
 		phases = phases,
 		cooldown = nonNegative,
 		requires = requiresSchema,
-		effect = Validate.string({ oneOf = { "Knockdown", "Dodge", "Throw", "Pass", "CallPass" } }),
+		effect = Validate.string({ oneOf = { effect } }),
 		pose = Validate.string({ oneOf = { "Lunge", "None" } }),
 	}
 	for name, validator in own do
@@ -236,20 +239,20 @@ end
 local schema = Validate.record({
 	airMultiplier = fraction,
 	callPassWindow = positive,
-	Tackle = action({
+	Tackle = action(defaults.Tackle, {
 		hit = hit,
 		motion = Validate.record({ lungeSpeed = positive }),
 		followUp = followUp("Tackle"),
 	}),
-	Dive = action({ hit = hit, motion = Validate.record({ lungeSpeed = positive }) }),
-	Dodge = action({ motion = Validate.record({ sideSpeed = positive }) }),
-	Uppercut = action({
+	Dive = action(defaults.Dive, { hit = hit, motion = Validate.record({ lungeSpeed = positive }) }),
+	Dodge = action(defaults.Dodge, { motion = Validate.record({ sideSpeed = positive }) }),
+	Uppercut = action(defaults.Uppercut, {
 		hit = hit,
 		motion = Validate.record({ wallLeapDistance = positive, wallLeapImpulse = positive }),
 	}),
-	ChargeThrow = action({ throw = throw }),
-	Pass = action({ pass = pass }),
-	CallPass = action({}),
+	ChargeThrow = action(defaults.ChargeThrow, { throw = throw }),
+	Pass = action(defaults.Pass, { pass = pass }),
+	CallPass = action(defaults.CallPass, {}),
 })
 
 return {

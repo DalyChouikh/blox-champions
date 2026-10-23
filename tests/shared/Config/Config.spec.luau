@@ -58,7 +58,7 @@ describe("Config defaults", function()
 			guardTeleportFactor = 2,
 			maxActionsPerSecond = 15,
 			hitLagToleranceStuds = 3,
-			actionCooldownTolerance = 0.1,
+			actionTimingTolerance = 0.1,
 		})
 	end)
 
@@ -490,6 +490,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { Dodge = { hit = { range = 1, coneDeg = 1, aimUpDeg = 0, knockdownSeconds = 1 } } },
 				message = "Actions.Dodge.hit: unknown key",
+			},
+			{
+				overrides = { Tackle = { effect = "Throw" } },
+				message = 'Actions.Tackle.effect: must be one of Knockdown (got "Throw")',
 			},
 		}
 		for _, case in cases do

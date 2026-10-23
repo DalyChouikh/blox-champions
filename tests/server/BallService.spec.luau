@@ -37,9 +37,18 @@ end
 local function holder(name: string, rig: Model, canCatch: boolean?): BallService.Holder
 	return {
 		player = name,
-		root = rig:FindFirstChild("HumanoidRootPart") :: BasePart,
+		root = Fixtures.root(rig),
 		canCatch = canCatch ~= false,
 	}
+end
+
+-- Whether the ball's lift is on: a pass flies against gravity.
+local function flyingFlat(): boolean
+	local lift = BallService.part:FindFirstChildOfClass("VectorForce")
+	if lift then
+		return lift.Enabled
+	end
+	return false
 end
 
 local function isSpawn(position: Vector3): boolean
@@ -107,7 +116,7 @@ describe("BallService", function()
 		expect(BallService.part.Massless).toBe(true)
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
 		closest:PivotTo(closest:GetPivot() + Vector3.new(10, 0, 0))
-		local root = closest:FindFirstChild("HumanoidRootPart") :: BasePart
+		local root = Fixtures.root(closest)
 		Fixtures.expectNear(BallService.part.Position, root.CFrame * config.Ball.carryOffset)
 	end)
 
@@ -209,7 +218,7 @@ describe("BallService", function()
 	it("lets the ball pass through the player who let go of it until it is clear of them", function()
 		local rig = caughtBy("A")
 		SkaterBody.build(rig, config.Movement)
-		local root = rig:FindFirstChild(SkaterRig.root) :: BasePart
+		local root = Fixtures.root(rig)
 		local collider = rig:FindFirstChild(SkaterRig.collider) :: BasePart
 		local touch = config.Ball.radius + config.Movement.colliderDiameter / 2 + config.Network.pickupLagToleranceStuds
 		local function passesThroughA(): boolean
@@ -239,12 +248,28 @@ describe("BallService", function()
 		expect(passesThroughA()).toBe(true)
 	end)
 
+	it("lets a released ball move no faster than the movement guard allows", function()
+		local limit = config.Movement.hardCap * config.Network.speedTolerance
+		local rig = caughtBy("A")
+		local root = Fixtures.root(rig)
+		-- The carrier's client sets its own assembly's velocity, the ball's included.
+		root.AssemblyLinearVelocity = Vector3.new(10000, 0, 0)
+		BallService:drop()
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(limit, 0, 0))
+		-- A given velocity too.
+		BallService.part.CFrame = CFrame.new(root.Position)
+		BallService:step(1 / 60, { holder("A", rig) })
+		expect(BallService.state.carrier).toBe("A")
+		BallService:drop(Vector3.new(0, 0, -10000))
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -limit))
+	end)
+
 	it("homes a pass on its target", function()
 		local a = caughtBy("A")
 		local b = Fixtures.rig(folder, "B", CFrame.new(BallService.part.Position + Vector3.new(20, 0, -30)))
 		BallService:pass("A", Vector3.new(0, 0, -90), "B")
 		expect(BallService.state.status).toBe("Flying")
-		local root = b:FindFirstChild("HumanoidRootPart") :: BasePart
+		local root = Fixtures.root(b)
 		local turn = (root.Position - BallService.part.Position).Unit * 60 * 0.1
 		BallService:step(0.1, { holder("A", a), holder("B", b) })
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -90) + turn)
@@ -259,6 +284,95 @@ describe("BallService", function()
 		-- For good: back on their feet, they are no longer homed on.
 		BallService:step(0.1, { holder("A", a), holder("B", b) })
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -90))
+	end)
+
+	it("stops homing when its target is gone", function()
+		local a = caughtBy("A")
+		local b = Fixtures.rig(folder, "B", CFrame.new(BallService.part.Position + Vector3.new(20, 0, -30)))
+		BallService:pass("A", Vector3.new(0, 0, -90), "B")
+		BallService:step(0.1, { holder("A", a) })
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -90))
+		-- For good: back among the holders, they are no longer homed on.
+		BallService:step(0.1, { holder("A", a), holder("B", b) })
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -90))
+	end)
+
+	it("flies a pass flat against gravity until it lands, and a plain throw falls", function()
+		local a = caughtBy("A")
+		expect(flyingFlat()).toBe(false)
+		BallService:pass("A", Vector3.new(0, 0, -90), nil)
+		expect(flyingFlat()).toBe(true)
+		-- As strong as the free ball's weight, upward, at its center (a welded massless part weighs 0 by GetMass).
+		local lift = BallService.part:FindFirstChildOfClass("VectorForce") :: VectorForce
+		Fixtures.expectNear(lift.Force, Vector3.new(0, BallService.part:GetMass() * workspace.Gravity, 0))
+		expect(lift.RelativeTo).toBe(Enum.ActuatorRelativeTo.World)
+		expect(lift.ApplyAtCenterOfMass).toBe(true)
+		BallService:step(1 / 60, { holder("A", a) })
+		expect(flyingFlat()).toBe(true)
+		local wall = Instance.new("Part")
+		wall.Parent = folder
+		BallService:onTouched(wall)
+		expect(flyingFlat()).toBe(false)
+		-- A throw is not a pass.
+		BallService.part.CFrame = CFrame.new(Fixtures.root(a).Position)
+		BallService:step(config.Ball.rethrowPickupDelay, { holder("A", a) })
+		expect(BallService.state.carrier).toBe("A")
+		BallService:throw("A", Vector3.new(0, 0, -90))
+		expect(flyingFlat()).toBe(false)
+	end)
+
+	it("lets a pass fall once it is caught, touches a body, loses its receiver, or leaves play", function()
+		local a = caughtBy("A")
+		local aRoot = Fixtures.root(a)
+		local b = Fixtures.rig(folder, "B", CFrame.new(aRoot.Position + Vector3.new(0, 0, -30)))
+		local bRoot = Fixtures.root(b)
+		local c = Fixtures.rig(folder, "C", CFrame.new(aRoot.Position + Vector3.new(0, 0, 30)))
+		local cRoot = Fixtures.root(c)
+		local function passFromA(target: string?)
+			BallService.part.CFrame = CFrame.new(aRoot.Position)
+			BallService:step(config.Ball.rethrowPickupDelay, { holder("A", a) })
+			assert(BallService.state.carrier == "A", "A should carry the ball")
+			BallService:pass("A", Vector3.new(0, 0, -90), target)
+			assert(flyingFlat(), "a pass should fly flat")
+		end
+		-- Caught by its receiver.
+		passFromA("B")
+		BallService.part.CFrame = CFrame.new(bRoot.Position)
+		BallService:step(1 / 60, { holder("A", a), holder("B", b) })
+		expect(BallService.state.carrier).toBe("B")
+		expect(flyingFlat()).toBe(false)
+		-- Touching a knocked-down body.
+		BallService:pass("B", Vector3.new(0, 0, 90), nil)
+		BallService.part.CFrame = CFrame.new(cRoot.Position + Vector3.new(3, 0, 0))
+		BallService:step(1 / 60, { holder("B", b), holder("C", c, false) })
+		expect(flyingFlat()).toBe(false)
+		-- Its receiver knocked down.
+		passFromA("B")
+		BallService:step(1 / 60, { holder("A", a), holder("B", b, false) })
+		expect(flyingFlat()).toBe(false)
+		-- Back in play from a spawn, dead after a point, or hidden for a kickoff.
+		passFromA(nil)
+		BallService:spawn()
+		expect(flyingFlat()).toBe(false)
+		passFromA(nil)
+		BallService:kill()
+		expect(flyingFlat()).toBe(false)
+		BallService:spawn()
+		passFromA(nil)
+		BallService:hide()
+		expect(flyingFlat()).toBe(false)
+	end)
+
+	it("reports a knocked-down defender's touch even beside the thrower", function()
+		local a = caughtBy("A")
+		local aRoot = Fixtures.root(a)
+		BallService:throw("A", Vector3.new(0, 0, -30))
+		local at = aRoot.Position + Vector3.new(2.5, 0, 0)
+		local b = Fixtures.rig(folder, "B", CFrame.new(at + Vector3.new(3.5, 0, 0)))
+		BallService.part.CFrame = CFrame.new(at)
+		local frame = BallService:step(1 / 60, { holder("A", a), holder("B", b, false) })
+		expect(frame.picker).toBeNil()
+		expect(frame.toucher).toBe("B")
 	end)
 
 	it("lets a knocked-down player not catch, but reports their touch", function()
@@ -282,7 +396,7 @@ describe("BallService", function()
 	it("lands a thrown ball when it touches the arena, not a player", function()
 		local rig = caughtBy("A")
 		BallService:throw("A", Vector3.new(0, 10, 0))
-		BallService:onTouched(rig:FindFirstChild("HumanoidRootPart") :: BasePart)
+		BallService:onTouched(Fixtures.root(rig))
 		expect(BallService.state.status).toBe("Flying")
 		local floor = Instance.new("Part")
 		floor.Parent = folder

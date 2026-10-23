@@ -1,9 +1,11 @@
 --!strict
--- Runs matches on the server (spec §4–§5, §10). Each frame it reports the ball's movement, a throw, a catch and a body
--- touch to the rules engine in the order the engine documents, ticks it, reacts to its events — hiding and spawning the
--- ball, placing and freezing characters, opening and closing the goal — and sends them to clients. It keeps the ball
--- dead whenever play is not live, so the ball is only ever carried by the engine's last holder. After a match ends it
--- waits postMatchSeconds and starts the next one with everyone reseated; once every player has left it starts over.
+-- Runs matches on the server (spec §4–§5, §10), in the server's one frame order. Each frame it steps the actions first
+-- (strikes, knockdowns and their drops), then the ball, then reports the ball's movement, a throw, a catch, a body
+-- touch and each knockdown to the rules engine in the order the engine documents, ticks it, reacts to its events —
+-- hiding and spawning the ball, clearing every action, knockdown and call at a kickoff, placing and freezing
+-- characters, opening and closing the goal — and sends them to clients. It keeps the ball dead whenever play is not
+-- live, so the ball is only ever carried by the engine's last holder. After a match ends it waits postMatchSeconds and
+-- starts the next one with everyone reseated; once every player has left it starts over.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
