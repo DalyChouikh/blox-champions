@@ -231,6 +231,8 @@ local PoseController: PoseController = {
 			pumping = false,
 			braking = false,
 			carrying = false,
+			lunging = false,
+			knockedDown = false,
 			bodyOffset = 0,
 		}
 		self._surfaces = RaycastParams.new()

@@ -18,6 +18,8 @@ local function still(): Pose.PoseInput
 		pumping = false,
 		braking = false,
 		carrying = false,
+		lunging = false,
+		knockedDown = false,
 		bodyOffset = 0,
 	}
 end
@@ -116,6 +118,24 @@ describe("Pose", function()
 		Pose.compute(pose, turningRight, out)
 		expect(points(out.root, Vector3.yAxis).X).toBeGreaterThan(0) -- into a right turn
 		expect(points(out.rightShoulder, DOWN).X).toBeGreaterThan(0) -- the right arm rises out to the side
+	end)
+
+	it("tips a lunging root forward and a knocked-down root back, knocked down first", function()
+		local out = {} :: Pose.Frame
+		-- A lunge replaces the pump's lean.
+		local lunging = still()
+		lunging.lunging = true
+		lunging.pumping = true
+		lunging.bodyOffset = 0.5
+		Pose.compute(pose, lunging, out)
+		expect(out.root.LookVector.Y).toBeCloseTo(-math.sin(math.rad(pose.lungeDeg)), 6)
+		expect(out.root.Position.Y).toBe(0.5)
+
+		local knockedDown = still()
+		knockedDown.knockedDown = true
+		knockedDown.lunging = true
+		Pose.compute(pose, knockedDown, out)
+		expect(out.root.LookVector.Y).toBeCloseTo(math.sin(math.rad(pose.knockdownTiltDeg)), 6)
 	end)
 
 	it("writes the root as the lift, then the pitch, then the roll", function()

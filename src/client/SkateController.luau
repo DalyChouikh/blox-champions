@@ -327,7 +327,8 @@ local SkateController: SkateController = {
 		self._rayParams.FilterType = Enum.RaycastFilterType.Include
 		refreshSurfaces(self)
 		self._keys = InputController.newKeys()
-		self._input = { move = Vector3.zero, pump = false, brake = false, jump = false, draftAccel = 0 }
+		self._input =
+			{ move = Vector3.zero, pump = false, brake = false, jump = false, draftAccel = 0, knockedDown = false }
 		self._ground = { hit = false, normal = worldUp(self), distance = 0 }
 		self._sources = {}
 		self._teammates = {}

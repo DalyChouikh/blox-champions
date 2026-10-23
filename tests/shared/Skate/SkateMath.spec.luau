@@ -18,7 +18,8 @@ local SLOPE = Vector3.new(0, math.cos(math.rad(30)), -math.sin(math.rad(30)))
 local DOWNHILL = Vector3.new(0, -0.5, -math.cos(math.rad(30)))
 
 local function input(overrides: { [string]: any }?): Types.SkateInput
-	local record: Types.SkateInput = { move = Vector3.zero, pump = false, brake = false, jump = false, draftAccel = 0 }
+	local record: Types.SkateInput =
+		{ move = Vector3.zero, pump = false, brake = false, jump = false, draftAccel = 0, knockedDown = false }
 	local changes: { [string]: any } = overrides or {}
 	for key, value in changes do
 		(record :: any)[key] = value
@@ -234,6 +235,43 @@ describe("SkateMath off the ground and on walls", function()
 		Fixtures.expectNear(s.velocity, Vector3.zero)
 		s:step(input({ move = -Vector3.zAxis }), ground(), 0.1)
 		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -2.594))
+	end)
+end)
+
+describe("SkateMath pushes and knockdowns", function()
+	it("pushes the skater and caps the result at hardCap", function()
+		local s = skater(Vector3.new(0, 0, -100))
+		s:push(Vector3.new(0, 0, -60), false)
+		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -movement.hardCap))
+		expect(s.mode).toBe("Grounded")
+	end)
+
+	it("launches with a push that leaves the ground", function()
+		local s = skater(Vector3.zero)
+		s:push(Vector3.new(0, 110, 0), true)
+		expect(s.mode).toBe("Airborne")
+		expect(s.velocity.Y).toBeCloseTo(110, 4)
+	end)
+
+	it("slides a knocked-down skater, slowing by knockdownDecel and ignoring the stick, pump and jump", function()
+		local s = skater(Vector3.new(0, 0, -80))
+		s:step(input({ move = Vector3.xAxis, pump = true, jump = true, knockedDown = true }), ground(), 0.5)
+		expect(s.mode).toBe("Grounded")
+		Fixtures.expectNear(s.forward, -Vector3.zAxis)
+		-- 80 − (4 + 0.02 × 80) × 0.5 − 75 × 0.5
+		expect(s.velocity.Magnitude).toBeCloseTo(39.7, 2)
+
+		-- Nor does a knocked-down skater steer in the air.
+		local flying = skater(Vector3.new(0, 0, -30))
+		flying.mode = "Airborne"
+		flying:step(input({ move = Vector3.xAxis, knockedDown = true }), ground(FLAT, 0, false), 0.1)
+		expect(flying.velocity.X).toBeCloseTo(0, 6)
+	end)
+
+	it("stops a knocked-down skater at zero, never backwards", function()
+		local s = skater(Vector3.new(0, 0, -10))
+		s:step(input({ knockedDown = true }), ground(), 1)
+		Fixtures.expectNear(s.velocity, Vector3.zero)
 	end)
 end)
 
