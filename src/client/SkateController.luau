@@ -1,5 +1,5 @@
 --!strict
--- The local player's skating (spec §7.1). Every physics step it:
+-- The local player's skating (spec §7.1). Every physics step, first (FrameController), it:
 -- - reads the keys and casts the ground ray against the ride surfaces only;
 -- - filters the ray's normal;
 -- - works out the draft and the attach;
@@ -12,7 +12,6 @@
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Attach = require(ReplicatedStorage.Shared.Skate.Attach)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
@@ -385,9 +384,6 @@ local SkateController: SkateController = {
 				self:bind(character)
 			end)
 		end
-		RunService.PreSimulation:Connect(function(dt: number)
-			self:step(dt)
-		end)
 	end,
 
 	bind = function(self: SkateController, character: Model)

@@ -179,6 +179,52 @@ describe("ActionController", function()
 		expect(request.charge).toBeCloseTo(0.5, 6)
 	end)
 
+	it("keeps a throw released during a dodge for when the dodge ends", function()
+		setup()
+		BallCarrier:set(LOCAL_ID)
+		local throw = bindingOf("Throw")
+		throw:Fire(true)
+		for _ = 1, 15 do
+			frame()
+		end
+		-- A dodge, the throw still held for its first step.
+		press("Tackle")
+		frame()
+		expect(requests).toEqual({ { action = "Dodge" } })
+		throw:Fire(false)
+		-- The dodge runs 0.5 s (30 steps).
+		for _ = 1, 28 do
+			frame()
+		end
+		expect(#requests).toBe(1)
+		for _ = 1, 5 do
+			frame()
+		end
+		expect(#requests).toBe(2)
+		expect(requests[2].action).toBe("ChargeThrow")
+		expect(requests[2].charge).toBeCloseTo(16 * DT, 6)
+	end)
+
+	it("predicts the ball leaving with a pass, and takes it back if the pass is refused", function()
+		setup()
+		BallCarrier:set(LOCAL_ID)
+		press("Pass")
+		frame()
+		expect(requests[1].action).toBe("Pass")
+		expect(BallCarrier.carrier).toBeNil()
+		-- The tackle key right after is a tackle, not a dodge.
+		press("Tackle")
+		frame()
+		expect(requests[2]).toEqual({ action = "Tackle" })
+		-- Refused: the ball is back.
+		ActionController.runner:reset()
+		BallCarrier:set(LOCAL_ID)
+		press("Pass")
+		frame()
+		ActionController:rejected({ action = "Pass" })
+		expect(BallCarrier.carrier).toBe(LOCAL_ID)
+	end)
+
 	it("passes with the ball and calls for one without", function()
 		setup()
 		BallCarrier:set(LOCAL_ID)
