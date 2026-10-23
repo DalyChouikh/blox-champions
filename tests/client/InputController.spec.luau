@@ -26,9 +26,8 @@ afterEach(function()
 	folder:Destroy()
 end)
 
-local function expectNear2(actual: Vector2, expected: Vector2)
-	expect((actual - expected).Magnitude).toBeLessThan(1e-6)
-end
+-- The look scales are small (radians per pixel), so they are compared this closely.
+local EXACT = 1e-6
 
 -- The Look action's bindings by the key they read.
 local function lookBindings(): { [string]: InputBinding }
@@ -139,9 +138,9 @@ describe("InputController", function()
 		local look = InputController.context:FindFirstChild("Look") :: InputAction
 		expect(look.Type).toBe(Enum.InputActionType.Direction2D)
 		local byKey = lookBindings()
-		expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), math.rad(0.385)))
-		expectNear2(byKey.Thumbstick2.Vector2Scale, Vector2.new(math.rad(240), math.rad(-185)))
-		expectNear2(byKey.TouchDelta.Vector2Scale, Vector2.new(math.rad(1), math.rad(0.66)))
+		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), math.rad(0.385)), EXACT)
+		Fixtures.expectNear2(byKey.Thumbstick2.Vector2Scale, Vector2.new(math.rad(240), math.rad(-185)), EXACT)
+		Fixtures.expectNear2(byKey.TouchDelta.Vector2Scale, Vector2.new(math.rad(1), math.rad(0.66)), EXACT)
 		expect(byKey.Thumbstick2.ResponseCurve).toBe(2)
 		expect(byKey.MouseDelta.ResponseCurve).toBe(1)
 	end)
@@ -152,15 +151,15 @@ describe("InputController", function()
 		expect(byKey.MouseDelta.Scale).toBe(2)
 		expect(byKey.Thumbstick2.Scale).toBe(0.5)
 		expect(byKey.TouchDelta.Scale).toBe(1)
-		expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), -math.rad(0.385)))
-		expectNear2(byKey.Thumbstick2.Vector2Scale, Vector2.new(math.rad(240), math.rad(185)))
-		expectNear2(byKey.TouchDelta.Vector2Scale, Vector2.new(math.rad(1), -math.rad(0.66)))
+		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), -math.rad(0.385)), EXACT)
+		Fixtures.expectNear2(byKey.Thumbstick2.Vector2Scale, Vector2.new(math.rad(240), math.rad(185)), EXACT)
+		Fixtures.expectNear2(byKey.TouchDelta.Vector2Scale, Vector2.new(math.rad(1), -math.rad(0.66)), EXACT)
 		-- The same settings again change nothing; the defaults bring the defaults back.
 		InputController:setLookSettings(2, 0.5, true)
-		expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), -math.rad(0.385)))
+		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), -math.rad(0.385)), EXACT)
 		InputController:setLookSettings(1, 1, false)
 		expect(byKey.MouseDelta.Scale).toBe(1)
-		expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), math.rad(0.385)))
+		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), math.rad(0.385)), EXACT)
 
 		-- Each read follows the settings as the player changes them.
 		local mouse = 1
@@ -184,7 +183,7 @@ describe("InputController", function()
 		local keys = InputController.newCameraKeys()
 		look:Fire(Vector2.new(2, -1))
 		InputController:readCamera(keys)
-		expectNear2(keys.look, Vector2.new(2, -1))
+		Fixtures.expectNear2(keys.look, Vector2.new(2, -1), EXACT)
 		focus:Fire(true)
 		task.wait() -- Pressed is deferred
 		InputController:readCamera(keys)
@@ -210,10 +209,10 @@ describe("InputController", function()
 		local keys = InputController.newKeys()
 		InputController:setStick(Vector2.new(0, 1))
 		InputController:read(keys)
-		expectNear2(keys.move, Vector2.new(0, 1))
+		Fixtures.expectNear2(keys.move, Vector2.new(0, 1), EXACT)
 		InputController:setStick(Vector2.zero)
 		InputController:read(keys)
-		expectNear2(keys.move, Vector2.zero)
+		Fixtures.expectNear2(keys.move, Vector2.zero, EXACT)
 	end)
 
 	it("binds a touch button to its control", function()

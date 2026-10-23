@@ -32,6 +32,9 @@ export type ActionController = {
 	runner: ActionRunner.Runner,
 	-- The running action's pose in its windup or active phase, else "None": how PoseController poses the local skater.
 	pose: (self: ActionController) -> Config.PoseName,
+	-- The action `key` would start now (Config.Input.actions), or nil when none fits: what touch buttons and hints
+	-- show.
+	keyAction: (self: ActionController, key: Config.ActionKey) -> Config.ActionName?,
 	step: (self: ActionController, dt: number) -> (),
 	-- What an ActionRejected message runs (tests call it directly).
 	rejected: (self: ActionController, payload: any) -> (),
@@ -63,9 +66,25 @@ local function forKey(self: ActionController, own: Config.ActionName): Config.Ac
 	return own
 end
 
--- At most one action a step, in this order: the tackle key (a dodge with the ball), the uppercut, the pass key (a call
--- without the ball), then a throw. The throw charges while held with the ball and goes when it is let go, or as soon
--- after as the runner allows; losing the ball drops the charge.
+-- The action `key` starts: the first of Config.Input.actions[key] whose ball requirement fits, as its own or as its
+-- follow-up; nil when none fits (an uppercut with the ball, a throw without).
+local function actionFor(self: ActionController, key: Config.ActionKey, hasBall: boolean): Config.ActionName?
+	local actions = self._config.Actions
+	for _, name in self._config.Input.actions[key] do
+		if ActionRunner.ballFits(actions[name].requires.ball, hasBall) then
+			return forKey(self, name)
+		end
+	end
+	return nil
+end
+
+local function holdsBall(self: ActionController): boolean
+	return self._carrier.carrier == self._localId
+end
+
+-- At most one action a step, in this order: the tackle key, the uppercut, the pass key, then a throw, each starting
+-- what `actionFor` names. The throw charges while held with the ball and goes when it is let go, or as soon after as
+-- the runner allows; losing the ball drops the charge.
 local function chosen(
 	self: ActionController,
 	keys: InputController.ActionKeys,
@@ -81,13 +100,13 @@ local function chosen(
 		throwReleased = self._charge ~= nil
 	end
 	if keys.tackle then
-		return forKey(self, if hasBall then "Dodge" else "Tackle")
+		return actionFor(self, "tackle", hasBall)
 	elseif keys.uppercut then
-		return forKey(self, "Uppercut")
+		return actionFor(self, "uppercut", hasBall)
 	elseif keys.pass then
-		return forKey(self, if hasBall then "Pass" else "CallPass")
+		return actionFor(self, "pass", hasBall)
 	elseif throwReleased then
-		return "ChargeThrow"
+		return actionFor(self, "throw", hasBall)
 	end
 	return nil
 end
@@ -218,6 +237,10 @@ local ActionController: ActionController = {
 		return self._config.Actions[running].pose
 	end,
 
+	keyAction = function(self: ActionController, key: Config.ActionKey): Config.ActionName?
+		return actionFor(self, key, holdsBall(self))
+	end,
+
 	step = function(self: ActionController, dt: number)
 		local skate = self._skate
 		local skater = skate.skater
@@ -231,7 +254,7 @@ local ActionController: ActionController = {
 		end
 		self.runner:step(dt)
 		self._input:readActions(keys)
-		local hasBall = self._carrier.carrier == self._localId
+		local hasBall = holdsBall(self)
 		local name: Config.ActionName? = chosen(self, keys, hasBall, dt)
 		if name ~= nil then
 			begin(self, skater, name, hasBall)

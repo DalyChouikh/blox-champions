@@ -21,6 +21,11 @@ function Fixtures.expectNear(actual: Vector3, expected: Vector3, tolerance: numb
 	JestGlobals.expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-3)
 end
 
+-- The same for screen and stick vectors.
+function Fixtures.expectNear2(actual: Vector2, expected: Vector2, tolerance: number?)
+	JestGlobals.expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-3)
+end
+
 -- A binding tests can drive with Fire, added to the context's input action called `name`.
 function Fixtures.scriptedBinding(context: InputContext, name: string): InputBinding
 	local binding = Instance.new("InputBinding")

@@ -13,8 +13,10 @@ export type Effect = "Knockdown" | "Dodge" | "Throw" | "Pass" | "CallPass"
 export type PoseName = "Lunge" | "None"
 
 export type Phases = { windup: number, active: number, recovery: number }
+-- Whether an action needs the ball in hand, needs empty hands, or either.
+export type BallRequirement = "with" | "without" | "any"
 export type Requires = {
-	ball: "with" | "without" | "any",
+	ball: BallRequirement,
 	grounded: "grounded" | "airborne" | "any",
 	notKnockedDown: boolean,
 }
@@ -93,7 +95,7 @@ local function nameOf(name: string?): ActionName?
 	return nil
 end
 
-local function requires(ball: "with" | "without" | "any"): Requires
+local function requires(ball: BallRequirement): Requires
 	return { ball = ball, grounded = "any", notKnockedDown = true }
 end
 

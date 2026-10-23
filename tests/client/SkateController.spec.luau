@@ -184,6 +184,29 @@ describe("SkateController", function()
 		expect(velocityOf(rig).Magnitude).toBeLessThan(movement.attachBoostSpeed)
 	end)
 
+	it("knows when a teammate is close enough to attach behind", function()
+		local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
+		table.insert(others, { player = "2", team = "Blue", root = Fixtures.root(leader) })
+		SkateController:step(1 / 60)
+		expect(SkateController.attachable).toBe(true)
+
+		leader:PivotTo(CFrame.new(0, movement.hoverHeight, -40))
+		SkateController:step(1 / 60)
+		expect(SkateController.attachable).toBe(false)
+
+		-- Attached, then let go: during the cooldown the teammate right ahead is no one to attach behind.
+		leader:PivotTo(CFrame.new(0, movement.hoverHeight, -5))
+		local attachKey = Fixtures.scriptedBinding(InputController.context, "Attach")
+		attachKey:Fire(true)
+		SkateController:step(1 / 60)
+		expect((SkateController.skater :: any).mode).toBe("Attached")
+		expect(SkateController.attachable).toBe(true)
+		attachKey:Fire(false)
+		SkateController:step(1 / 60)
+		SkateController:step(1 / 60)
+		expect(SkateController.attachable).toBe(false)
+	end)
+
 	it("keeps telling the server about pump and brake during the freeze", function()
 		Fixtures.root(rig).Anchored = true
 		Fixtures.scriptedBinding(InputController.context, "Pump"):Fire(true)

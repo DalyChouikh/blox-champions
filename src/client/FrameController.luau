@@ -1,8 +1,9 @@
 --!strict
 -- The client's frame, in one fixed order. Each physics step: the skating, then the actions, which read the skater as
 -- the skating just left it, then the poses, which read both. Before each frame is drawn: the camera, which shows the
--- skater where physics left them. Roblox gives RunService handlers no documented order (they ran in reverse of their
--- connection order when measured), so this module alone connects them, one handler per phase.
+-- skater where physics left them, then the touch controls, which show what each button does now. Roblox gives
+-- RunService handlers no documented order (they ran in reverse of their connection order when measured), so this module
+-- alone connects them, one handler per phase.
 
 local RunService = game:GetService("RunService")
 
@@ -21,21 +22,24 @@ export type FrameController = {
 	_actions: Steppable,
 	_poses: Steppable,
 	_camera: Steppable,
+	_touch: Steppable,
 }
 
 local FrameController: FrameController = {
 	name = "FrameController",
-	dependencies = { "SkateController", "ActionController", "PoseController", "CameraController" },
+	dependencies = { "SkateController", "ActionController", "PoseController", "CameraController", "TouchControls" },
 	_skate = nil :: any,
 	_actions = nil :: any,
 	_poses = nil :: any,
 	_camera = nil :: any,
+	_touch = nil :: any,
 
 	init = function(self: FrameController, deps: { [string]: any })
 		self._skate = deps.SkateController
 		self._actions = deps.ActionController
 		self._poses = deps.PoseController
 		self._camera = deps.CameraController
+		self._touch = deps.TouchControls
 	end,
 
 	start = function(self: FrameController)
@@ -55,6 +59,7 @@ local FrameController: FrameController = {
 
 	render = function(self: FrameController, dt: number)
 		self._camera:step(dt)
+		self._touch:step(dt)
 	end,
 }
 

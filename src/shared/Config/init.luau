@@ -33,6 +33,7 @@ export type ActionKey = Input.ActionKey
 export type LookBinding = Input.LookBinding
 export type FocusMode = Input.FocusMode
 export type TouchLayout = Input.TouchLayout
+export type TouchControl = Input.TouchControl
 export type MatchConfig = Match.MatchConfig
 export type MovementConfig = Movement.MovementConfig
 export type NetworkConfig = Network.NetworkConfig
@@ -40,6 +41,7 @@ export type PoseConfig = Pose.PoseConfig
 export type ScoringConfig = Scoring.ScoringConfig
 export type UIConfig = UI.UIConfig
 export type ControlLabels = UI.ControlLabels
+export type TouchStyle = UI.TouchStyle
 
 export type GameConfig = {
 	Actions: ActionsConfig,

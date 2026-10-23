@@ -299,6 +299,14 @@ describe("CameraController", function()
 		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1))
 	end)
 
+	it("watches the ball once the character it followed is gone, before the next one is bound", function()
+		CameraController:step(DT)
+		ballAt(Vector3.new(0, 10, 0))
+		rig:Destroy()
+		CameraController:step(DT)
+		Fixtures.expectNear(camera.CFrame.Position, Vector3.new(0, 16, 30))
+	end)
+
 	it("holds still with neither a character nor a ball", function()
 		SkateController.skater = nil
 		SkateController.root = nil

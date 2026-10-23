@@ -298,6 +298,29 @@ describe("ActionController", function()
 		expect(requests).toEqual({ { action = "Tackle" }, { action = "Tackle" } })
 	end)
 
+	it("names the action each key would start now", function()
+		setup()
+		local function names(): { [string]: string }
+			local found: { [string]: string } = {}
+			for _, key: Config.ActionKey in { "tackle", "uppercut", "pass", "throw" } :: { Config.ActionKey } do
+				found[key] = ActionController:keyAction(key) or "none"
+			end
+			return found
+		end
+		expect(names()).toEqual({ tackle = "Tackle", uppercut = "Uppercut", pass = "CallPass", throw = "none" })
+		BallCarrier:set(LOCAL_ID)
+		expect(names()).toEqual({ tackle = "Dodge", uppercut = "none", pass = "Pass", throw = "ChargeThrow" })
+
+		-- Into the tackle's active phase, past its 0.05 s windup: the tackle key would dive.
+		BallCarrier:set(nil)
+		press("Tackle")
+		for _ = 1, 5 do
+			frame()
+		end
+		expect(ActionController.runner.phase).toBe("Active")
+		expect(ActionController:keyAction("tackle")).toBe("Dive")
+	end)
+
 	it("steps in under 0.1 ms", function()
 		setup()
 		BallCarrier:set(LOCAL_ID)

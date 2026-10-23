@@ -21,10 +21,24 @@ export type ControlLabels = {
 	BallFocus: string,
 }
 
+-- How the touch controls look: the stick's ring and the buttons on `background`, the knob and the labels in
+-- `foreground`, rounded by `corner`. A label is at most textSize pixels tall, shrinking to fit within textPadding
+-- pixels of its button's sides.
+export type TouchStyle = {
+	background: Color3,
+	backgroundTransparency: number,
+	foreground: Color3,
+	font: Enum.Font,
+	corner: UDim,
+	textSize: number,
+	textPadding: number,
+}
+
 export type UIConfig = {
 	clockWarnings: { number },
 	teamColors: { Blue: Color3, Orange: Color3 },
 	controlLabels: ControlLabels,
+	touchStyle: TouchStyle,
 }
 
 local defaults: UIConfig = {
@@ -43,6 +57,16 @@ local defaults: UIConfig = {
 		Pass = "Pass",
 		CallPass = "Call",
 		BallFocus = "Focus",
+	},
+	-- Roblox's own touch thumbstick colors; the art pass restyles them.
+	touchStyle = {
+		background = Color3.fromRGB(18, 18, 21),
+		backgroundTransparency = 0.4,
+		foreground = Color3.fromRGB(213, 215, 221),
+		font = Enum.Font.BuilderSansBold,
+		corner = UDim.new(0.5, 0),
+		textSize = 18,
+		textPadding = 6,
 	},
 }
 
@@ -79,6 +103,16 @@ local schema = Validate.record({
 		Pass = label,
 		CallPass = label,
 		BallFocus = label,
+	}),
+	touchStyle = Validate.record({
+		background = Validate.datatype("Color3"),
+		backgroundTransparency = Validate.number({ min = 0, max = 1 }),
+		foreground = Validate.datatype("Color3"),
+		font = Validate.enumItem(Enum.Font),
+		corner = Validate.datatype("UDim"),
+		-- Roblox clamps text sizes to 1..100 (measured).
+		textSize = Validate.number({ min = 1, max = 100, integer = true }),
+		textPadding = Validate.number({ min = 0 }),
 	}),
 })
 
