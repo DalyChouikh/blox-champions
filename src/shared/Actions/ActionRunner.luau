@@ -58,12 +58,16 @@ local function elapsed(self: Runner, phases: Actions.Phases): number
 	return phaseStart(phases, index) + phaseLength(phases, index) - self._phaseLeft
 end
 
+-- Whether an action's ball requirement lets a player who holds the ball (or doesn't) start it.
+function ActionRunner.ballFits(ball: Actions.BallRequirement, hasBall: boolean): boolean
+	return ball == "any" or (ball == "with") == hasBall
+end
+
 local function allows(requires: Actions.Requires, context: Context): boolean
 	if requires.notKnockedDown and context.knockedDown then
 		return false
 	end
-	local ball = requires.ball
-	if (ball == "with" and not context.hasBall) or (ball == "without" and context.hasBall) then
+	if not ActionRunner.ballFits(requires.ball, context.hasBall) then
 		return false
 	end
 	local grounded = requires.grounded

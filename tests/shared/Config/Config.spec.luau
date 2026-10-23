@@ -229,16 +229,21 @@ describe("Config defaults", function()
 			stickArea = UDim2.fromScale(0.4, 2 / 3),
 			stickDeadZone = 2,
 			stickRadius = 20,
+			stickRingSize = 74,
+			stickKnobSize = 36,
+			bigScreenSide = 500,
+			bigScreenScale = 2,
 			buttonSize = UDim2.fromOffset(72, 72),
+			-- Pixels from the bottom-right corner, 80 apart: three columns, the right one a step higher.
 			buttons = {
-				uppercut = UDim2.fromScale(0.92, 0.42),
-				pass = UDim2.fromScale(0.81, 0.52),
-				tackle = UDim2.fromScale(0.92, 0.62),
-				attach = UDim2.fromScale(0.7, 0.7),
-				throw = UDim2.fromScale(0.81, 0.7),
-				brake = UDim2.fromScale(0.7, 0.88),
-				pump = UDim2.fromScale(0.81, 0.88),
-				jump = UDim2.fromScale(0.92, 0.82),
+				uppercut = UDim2.new(1, -50, 1, -230),
+				tackle = UDim2.new(1, -50, 1, -150),
+				jump = UDim2.new(1, -50, 1, -70),
+				pass = UDim2.new(1, -130, 1, -210),
+				throw = UDim2.new(1, -130, 1, -130),
+				pump = UDim2.new(1, -130, 1, -50),
+				attach = UDim2.new(1, -210, 1, -130),
+				brake = UDim2.new(1, -210, 1, -50),
 			},
 		})
 	end)
@@ -294,6 +299,16 @@ describe("Config defaults", function()
 			Pass = "Pass",
 			CallPass = "Call",
 			BallFocus = "Focus",
+		})
+		-- Roblox's own touch thumbstick colors.
+		expect(ui.touchStyle).toEqual({
+			background = Color3.fromRGB(18, 18, 21),
+			backgroundTransparency = 0.4,
+			foreground = Color3.fromRGB(213, 215, 221),
+			font = Enum.Font.BuilderSansBold,
+			corner = UDim.new(0.5, 0),
+			textSize = 18,
+			textPadding = 6,
 		})
 	end)
 
@@ -600,6 +615,16 @@ describe("Config.forMode", function()
 			{
 				overrides = { Input = { actions = { tackle = { "Fly" } } } },
 				message = "Input.actions.tackle[1]: must name an action",
+			},
+			-- A button nearer another than its size, sideways (Pump 60 px from Jump) or up and down (Brake 20 px
+			-- under Throw).
+			{
+				overrides = { Input = { touch = { buttons = { pump = UDim2.new(1, -110, 1, -70) } } } },
+				message = "Input.touch: buttons must not overlap",
+			},
+			{
+				overrides = { Input = { touch = { buttons = { brake = UDim2.new(1, -130, 1, -110) } } } },
+				message = "Input.touch: buttons must not overlap",
 			},
 		}
 		for _, case in cases do

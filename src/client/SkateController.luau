@@ -54,6 +54,8 @@ export type SkateController = {
 	-- Read each step: the character's KnockedDown attribute, and the root anchored (the kickoff freeze).
 	knockedDown: boolean,
 	frozen: boolean,
+	-- Set each step: attached, or right behind a teammate with no cooldown, so holding Attach would attach.
+	attachable: boolean,
 	-- An action's push, written to the skater body at once; `launch` leaves the ground.
 	push: (self: SkateController, change: Vector3, launch: boolean) -> (),
 	-- A steep ride surface (a wall) lies within `distance` ahead.
@@ -214,11 +216,15 @@ local function moveSkater(self: SkateController, root: BasePart, skater: SkateMa
 		skater:step(self._input, self._ground, dt)
 		return
 	end
+	local found: Attach.Candidate? = if attach.leader == nil
+		then Attach.findLeader(movement, root.Position, self._teammates)
+		else nil
 	local leader: Attach.Candidate? = if attach.leader ~= nil
 		then currentLeader(self)
-		elseif keys.attach then Attach.findLeader(movement, root.Position, self._teammates)
+		elseif keys.attach then found
 		else nil
 	local change = attach:update(dt, keys.attach, leader)
+	self.attachable = attach.leader ~= nil or (found ~= nil and attach.cooldownLeft == 0)
 	if attach.leader ~= nil and leader ~= nil then
 		skater:follow(Attach.target(movement, leader), root.Position, leader.velocity, leader.forward)
 		return
@@ -282,6 +288,7 @@ local SkateController: SkateController = {
 	move = Vector3.zero,
 	knockedDown = false,
 	frozen = false,
+	attachable = false,
 	_config = nil :: any,
 	_inputController = nil :: any,
 	_camera = nil :: any,
@@ -358,6 +365,7 @@ local SkateController: SkateController = {
 		self.move = Vector3.zero
 		self.knockedDown = false
 		self.frozen = false
+		self.attachable = false
 	end,
 
 	start = function(self: SkateController)
@@ -397,6 +405,8 @@ local SkateController: SkateController = {
 	end,
 
 	step = function(self: SkateController, dt: number)
+		-- Only a free skater's step finds a teammate to attach behind.
+		self.attachable = false
 		local skater = self.skater
 		local root = self.root
 		if skater == nil or root == nil or root.Parent == nil then

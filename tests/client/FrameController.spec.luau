@@ -26,6 +26,7 @@ beforeEach(function()
 		ActionController = recorder("actions"),
 		PoseController = recorder("poses"),
 		CameraController = recorder("camera"),
+		TouchControls = recorder("touch"),
 	})
 end)
 
@@ -35,8 +36,8 @@ describe("FrameController", function()
 		expect(order).toEqual({ "skate 0.5", "actions 0.5", "poses 0.5" })
 	end)
 
-	it("renders the camera before each frame is drawn", function()
+	it("renders the camera, then the touch controls, before each frame is drawn", function()
 		FrameController:render(0.25)
-		expect(order).toEqual({ "camera 0.25" })
+		expect(order).toEqual({ "camera 0.25", "touch 0.25" })
 	end)
 end)

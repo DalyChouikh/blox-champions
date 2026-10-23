@@ -6,8 +6,9 @@
 -- pulls it in in front of the arena, so it never sees through a wall or the roof. With a mouse it keeps the mouse
 -- locked to the screen's center, except while Roblox's menu is open. At a kickoff, and for a new character, it starts
 -- behind the skater's facing. Ball Focus (§8.2) turns it toward the ball while the player doesn't carry it: held on
--- PC and gamepad, toggled by a tap on touch (Config.Input). A player with no character watches the ball, from the
--- spectator's distance and height above it; with no ball either, the camera holds still.
+-- PC and gamepad, toggled by a tap on touch (Config.Input). A player with no character (or whose character is gone
+-- before the next is bound) watches the ball, from the spectator's distance and height above it; with no ball either,
+-- the camera holds still.
 
 local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
@@ -234,8 +235,9 @@ local CameraController: CameraController = {
 
 		local skate = self._skate
 		local skater, root = skate.skater, skate.root
-		if skater == nil or root == nil then
-			-- A spectator watches the ball, upright; with no ball either, the camera holds still.
+		if skater == nil or root == nil or root.Parent == nil then
+			-- A spectator, or a player whose character is gone before the next is bound, watches the ball, upright;
+			-- with no ball either, the camera holds still.
 			self._root = nil
 			if ball ~= nil then
 				follow(self, Vector3.yAxis, ball.AssemblyLinearVelocity, 0, nil, not usingMouse, dt)
