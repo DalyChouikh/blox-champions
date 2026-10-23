@@ -1,7 +1,7 @@
 --!strict
 -- Every remote the game uses (spec §10.2), named only here. The server creates them once; clients wait for them.
 --   RuleEvents     server → clients  each frame's rule events, in order (one batch per frame that has any)
---   MatchSnapshot  server → client   the match's state, on joining and when a new match starts
+--   MatchSnapshot  server → clients  the match and its names, after each batch, on each seat change, and to a joiner
 --   BallCarrier    server → clients  { carrier = PlayerId? } whenever the ball changes hands
 --   SkateState     client → server   { pump, brake } whenever either changes (Net/Schemas checks it)
 --   ActionRequest  client → server   { action, aim?, charge? } when a player starts an action (Net/Schemas)

@@ -1,9 +1,9 @@
 --!strict
 -- The client's frame, in one fixed order. Each physics step: the skating, then the actions, which read the skater as
 -- the skating just left it, then the poses, which read both. Before each frame is drawn: the camera, which shows the
--- skater where physics left them, then the touch controls, which show what each button does now. Roblox gives
--- RunService handlers no documented order (they ran in reverse of their connection order when measured), so this module
--- alone connects them, one handler per phase.
+-- skater where physics left them, then the touch controls, which show what each button does now, then the HUD's
+-- state, whose clocks count on, then the HUD, which shows it. Roblox gives RunService handlers no documented order
+-- (they ran in reverse of their connection order when measured), so only this module connects them, one per phase.
 
 local RunService = game:GetService("RunService")
 
@@ -23,16 +23,28 @@ export type FrameController = {
 	_poses: Steppable,
 	_camera: Steppable,
 	_touch: Steppable,
+	_hudStore: Steppable,
+	_hud: Steppable,
 }
 
 local FrameController: FrameController = {
 	name = "FrameController",
-	dependencies = { "SkateController", "ActionController", "PoseController", "CameraController", "TouchControls" },
+	dependencies = {
+		"SkateController",
+		"ActionController",
+		"PoseController",
+		"CameraController",
+		"TouchControls",
+		"HudStore",
+		"Hud",
+	},
 	_skate = nil :: any,
 	_actions = nil :: any,
 	_poses = nil :: any,
 	_camera = nil :: any,
 	_touch = nil :: any,
+	_hudStore = nil :: any,
+	_hud = nil :: any,
 
 	init = function(self: FrameController, deps: { [string]: any })
 		self._skate = deps.SkateController
@@ -40,6 +52,8 @@ local FrameController: FrameController = {
 		self._poses = deps.PoseController
 		self._camera = deps.CameraController
 		self._touch = deps.TouchControls
+		self._hudStore = deps.HudStore
+		self._hud = deps.Hud
 	end,
 
 	start = function(self: FrameController)
@@ -60,6 +74,8 @@ local FrameController: FrameController = {
 	render = function(self: FrameController, dt: number)
 		self._camera:step(dt)
 		self._touch:step(dt)
+		self._hudStore:step(dt)
+		self._hud:step(dt)
 	end,
 }
 

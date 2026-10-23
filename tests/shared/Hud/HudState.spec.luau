@@ -6,52 +6,13 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
-local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 local config = Fixtures.config()
 
-local function player(id: string, team: "Blue" | "Orange", present: boolean): Types.PlayerStats
-	return {
-		player = id,
-		team = team,
-		joinOrder = tonumber(id) :: number,
-		present = present,
-		score = 0,
-		goals = 0,
-		assists = 0,
-		saves = 0,
-		steals = 0,
-	}
-end
-
--- A live snapshot with players "1" (Blue, Ana) and "2" (Orange, Rex), changed by `overrides`.
-local function payload(overrides: { [string]: any }?): Payloads.MatchSnapshot
-	local match: { [string]: any } = {
-		state = "Live",
-		period = "Regulation",
-		phaseSecondsLeft = 0,
-		secondsLeft = 120,
-		overtimeSeconds = 0,
-		scores = { Blue = 0, Orange = 0 },
-		streak = 0,
-		lapProgress = 0,
-		gateCount = 4,
-		stats = {
-			scores = { Blue = 0, Orange = 0 },
-			players = { player("1", "Blue", true), player("2", "Orange", true) },
-		},
-	}
-	local changes: { [string]: any } = overrides or {}
-	for key, value in changes do
-		match[key] = value
-	end
-	return { match = match :: any, names = { ["1"] = "Ana", ["2"] = "Rex" } }
-end
-
 local function liveState(overrides: { [string]: any }?): HudState.HudState
 	local state = HudState.new(config)
-	state:applySnapshot(payload(overrides))
+	state:applySnapshot(Fixtures.matchSnapshot(overrides))
 	return state
 end
 
@@ -61,9 +22,9 @@ end
 
 describe("HudState", function()
 	it("starts from a snapshot taken mid-match, names and score tab included", function()
-		local snapshot = payload({ secondsLeft = 120.5 })
+		local snapshot = Fixtures.matchSnapshot({ secondsLeft = 120.5 })
 		snapshot.names["9"] = "Gone"
-		table.insert(snapshot.match.stats.players, player("9", "Blue", false))
+		table.insert(snapshot.match.stats.players, Fixtures.playerStats("9", "Blue", false))
 		local state = HudState.new(config)
 		state:applySnapshot(snapshot)
 		expect(state.names["9"]).toBe("Gone")
@@ -87,7 +48,7 @@ describe("HudState", function()
 		expect(match(celebration).secondsLeft).toBe(120)
 
 		local running = HudState.new(Fixtures.config({ Match = { clockPausesDuringKickoff = false } }))
-		running:applySnapshot(payload({ state = "Kickoff", phaseSecondsLeft = 3 }))
+		running:applySnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
 		running:step(1)
 		expect(match(running).secondsLeft).toBeCloseTo(119, 6)
 	end)
@@ -106,7 +67,7 @@ describe("HudState", function()
 	it("counts down the kickoff in a banner, 3-2-1", function()
 		local state = liveState()
 		state:applyEvents({ { name = "KickoffStarted", countdownSeconds = 3 } })
-		state:applySnapshot(payload({ state = "Kickoff", phaseSecondsLeft = 3 }))
+		state:applySnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
 		expect(state.banner).toEqual({ kind = "Countdown", value = 3 })
 		local version = state.version
 		state:step(1.2)
@@ -156,7 +117,7 @@ describe("HudState", function()
 		local seconds = config.UI.hud.bannerSeconds
 		local state = liveState()
 		state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } })
-		state:applySnapshot(payload({ state = "Celebration", phaseSecondsLeft = seconds + 1 }))
+		state:applySnapshot(Fixtures.matchSnapshot({ state = "Celebration", phaseSecondsLeft = seconds + 1 }))
 		state:step(seconds + 0.5)
 		expect(state.banner).toEqual({ kind = "Goal", team = "Blue" })
 		state:applyEvents({ { name = "KickoffStarted", countdownSeconds = 3 } })
@@ -203,9 +164,9 @@ describe("HudState", function()
 		expect((state.ended :: HudState.Ended).winner).toBe("Blue")
 		expect((state.ended :: HudState.Ended).mvp).toBe("1")
 		expect(state.banner).toBeNil()
-		state:applySnapshot(payload({ state = "Ended" }))
+		state:applySnapshot(Fixtures.matchSnapshot({ state = "Ended" }))
 		expect(state.ended ~= nil).toBe(true)
-		state:applySnapshot(payload({ state = "Kickoff", phaseSecondsLeft = 3 }))
+		state:applySnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
 		expect(state.ended).toBeNil()
 	end)
 
