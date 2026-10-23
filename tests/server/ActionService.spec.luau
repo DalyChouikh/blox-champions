@@ -90,10 +90,6 @@ afterEach(function()
 	folder:Destroy()
 end)
 
-local function rootOf(id: string): BasePart
-	return rigs[id]:FindFirstChild("HumanoidRootPart") :: BasePart
-end
-
 -- Stands the player `offset` from a spot on the track, facing -Z.
 local function stand(id: string, offset: Vector3)
 	rigs[id]:PivotTo(CFrame.new(ON_TRACK + offset))
@@ -101,7 +97,7 @@ end
 
 local function giveBall(id: string)
 	BallService:spawn()
-	BallService.part.CFrame = CFrame.new(rootOf(id).Position)
+	BallService.part.CFrame = CFrame.new(Fixtures.root(rigs[id]).Position)
 	BallService:step(DT, CharacterService:holders())
 	assert(BallService.state.carrier == id, `{id} should carry the ball`)
 end
@@ -178,14 +174,14 @@ describe("ActionService", function()
 		-- A thrower whose client claims 10000 studs/s keeps only the allowed speed's share.
 		giveBall(a)
 		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
-		rootOf(a).AssemblyLinearVelocity = Vector3.new(0, 0, -10000)
+		Fixtures.root(rigs[a]).AssemblyLinearVelocity = Vector3.new(0, 0, -10000)
 		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 })
 		local thrown = throwSettings.maxSpeed + throwSettings.inheritCarrierVelocity * limit
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -thrown))
 		-- A knocked-down carrier whose client claims 10000 studs/s drops it at the allowed speed.
-		rootOf(a).AssemblyLinearVelocity = Vector3.zero
+		Fixtures.root(rigs[a]).AssemblyLinearVelocity = Vector3.zero
 		giveBall(b)
-		rootOf(b).AssemblyLinearVelocity = Vector3.new(0, 0, 10000)
+		Fixtures.root(rigs[b]).AssemblyLinearVelocity = Vector3.new(0, 0, 10000)
 		ActionService:request(a, { action = "Tackle" })
 		expect(advance(0.2)).toEqual({ `{a}>{b}` })
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, limit))
@@ -201,7 +197,7 @@ describe("ActionService", function()
 		ActionService:request(a, { action = "Pass", aim = Vector3.xAxis })
 		local velocity = BallService.part.AssemblyLinearVelocity
 		expect(velocity.Magnitude).toBeCloseTo(90, 3)
-		Fixtures.expectNear(velocity.Unit, (rootOf(b).Position - BallService.part.Position).Unit)
+		Fixtures.expectNear(velocity.Unit, (Fixtures.root(rigs[b]).Position - BallService.part.Position).Unit)
 		-- The call ends after its window.
 		advance(config.Actions.callPassWindow + 0.1)
 		expect(attribute(b, Attributes.CallingPass)).toBeNil()
@@ -233,7 +229,7 @@ describe("ActionService", function()
 		stand(a, Vector3.zero)
 		stand(b, Vector3.new(0, 0, -4))
 		giveBall(b)
-		rootOf(b).AssemblyLinearVelocity = Vector3.new(0, 0, 30)
+		Fixtures.root(rigs[b]).AssemblyLinearVelocity = Vector3.new(0, 0, 30)
 		ActionService:request(a, { action = "Tackle" })
 		expect(advance(0.2)).toEqual({ `{a}>{b}` })
 		expect(BallService.state.status).toBe("Loose")
@@ -295,7 +291,7 @@ describe("ActionService", function()
 		ActionService:request(b, { action = "Tackle" })
 		expect(rejected(b)).toEqual({ "Tackle" })
 
-		rootOf(d).Anchored = true
+		Fixtures.root(rigs[d]).Anchored = true
 		ActionService:request(d, { action = "CallPass" })
 		expect(rejected(d)).toEqual({ "CallPass" })
 		expect(attribute(d, Attributes.CallingPass)).toBeNil()

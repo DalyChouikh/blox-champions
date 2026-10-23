@@ -36,7 +36,7 @@ beforeEach(function()
 	folder.Name = "MovementGuardTest"
 	folder.Parent = workspace
 	rig = Fixtures.rig(folder, "Skater", CFrame.new(0, 3, 0))
-	holders = { { player = "1", root = rig.PrimaryPart :: BasePart } }
+	holders = { { player = "1", root = Fixtures.root(rig) } }
 	characterService = {
 		holders = function(): { { player: string, root: BasePart } }
 			return holders
@@ -74,13 +74,13 @@ describe("MovementGuard", function()
 		tick()
 		moveTo(-180)
 		tick()
-		expect((rig.PrimaryPart :: BasePart).Position.Z).toBeCloseTo(-30, 3)
+		expect(Fixtures.root(rig).Position.Z).toBeCloseTo(-30, 3)
 		expect(#logs).toBe(1)
 		expect(string.find(logs[1], "1", 1, true) ~= nil).toBe(true)
 	end)
 
 	it("leaves frozen skaters alone and trusts the server's placements", function()
-		local root = rig.PrimaryPart :: BasePart
+		local root = Fixtures.root(rig)
 		root.Anchored = true
 		moveTo(500)
 		tick()

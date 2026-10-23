@@ -37,7 +37,7 @@ end
 local function holder(name: string, rig: Model, canCatch: boolean?): BallService.Holder
 	return {
 		player = name,
-		root = rig:FindFirstChild("HumanoidRootPart") :: BasePart,
+		root = Fixtures.root(rig),
 		canCatch = canCatch ~= false,
 	}
 end
@@ -116,7 +116,7 @@ describe("BallService", function()
 		expect(BallService.part.Massless).toBe(true)
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
 		closest:PivotTo(closest:GetPivot() + Vector3.new(10, 0, 0))
-		local root = closest:FindFirstChild("HumanoidRootPart") :: BasePart
+		local root = Fixtures.root(closest)
 		Fixtures.expectNear(BallService.part.Position, root.CFrame * config.Ball.carryOffset)
 	end)
 
@@ -218,7 +218,7 @@ describe("BallService", function()
 	it("lets the ball pass through the player who let go of it until it is clear of them", function()
 		local rig = caughtBy("A")
 		SkaterBody.build(rig, config.Movement)
-		local root = rig:FindFirstChild(SkaterRig.root) :: BasePart
+		local root = Fixtures.root(rig)
 		local collider = rig:FindFirstChild(SkaterRig.collider) :: BasePart
 		local touch = config.Ball.radius + config.Movement.colliderDiameter / 2 + config.Network.pickupLagToleranceStuds
 		local function passesThroughA(): boolean
@@ -251,7 +251,7 @@ describe("BallService", function()
 	it("lets a released ball move no faster than the movement guard allows", function()
 		local limit = config.Movement.hardCap * config.Network.speedTolerance
 		local rig = caughtBy("A")
-		local root = rig:FindFirstChild(SkaterRig.root) :: BasePart
+		local root = Fixtures.root(rig)
 		-- The carrier's client sets its own assembly's velocity, the ball's included.
 		root.AssemblyLinearVelocity = Vector3.new(10000, 0, 0)
 		BallService:drop()
@@ -269,7 +269,7 @@ describe("BallService", function()
 		local b = Fixtures.rig(folder, "B", CFrame.new(BallService.part.Position + Vector3.new(20, 0, -30)))
 		BallService:pass("A", Vector3.new(0, 0, -90), "B")
 		expect(BallService.state.status).toBe("Flying")
-		local root = b:FindFirstChild("HumanoidRootPart") :: BasePart
+		local root = Fixtures.root(b)
 		local turn = (root.Position - BallService.part.Position).Unit * 60 * 0.1
 		BallService:step(0.1, { holder("A", a), holder("B", b) })
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -90) + turn)
@@ -314,7 +314,7 @@ describe("BallService", function()
 		BallService:onTouched(wall)
 		expect(flyingFlat()).toBe(false)
 		-- A throw is not a pass.
-		BallService.part.CFrame = CFrame.new((a:FindFirstChild(SkaterRig.root) :: BasePart).Position)
+		BallService.part.CFrame = CFrame.new(Fixtures.root(a).Position)
 		BallService:step(config.Ball.rethrowPickupDelay, { holder("A", a) })
 		expect(BallService.state.carrier).toBe("A")
 		BallService:throw("A", Vector3.new(0, 0, -90))
@@ -323,11 +323,11 @@ describe("BallService", function()
 
 	it("lets a pass fall once it is caught, touches a body, loses its receiver, or leaves play", function()
 		local a = caughtBy("A")
-		local aRoot = a:FindFirstChild(SkaterRig.root) :: BasePart
+		local aRoot = Fixtures.root(a)
 		local b = Fixtures.rig(folder, "B", CFrame.new(aRoot.Position + Vector3.new(0, 0, -30)))
-		local bRoot = b:FindFirstChild(SkaterRig.root) :: BasePart
+		local bRoot = Fixtures.root(b)
 		local c = Fixtures.rig(folder, "C", CFrame.new(aRoot.Position + Vector3.new(0, 0, 30)))
-		local cRoot = c:FindFirstChild(SkaterRig.root) :: BasePart
+		local cRoot = Fixtures.root(c)
 		local function passFromA(target: string?)
 			BallService.part.CFrame = CFrame.new(aRoot.Position)
 			BallService:step(config.Ball.rethrowPickupDelay, { holder("A", a) })
@@ -365,7 +365,7 @@ describe("BallService", function()
 
 	it("reports a knocked-down defender's touch even beside the thrower", function()
 		local a = caughtBy("A")
-		local aRoot = a:FindFirstChild(SkaterRig.root) :: BasePart
+		local aRoot = Fixtures.root(a)
 		BallService:throw("A", Vector3.new(0, 0, -30))
 		local at = aRoot.Position + Vector3.new(2.5, 0, 0)
 		local b = Fixtures.rig(folder, "B", CFrame.new(at + Vector3.new(3.5, 0, 0)))
@@ -396,7 +396,7 @@ describe("BallService", function()
 	it("lands a thrown ball when it touches the arena, not a player", function()
 		local rig = caughtBy("A")
 		BallService:throw("A", Vector3.new(0, 10, 0))
-		BallService:onTouched(rig:FindFirstChild("HumanoidRootPart") :: BasePart)
+		BallService:onTouched(Fixtures.root(rig))
 		expect(BallService.state.status).toBe("Flying")
 		local floor = Instance.new("Part")
 		floor.Parent = folder

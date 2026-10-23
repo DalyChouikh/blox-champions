@@ -34,7 +34,7 @@ local function bindingOf(name: string): InputBinding
 	if existing then
 		return existing
 	end
-	local binding = Fixtures.scriptedBinding(InputController.context:FindFirstChild(name) :: InputAction)
+	local binding = Fixtures.scriptedBinding(InputController.context, name)
 	bindings[name] = binding
 	return binding
 end
@@ -48,10 +48,6 @@ end
 
 local function skater(): any
 	return SkateController.skater
-end
-
-local function root(): BasePart
-	return rig.PrimaryPart :: BasePart
 end
 
 -- The controllers over a floor, on a skater facing -Z. `surfaces` become ride surfaces too, before the rays read them.
@@ -275,11 +271,11 @@ describe("ActionController", function()
 		press("Tackle")
 		frame()
 		expect(ActionController.runner.action).toBe("Tackle")
-		root().Anchored = true
+		Fixtures.root(rig).Anchored = true
 		press("Tackle")
 		frame()
 		expect(ActionController.runner.action).toBeNil()
-		root().Anchored = false
+		Fixtures.root(rig).Anchored = false
 		frame()
 		expect(#requests).toBe(1)
 		-- The tackle's cooldown went with the reset.
