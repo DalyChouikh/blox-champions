@@ -46,7 +46,12 @@ export type Snapshot = {
 	lastHolder: PlayerId?,
 	streak: number,
 	lapProgress: number,
+	-- The gates in a lap, and the one that counts next for the possessing team (nil until their first gate).
+	gateCount: number,
+	nextGate: number?,
 	goalOpenFor: Team?,
+	-- The score tab: every player who played this match, by team, then score.
+	stats: Types.MatchStats,
 }
 
 -- Returned on quiet ticks so draining never allocates.
@@ -312,14 +317,14 @@ function MatchEngine.tick(self: MatchEngine, dt: number)
 	if not (dt >= 0 and dt < math.huge) then
 		error("MatchEngine: dt must be a finite non-negative number", 0)
 	end
-	local state = self._state
+	local state: Types.MatchState = self._state
 	if state == "Waiting" or state == "Ended" then
 		return
 	end
 	self._now += dt
 
 	-- The clock runs before the phase timer, so a match that ends at 0:00 skips the rest of the tick.
-	if state == "Live" or not self._config.Match.clockPausesDuringKickoff then
+	if MatchClock.runs(self._config.Match, state) then
 		if self._clock:advance(dt, self._onClockWarning) then
 			timeUp(self)
 			if self._state == "Ended" then
@@ -468,7 +473,10 @@ function MatchEngine.snapshot(self: MatchEngine): Snapshot
 		lastHolder = self._possession.lastHolder,
 		streak = self._laps.streak,
 		lapProgress = self._laps.progress,
+		gateCount = self._laps.gateCount,
+		nextGate = self._laps.nextGate,
 		goalOpenFor = self._goal.openFor,
+		stats = self._scores:stats(),
 	}
 end
 

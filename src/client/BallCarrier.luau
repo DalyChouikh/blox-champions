@@ -5,6 +5,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
@@ -40,11 +41,10 @@ local BallCarrier: BallCarrier = {
 	end,
 
 	start = function(self: BallCarrier)
-		Remotes.get(ReplicatedStorage, Remotes.names.BallCarrier).OnClientEvent:Connect(function(payload: {
-			carrier: PlayerId?,
-		})
-			self:set(payload.carrier)
-		end)
+		Remotes.get(ReplicatedStorage, Remotes.names.BallCarrier).OnClientEvent
+			:Connect(function(payload: Payloads.BallCarrier)
+				self:set(payload.carrier)
+			end)
 	end,
 
 	set = function(self: BallCarrier, player: PlayerId?)

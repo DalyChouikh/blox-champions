@@ -12,8 +12,9 @@ type Fields = {
 	gateCount: number,
 	streak: number,
 	progress: number,
+	-- The gate that counts next; nil until a streak's first gate starts the sequence (any gate counts then).
+	nextGate: number?,
 	_gates: { Crossing.Rectangle },
-	_nextGate: number?,
 	-- Reused by every call, so reporting and ordering crossings never allocates on a tick.
 	_crossed: { number },
 	_fractions: { [number]: number },
@@ -32,8 +33,8 @@ function LapTracker.new(gates: { Crossing.Rectangle }): LapTracker
 			gateCount = #gates,
 			streak = 0,
 			progress = 0,
+			nextGate = nil,
 			_gates = gates,
-			_nextGate = nil,
 			_crossed = {},
 			_fractions = fractions,
 			_byFraction = function(a: number, b: number): boolean
@@ -68,11 +69,11 @@ end
 -- Returns the progress after accepting the crossing (1..gateCount, where gateCount completes a lap: the
 -- streak grows by one and the next lap starts at 0), or nil when the crossing is out of order.
 function LapTracker.accept(self: LapTracker, gateIndex: number): number?
-	local nextGate = self._nextGate
+	local nextGate = self.nextGate
 	if nextGate ~= nil and gateIndex ~= nextGate then
 		return nil
 	end
-	self._nextGate = gateIndex % self.gateCount + 1
+	self.nextGate = gateIndex % self.gateCount + 1
 	local progress = self.progress + 1
 	if progress == self.gateCount then
 		self.streak += 1
@@ -86,7 +87,7 @@ end
 function LapTracker.reset(self: LapTracker)
 	self.streak = 0
 	self.progress = 0
-	self._nextGate = nil
+	self.nextGate = nil
 end
 
 return LapTracker

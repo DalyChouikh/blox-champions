@@ -33,6 +33,15 @@ describe("LapTracker", function()
 		expect(laps:accept(1)).toBe(1)
 	end)
 
+	it("names the next gate once a streak's first gate is crossed", function()
+		local laps = LapTracker.new(Fixtures.gates())
+		expect(laps.nextGate).toBeNil()
+		laps:accept(3)
+		expect(laps.nextGate).toBe(4)
+		laps:accept(4)
+		expect(laps.nextGate).toBe(1)
+	end)
+
 	it("clears the streak, progress and sequence on reset", function()
 		local laps = LapTracker.new(Fixtures.gates())
 		for gate = 1, 4 do
