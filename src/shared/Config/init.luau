@@ -2,6 +2,7 @@
 -- Game configuration: per-area defaults merged with a game mode's overrides, validated, and deep-frozen.
 -- Adding a tunable means adding it to an area file (defaults + schema); modes only list what they change.
 
+local Actions = require(script.Actions)
 local Arena = require(script.Arena)
 local Ball = require(script.Ball)
 local Input = require(script.Input)
@@ -14,6 +15,14 @@ local Scoring = require(script.Scoring)
 local UI = require(script.UI)
 local Validate = require(script.Validate)
 
+export type ActionsConfig = Actions.ActionsConfig
+export type ActionConfig = Actions.ActionConfig
+export type ActionName = Actions.ActionName
+export type Effect = Actions.Effect
+export type PoseName = Actions.PoseName
+export type Hit = Actions.Hit
+export type ThrowSettings = Actions.ThrowSettings
+export type PassSettings = Actions.PassSettings
 export type ArenaConfig = Arena.ArenaConfig
 export type BallConfig = Ball.BallConfig
 export type InputConfig = Input.InputConfig
@@ -25,6 +34,7 @@ export type ScoringConfig = Scoring.ScoringConfig
 export type UIConfig = UI.UIConfig
 
 export type GameConfig = {
+	Actions: ActionsConfig,
 	Arena: ArenaConfig,
 	Ball: BallConfig,
 	Input: InputConfig,
@@ -64,6 +74,7 @@ local crossAreaRules: { Validate.Rule } = {
 
 Config.schema = Validate.checkAll(
 	Validate.record({
+		Actions = Actions.schema,
 		Arena = Arena.schema,
 		Ball = Ball.schema,
 		Input = Input.schema,
@@ -110,6 +121,7 @@ end
 
 local function build(overrides: { [string]: any }): GameConfig
 	local config = deepCopy({
+		Actions = Actions.defaults,
 		Arena = Arena.defaults,
 		Ball = Ball.defaults,
 		Input = Input.defaults,

@@ -17,6 +17,12 @@ export type NetworkConfig = {
 	guardStrikes: number,
 	-- A move this many times the allowed distance in one sample returns the skater at once.
 	guardTeleportFactor: number,
+	-- How many action requests a client may send (a burst of this many, refilled per second).
+	maxActionsPerSecond: number,
+	-- Extra reach for strikes judged on the server, which sees each player slightly behind their own screen.
+	hitLagToleranceStuds: number,
+	-- How early an action may reach the server before its cooldown ends: network jitter, not cheating.
+	actionCooldownTolerance: number,
 }
 
 local defaults: NetworkConfig = {
@@ -26,6 +32,9 @@ local defaults: NetworkConfig = {
 	speedTolerance = 1.2,
 	guardStrikes = 3,
 	guardTeleportFactor = 2,
+	maxActionsPerSecond = 15,
+	hitLagToleranceStuds = 3,
+	actionCooldownTolerance = 0.1,
 }
 
 local schema = Validate.record({
@@ -35,6 +44,9 @@ local schema = Validate.record({
 	speedTolerance = Validate.number({ above = 0 }),
 	guardStrikes = Validate.number({ min = 1, integer = true }),
 	guardTeleportFactor = Validate.number({ above = 0 }),
+	maxActionsPerSecond = Validate.number({ above = 0 }),
+	hitLagToleranceStuds = Validate.number({ min = 0 }),
+	actionCooldownTolerance = Validate.number({ min = 0 }),
 })
 
 return {
