@@ -219,6 +219,7 @@ describe("Config defaults", function()
 		expect(input.ballFocus).toEqual({ Enum.KeyCode.MouseRightButton, Enum.KeyCode.ButtonL2 })
 		expect(input.ballFocusMode).toBe("Hold")
 		expect(input.touchBallFocusMode).toBe("Toggle")
+		expect(input.scoreTab).toEqual({ Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect })
 		expect(input.actions).toEqual({
 			tackle = { "Tackle", "Dodge" },
 			uppercut = { "Uppercut" },
@@ -311,6 +312,95 @@ describe("Config defaults", function()
 			textPadding = 6,
 			knobTransparency = 0,
 		})
+		expect(ui.teamNames).toEqual({ Blue = "Blue", Orange = "Orange" })
+		-- Keys Roblox's GetStringForKeyCode names "" or " ".
+		expect(ui.keyNames).toEqual({
+			Space = "Space",
+			LeftShift = "Shift",
+			RightShift = "Shift",
+			LeftControl = "Ctrl",
+			RightControl = "Ctrl",
+			Tab = "Tab",
+			MouseLeftButton = "LMB",
+			MouseRightButton = "RMB",
+		})
+		expect(ui.text).toEqual({
+			lap = "Lap %d/%d",
+			streak = "Streak %d/%d",
+			overtime = "OVERTIME",
+			goal = "GOAL!",
+			streakPoint = "STREAK POINT!",
+			denied = "DENIED!",
+			clockWarning = "%d SECONDS",
+			lastChance = "LAST CHANCE",
+			speed = "%d km/h",
+			possession = "%s has the ball",
+			lapCompleted = "Lap %d completed",
+			goalOpen = "%s goal is active",
+			scored = "%s scored!",
+			scoredStreak = "%s scored a streak point!",
+			wins = "%s WINS",
+			mvp = "MVP",
+			scores = "SCORES",
+			columns = {
+				player = "Player",
+				score = "Score",
+				goals = "Goals",
+				assists = "Assists",
+				saves = "Saves",
+				steals = "Steals",
+			},
+			unknownPlayer = "Player",
+			-- A raised hand.
+			callPass = "\u{270B}",
+		})
+		expect(ui.hud).toEqual({
+			font = Enum.Font.BuilderSansBold,
+			textColor = Color3.fromRGB(245, 245, 245),
+			panel = Color3.fromRGB(18, 18, 21),
+			panelTransparency = 0.35,
+			dimTransparency = 0.6,
+			corner = UDim.new(0, 8),
+			textSize = 20,
+			titleSize = 32,
+			bannerSize = 96,
+			bannerSeconds = 2,
+			feedSeconds = 6,
+			feedMaxEntries = 5,
+			glowThickness = 3,
+			layout = {
+				scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
+				banner = { position = UDim2.fromScale(0.5, 0.3), size = UDim2.fromOffset(640, 110) },
+				feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
+				hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
+				speedometer = {
+					position = UDim2.new(1, -24, 1, -24),
+					touchPosition = UDim2.new(1, -24, 1, -300),
+					size = UDim2.fromOffset(160, 40),
+				},
+				reticle = { size = 6 },
+				scoreTab = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(640, 360), rowHeight = 28 },
+				scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
+				endScreen = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(720, 520) },
+			},
+		})
+		expect(ui.markers).toEqual({
+			ringSize = 56,
+			ringThickness = 3,
+			lineWidth = 0.2,
+			groundProbe = 100,
+			groundMarkerSize = 4,
+			groundMarkerTransparency = 0.4,
+			edgeMargin = 48,
+			arrowSize = 28,
+		})
+		expect(ui.nameTag).toEqual({
+			size = UDim2.fromOffset(200, 48),
+			studsOffset = Vector3.new(0, 4, 0),
+			textSize = 20,
+			callSize = 28,
+		})
+		expect(ui.arenaGlow).toEqual({ material = Enum.Material.Neon, panelSlide = 16, panelSlideSeconds = 0.4 })
 	end)
 
 	it("match the spec's arena layout", function()
@@ -599,6 +689,9 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Input = { move = { sticks = { Enum.KeyCode.Thumbstick2 } } } })
 		end).toThrow("Input: Thumbstick2 is bound to more than one action")
+		expect(function()
+			Fixtures.config({ Input = { scoreTab = { Enum.KeyCode.E } } })
+		end).toThrow("Input: E is bound to more than one action")
 		-- Ball Focus may share Charge Throw's keys: one needs the ball, the other works without it.
 		expect(function()
 			Fixtures.config({ Input = { ballFocus = { Enum.KeyCode.MouseLeftButton, Enum.KeyCode.ButtonL2 } } })
@@ -631,6 +724,27 @@ describe("Config.forMode", function()
 				overrides = { Input = { touch = { buttonSize = UDim2.fromScale(0.1, 0.1) } } },
 				message = "Input.touch: buttonSize must be in pixels",
 			},
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config(case.overrides)
+			end).toThrow(case.message)
+		end
+	end)
+
+	it("rejects HUD text and settings that contradict themselves", function()
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			-- A text takes exactly as many values as the HUD gives it.
+			{
+				overrides = { UI = { text = { lap = "Lap %d" } } },
+				message = "UI.text.lap: placeholder count must be 2",
+			},
+			{
+				overrides = { UI = { text = { possession = "has the ball" } } },
+				message = "UI.text.possession: placeholder count must be 1",
+			},
+			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
+			{ overrides = { UI = { keyNames = { Banana = "B" } } }, message = "UI.keyNames: Banana must name a key" },
 		}
 		for _, case in cases do
 			expect(function()
