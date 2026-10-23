@@ -14,6 +14,7 @@ local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallService = require(script.Parent.BallService)
 local CharacterService = require(script.Parent.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
+local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local NetService = require(script.Parent.NetService)
 local PassTarget = require(ReplicatedStorage.Shared.Actions.PassTarget)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
@@ -24,6 +25,7 @@ local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local TeamService = require(script.Parent.TeamService)
 local Throw = require(ReplicatedStorage.Shared.Actions.Throw)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
+local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
 type PlayerId = Types.PlayerId
 type Holder = BallService.Holder
@@ -64,6 +66,8 @@ export type ActionService = {
 	_ball: BallService.BallService,
 	_teams: TeamService.TeamService,
 	_characters: CharacterService.CharacterService,
+	-- The fastest a skater may move: a client-reported velocity is never trusted beyond it.
+	_speedLimit: number,
 	_now: number,
 	_records: { [PlayerId]: Record },
 	-- Players with a record, in the order they got it, so a frame's strikes resolve the same way every time.
@@ -223,9 +227,13 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Pass: Effect, 
 	Knockdown = noEffect,
 	-- A dodge only makes its player immune (isImmune).
 	Dodge = noEffect,
+	-- The charge the client claims, up to how long the thrower has held the ball: an honest client only charges
+	-- once it learns it carries, so its hold is never longer than the server's.
 	Throw = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
 		local throw = action.throw :: Config.ThrowSettings
-		self._ball:throw(player, Throw.charged(throw, payload.aim, payload.charge, holder.root.AssemblyLinearVelocity))
+		local charge = math.min(payload.charge, self._ball.state.heldSeconds / throw.chargeMaxSeconds)
+		local carrier = Vectors.clampMagnitude(holder.root.AssemblyLinearVelocity, self._speedLimit)
+		self._ball:throw(player, Throw.charged(throw, payload.aim, charge, carrier))
 	end,
 	Pass = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
 		local pass = action.pass :: Config.PassSettings
@@ -251,6 +259,7 @@ local ActionService: ActionService = {
 	_ball = nil :: any,
 	_teams = nil :: any,
 	_characters = nil :: any,
+	_speedLimit = 0,
 	_now = 0,
 	_records = {},
 	_order = {},
@@ -269,6 +278,7 @@ local ActionService: ActionService = {
 		self._ball = deps.BallService
 		self._teams = deps.TeamService
 		self._characters = deps.CharacterService
+		self._speedLimit = MovementCheck.speedLimit(config.Movement, config.Network)
 		self._now = 0
 		self._records = {}
 		self._order = {}

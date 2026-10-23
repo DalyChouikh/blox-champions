@@ -10,11 +10,13 @@ local ActionService = require(ServerScriptService.Server.ActionService)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallService = require(ServerScriptService.Server.BallService)
 local CharacterService = require(ServerScriptService.Server.CharacterService)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local TeamService = require(ServerScriptService.Server.TeamService)
 
 local config = Fixtures.config()
+local throwSettings = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
 local DT = 1 / 60
 local SPAWNS = { CFrame.new(0, 500, 0) }
 -- Far from each other and from every test's play, until a test moves them.
@@ -132,6 +134,8 @@ describe("ActionService", function()
 		local a = blue[1]
 		stand(a, Vector3.zero)
 		giveBall(a)
+		-- Held long enough for a full charge.
+		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
 		-- A validated message reaches the request the service listens with.
 		fakeNet.handlers[Remotes.names.ActionRequest](
 			a,
@@ -140,6 +144,47 @@ describe("ActionService", function()
 		expect(BallService.state.status).toBe("Flying")
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -160))
 		expect(rejected(a)).toEqual({})
+	end)
+
+	it("bounds a throw's charge by how long the thrower has held the ball", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		giveBall(a)
+		-- Thrown at once, claiming a full charge: none.
+		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 })
+		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(throwSettings.minSpeed, 3)
+		-- Held for half the charge time, claiming a full charge: half.
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds / 2, CharacterService:holders())
+		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 })
+		local half = (throwSettings.minSpeed + throwSettings.maxSpeed) / 2
+		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(half, 3)
+		-- A smaller claim stands.
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
+		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 0 })
+		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(throwSettings.minSpeed, 3)
+	end)
+
+	it("trusts no client velocity beyond what the movement guard allows", function()
+		local limit = config.Movement.hardCap * config.Network.speedTolerance
+		local a, b = blue[1], orange[1]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(0, 0, -4))
+		-- A thrower whose client claims 10000 studs/s keeps only the allowed speed's share.
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
+		rootOf(a).AssemblyLinearVelocity = Vector3.new(0, 0, -10000)
+		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 })
+		local thrown = throwSettings.maxSpeed + throwSettings.inheritCarrierVelocity * limit
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -thrown))
+		-- A knocked-down carrier whose client claims 10000 studs/s drops it at the allowed speed.
+		rootOf(a).AssemblyLinearVelocity = Vector3.zero
+		giveBall(b)
+		rootOf(b).AssemblyLinearVelocity = Vector3.new(0, 0, 10000)
+		ActionService:request(a, { action = "Tackle" })
+		expect(advance(0.2)).toEqual({ `{a}>{b}` })
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, limit))
 	end)
 
 	it("passes to the teammate who called", function()

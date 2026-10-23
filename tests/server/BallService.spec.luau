@@ -239,6 +239,22 @@ describe("BallService", function()
 		expect(passesThroughA()).toBe(true)
 	end)
 
+	it("lets a released ball move no faster than the movement guard allows", function()
+		local limit = config.Movement.hardCap * config.Network.speedTolerance
+		local rig = caughtBy("A")
+		local root = rig:FindFirstChild(SkaterRig.root) :: BasePart
+		-- The carrier's client sets its own assembly's velocity, the ball's included.
+		root.AssemblyLinearVelocity = Vector3.new(10000, 0, 0)
+		BallService:drop()
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(limit, 0, 0))
+		-- A given velocity too.
+		BallService.part.CFrame = CFrame.new(root.Position)
+		BallService:step(1 / 60, { holder("A", rig) })
+		expect(BallService.state.carrier).toBe("A")
+		BallService:drop(Vector3.new(0, 0, -10000))
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -limit))
+	end)
+
 	it("homes a pass on its target", function()
 		local a = caughtBy("A")
 		local b = Fixtures.rig(folder, "B", CFrame.new(BallService.part.Position + Vector3.new(20, 0, -30)))

@@ -16,9 +16,11 @@ local BallState = require(ReplicatedStorage.Shared.Ball.BallState)
 local Bounds = require(ReplicatedStorage.Shared.Arena.Geometry.Bounds)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Homing = require(ReplicatedStorage.Shared.Ball.Homing)
+local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
+local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
 type PlayerId = Types.PlayerId
 
@@ -58,7 +60,7 @@ export type BallService = {
 	throw: (self: BallService, player: PlayerId, velocity: Vector3) -> (),
 	-- A throw that homes on `target`.
 	pass: (self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId?) -> (),
-	-- A given velocity replaces the ball's (a knocked-down carrier's momentum).
+	-- A given velocity replaces the ball's (a knocked-down carrier's momentum). Either is held to the speed limit.
 	drop: (self: BallService, velocity: Vector3?) -> (),
 	onTouched: (self: BallService, hit: BasePart) -> (),
 	step: (self: BallService, dt: number, holders: { Holder }) -> BallFrame,
@@ -70,6 +72,8 @@ export type BallService = {
 	-- How close a body is to touch the ball: the ball's and the collider's radii, plus the lag tolerance.
 	_contact: number,
 	_homingAccel: number,
+	-- The fastest a ball leaving a carrier may keep moving: their client sets their velocity, and the ball's with it.
+	_speedLimit: number,
 	-- The pass's target while it homes.
 	_passTarget: PlayerId?,
 	_hidden: boolean,
@@ -147,12 +151,15 @@ end
 -- Lets go of the ball if someone carries it: a free physics part again, simulated by the server. The weld goes
 -- first: network ownership cannot be set on a part welded to an anchored one (a frozen character). The ball leaves
 -- from the carrier's side, within touch of their collider, so it passes through them until it is clear of them: a
--- throw across their body would otherwise bounce off it.
+-- throw across their body would otherwise bounce off it. It keeps the carrier's velocity, read while still welded into
+-- their assembly, up to the speed limit.
 local function release(self: BallService)
 	local weld = self._weld
 	if weld == nil then
 		return
 	end
+	local part = self.part
+	local carried = part.AssemblyLinearVelocity
 	local root = weld.Part0
 	local character = if root then root.Parent else nil
 	local collider = if character then character:FindFirstChild(SkaterRig.collider) :: BasePart? else nil
@@ -165,10 +172,10 @@ local function release(self: BallService)
 	end
 	weld:Destroy()
 	self._weld = nil
-	local part = self.part
 	part.Massless = false
 	part.CanCollide = true
 	part.CanTouch = true
+	part.AssemblyLinearVelocity = Vectors.clampMagnitude(carried, self._speedLimit)
 	if part:IsDescendantOf(workspace) then
 		part:SetNetworkOwner(nil)
 	end
@@ -291,6 +298,7 @@ local BallService: BallService = {
 	_reach = 0,
 	_contact = 0,
 	_homingAccel = 0,
+	_speedLimit = 0,
 	_passTarget = nil,
 	_hidden = true,
 	_teleported = true,
@@ -313,6 +321,7 @@ local BallService: BallService = {
 		self._reach = config.Ball.pickupRadius + lagTolerance
 		self._contact = config.Ball.radius + config.Movement.colliderDiameter / 2 + lagTolerance
 		self._homingAccel = (config.Actions.Pass.pass :: Config.PassSettings).homingAccel
+		self._speedLimit = MovementCheck.speedLimit(config.Movement, config.Network)
 		self._passTarget = nil
 		self.state = BallState.new(config.Ball.rethrowPickupDelay)
 		self._canPickUp = function(player: PlayerId): boolean
@@ -381,7 +390,7 @@ local BallService: BallService = {
 	drop = function(self: BallService, velocity: Vector3?)
 		release(self)
 		if velocity ~= nil then
-			self.part.AssemblyLinearVelocity = velocity
+			self.part.AssemblyLinearVelocity = Vectors.clampMagnitude(velocity, self._speedLimit)
 		end
 		self.state:drop()
 	end,
