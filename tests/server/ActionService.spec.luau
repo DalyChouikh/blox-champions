@@ -44,6 +44,8 @@ local fakeArena = {
 
 local folder: Folder
 local rigs: { [string]: Model } = {}
+-- The stub players TeamService seated, by id.
+local stubs: { [string]: any } = {}
 -- The seated players by team: three each.
 local blue: { string } = {}
 local orange: { string } = {}
@@ -55,6 +57,7 @@ beforeEach(function()
 	table.clear(fakeNet.handlers)
 	table.clear(fakeNet.sent)
 	table.clear(rigs)
+	table.clear(stubs)
 	blue, orange = {}, {}
 	BallService:init({ Config = config, ArenaService = fakeArena })
 	TeamService:init({ Config = config })
@@ -74,7 +77,8 @@ beforeEach(function()
 	-- Teams take turns, with a random first pick: sort the six seated players by the team they got.
 	for index = 1, 6 do
 		local id = tostring(index)
-		TeamService:join(Fixtures.stubPlayer(index))
+		stubs[id] = Fixtures.stubPlayer(index)
+		TeamService:join(stubs[id])
 		local rig = Fixtures.rig(folder, id, CFrame.new(PARKED + Vector3.new(index * 50, 0, 0)))
 		CharacterService:adopt(id, rig)
 		rigs[id] = rig
@@ -382,6 +386,50 @@ describe("ActionService", function()
 		expect(rejected(b)).toEqual({ "Uppercut" })
 		expect(rejected(a)).toEqual({})
 		expect(attribute(a, Attributes.Action)).toBe("Uppercut")
+	end)
+
+	it("shows a running action only until its recovery", function()
+		local a, b = blue[1], blue[2]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(50, 0, 0))
+		ActionService:request(a, { action = "Tackle" })
+		advance(0.1)
+		expect(attribute(a, Attributes.Action)).toBe("Tackle")
+		-- The tackle recovers from 0.3 s.
+		advance(0.3)
+		expect(attribute(a, Attributes.Action)).toBeNil()
+		-- A dive from a tackle: shown through its active phase (0.35 s), not its recovery.
+		ActionService:request(b, { action = "Tackle" })
+		advance(0.1)
+		ActionService:request(b, { action = "Dive" })
+		advance(0.3)
+		expect(attribute(b, Attributes.Action)).toBe("Dive")
+		advance(0.1)
+		expect(attribute(b, Attributes.Action)).toBeNil()
+	end)
+
+	it("stops a call once the caller has the ball", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		ActionService:request(a, { action = "CallPass" })
+		advance(0.1)
+		expect(attribute(a, Attributes.CallingPass)).toBe(true)
+		giveBall(a)
+		advance(DT)
+		expect(attribute(a, Attributes.CallingPass)).toBeNil()
+	end)
+
+	it("forgets a player who loses their seat, and starts them clean when seated again", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		ActionService:request(a, { action = "Tackle" })
+		advance(0.1)
+		TeamService:leave(stubs[a])
+		TeamService:join(stubs[a])
+		-- Their tackle's cooldown (0.7 s left) went with them.
+		ActionService:request(a, { action = "Tackle" })
+		expect(rejected(a)).toEqual({})
+		expect(attribute(a, Attributes.Action)).toBe("Tackle")
 	end)
 
 	it("clears every action, knockdown and call at a kickoff", function()

@@ -10,8 +10,8 @@ return table.freeze({
 	Braking = "Braking",
 	-- On a character: knocked down by a strike (no control, cannot catch), set and cleared by the server.
 	KnockedDown = "KnockedDown",
-	-- On a character: the action it is running (a Config.Actions name), absent when none.
+	-- On a character: the action it is running (a Config.Actions name) until that action's recovery; absent otherwise.
 	Action = "Action",
-	-- On a character: calling for a pass, for Actions.callPassWindow.
+	-- On a character: calling for a pass, for Actions.callPassWindow or until they get the ball.
 	CallingPass = "CallingPass",
 })

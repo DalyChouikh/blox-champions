@@ -3,9 +3,10 @@
 -- own ActionRunner and applied here, or refused with ActionRejected. Throws and passes go through BallService. Strikes
 -- are judged each frame against the server's positions and knock down the nearest opponent they reach; every strike
 -- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns, the
--- running action and calls for a pass show as character attributes every client reads. MatchService steps it first in
--- each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the sum of the frames it is stepped,
--- so a request between frames counts as the last frame's.
+-- running action (until its recovery) and calls for a pass show as character attributes every client reads. A throw
+-- keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held for.
+-- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
+-- sum of the frames it is stepped, so a request between frames counts as the last frame's.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -123,9 +124,11 @@ local function recordOf(self: ActionService, player: PlayerId): Record
 	return record
 end
 
--- Keeps the character's Action attribute on the running action, writing it only when it changes.
+-- Keeps the character's Action attribute on the running action until its recovery, as the player's own pose shows it,
+-- writing it only when it changes.
 local function show(self: ActionService, player: PlayerId, record: Record)
-	local action: Config.ActionName? = record.runner.action
+	local runner = record.runner
+	local action: Config.ActionName? = if runner.phase == "Recovery" then nil else runner.action
 	if action ~= record.shown then
 		record.shown = action
 		setAttribute(self, player, Attributes.Action, action)
@@ -335,8 +338,9 @@ local ActionService: ActionService = {
 		table.clear(self._knockdowns)
 		refreshHolders(self)
 		local window = self._config.Actions.callPassWindow
+		local carrier = self._ball.state.carrier
 		for player, at in self._calls do
-			if self._now - at > window then
+			if self._now - at > window or player == carrier then
 				self._calls[player] = nil
 				setAttribute(self, player, Attributes.CallingPass, nil)
 			end
