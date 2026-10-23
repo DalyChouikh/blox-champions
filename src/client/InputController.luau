@@ -1,9 +1,13 @@
 --!strict
--- The skating and action keys (spec §8.3) on Roblox's Input Action System, built from Config.Input. One context sits
--- above Roblox's own character controls and sinks the keys it binds, so their defaults never fire on ours.
--- SkateController reads the skating keys once per physics step and ActionController the action keys. A press is
--- counted when it happens, so one that starts and ends between two reads still counts; a hold is read as it is now.
+-- The controls (spec §8.3) on Roblox's Input Action System, built from Config.Input. One context sits above Roblox's
+-- own character controls and sinks the keys it binds, so their defaults never fire on ours. SkateController reads the
+-- skating keys once per physics step, ActionController the action keys, and CameraController the look and Ball Focus.
+-- A press is counted when it happens, so one that starts and ends between two reads still counts; a hold is read as
+-- it is now, and the look as the rate Roblox's own camera reads (turn = state × dt). Touch controls hook their stick
+-- pad and buttons in here. Every key stops while Roblox's menu is open: the keys fire then too (measured), and a hold
+-- lets go.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -13,10 +17,13 @@ local Config = require(ReplicatedStorage.Shared.Config)
 export type SkateKeys = { move: Vector2, pump: boolean, brake: boolean, attach: boolean, jump: boolean }
 -- One read of the action keys: a press since the last read for each, and the throw held now.
 export type ActionKeys = { tackle: boolean, uppercut: boolean, pass: boolean, throw: boolean }
+-- One read of the camera keys: the look (radians per second), Ball Focus held now, and pressed since the last read.
+export type CameraKeys = { look: Vector2, ballFocus: boolean, ballFocusPressed: boolean }
 
 -- The pressed (not held) buttons, each counted on its own.
-type Presses = { jump: number, tackle: number, uppercut: number, pass: number }
-type Pressed = "jump" | "tackle" | "uppercut" | "pass"
+type Presses = { jump: number, tackle: number, uppercut: number, pass: number, ballFocus: number }
+type Pressed = "jump" | "tackle" | "uppercut" | "pass" | "ballFocus"
+type LookBindings = { mouse: InputBinding, stick: InputBinding, touch: InputBinding }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
 export type InputController = {
@@ -29,14 +36,52 @@ export type InputController = {
 	read: (self: InputController, into: SkateKeys) -> (),
 	newActionKeys: () -> ActionKeys,
 	readActions: (self: InputController, into: ActionKeys) -> (),
+	newCameraKeys: () -> CameraKeys,
+	readCamera: (self: InputController, into: CameraKeys) -> (),
+	-- The player's Roblox settings: mouse and gamepad sensitivity, and an inverted look.
+	setLookSettings: (self: InputController, mouse: number, stick: number, invertY: boolean) -> (),
+	-- A touch button that works the control as its keys do.
+	bindButton: (self: InputController, control: Config.Control, button: GuiButton) -> (),
+	-- The touch position while a touch that began on `pad` lasts, (-1, -1) once it ends.
+	bindTouchStick: (self: InputController, pad: GuiButton) -> InputAction,
+	-- The touch stick, as a move (x right, y forward, length 0..1).
+	setStick: (self: InputController, stick: Vector2) -> (),
+	setPaused: (self: InputController, paused: boolean) -> (),
 	destroy: (self: InputController) -> (),
+	_input: Config.InputConfig,
 	_move: InputAction,
 	_pump: InputAction,
 	_brake: InputAction,
 	_attach: InputAction,
 	_throw: InputAction,
+	_look: InputAction,
+	_ballFocus: InputAction,
+	_lookBindings: LookBindings,
+	_stick: InputBinding,
 	_presses: Presses,
 	_connections: { RBXScriptConnection },
+	-- The Roblox look settings last applied, and where they are read.
+	_lookSettings: () -> (number, number, boolean),
+	_mouseSensitivity: number,
+	_stickSensitivity: number,
+	_invertY: boolean,
+}
+
+-- Every action's name in the context, spelled once.
+local NAMES = {
+	move = "Move",
+	jump = "Jump",
+	pump = "Pump",
+	brake = "Brake",
+	attach = "Attach",
+	tackle = "Tackle",
+	uppercut = "Uppercut",
+	pass = "Pass",
+	throw = "Throw",
+	look = "Look",
+	ballFocus = "BallFocus",
+	touchMove = "TouchMove",
+	touchStick = "TouchStick",
 }
 
 local function newAction(context: InputContext, name: string, actionType: Enum.InputActionType): InputAction
@@ -86,30 +131,62 @@ local function takePress(self: InputController, pressed: Pressed): boolean
 	return any
 end
 
+local function lookBinding(action: InputAction, look: Config.LookBinding): InputBinding
+	local binding = Instance.new("InputBinding")
+	binding.KeyCode = look.key
+	binding.ResponseCurve = look.responseCurve
+	binding.Parent = action
+	return binding
+end
+
+-- A look binding's scale in radians, its y turned over when the player inverts the look.
+local function lookScale(look: Config.LookBinding, invertY: boolean): Vector2
+	local degrees = look.degPerUnit
+	return Vector2.new(math.rad(degrees.X), math.rad(if invertY then -degrees.Y else degrees.Y))
+end
+
+-- The player's settings as Roblox's own camera reads them (UserGameSettings).
+local function robloxLookSettings(): (number, number, boolean)
+	local settings = UserSettings():GetService("UserGameSettings")
+	return settings.MouseSensitivity, settings.GamepadCameraSensitivity, settings:GetCameraYInvertValue() < 0
+end
+
 local InputController: InputController = {
 	name = "InputController",
 	dependencies = { "Config" },
 	context = nil :: any,
+	_input = nil :: any,
 	_move = nil :: any,
 	_pump = nil :: any,
 	_brake = nil :: any,
 	_attach = nil :: any,
 	_throw = nil :: any,
-	_presses = { jump = 0, tackle = 0, uppercut = 0, pass = 0 },
+	_look = nil :: any,
+	_ballFocus = nil :: any,
+	_lookBindings = nil :: any,
+	_stick = nil :: any,
+	_presses = { jump = 0, tackle = 0, uppercut = 0, pass = 0, ballFocus = 0 },
 	_connections = {},
+	_lookSettings = robloxLookSettings,
+	_mouseSensitivity = 1,
+	_stickSensitivity = 1,
+	_invertY = false,
 
-	-- deps.Parent keeps the context out of the local player's PlayerScripts in tests.
+	-- deps.Parent keeps the context out of the local player's PlayerScripts in tests; deps.GuiService (its menu
+	-- signals) and deps.LookSettings replace the live game there.
 	init = function(self: InputController, deps: { [string]: any })
 		local input: Config.InputConfig = (deps.Config :: Config.GameConfig).Input
+		self._input = input
 		local context = Instance.new("InputContext")
 		context.Name = "SkateControls"
 		context.Priority = input.contextPriority
 		context.Sink = true
 		self.context = context
-		self._presses = { jump = 0, tackle = 0, uppercut = 0, pass = 0 }
+		self._presses = { jump = 0, tackle = 0, uppercut = 0, pass = 0, ballFocus = 0 }
 		self._connections = {}
+		self._lookSettings = deps.LookSettings or robloxLookSettings
 
-		local move = newAction(context, "Move", Enum.InputActionType.Direction2D)
+		local move = newAction(context, NAMES.move, Enum.InputActionType.Direction2D)
 		for _, composite in input.move.composites do
 			local binding = Instance.new("InputBinding")
 			binding.Up = composite.up
@@ -119,15 +196,45 @@ local InputController: InputController = {
 			binding.Parent = move
 		end
 		bindKeys(move, input.move.sticks)
+		local stick = Instance.new("InputBinding")
+		stick.Name = NAMES.touchStick
+		stick.Type = Enum.InputBindingType.Scriptable
+		stick.Parent = move
 		self._move = move
-		newPressButton(self, "Jump", input.jump, "jump")
-		self._pump = newButton(context, "Pump", input.pump)
-		self._brake = newButton(context, "Brake", input.brake)
-		self._attach = newButton(context, "Attach", input.attach)
-		newPressButton(self, "Tackle", input.tackle, "tackle")
-		newPressButton(self, "Uppercut", input.uppercut, "uppercut")
-		newPressButton(self, "Pass", input.pass, "pass")
-		self._throw = newButton(context, "Throw", input.throw)
+		self._stick = stick
+		newPressButton(self, NAMES.jump, input.jump, "jump")
+		self._pump = newButton(context, NAMES.pump, input.pump)
+		self._brake = newButton(context, NAMES.brake, input.brake)
+		self._attach = newButton(context, NAMES.attach, input.attach)
+		newPressButton(self, NAMES.tackle, input.tackle, "tackle")
+		newPressButton(self, NAMES.uppercut, input.uppercut, "uppercut")
+		newPressButton(self, NAMES.pass, input.pass, "pass")
+		self._throw = newButton(context, NAMES.throw, input.throw)
+		self._ballFocus = newPressButton(self, NAMES.ballFocus, input.ballFocus, "ballFocus")
+
+		local look = newAction(context, NAMES.look, Enum.InputActionType.Direction2D)
+		self._look = look
+		self._lookBindings = {
+			mouse = lookBinding(look, input.look.mouse),
+			stick = lookBinding(look, input.look.stick),
+			touch = lookBinding(look, input.look.touch),
+		}
+		self._mouseSensitivity, self._stickSensitivity, self._invertY = 1, 1, false
+		self:setLookSettings(1, 1, false)
+
+		local menu = deps.GuiService or GuiService
+		table.insert(
+			self._connections,
+			menu.MenuOpened:Connect(function()
+				self:setPaused(true)
+			end)
+		)
+		table.insert(
+			self._connections,
+			menu.MenuClosed:Connect(function()
+				self:setPaused(false)
+			end)
+		)
 		context.Parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerScripts")
 	end,
 
@@ -152,6 +259,54 @@ local InputController: InputController = {
 		into.uppercut = takePress(self, "uppercut")
 		into.pass = takePress(self, "pass")
 		into.throw = self._throw:GetState() :: boolean
+	end,
+
+	newCameraKeys = function(): CameraKeys
+		return { look = Vector2.zero, ballFocus = false, ballFocusPressed = false }
+	end,
+
+	-- Also follows the player's Roblox settings, read each time as Roblox's own camera reads them.
+	readCamera = function(self: InputController, into: CameraKeys)
+		local mouse, stick, invertY = self._lookSettings()
+		if mouse ~= self._mouseSensitivity or stick ~= self._stickSensitivity or invertY ~= self._invertY then
+			self:setLookSettings(mouse, stick, invertY)
+		end
+		into.look = self._look:GetState() :: Vector2
+		into.ballFocus = self._ballFocus:GetState() :: boolean
+		into.ballFocusPressed = takePress(self, "ballFocus")
+	end,
+
+	setLookSettings = function(self: InputController, mouse: number, stick: number, invertY: boolean)
+		local looks, bindings = self._input.look, self._lookBindings
+		bindings.mouse.Scale = mouse
+		bindings.stick.Scale = stick
+		bindings.mouse.Vector2Scale = lookScale(looks.mouse, invertY)
+		bindings.stick.Vector2Scale = lookScale(looks.stick, invertY)
+		bindings.touch.Vector2Scale = lookScale(looks.touch, invertY)
+		self._mouseSensitivity, self._stickSensitivity, self._invertY = mouse, stick, invertY
+	end,
+
+	bindButton = function(self: InputController, control: Config.Control, button: GuiButton)
+		local binding = Instance.new("InputBinding")
+		binding.UIButton = button
+		binding.Parent = self.context:FindFirstChild(NAMES[control]) :: InputAction
+	end,
+
+	bindTouchStick = function(self: InputController, pad: GuiButton): InputAction
+		local action = newAction(self.context, NAMES.touchMove, Enum.InputActionType.ViewportPosition)
+		local binding = Instance.new("InputBinding")
+		binding.KeyCode = Enum.KeyCode.TouchPosition
+		binding.UIModifier = pad
+		binding.Parent = action
+		return action
+	end,
+
+	setStick = function(self: InputController, stick: Vector2)
+		self._stick:Fire(stick)
+	end,
+
+	setPaused = function(self: InputController, paused: boolean)
+		self.context.Enabled = not paused
 	end,
 
 	destroy = function(self: InputController)
