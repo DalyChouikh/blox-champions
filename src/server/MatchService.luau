@@ -5,9 +5,10 @@
 -- hiding and spawning the ball, clearing every action, knockdown and call at a kickoff, placing and freezing
 -- characters, opening and closing the goal — and sends them to clients, each frame's batch followed by the match's
 -- snapshot, which clients draw from. A snapshot also goes to everyone whenever a seat changes, and to each player who
--- joins; it names every player who ever joined, so the score tab can name those who left. It keeps the ball dead
--- whenever play is not live, so the ball is only ever carried by the engine's last holder. After a match ends it waits
--- postMatchSeconds and starts the next one with everyone reseated; once every player has left it starts over.
+-- joins; it names every player in the server and each who left during the match, so the score tab can name them. It
+-- keeps the ball dead whenever play is not live, so the ball is only ever carried by the engine's last holder. After a
+-- match ends it waits postMatchSeconds and starts the next one with everyone reseated; once every player has left it
+-- starts over.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -76,6 +77,13 @@ local function newEngine(self: MatchService)
 	self._inEngine = {}
 	self._waiting = true
 	self._postMatchLeft = nil
+	-- A new match lists only the players in the server, so the names sent with each snapshot stop at them.
+	local names = self._names
+	for player in names do
+		if not self._teams:has(player) then
+			names[player] = nil
+		end
+	end
 	-- A new engine's goal is closed; the panel must say so even if the last match ended with it open.
 	setGoalOpen(self, false)
 end

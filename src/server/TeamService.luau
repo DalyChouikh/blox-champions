@@ -28,6 +28,8 @@ export type TeamService = {
 	teamOf: (self: TeamService, player: PlayerId) -> Team?,
 	slotOf: (self: TeamService, player: PlayerId) -> (Team?, number?),
 	seatedCount: (self: TeamService) -> number,
+	-- Whether the player is in the server, seated or spectating.
+	has: (self: TeamService, player: PlayerId) -> boolean,
 	-- Every player who joins, seated or not (the match sends them a snapshot).
 	joined: Signal.Signal<PlayerId>,
 	seated: Signal.Signal<PlayerId, Team>,
@@ -129,6 +131,11 @@ local TeamService: TeamService = {
 			return nil, nil
 		end
 		return team, table.find(self._roster:members(team), player)
+	end,
+
+	has = function(self: TeamService, player: PlayerId): boolean
+		local found: Player? = self._players[player]
+		return found ~= nil
 	end,
 
 	seatedCount = function(self: TeamService): number

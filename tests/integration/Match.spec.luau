@@ -487,25 +487,41 @@ describe("A match on the generated arena", function()
 		end
 	)
 
-	it("sends a snapshot to everyone whenever a seat changes, naming every player who ever joined", function()
-		setup()
-		local _, players = seat(2)
-		local function lastToEveryone(): any
-			local snapshots = firedNamed(Remotes.names.MatchSnapshot)
-			for index = #snapshots, 1, -1 do
-				if snapshots[index].to == nil then
-					return snapshots[index].payload
+	it(
+		"sends a snapshot to everyone whenever a seat changes, naming this match's players, also those who left",
+		function()
+			setup()
+			local _, players = seat(2)
+			local function lastToEveryone(): any
+				local snapshots = firedNamed(Remotes.names.MatchSnapshot)
+				for index = #snapshots, 1, -1 do
+					if snapshots[index].to == nil then
+						return snapshots[index].payload
+					end
 				end
+				return nil
 			end
-			return nil
+			expect(#lastToEveryone().match.stats.players).toBe(2)
+			local before = #firedNamed(Remotes.names.MatchSnapshot)
+			TeamService:leave(players[2])
+			expect(#firedNamed(Remotes.names.MatchSnapshot)).toBe(before + 1)
+			local left = lastToEveryone()
+			expect(left.names["2"]).toBe("Name2")
+			expect(#left.match.stats.players).toBe(2)
 		end
-		expect(#lastToEveryone().match.stats.players).toBe(2)
-		local before = #firedNamed(Remotes.names.MatchSnapshot)
-		TeamService:leave(players[2])
-		expect(#firedNamed(Remotes.names.MatchSnapshot)).toBe(before + 1)
-		local left = lastToEveryone()
-		expect(left.names["2"]).toBe("Name2")
-		expect(#left.match.stats.players).toBe(2)
+	)
+
+	it("forgets, when the next match starts, the names of players no longer in the server", function()
+		setup({ lapsToOpenGoal = 1, lapsForStreakPoint = 2, pointsToWin = 1, postMatchSeconds = 2 })
+		local leaver = Fixtures.stubPlayer(9)
+		TeamService:join(leaver)
+		TeamService:leave(leaver)
+		scoreOnce()
+		expect(lastFired(Remotes.names.MatchSnapshot).payload.names["9"]).toBe("Name9")
+		frames(2.05)
+		local names = lastFired(Remotes.names.MatchSnapshot).payload.names
+		expect(names["9"]).toBeNil()
+		expect(names["1"]).toBe("Name1")
 	end)
 
 	it("tells everyone who carries the ball", function()
