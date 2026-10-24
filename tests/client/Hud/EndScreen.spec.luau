@@ -10,6 +10,7 @@ local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local React = require(ReplicatedStorage.Packages.React)
+local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 local config = Fixtures.config()
 local colors = config.UI.teamColors
@@ -20,7 +21,8 @@ local folder: Folder
 -- The HUD's area, as the Hud's binding gives it.
 local area: React.Binding<Vector2>, setArea: (Vector2) -> ()
 
-local function screen(mvp: string?): React.ReactElement
+-- Blue won 5-3: Ana (Blue) scored 5, Rex (Orange) 3; or `players` instead of them.
+local function screen(mvp: string?, players: { Types.PlayerStats }?): React.ReactElement
 	local ana = Fixtures.playerStats("1", "Blue", true)
 	ana.score, ana.goals = 5, 5
 	local rex = Fixtures.playerStats("2", "Orange", true)
@@ -28,7 +30,7 @@ local function screen(mvp: string?): React.ReactElement
 	local ended: HudState.Ended = {
 		winner = "Blue",
 		mvp = mvp,
-		stats = { scores = { Blue = 5, Orange = 3 }, players = { ana, rex } },
+		stats = { scores = { Blue = 5, Orange = 3 }, players = players or { ana, rex } },
 	}
 	return React.createElement(React.Fragment, nil, {
 		EndScreen = React.createElement(
@@ -84,5 +86,17 @@ describe("EndScreen", function()
 		expect(fit.Scale).toBeCloseTo(307 / 520, 4)
 		setArea(Vector2.new(1920, 1000))
 		expect(fit.Scale).toBe(1)
+	end)
+
+	it("fits by its parts once they make it taller than its size", function()
+		-- The winner, the totals, the MVP's title and card, and twelve rows under the header, spacing apart, inside the
+		-- padding: 630 px with the defaults, as Edit lays it out.
+		local hud = config.UI.hud
+		local row, gap = hud.layout.scoreTab.rowHeight, hud.spacing
+		local tall = 2 * gap + 3 * (hud.titleSize + gap) + (2 * row + gap) + gap + (13 * row + 12 * gap)
+		setArea(Vector2.new(750, 323))
+		local mounted = Fixtures.mount(screen("1", Fixtures.roster(12)), folder)
+		local fit = (mounted:FindFirstChild("EndScreen") :: Frame):FindFirstChild("Fit") :: UIScale
+		expect(fit.Scale).toBeCloseTo((323 - 2 * hud.screenMargin) / tall, 4)
 	end)
 end)

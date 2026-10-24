@@ -66,12 +66,20 @@ function Style.corner(config: Config.GameConfig): React.ReactElement
 	return React.createElement("UICorner", { CornerRadius = config.UI.hud.corner })
 end
 
--- Shrinks a panel of `size` to fit the HUD's area (a binding), screenMargin inside each edge (Fit).
-function Style.fit(config: Config.GameConfig, area: React.Binding<Vector2>, size: UDim2): React.ReactElement
-	local margin = config.UI.hud.screenMargin
+-- Shrinks a panel to fit the HUD's area (a binding), screenMargin inside each edge (Fit). The panel is `size`, or as
+-- tall as its parts need where that is taller: `content` pixels inside Style.padding (its AutomaticSize Y grows it).
+function Style.fit(
+	config: Config.GameConfig,
+	area: React.Binding<Vector2>,
+	size: UDim2,
+	content: number
+): React.ReactElement
+	local hud = config.UI.hud
+	local margin = hud.screenMargin
+	local laidOut = UDim2.fromOffset(size.X.Offset, math.max(size.Y.Offset, content + 2 * hud.spacing))
 	return React.createElement("UIScale", {
 		Scale = area:map(function(shown: Vector2): number
-			return Fit.scale(shown, size, margin)
+			return Fit.scale(shown, laidOut, margin)
 		end),
 	})
 end

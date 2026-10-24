@@ -32,12 +32,13 @@ local function stats(): Types.MatchStats
 	return { scores = { Blue = 3, Orange = 1 }, players = { ana, kai, gone, rex } }
 end
 
-local function tab(): Frame
+-- The tab of `listed` (default: stats()), mounted.
+local function tab(listed: Types.MatchStats?): Frame
 	local mounted = Fixtures.mount(
 		React.createElement(React.Fragment, nil, {
 			ScoreTab = React.createElement(
 				ScoreTab,
-				{ config = config, text = text, stats = stats(), names = NAMES, localId = "1", area = area }
+				{ config = config, text = text, stats = listed or stats(), names = NAMES, localId = "1", area = area }
 			),
 		}),
 		folder
@@ -89,6 +90,16 @@ describe("ScoreTab", function()
 		expect(fit.Scale).toBeCloseTo(307 / 360, 4)
 		setArea(Vector2.new(1920, 1000))
 		expect(fit.Scale).toBe(1)
+	end)
+
+	it("fits by its rows once they make it taller than its size", function()
+		-- Twelve rows and the header, spacing apart, inside the padding: 448 px with the defaults, as Edit lays it out.
+		local hud = config.UI.hud
+		local tall = 2 * hud.spacing + 13 * hud.layout.scoreTab.rowHeight + 12 * hud.spacing
+		setArea(Vector2.new(750, 323))
+		local listed: Types.MatchStats = { scores = { Blue = 0, Orange = 0 }, players = Fixtures.roster(12) }
+		local fit = tab(listed):FindFirstChild("Fit") :: UIScale
+		expect(fit.Scale).toBeCloseTo((323 - 2 * hud.screenMargin) / tall, 4)
 	end)
 
 	it("dims players who left and marks the local player", function()

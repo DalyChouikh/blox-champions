@@ -81,6 +81,15 @@ function Fixtures.playerStats(id: Types.PlayerId, team: Team.Team, present: bool
 	}
 end
 
+-- `count` players with no points, ids "1" to `count`, alternately Blue and Orange, all still in the match.
+function Fixtures.roster(count: number): { Types.PlayerStats }
+	local players: { Types.PlayerStats } = {}
+	for index = 1, count do
+		table.insert(players, Fixtures.playerStats(tostring(index), if index % 2 == 1 then "Blue" else "Orange", true))
+	end
+	return players
+end
+
 -- What the server sends the HUD: a live match two minutes from the end with players "1" (Blue, Ana) and "2" (Orange,
 -- Rex), its fields changed by `overrides`, taken on server frame `frame` (default 0).
 function Fixtures.matchSnapshot(overrides: { [string]: any }?, frame: number?): Payloads.MatchSnapshot
