@@ -124,10 +124,15 @@ export type MarkerSettings = {
 	ringThickness: number,
 	lineWidth: number,
 	groundProbe: number,
+	-- The ground marker is a disc this wide and this thick.
 	groundMarkerSize: number,
+	groundMarkerThickness: number,
 	groundMarkerTransparency: number,
 	edgeMargin: number,
 	arrowSize: number,
+	-- The arrows' image, pointing up and white, so it takes their colour. The default is Roblox's own chevron from
+	-- its content folder; the art pass swaps in ours.
+	arrowImage: string,
 }
 
 -- A name tag's size, how far above a player's root it sits (studs), and its text sizes.
@@ -267,9 +272,11 @@ local defaults: UIConfig = {
 		lineWidth = 0.2,
 		groundProbe = 100,
 		groundMarkerSize = 4,
+		groundMarkerThickness = 0.2,
 		groundMarkerTransparency = 0.4,
 		edgeMargin = 48,
 		arrowSize = 28,
+		arrowImage = "rbxasset://textures/ui/MenuBar/arrow_up.png",
 	},
 	nameTag = {
 		size = UDim2.fromOffset(200, 48),
@@ -436,9 +443,11 @@ local schema = Validate.record({
 		lineWidth = positive,
 		groundProbe = positive,
 		groundMarkerSize = positive,
+		groundMarkerThickness = positive,
 		groundMarkerTransparency = transparency,
 		edgeMargin = positive,
 		arrowSize = positive,
+		arrowImage = label,
 	}),
 	nameTag = Validate.record({
 		size = udim2,

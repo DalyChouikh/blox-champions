@@ -10,6 +10,8 @@ local modules: { Loader.LoadableModule } = {
 	require(script.Parent.InputController),
 	require(script.Parent.RideSurfaces),
 	require(script.Parent.BallCarrier),
+	require(script.Parent.BallPart),
+	require(script.Parent.ArenaParts),
 	require(script.Parent.SkateController),
 	require(script.Parent.ActionController),
 	require(script.Parent.PoseController),
@@ -17,6 +19,7 @@ local modules: { Loader.LoadableModule } = {
 	require(script.Parent.TouchControls),
 	require(script.Parent.HudStore),
 	require(script.Parent.Hud),
+	require(script.Parent.WorldMarkers),
 	require(script.Parent.FrameController),
 }
 

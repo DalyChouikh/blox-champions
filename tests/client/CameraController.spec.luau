@@ -83,9 +83,11 @@ local function initCamera()
 		MenuOpen = function(): boolean
 			return menuOpen
 		end,
-		Ball = function(): BasePart?
-			return ball
-		end,
+		BallPart = {
+			get = function(_self: any): BasePart?
+				return ball
+			end,
+		},
 		LocalId = LOCAL_ID,
 	})
 end

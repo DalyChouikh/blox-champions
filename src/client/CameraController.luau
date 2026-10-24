@@ -11,13 +11,13 @@
 -- gone before the next is bound) watches the ball, from the spectator's distance and height above it; with no ball
 -- either, the camera holds still.
 
-local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local BallCarrier = require(script.Parent.BallCarrier)
+local BallPart = require(script.Parent.BallPart)
 local ChaseCamera = require(ReplicatedStorage.Shared.Camera.ChaseCamera)
 local Config = require(ReplicatedStorage.Shared.Config)
 local InputController = require(script.Parent.InputController)
@@ -25,7 +25,6 @@ local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local RideSurfaces = require(script.Parent.RideSurfaces)
 local SkateController = require(script.Parent.SkateController)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
-local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
@@ -39,7 +38,7 @@ export type CameraController = {
 	name: string,
 	dependencies: { string },
 	init: (self: CameraController, deps: { [string]: any }) -> (),
-	start: (self: CameraController) -> (),
+	start: ((self: CameraController) -> ())?,
 	step: (self: CameraController, dt: number) -> (),
 	chase: ChaseCamera.ChaseCamera,
 	-- Whether Ball Focus is on, as the last step applied it (the touch throw button rings while it is).
@@ -54,8 +53,7 @@ export type CameraController = {
 	_preferredInput: () -> Enum.PreferredInput,
 	_menuOpen: () -> boolean,
 	_raycast: (origin: Vector3, direction: Vector3, params: RaycastParams) -> RaycastResult?,
-	-- The ball's part, or nil while there is none in the arena.
-	_ball: () -> BasePart?,
+	_ballPart: BallPart.BallPart,
 	_localId: PlayerId,
 	-- Records reused every step.
 	_keys: InputController.CameraKeys,
@@ -64,8 +62,6 @@ export type CameraController = {
 	_root: BasePart?,
 	-- Ball Focus turned on by a tap (toggle mode).
 	_focusToggled: boolean,
-	-- The tagged ball part in the workspace, kept by start()'s tag signals.
-	_ballPart: BasePart?,
 }
 
 -- The mouse stays at the screen's center while a mouse plays, so it turns the camera; it is free otherwise and
@@ -145,7 +141,7 @@ end
 
 local CameraController: CameraController = {
 	name = "CameraController",
-	dependencies = { "Config", "InputController", "RideSurfaces", "SkateController", "BallCarrier" },
+	dependencies = { "Config", "InputController", "RideSurfaces", "SkateController", "BallCarrier", "BallPart" },
 	chase = nil :: any,
 	focusing = false,
 	_config = nil :: any,
@@ -164,18 +160,15 @@ local CameraController: CameraController = {
 	_raycast = function(_origin: Vector3, _direction: Vector3, _params: RaycastParams): RaycastResult?
 		return nil
 	end,
-	_ball = function(): BasePart?
-		return nil
-	end,
+	_ballPart = nil :: any,
 	_localId = "",
 	_keys = nil :: any,
 	_target = nil :: any,
 	_root = nil,
 	_focusToggled = false,
-	_ballPart = nil,
 
-	-- deps.Camera, deps.Mouse, deps.PreferredInput, deps.MenuOpen, deps.Raycast, deps.Ball and deps.LocalId replace
-	-- the live game in tests.
+	-- deps.Camera, deps.Mouse, deps.PreferredInput, deps.MenuOpen, deps.Raycast and deps.LocalId replace the live game
+	-- in tests.
 	init = function(self: CameraController, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -196,11 +189,7 @@ local CameraController: CameraController = {
 			or function(origin: Vector3, direction: Vector3, params: RaycastParams): RaycastResult?
 				return workspace:Raycast(origin, direction, params)
 			end
-		self._ball = deps.Ball
-			or function(): BasePart?
-				local part = self._ballPart
-				return if part ~= nil and part.Parent ~= nil then part else nil
-			end
+		self._ballPart = deps.BallPart
 		self._localId = deps.LocalId or PlayerIds.of(Players.LocalPlayer :: Player)
 		self.chase = ChaseCamera.new(config.Camera, config.Movement.hardCap, Vector3.yAxis, -Vector3.zAxis)
 		self._keys = InputController.newCameraKeys()
@@ -214,26 +203,7 @@ local CameraController: CameraController = {
 		}
 		self._root = nil
 		self._focusToggled = false
-		self._ballPart = nil
 		self.focusing = false
-	end,
-
-	-- Keeps the ball's part: the server tags it (Tags.Ball), and it reaches a client only while in the workspace.
-	start = function(self: CameraController)
-		local function found(instance: Instance)
-			if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
-				self._ballPart = instance
-			end
-		end
-		CollectionService:GetInstanceAddedSignal(Tags.Ball):Connect(found)
-		CollectionService:GetInstanceRemovedSignal(Tags.Ball):Connect(function(instance: Instance)
-			if instance == self._ballPart then
-				self._ballPart = nil
-			end
-		end)
-		for _, instance in CollectionService:GetTagged(Tags.Ball) do
-			found(instance)
-		end
 	end,
 
 	step = function(self: CameraController, dt: number)
@@ -247,7 +217,7 @@ local CameraController: CameraController = {
 		self._input:readCamera(self._keys)
 		local focused = focusing(self, device)
 		self.focusing = focused
-		local ball = self._ball()
+		local ball = self._ballPart:get()
 		local settings = self._config.Camera
 
 		local skate = self._skate
