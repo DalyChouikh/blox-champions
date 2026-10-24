@@ -47,14 +47,15 @@ function HudText.speed(self: HudText, studsPerSecond: number): string
 	return cached
 end
 
--- The possessing team's laps toward opening the goal, or their streak once it is open for them; nil while neutral.
+-- The possessing team's laps toward opening the goal, or their streak once it has opened it; nil while neutral. A
+-- point closes the goal, but the streak that opened it stays until the kickoff (or the match's end), so it is still
+-- the streak then.
 function HudText.lap(self: HudText, match: MatchEngine.Snapshot): string?
-	local team = match.possessingTeam
-	if team == nil then
+	if match.possessingTeam == nil then
 		return nil
 	end
 	local text, rules = self._config.UI.text, self._config.Match
-	if match.goalOpenFor == team then
+	if match.streak >= rules.lapsToOpenGoal then
 		return string.format(text.streak, match.streak, rules.lapsForStreakPoint)
 	end
 	return string.format(text.lap, match.streak, rules.lapsToOpenGoal)

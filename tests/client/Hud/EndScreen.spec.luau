@@ -17,6 +17,8 @@ local text = HudText.new(config)
 local NAMES = { ["1"] = "Ana", ["2"] = "Rex" }
 
 local folder: Folder
+-- The HUD's area, as the Hud's binding gives it.
+local area: React.Binding<Vector2>, setArea: (Vector2) -> ()
 
 local function screen(mvp: string?): React.ReactElement
 	local ana = Fixtures.playerStats("1", "Blue", true)
@@ -31,7 +33,7 @@ local function screen(mvp: string?): React.ReactElement
 	return React.createElement(React.Fragment, nil, {
 		EndScreen = React.createElement(
 			EndScreen,
-			{ config = config, text = text, ended = ended, names = NAMES, localId = "2" }
+			{ config = config, text = text, ended = ended, names = NAMES, localId = "2", area = area }
 		),
 	})
 end
@@ -40,6 +42,7 @@ beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "EndScreenTest"
 	folder.Parent = workspace
+	area, setArea = React.createBinding(Vector2.zero)
 end)
 
 afterEach(function()
@@ -71,5 +74,15 @@ describe("EndScreen", function()
 
 		rerender(screen(nil))
 		expect(mvp.Visible).toBe(false)
+	end)
+
+	it("shrinks to fit a screen smaller than itself", function()
+		-- A phone's safe area: (323 - 2 margins) / 520.
+		setArea(Vector2.new(750, 323))
+		local mounted = Fixtures.mount(screen("1"), folder)
+		local fit = (mounted:FindFirstChild("EndScreen") :: Frame):FindFirstChild("Fit") :: UIScale
+		expect(fit.Scale).toBeCloseTo(307 / 520, 4)
+		setArea(Vector2.new(1920, 1000))
+		expect(fit.Scale).toBe(1)
 	end)
 end)

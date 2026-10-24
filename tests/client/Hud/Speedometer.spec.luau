@@ -10,7 +10,8 @@ local React = require(ReplicatedStorage.Packages.React)
 local Speedometer = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.Hud.Speedometer)
 
 local config = Fixtures.config()
-local place = config.UI.hud.layout.speedometer
+local hud = config.UI.hud
+local place = hud.layout.speedometer
 
 local folder: Folder?
 
@@ -41,11 +42,15 @@ describe("Speedometer", function()
 		expect(label.Visible).toBe(true)
 		expect(label.Text).toBe("120 km/h")
 		expect(label.Position == place.position).toBe(true)
+		expect(label.AnchorPoint == Vector2.one and label.TextXAlignment == Enum.TextXAlignment.Right).toBe(true)
+		expect(label.TextSize).toBe(hud.titleSize)
 		setSpeed("96 km/h")
 		expect(label.Text).toBe("96 km/h")
-		-- Above the touch buttons on touch.
+		-- On touch, small in the top-left corner: the right side holds the touch buttons and the score button.
 		rerender(meter(Enum.PreferredInput.Touch, true))
 		expect(label.Position == place.touchPosition).toBe(true)
+		expect(label.AnchorPoint == Vector2.zero and label.TextXAlignment == Enum.TextXAlignment.Left).toBe(true)
+		expect(label.TextSize).toBe(hud.textSize)
 		rerender(meter(Enum.PreferredInput.KeyboardAndMouse, false))
 		expect(label.Visible).toBe(false)
 	end)

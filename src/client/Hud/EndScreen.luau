@@ -1,7 +1,7 @@
 --!strict
 -- The end of the match (spec §6.5, §11.1), in the middle of the screen until the next match starts: the winner in
 -- their team's colour, both teams' totals, the MVP's card (their row of the score tab; hidden without an MVP), and the
--- whole score tab. A plain function of its props.
+-- whole score tab. It shrinks to fit a small screen. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -20,6 +20,8 @@ export type EndScreenProps = {
 	ended: HudState.Ended,
 	names: { [Types.PlayerId]: string },
 	localId: Types.PlayerId,
+	-- The HUD's area, which the screen fits in.
+	area: React.Binding<Vector2>,
 }
 
 -- A headline in `color`, as tall as the HUD's titles.
@@ -75,6 +77,7 @@ local function EndScreen(props: EndScreenProps): React.ReactElement
 		{
 			Corner = Style.corner(config),
 			Padding = Style.padding(config),
+			Fit = Style.fit(config, props.area, place.size),
 			Layout = Style.list(config, Enum.FillDirection.Vertical),
 			Winner = title(config, 1, text:wins(ended.winner), ui.teamColors[ended.winner]),
 			Totals = React.createElement(

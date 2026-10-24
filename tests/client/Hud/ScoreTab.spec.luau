@@ -17,6 +17,8 @@ local text = HudText.new(config)
 local NAMES = { ["1"] = "Ana", ["2"] = "Rex", ["3"] = "Kai", ["9"] = "Gone" }
 
 local folder: Folder
+-- The HUD's area, as the Hud's binding gives it.
+local area: React.Binding<Vector2>, setArea: (Vector2) -> ()
 
 -- Ana (Blue) leads with 5, Kai (Blue) has 2, Rex (Orange) 4, and Gone (Blue) left: by team, then score.
 local function stats(): Types.MatchStats
@@ -35,7 +37,7 @@ local function tab(): Frame
 		React.createElement(React.Fragment, nil, {
 			ScoreTab = React.createElement(
 				ScoreTab,
-				{ config = config, text = text, stats = stats(), names = NAMES, localId = "1" }
+				{ config = config, text = text, stats = stats(), names = NAMES, localId = "1", area = area }
 			),
 		}),
 		folder
@@ -52,6 +54,7 @@ beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "ScoreTabTest"
 	folder.Parent = workspace
+	area, setArea = React.createBinding(Vector2.zero)
 end)
 
 afterEach(function()
@@ -77,6 +80,15 @@ describe("ScoreTab", function()
 			table.insert(orders, (frame:FindFirstChild(id, true) :: Frame).LayoutOrder)
 		end
 		expect(orders).toEqual({ 1, 2, 3, 4 })
+	end)
+
+	it("shrinks to fit a screen smaller than itself", function()
+		-- A phone's safe area: (323 - 2 margins) / 360.
+		setArea(Vector2.new(750, 323))
+		local fit = tab():FindFirstChild("Fit") :: UIScale
+		expect(fit.Scale).toBeCloseTo(307 / 360, 4)
+		setArea(Vector2.new(1920, 1000))
+		expect(fit.Scale).toBe(1)
 	end)
 
 	it("dims players who left and marks the local player", function()

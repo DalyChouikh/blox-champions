@@ -218,11 +218,12 @@ describe("Hud", function()
 		expect(part("ScoreButton")).toBeNil()
 	end)
 
-	it("shows the end screen once the match ends, until the next starts", function()
+	it("shows the end screen in place of the scoreboard once the match ends, until the next starts", function()
 		local stats = (HudStore.state.match :: any).stats
 		HudStore:onEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } })
 		Hud:step(0)
 		expect(part("EndScreen") ~= nil).toBe(true)
+		expect(part("Scoreboard")).toBeNil()
 		-- Its own score tab stands in for the held one.
 		Fixtures.scriptedBinding(InputController.context, "ScoreTab"):Fire(true)
 		Hud:step(0)
@@ -230,6 +231,24 @@ describe("Hud", function()
 		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
 		Hud:step(0)
 		expect(part("EndScreen")).toBeNil()
+		expect(part("Scoreboard") ~= nil).toBe(true)
+	end)
+
+	it("fits the score tab and the end screen to the HUD's area", function()
+		local function fit(panel: string): number
+			return (part(panel):FindFirstChild("Fit") :: UIScale).Scale
+		end
+		Fixtures.scriptedBinding(InputController.context, "ScoreTab"):Fire(true)
+		Hud:step(0)
+		-- A phone's safe area: each panel's height decides, less a margin at each side.
+		Hud:resize(Vector2.new(750, 323))
+		expect(fit("ScoreTab")).toBeCloseTo(307 / 360, 4)
+		local stats = (HudStore.state.match :: any).stats
+		HudStore:onEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } })
+		Hud:step(0)
+		expect(fit("EndScreen")).toBeCloseTo(307 / 520, 4)
+		Hud:resize(Vector2.new(1920, 1000))
+		expect(fit("EndScreen")).toBe(1)
 	end)
 
 	it("steps in under 0.1 ms", function()

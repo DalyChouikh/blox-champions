@@ -372,6 +372,7 @@ describe("Config defaults", function()
 			glowThickness = 3,
 			spacing = 6,
 			pipSize = 10,
+			screenMargin = 8,
 			layout = {
 				scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
 				banner = { position = UDim2.fromScale(0.5, 0.3), size = UDim2.fromOffset(640, 110) },
@@ -379,7 +380,7 @@ describe("Config defaults", function()
 				hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
 				speedometer = {
 					position = UDim2.new(1, -24, 1, -24),
-					touchPosition = UDim2.new(1, -24, 1, -300),
+					touchPosition = UDim2.fromOffset(16, 8),
 					size = UDim2.fromOffset(160, 40),
 				},
 				reticle = { size = 6 },
@@ -765,6 +766,7 @@ describe("Config.forMode", function()
 				message = "UI.hud.layout.scoreTab.columnWidth: must be > 0",
 			},
 			{ overrides = { UI = { hud = { spacing = -1 } } }, message = "UI.hud.spacing: must be >= 0" },
+			{ overrides = { UI = { hud = { screenMargin = -1 } } }, message = "UI.hud.screenMargin: must be >= 0" },
 			{ overrides = { UI = { keyNames = { Banana = "B" } } }, message = "UI.keyNames: Banana must name a key" },
 		}
 		for _, case in cases do
