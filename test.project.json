@@ -1,7 +1,7 @@
 {
 	"name": "blox-champions-test",
 	"tree": {
-		"$className": "DataModel",
+		"$path": "place.project.json",
 		"ReplicatedStorage": {
 			"Shared": {
 				"$path": "src/shared"
@@ -27,21 +27,6 @@
 		"ServerStorage": {
 			"RunTests": {
 				"$path": "scripts/RunTests.luau"
-			}
-		},
-		"StarterPlayer": {
-			"$properties": {
-				"EnableMouseLockOption": false
-			},
-			"StarterPlayerScripts": {
-				"Client": {
-					"$path": "src/client"
-				}
-			},
-			"StarterCharacterScripts": {
-				"Animate": {
-					"$path": "src/character/Animate.client.luau"
-				}
 			}
 		}
 	}

@@ -1,7 +1,7 @@
 {
 	"name": "blox-champions",
 	"tree": {
-		"$className": "DataModel",
+		"$path": "place.project.json",
 		"ReplicatedStorage": {
 			"Shared": {
 				"$path": "src/shared"
@@ -13,21 +13,6 @@
 		"ServerScriptService": {
 			"Server": {
 				"$path": "src/server"
-			}
-		},
-		"StarterPlayer": {
-			"$properties": {
-				"EnableMouseLockOption": false
-			},
-			"StarterPlayerScripts": {
-				"Client": {
-					"$path": "src/client"
-				}
-			},
-			"StarterCharacterScripts": {
-				"Animate": {
-					"$path": "src/character/Animate.client.luau"
-				}
 			}
 		}
 	}
