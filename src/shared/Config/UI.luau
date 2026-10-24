@@ -120,8 +120,9 @@ export type HudSettings = {
 	layout: HudLayout,
 }
 
--- The ball's ring (pixels), its line and ground marker (studs, the marker found within groundProbe studs below the
--- ball), and the arrows pinned edgeMargin pixels inside the screen's edge.
+-- The ball's ring (pixels: ringSize wider than the ball, so it rings it at any distance), its line and ground marker
+-- (studs, the marker found within groundProbe studs below the ball), and the arrows pinned edgeMargin pixels inside the
+-- screen's edge.
 export type MarkerSettings = {
 	ringSize: number,
 	ringThickness: number,
