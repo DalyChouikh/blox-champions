@@ -3,14 +3,14 @@
 -- the ScreenGui "Hud", below Roblox's own top bar; the reticle sits in "HudCentre", which spans the whole screen, so
 -- its centre is where the camera aims (drawn once: it never changes). Before each frame is drawn (FrameController),
 -- after HudStore has counted the clocks, the Hud renders App again only when something App shows has changed: the HUD
--- state's version, the device, the carrier, or whether the local player has a skater. What changes every frame (the
--- clock, the speed, what each control does now) goes through bindings instead, each set only when its text changes;
--- the texts come from caches and the config, so a quiet frame allocates nothing. Hints name each key as the device
--- shows it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout gives it, else
--- Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the labels. The score
--- tab shows while its key is held; on touch a button toggles it, and the toggle clears once the device is not touch.
--- The score tab and the end screen shrink to fit the HUD's area on a small screen: its size goes to them through a
--- binding, followed from start on.
+-- state's version, the device, the carrier, whether the local player has a skater, or whether the score tab is open.
+-- What changes every frame (the clock, the speed, what each control does now) goes through bindings instead, each set
+-- only when its text changes; the texts come from caches and the config, so a quiet frame allocates nothing. Hints name
+-- each key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout
+-- gives it, else Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the
+-- labels. The score tab shows while its key is held; on touch a button toggles it, and the toggle clears once the
+-- device is not touch or the match is over (the button hides behind the end screen). The score tab and the end screen
+-- shrink to fit the HUD's area on a small screen: its size goes to them through a binding, followed from start on.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -260,7 +260,7 @@ local Hud: Hud = {
 		local carrier = self._carrier.carrier
 		local skate = self._skate
 		local hasSkater = skate:hasSkater()
-		if device ~= Enum.PreferredInput.Touch then
+		if device ~= Enum.PreferredInput.Touch or state.ended ~= nil then
 			self._touchToggled = false
 		end
 		local scoreTabOpen = self._input:scoreTabHeld() or self._touchToggled

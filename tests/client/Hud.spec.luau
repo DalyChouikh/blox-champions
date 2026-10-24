@@ -47,6 +47,12 @@ local function part(name: string): any
 	return Hud.gui:FindFirstChild(name, true)
 end
 
+-- Ends the match as the server's MatchEnded does: Blue wins, Ana the MVP.
+local function endMatch()
+	local stats = (HudStore.state.match :: any).stats
+	HudStore:onEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } })
+end
+
 -- The key a hint row shows: its key's text, or its glyph.
 local function hintKey(control: string): (string?, string?)
 	local row = part("ControlHints"):FindFirstChild(control)
@@ -219,8 +225,7 @@ describe("Hud", function()
 	end)
 
 	it("shows the end screen in place of the scoreboard once the match ends, until the next starts", function()
-		local stats = (HudStore.state.match :: any).stats
-		HudStore:onEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } })
+		endMatch()
 		Hud:step(0)
 		expect(part("EndScreen") ~= nil).toBe(true)
 		expect(part("Scoreboard")).toBeNil()
@@ -234,6 +239,21 @@ describe("Hud", function()
 		expect(part("Scoreboard") ~= nil).toBe(true)
 	end)
 
+	it("hides the touch score button behind the end screen, and forgets its toggle", function()
+		preferred = Enum.PreferredInput.Touch
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect(part("ScoreTab") ~= nil).toBe(true)
+		endMatch()
+		Hud:step(0)
+		expect(part("ScoreButton")).toBeNil()
+		-- The tab toggled on before the end stays shut when the next match starts.
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
+		Hud:step(0)
+		expect(part("ScoreButton") ~= nil).toBe(true)
+		expect(part("ScoreTab")).toBeNil()
+	end)
+
 	it("fits the score tab and the end screen to the HUD's area", function()
 		local function fit(panel: string): number
 			return (part(panel):FindFirstChild("Fit") :: UIScale).Scale
@@ -243,8 +263,7 @@ describe("Hud", function()
 		-- A phone's safe area: each panel's height decides, less a margin at each side.
 		Hud:resize(Vector2.new(750, 323))
 		expect(fit("ScoreTab")).toBeCloseTo(307 / 360, 4)
-		local stats = (HudStore.state.match :: any).stats
-		HudStore:onEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } })
+		endMatch()
 		Hud:step(0)
 		expect(fit("EndScreen")).toBeCloseTo(307 / 520, 4)
 		Hud:resize(Vector2.new(1920, 1000))
