@@ -102,6 +102,8 @@ export type HudSettings = {
 	textColor: Color3,
 	panel: Color3,
 	panelTransparency: number,
+	-- The score tab and the end screen, drawn over the game: solid, so nothing shows through them.
+	overlayTransparency: number,
 	dimTransparency: number,
 	corner: UDim,
 	textSize: number,
@@ -239,6 +241,8 @@ local defaults: UIConfig = {
 		textColor = Color3.fromRGB(245, 245, 245),
 		panel = Color3.fromRGB(18, 18, 21),
 		panelTransparency = 0.35,
+		-- The owner's choice (2026-10-24).
+		overlayTransparency = 0,
 		dimTransparency = 0.6,
 		corner = UDim.new(0, 8),
 		textSize = 20,
@@ -439,6 +443,7 @@ local fields = Validate.record({
 		textColor = Validate.datatype("Color3"),
 		panel = Validate.datatype("Color3"),
 		panelTransparency = transparency,
+		overlayTransparency = transparency,
 		dimTransparency = transparency,
 		corner = Validate.datatype("UDim"),
 		textSize = textSize,

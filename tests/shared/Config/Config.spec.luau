@@ -361,6 +361,7 @@ describe("Config defaults", function()
 			textColor = Color3.fromRGB(245, 245, 245),
 			panel = Color3.fromRGB(18, 18, 21),
 			panelTransparency = 0.35,
+			overlayTransparency = 0,
 			dimTransparency = 0.6,
 			corner = UDim.new(0, 8),
 			textSize = 20,
@@ -731,6 +732,11 @@ describe("Config.forMode", function()
 				overrides = { Input = { touch = { buttons = { brake = UDim2.new(1, -130, 1, -110) } } } },
 				message = "Input.touch: buttons must not overlap",
 			},
+			-- The buttons' reach (TouchArea) measures from the bottom-right corner.
+			{
+				overrides = { Input = { touch = { buttons = { jump = UDim2.new(0.5, -50, 1, -70) } } } },
+				message = "Input.touch: buttons must sit at the bottom-right corner (scales 1, 1)",
+			},
 			-- The overlap rule measures pixels, so a button's size must be in pixels.
 			{
 				overrides = { Input = { touch = { buttonSize = UDim2.fromScale(0.1, 0.1) } } },
@@ -762,6 +768,10 @@ describe("Config.forMode", function()
 			},
 			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
 			{ overrides = { UI = { hud = { pipSize = 0 } } }, message = "UI.hud.pipSize: must be > 0" },
+			{
+				overrides = { UI = { hud = { overlayTransparency = 2 } } },
+				message = "UI.hud.overlayTransparency: must be <= 1 (got 2)",
+			},
 			{
 				overrides = { UI = { markers = { arrowImage = "" } } },
 				message = "UI.markers.arrowImage: must not be empty",

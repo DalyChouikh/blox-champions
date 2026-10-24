@@ -1,7 +1,8 @@
 --!strict
 -- The event feed (spec §11.1), above the bottom of the screen: possession changes, laps, the goal opening and points,
 -- the newest last, each line in its team's colour. Each line is keyed by its entry's id, so a line keeps its label
--- while older ones leave. It shrinks to fit a small screen. A plain function of its props.
+-- while older ones leave. It centres in the HUD's stage (left of the touch buttons on touch) and shrinks to fit it. A
+-- plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -18,7 +19,7 @@ export type FeedProps = {
 	-- Oldest first.
 	feed: { HudState.FeedEntry },
 	names: { [Types.PlayerId]: string },
-	-- The HUD's area, which the feed fits in.
+	-- The HUD's stage, which the feed fits in.
 	area: React.Binding<Vector2>,
 }
 
