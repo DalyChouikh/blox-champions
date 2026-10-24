@@ -50,7 +50,7 @@ end
 -- Ends the match as the server's MatchEnded does: Blue wins, Ana the MVP.
 local function endMatch()
 	local stats = (HudStore.state.match :: any).stats
-	HudStore:onEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } })
+	HudStore:onEvents(Fixtures.ruleEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } }))
 end
 
 -- The key a hint row shows: its key's text, or its glyph.
@@ -113,7 +113,7 @@ describe("Hud", function()
 		Hud:step(0)
 		Hud:step(0)
 		expect(Hud.renders).toBe(1)
-		HudStore:onEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } })
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } }))
 		Hud:step(0)
 		expect(Hud.renders).toBe(2)
 		preferred = Enum.PreferredInput.Gamepad
@@ -130,7 +130,7 @@ describe("Hud", function()
 	end)
 
 	it("shows the banner and the feed from the HUD's state", function()
-		HudStore:onEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } })
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } }))
 		Hud:step(0)
 		local banner = part("Banner") :: TextLabel
 		expect(banner.Visible).toBe(true)

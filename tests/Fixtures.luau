@@ -82,8 +82,8 @@ function Fixtures.playerStats(id: Types.PlayerId, team: Team.Team, present: bool
 end
 
 -- What the server sends the HUD: a live match two minutes from the end with players "1" (Blue, Ana) and "2" (Orange,
--- Rex), its fields changed by `overrides`.
-function Fixtures.matchSnapshot(overrides: { [string]: any }?): Payloads.MatchSnapshot
+-- Rex), its fields changed by `overrides`, taken on server frame `frame` (default 0).
+function Fixtures.matchSnapshot(overrides: { [string]: any }?, frame: number?): Payloads.MatchSnapshot
 	local match: { [string]: any } = {
 		state = "Live",
 		period = "Regulation",
@@ -103,7 +103,12 @@ function Fixtures.matchSnapshot(overrides: { [string]: any }?): Payloads.MatchSn
 	for key, value in changes do
 		match[key] = value
 	end
-	return { match = match :: any, names = { ["1"] = "Ana", ["2"] = "Rex" } }
+	return { frame = frame or 0, match = match :: any, names = { ["1"] = "Ana", ["2"] = "Rex" } }
+end
+
+-- One server frame's rule events as the server sends them, on frame `frame` (default 1: after matchSnapshot's).
+function Fixtures.ruleEvents(events: { Types.Event }, frame: number?): Payloads.RuleEvents
+	return { frame = frame or 1, events = events }
 end
 
 -- A straight synthetic "track": every gate faces +X, so a segment moving +X crosses it forward.

@@ -145,7 +145,7 @@ end
 local function events(): { string }
 	local names: { string } = {}
 	for _, batch in firedNamed(Remotes.names.RuleEvents) do
-		for _, event in batch.payload do
+		for _, event in batch.payload.events do
 			table.insert(names, event.name)
 		end
 	end
@@ -156,7 +156,7 @@ end
 local function eventsNamed(name: string): { any }
 	local found: { any } = {}
 	for _, batch in firedNamed(Remotes.names.RuleEvents) do
-		for _, event in batch.payload do
+		for _, event in batch.payload.events do
 			if event.name == name then
 				table.insert(found, event)
 			end
@@ -417,7 +417,7 @@ describe("A match on the generated arena", function()
 		seat(1)
 		kickoff()
 		for _, batch in firedNamed(Remotes.names.RuleEvents) do
-			for _, event in batch.payload do
+			for _, event in batch.payload.events do
 				if event.name == "KickoffEnded" then
 					expect(batch.ballAt).toBe("ServerStorage")
 				end
@@ -474,7 +474,7 @@ describe("A match on the generated arena", function()
 			frames(FRAME)
 			local batches = firedNamed(Remotes.names.RuleEvents)
 			expect(#batches).toBe(1)
-			expect(#batches[1].payload).toBe(2)
+			expect(#batches[1].payload.events).toBe(2)
 			local after = fired[(table.find(fired, batches[1]) :: number) + 1]
 			expect(after.name).toBe(Remotes.names.MatchSnapshot)
 			expect(after.to).toBeNil()
@@ -522,6 +522,20 @@ describe("A match on the generated arena", function()
 		local names = lastFired(Remotes.names.MatchSnapshot).payload.names
 		expect(names["9"]).toBeNil()
 		expect(names["1"]).toBe("Name1")
+	end)
+
+	it("marks each batch and each snapshot with the server frame it was sent on", function()
+		setup()
+		seat(1)
+		-- Before the first frame: the joiner's snapshot and the seat's.
+		expect(lastFired(Remotes.names.MatchSnapshot).payload.frame).toBe(0)
+		frames(FRAME)
+		expect(lastFired(Remotes.names.RuleEvents).payload.frame).toBe(1)
+		expect(lastFired(Remotes.names.MatchSnapshot).payload.frame).toBe(1)
+		-- Between frames a snapshot carries the last one's number.
+		frames(5 * FRAME)
+		TeamService:join(Fixtures.stubPlayer(2))
+		expect(lastFired(Remotes.names.MatchSnapshot).payload.frame).toBe(6)
 	end)
 
 	it("tells everyone who carries the ball", function()
