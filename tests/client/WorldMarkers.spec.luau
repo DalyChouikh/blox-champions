@@ -106,6 +106,12 @@ describe("WorldMarkers", function()
 		expect(stroke().Color == colors.Blue).toBe(true)
 	end)
 
+	it("sizes the ring to the ball at any distance: its width in studs, ringSize pixels wider", function()
+		WorldMarkers:step(DT)
+		local width = 2 * config.Ball.radius
+		expect(WorldMarkers.ring.Size == UDim2.new(width, markers.ringSize, width, markers.ringSize)).toBe(true)
+	end)
+
 	it("drops a line from the ball to a marker on the ground below it", function()
 		WorldMarkers:step(DT)
 		local ground, line = WorldMarkers.ground, WorldMarkers.line

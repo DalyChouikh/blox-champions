@@ -212,7 +212,8 @@ local fields = Validate.record({
 			bigScreenSide = Validate.number({ above = 0 }),
 			bigScreenStickScale = Validate.number({ above = 0 }),
 			bigScreenButtonScale = Validate.number({ above = 0 }),
-			buttonSize = udim2,
+			-- The overlap rule measures pixels.
+			buttonSize = Validate.pixels(),
 			buttons = Validate.record({
 				jump = udim2,
 				pump = udim2,
@@ -229,12 +230,6 @@ local fields = Validate.record({
 				message = "stickRadius must be above stickDeadZone",
 				holds = function(touch: TouchLayout): boolean
 					return touch.stickRadius > touch.stickDeadZone
-				end,
-			},
-			{
-				message = "buttonSize must be in pixels",
-				holds = function(touch: TouchLayout): boolean
-					return touch.buttonSize.X.Scale == 0 and touch.buttonSize.Y.Scale == 0
 				end,
 			},
 			{

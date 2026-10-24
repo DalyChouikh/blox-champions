@@ -4,10 +4,12 @@
 -- touch and each knockdown to the rules engine in the order the engine documents, ticks it, reacts to its events —
 -- hiding and spawning the ball, clearing every action, knockdown and call at a kickoff, placing and freezing
 -- characters, opening and closing the goal — and sends them to clients, each frame's batch followed by the match's
--- snapshot, which clients draw from. A snapshot also goes to everyone whenever a seat changes, and to each player who
--- joins; it names every player who ever joined, so the score tab can name those who left. It keeps the ball dead
--- whenever play is not live, so the ball is only ever carried by the engine's last holder. After a match ends it waits
--- postMatchSeconds and starts the next one with everyone reseated; once every player has left it starts over.
+-- snapshot, which clients draw from, both marked with the frame's number. A snapshot also goes to everyone whenever a
+-- seat changes, and to each player who joins, marked with the last frame's number; it names every player in the server
+-- and each who left during the match, so the score tab can name them. It
+-- keeps the ball dead whenever play is not live, so the ball is only ever carried by the engine's last holder. After a
+-- match ends it waits postMatchSeconds and starts the next one with everyone reseated; once every player has left it
+-- starts over.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -50,8 +52,10 @@ export type MatchService = {
 	-- Counts down after MatchEnded; nil while a match is on.
 	_postMatchLeft: number?,
 	_carrier: PlayerId?,
-	-- Every player who joined, by id: their name as the HUD shows it, kept after they leave.
+	-- The players in the server and each who left during the current match, by id: their name as the HUD shows it.
 	_names: { [PlayerId]: string },
+	-- The frames stepped so far: the number each batch and snapshot carries, so a client can tell which is newer.
+	_frame: number,
 	_nameOf: (player: PlayerId) -> string,
 }
 
@@ -76,13 +80,20 @@ local function newEngine(self: MatchService)
 	self._inEngine = {}
 	self._waiting = true
 	self._postMatchLeft = nil
+	-- A new match lists only the players in the server, so the names sent with each snapshot stop at them.
+	local names = self._names
+	for player in names do
+		if not self._teams:has(player) then
+			names[player] = nil
+		end
+	end
 	-- A new engine's goal is closed; the panel must say so even if the last match ended with it open.
 	setGoalOpen(self, false)
 end
 
 -- The match as clients draw it, to `to`, or to everyone.
 local function sendSnapshot(self: MatchService, to: PlayerId?)
-	local payload: Payloads.MatchSnapshot = { match = self.engine:snapshot(), names = self._names }
+	local payload: Payloads.MatchSnapshot = { frame = self._frame, match = self.engine:snapshot(), names = self._names }
 	if to ~= nil then
 		self._net:fireTo(to, Remotes.names.MatchSnapshot, payload)
 	else
@@ -149,6 +160,7 @@ local MatchService: MatchService = {
 	_postMatchLeft = nil,
 	_carrier = nil,
 	_names = {},
+	_frame = 0,
 	_nameOf = function(player: PlayerId): string
 		return player
 	end,
@@ -164,6 +176,7 @@ local MatchService: MatchService = {
 		self._actions = deps.ActionService
 		self._carrier = nil
 		self._names = {}
+		self._frame = 0
 		self._nameOf = deps.NameOf
 			or function(player: PlayerId): string
 				local roblox = PlayerIds.player(player)
@@ -213,6 +226,7 @@ local MatchService: MatchService = {
 	-- then the engine's facts in its order (ballMoved, thrown, pickedUp, touched, knockedDown), tick, and the drained
 	-- events.
 	step = function(self: MatchService, dt: number)
+		self._frame += 1
 		local engine = self.engine
 		if self._waiting and self._teams:seatedCount() >= self._config.Match.minPlayersToStart then
 			self._waiting = false
@@ -241,7 +255,8 @@ local MatchService: MatchService = {
 		-- Sent before the reactions, so one that fails cannot keep the frame's events or its snapshot from the clients.
 		local events = engine:drainEvents()
 		if #events > 0 then
-			self._net:fireAll(Remotes.names.RuleEvents, events)
+			local batch: Payloads.RuleEvents = { frame = self._frame, events = events }
+			self._net:fireAll(Remotes.names.RuleEvents, batch)
 			sendSnapshot(self)
 			for _, event in events do
 				react(self, event)

@@ -1,5 +1,6 @@
 --!strict
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
@@ -15,11 +16,13 @@ local config = Fixtures.config()
 local text = HudText.new(config)
 
 local folder: Folder
+-- The HUD's area, as the Hud's binding gives it.
+local area: React.Binding<Vector2>, setArea: (Vector2) -> ()
 
 -- The banner keyed as App keys it, which names its label.
 local function banner(shown: HudState.Banner?): React.ReactElement
 	return React.createElement(React.Fragment, nil, {
-		Banner = React.createElement(Banner, { config = config, text = text, banner = shown }),
+		Banner = React.createElement(Banner, { config = config, text = text, banner = shown, area = area }),
 	})
 end
 
@@ -27,9 +30,11 @@ beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "BannerTest"
 	folder.Parent = workspace
+	area, setArea = React.createBinding(Vector2.zero)
 end)
 
 afterEach(function()
+	Fixtures.unmountAll()
 	folder:Destroy()
 end)
 
@@ -50,5 +55,42 @@ describe("Banner", function()
 		local label = mounted:FindFirstChild("Banner") :: TextLabel
 		expect(label.Text).toBe("2")
 		expect(label.TextColor3 == config.UI.hud.textColor).toBe(true)
+	end)
+
+	it("fits every banner's text on its label", function()
+		local hud = config.UI.hud
+		local size = hud.layout.banner.size
+		local banners: { HudState.Banner } = {
+			{ kind = "Goal" },
+			{ kind = "StreakPoint" },
+			{ kind = "Denied" },
+			{ kind = "LastChance" },
+			{ kind = "Overtime" },
+		}
+		for _, seconds in config.UI.clockWarnings do
+			table.insert(banners, { kind = "ClockWarning", value = seconds })
+		end
+		for digit = 1, config.Match.kickoffCountdownSeconds do
+			table.insert(banners, { kind = "Countdown", value = digit })
+		end
+		local tooBig: { string } = {}
+		for _, shown in banners do
+			local written = text:banner(shown)
+			local bounds = TextService:GetTextSize(written, hud.bannerSize, hud.font, Vector2.new(math.huge, math.huge))
+			if bounds.X > size.X.Offset or bounds.Y > size.Y.Offset then
+				table.insert(tooBig, written)
+			end
+		end
+		expect(tooBig).toEqual({})
+	end)
+
+	it("shrinks to fit a screen narrower than itself", function()
+		-- (480 - 2 margins) / 640.
+		setArea(Vector2.new(480, 323))
+		local mounted = Fixtures.mount(banner({ kind = "Goal", team = "Blue" }), folder)
+		local fit = (mounted:FindFirstChild("Banner") :: TextLabel):FindFirstChild("Fit") :: UIScale
+		expect(fit.Scale).toBeCloseTo(464 / 640, 4)
+		setArea(Vector2.new(1920, 1000))
+		expect(fit.Scale).toBe(1)
 	end)
 end)

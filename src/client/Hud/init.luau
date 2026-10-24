@@ -3,14 +3,14 @@
 -- the ScreenGui "Hud", below Roblox's own top bar; the reticle sits in "HudCentre", which spans the whole screen, so
 -- its centre is where the camera aims (drawn once: it never changes). Before each frame is drawn (FrameController),
 -- after HudStore has counted the clocks, the Hud renders App again only when something App shows has changed: the HUD
--- state's version, the device, the carrier, or whether the local player has a skater. What changes every frame (the
--- clock, the speed, what each control does now) goes through bindings instead, each set only when its text changes;
--- the texts come from caches and the config, so a quiet frame allocates nothing. Hints name each key as the device
--- shows it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout gives it, else
--- Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the labels. The score
--- tab shows while its key is held; on touch a button toggles it, and the toggle clears once the device is not touch.
--- The score tab and the end screen shrink to fit the HUD's area on a small screen: its size goes to them through a
--- binding, followed from start on.
+-- state's version, the device, the carrier, whether the local player has a skater, or whether the score tab is open.
+-- What changes every frame (the clock, the speed, what each control does now) goes through bindings instead, each set
+-- only when its text changes; the texts come from caches and the config, so a quiet frame allocates nothing. Hints name
+-- each key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout
+-- gives it, else Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the
+-- labels. The score tab shows while its key is held; on touch a button toggles it, and the toggle clears once the
+-- device is not touch or the match is over (the button hides behind the end screen). The score tab and the end screen
+-- shrink to fit the HUD's area on a small screen: its size goes to them through a binding, followed from start on.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -48,6 +48,8 @@ export type Hud = {
 	toggleScoreTab: (self: Hud) -> (),
 	-- The HUD's area changed (the gui's AbsoluteSize): the big panels fit in it.
 	resize: (self: Hud, area: Vector2) -> (),
+	-- Unmounts both React roots (tests).
+	destroy: (self: Hud) -> (),
 	gui: ScreenGui,
 	-- Spans the whole screen: the reticle's.
 	centre: ScreenGui,
@@ -66,6 +68,7 @@ export type Hud = {
 	_keyString: (key: Enum.KeyCode) -> string,
 	_keyImage: (key: Enum.KeyCode) -> string,
 	_root: ReactRoblox.RootType,
+	_centreRoot: ReactRoblox.RootType,
 	_bindings: App.HudBindings,
 	_clock: Shown,
 	_speed: Shown,
@@ -148,6 +151,7 @@ local Hud: Hud = {
 		return ""
 	end,
 	_root = nil :: any,
+	_centreRoot = nil :: any,
 	_bindings = nil :: any,
 	_clock = nil :: any,
 	_speed = nil :: any,
@@ -229,7 +233,8 @@ local Hud: Hud = {
 		centre.ScreenInsets = Enum.ScreenInsets.None
 		centre.Parent = parent
 		self.centre = centre
-		ReactRoblox.createLegacyRoot(centre):render(React.createElement(React.Fragment, nil, {
+		self._centreRoot = ReactRoblox.createLegacyRoot(centre)
+		self._centreRoot:render(React.createElement(React.Fragment, nil, {
 			Reticle = React.createElement(Reticle, { config = config }),
 		}))
 	end,
@@ -247,6 +252,11 @@ local Hud: Hud = {
 		self._touchToggled = not self._touchToggled
 	end,
 
+	destroy = function(self: Hud)
+		self._root:unmount()
+		self._centreRoot:unmount()
+	end,
+
 	resize = function(self: Hud, area: Vector2)
 		if area ~= self._area then
 			self._area = area
@@ -260,7 +270,7 @@ local Hud: Hud = {
 		local carrier = self._carrier.carrier
 		local skate = self._skate
 		local hasSkater = skate:hasSkater()
-		if device ~= Enum.PreferredInput.Touch then
+		if device ~= Enum.PreferredInput.Touch or state.ended ~= nil then
 			self._touchToggled = false
 		end
 		local scoreTabOpen = self._input:scoreTabHeld() or self._touchToggled

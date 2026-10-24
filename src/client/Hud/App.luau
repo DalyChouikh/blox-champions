@@ -2,7 +2,8 @@
 -- The whole HUD as one React element: a full-screen frame, "Root", that holds every part of the HUD. The scoreboard
 -- shows from the first snapshot on; the hints wherever the Hud gives their keys; the score tab while it is open, except
 -- once the match is over, when the end screen shows until the next match in place of the score tab and the scoreboard
--- (it holds the final score and its own score tab); the score button on touch. A plain function of its props.
+-- (it holds the final score and its own score tab); the score button on touch while the match is on. A plain function
+-- of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -64,8 +65,14 @@ local function App(props: AppProps): React.ReactElement
 					clock = bindings.clock,
 				})
 				else nil,
-			Banner = React.createElement(Banner, { config = config, text = text, banner = state.banner }),
-			Feed = React.createElement(Feed, { config = config, text = text, feed = state.feed, names = state.names }),
+			Banner = React.createElement(
+				Banner,
+				{ config = config, text = text, banner = state.banner, area = bindings.area }
+			),
+			Feed = React.createElement(
+				Feed,
+				{ config = config, text = text, feed = state.feed, names = state.names, area = bindings.area }
+			),
 			ControlHints = if keys ~= nil
 				then React.createElement(ControlHints, { config = config, keys = keys, labels = bindings.labels })
 				else nil,
@@ -97,7 +104,7 @@ local function App(props: AppProps): React.ReactElement
 					area = bindings.area,
 				})
 				else nil,
-			ScoreButton = if props.device == Enum.PreferredInput.Touch
+			ScoreButton = if props.device == Enum.PreferredInput.Touch and ended == nil
 				then React.createElement(ScoreButton, { config = config, onActivated = props.onScoreButton })
 				else nil,
 		}),

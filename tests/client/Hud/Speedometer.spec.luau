@@ -16,6 +16,7 @@ local place = hud.layout.speedometer
 local folder: Folder?
 
 afterEach(function()
+	Fixtures.unmountAll()
 	if folder ~= nil then
 		folder:Destroy()
 		folder = nil

@@ -1,7 +1,7 @@
 --!strict
 -- The score tab (spec §6.4, §11.1), in the middle of the screen while its key is held (or its touch button toggled
--- on): every player who played this match, by team, then score (StatsTable). It shrinks to fit a small screen. A
--- plain function of its props.
+-- on): every player who played this match, by team, then score (StatsTable). It shrinks to fit a small screen, as
+-- tall as its rows make it. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -36,8 +36,8 @@ local function ScoreTab(props: ScoreTabProps): React.ReactElement
 		{
 			Corner = Style.corner(config),
 			Padding = Style.padding(config),
-			Fit = Style.fit(config, props.area, place.size),
-			Table = React.createElement(StatsTable, {
+			Fit = Style.fit(config, props.area, place.size, StatsTable.height(config, #props.stats.players)),
+			Table = React.createElement(StatsTable.Table, {
 				config = config,
 				text = props.text,
 				players = props.stats.players,

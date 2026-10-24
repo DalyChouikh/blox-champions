@@ -1,7 +1,7 @@
 --!strict
 -- The banner across the screen (spec §11.1): the kickoff's 3-2-1, GOAL!, STREAK POINT!, DENIED!, the clock warnings,
 -- LAST CHANCE and OVERTIME, in the colour of the team it is about, or the HUD's text colour. Hidden without a banner.
--- A plain function of its props.
+-- It shrinks to fit a small screen. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,6 +15,8 @@ export type BannerProps = {
 	config: Config.GameConfig,
 	text: HudText.HudText,
 	banner: HudState.Banner?,
+	-- The HUD's area, which the banner fits in.
+	area: React.Binding<Vector2>,
 }
 
 local function Banner(props: BannerProps): React.ReactElement
@@ -32,7 +34,8 @@ local function Banner(props: BannerProps): React.ReactElement
 			Text = if banner ~= nil then props.text:banner(banner) else "",
 			TextColor3 = if team ~= nil then ui.teamColors[team] else ui.hud.textColor,
 			Visible = banner ~= nil,
-		})
+		}),
+		{ Fit = Style.fit(config, props.area, place.size) }
 	)
 end
 

@@ -375,7 +375,7 @@ describe("Config defaults", function()
 			screenMargin = 8,
 			layout = {
 				scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
-				banner = { position = UDim2.fromScale(0.5, 0.3), size = UDim2.fromOffset(640, 110) },
+				banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(640, 110) },
 				feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
 				hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
 				speedometer = {
@@ -734,7 +734,7 @@ describe("Config.forMode", function()
 			-- The overlap rule measures pixels, so a button's size must be in pixels.
 			{
 				overrides = { Input = { touch = { buttonSize = UDim2.fromScale(0.1, 0.1) } } },
-				message = "Input.touch: buttonSize must be in pixels",
+				message = "Input.touch.buttonSize: must be in pixels (scales 0, offsets > 0)",
 			},
 		}
 		for _, case in cases do
@@ -755,6 +755,11 @@ describe("Config.forMode", function()
 				overrides = { UI = { text = { possession = "has the ball" } } },
 				message = "UI.text.possession: placeholder count must be 1",
 			},
+			-- A doubled percent prints one; it takes no value.
+			{
+				overrides = { UI = { text = { clockWarning = "%%d SECONDS" } } },
+				message = "UI.text.clockWarning: placeholder count must be 1",
+			},
 			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
 			{ overrides = { UI = { hud = { pipSize = 0 } } }, message = "UI.hud.pipSize: must be > 0" },
 			{
@@ -768,12 +773,30 @@ describe("Config.forMode", function()
 			{ overrides = { UI = { hud = { spacing = -1 } } }, message = "UI.hud.spacing: must be >= 0" },
 			{ overrides = { UI = { hud = { screenMargin = -1 } } }, message = "UI.hud.screenMargin: must be >= 0" },
 			{ overrides = { UI = { keyNames = { Banana = "B" } } }, message = "UI.keyNames: Banana must name a key" },
+			-- The HUD fits its parts by their sizes in pixels.
+			{
+				overrides = { UI = { hud = { layout = { banner = { size = UDim2.fromScale(0.5, 0.2) } } } } },
+				message = "UI.hud.layout.banner.size: must be in pixels (scales 0, offsets > 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { size = UDim2.fromOffset(0, 360) } } } } },
+				message = "UI.hud.layout.scoreTab.size: must be in pixels (scales 0, offsets > 0)",
+			},
+			-- Five number columns of 120 and their gaps, inside the padding: 642 px, wider than the 640 px tab.
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { columnWidth = 120 } } } } },
+				message = "UI: the score tab's number columns must leave room for names, in the tab and the end screen",
+			},
 		}
 		for _, case in cases do
 			expect(function()
 				Fixtures.config(case.overrides)
 			end).toThrow(case.message)
 		end
+		-- Prints "60%s": one value, then a percent sign and an s.
+		expect(function()
+			Fixtures.config({ UI = { text = { clockWarning = "%d%%s" } } })
+		end).never.toThrow()
 	end)
 
 	it("rejects team spawns that would not fit on a straight", function()

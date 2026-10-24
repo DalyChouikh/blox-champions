@@ -1,7 +1,8 @@
 --!strict
 -- The scoreboard (spec §11.1), at the top of the screen:
 -- - both scores, each with a pip per point to win, filled for each point scored;
--- - the clock between them, a binding, so it counts without a render; OVERTIME under it in overtime;
+-- - the clock between them, a binding, so it counts without a render; under it OVERTIME in overtime, and LAST CHANCE
+--   in the trailing team's colour through Last Chance (HudText:period);
 -- - the carrier's name in their team's colour, hidden while the ball is loose;
 -- - the lap bar of the team with the ball: a segment per gate, filled for each gate crossed this lap, labelled with the
 --   lap or the streak (HudText:lap), and glowing while the goal is open for that team.
@@ -118,6 +119,9 @@ local function Scoreboard(props: ScoreboardProps): React.ReactElement
 	local hud = ui.hud
 	local place = hud.layout.scoreboard
 	local carrierTeam = if carrier ~= nil then HudState.teamOf(match, carrier) else nil
+	local period = props.text:period(match)
+	-- Set only through Last Chance.
+	local trailing = match.trailingTeam
 	local line = UDim2.new(1, 0, 0, hud.textSize)
 	return React.createElement(
 		"Frame",
@@ -157,8 +161,9 @@ local function Scoreboard(props: ScoreboardProps): React.ReactElement
 				Style.text(config, {
 					LayoutOrder = 2,
 					Size = line,
-					Text = ui.text.overtime,
-					Visible = match.period == "Overtime",
+					Text = period or "",
+					TextColor3 = if trailing ~= nil then ui.teamColors[trailing] else hud.textColor,
+					Visible = period ~= nil,
 				})
 			),
 			Carrier = React.createElement(

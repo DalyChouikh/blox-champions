@@ -30,6 +30,9 @@ function Fixtures.expectNear2(actual: Vector2, expected: Vector2, tolerance: num
 	JestGlobals.expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-3)
 end
 
+-- Every root Fixtures.mount made since the last Fixtures.unmountAll.
+local roots: { any } = {}
+
 -- Renders `element` into a new folder under `parent` with React Luau's legacy root, which renders synchronously, so
 -- its instances exist as soon as this returns. Returns the folder, a function that renders another element in its
 -- place, and one that unmounts it. React is required here, so specs that never mount never load it.
@@ -40,11 +43,21 @@ function Fixtures.mount(element: any, parent: Instance): (Folder, (element: any)
 	folder.Parent = parent
 	local root = ReactRoblox.createLegacyRoot(folder)
 	root:render(element)
+	table.insert(roots, root)
 	return folder, function(nextElement: any)
 		root:render(nextElement)
 	end, function()
 		root:unmount()
 	end
+end
+
+-- Unmounts every root Fixtures.mount made, so React lets go of them: each component spec's afterEach calls it.
+-- Unmounting a root a second time does nothing (probed).
+function Fixtures.unmountAll()
+	for _, root in roots do
+		root:unmount()
+	end
+	table.clear(roots)
 end
 
 -- A binding tests can drive with Fire, added to the context's input action called `name`.
@@ -81,9 +94,18 @@ function Fixtures.playerStats(id: Types.PlayerId, team: Team.Team, present: bool
 	}
 end
 
+-- `count` players with no points, ids "1" to `count`, alternately Blue and Orange, all still in the match.
+function Fixtures.roster(count: number): { Types.PlayerStats }
+	local players: { Types.PlayerStats } = {}
+	for index = 1, count do
+		table.insert(players, Fixtures.playerStats(tostring(index), if index % 2 == 1 then "Blue" else "Orange", true))
+	end
+	return players
+end
+
 -- What the server sends the HUD: a live match two minutes from the end with players "1" (Blue, Ana) and "2" (Orange,
--- Rex), its fields changed by `overrides`.
-function Fixtures.matchSnapshot(overrides: { [string]: any }?): Payloads.MatchSnapshot
+-- Rex), its fields changed by `overrides`, taken on server frame `frame` (default 0).
+function Fixtures.matchSnapshot(overrides: { [string]: any }?, frame: number?): Payloads.MatchSnapshot
 	local match: { [string]: any } = {
 		state = "Live",
 		period = "Regulation",
@@ -103,7 +125,12 @@ function Fixtures.matchSnapshot(overrides: { [string]: any }?): Payloads.MatchSn
 	for key, value in changes do
 		match[key] = value
 	end
-	return { match = match :: any, names = { ["1"] = "Ana", ["2"] = "Rex" } }
+	return { frame = frame or 0, match = match :: any, names = { ["1"] = "Ana", ["2"] = "Rex" } }
+end
+
+-- One server frame's rule events as the server sends them, on frame `frame` (default 1: after matchSnapshot's).
+function Fixtures.ruleEvents(events: { Types.Event }, frame: number?): Payloads.RuleEvents
+	return { frame = frame or 1, events = events }
 end
 
 -- A straight synthetic "track": every gate faces +X, so a segment moving +X crosses it forward.

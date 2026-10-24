@@ -40,4 +40,21 @@ describe("ArenaParts", function()
 		ArenaParts:refresh()
 		expect(ArenaParts.parts).toBeNil()
 	end)
+
+	it("follows the arena's tags from start on, with a new record each time the arena changes", function()
+		ArenaParts:start()
+		local arena = Fixtures.hudArena(folder)
+		-- Tag signals are deferred: they run at the next yield.
+		task.wait()
+		local first = ArenaParts.parts
+		expect(first ~= nil).toBe(true)
+		arena.markers[4]:Destroy()
+		task.wait()
+		local second = ArenaParts.parts :: any
+		expect(second ~= nil and second ~= first).toBe(true)
+		expect(second.markers[4]).toBeNil()
+		arena.panel:Destroy()
+		task.wait()
+		expect(ArenaParts.parts).toBeNil()
+	end)
 end)

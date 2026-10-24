@@ -95,6 +95,17 @@ describe("ArenaGlow", function()
 		expect(glows(markers[3], nil)).toBe(true)
 	end)
 
+	it("keeps each part's first look when the arena's parts are found again while they glow", function()
+		snapshot({ possessingTeam = "Blue", goalOpenFor = "Blue" })
+		-- A new record of the same parts, the ring still glowing.
+		ArenaParts:refresh()
+		ArenaGlow:step(DT)
+		snapshot({ possessingTeam = "Blue" })
+		for _, rim in arena.rim do
+			expect(glows(rim, nil)).toBe(true)
+		end
+	end)
+
 	it("slides the panel out of the ring while the goal is open, and back", function()
 		local closed = arena.panel.CFrame
 		local up = arena.hoop:GetPivot().UpVector

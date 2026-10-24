@@ -120,8 +120,9 @@ export type HudSettings = {
 	layout: HudLayout,
 }
 
--- The ball's ring (pixels), its line and ground marker (studs, the marker found within groundProbe studs below the
--- ball), and the arrows pinned edgeMargin pixels inside the screen's edge.
+-- The ball's ring (pixels: ringSize wider than the ball, so it rings it at any distance), its line and ground marker
+-- (studs, the marker found within groundProbe studs below the ball), and the arrows pinned edgeMargin pixels inside the
+-- screen's edge.
 export type MarkerSettings = {
 	ringSize: number,
 	ringThickness: number,
@@ -134,7 +135,8 @@ export type MarkerSettings = {
 	edgeMargin: number,
 	arrowSize: number,
 	-- The arrows' image, pointing up and white, so it takes their colour. The default is Roblox's own chevron from
-	-- its content folder; the art pass swaps in ours.
+	-- its content folder (found in three installed Studio versions). No Roblox page documents it, so an update could
+	-- remove it and leave the arrows blank: the art pass swaps in ours, and Phase 9 checks it on real devices.
 	arrowImage: string,
 }
 
@@ -251,7 +253,8 @@ local defaults: UIConfig = {
 		screenMargin = 8,
 		layout = {
 			scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
-			banner = { position = UDim2.fromScale(0.5, 0.3), size = UDim2.fromOffset(640, 110) },
+			-- Its centre 200 px from the top: clear of the scoreboard on a phone too (the owner's choice).
+			banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(640, 110) },
 			feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
 			hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
 			speedometer = {
@@ -302,9 +305,11 @@ local function noDuplicates(values: { number }): boolean
 	return true
 end
 
--- How many values `text` takes: its %d and %s, each with an optional width (%02d).
+-- How many values `text` takes: its %d and %s, each with an optional width (%02d). A doubled %% prints a percent sign
+-- and takes none, so it is dropped first.
 local function placeholders(text: string): number
-	local _, count = string.gsub(text, "%%%d*[ds]", "")
+	local plain = string.gsub(text, "%%%%", "")
+	local _, count = string.gsub(plain, "%%%d*[ds]", "")
 	return count
 end
 
@@ -345,11 +350,27 @@ local textSize = Validate.number({ min = 1, max = 100, integer = true })
 local transparency = Validate.number({ min = 0, max = 1 })
 local positive = Validate.number({ above = 0 })
 local udim2 = Validate.datatype("UDim2")
-local place = Validate.record({ position = udim2, size = udim2 })
-local list = Validate.record({ position = udim2, size = udim2, rowHeight = positive })
-local columns = Validate.record({ position = udim2, size = udim2, rowHeight = positive, columnWidth = positive })
+local pixels = Validate.pixels()
+local place = Validate.record({ position = udim2, size = pixels })
+local list = Validate.record({ position = udim2, size = pixels, rowHeight = positive })
+local columns = Validate.record({ position = udim2, size = pixels, rowHeight = positive, columnWidth = positive })
 
-local schema = Validate.record({
+-- The score tab's table (StatsTable) gives each number column columnWidth and a spacing gap, inside its panel's
+-- padding (spacing at each side), and the name column what is left: the score tab and the end screen draw it, and
+-- both must leave the names some room.
+local function namesFit(ui: UIConfig): boolean
+	local hud = ui.hud
+	local layout = hud.layout
+	local count = 0
+	for _ in ui.text.columns do
+		count += 1
+	end
+	-- Every column but the name's.
+	local taken = (count - 1) * (layout.scoreTab.columnWidth + hud.spacing) + 2 * hud.spacing
+	return taken < layout.scoreTab.size.X.Offset and taken < layout.endScreen.size.X.Offset
+end
+
+local fields = Validate.record({
 	clockWarnings = Validate.check(
 		Validate.list(Validate.number({ min = 1, integer = true })),
 		noDuplicates,
@@ -435,7 +456,7 @@ local schema = Validate.record({
 			banner = place,
 			feed = list,
 			hints = list,
-			speedometer = Validate.record({ position = udim2, touchPosition = udim2, size = udim2 }),
+			speedometer = Validate.record({ position = udim2, touchPosition = udim2, size = pixels }),
 			reticle = Validate.record({ size = positive }),
 			scoreTab = columns,
 			scoreButton = place,
@@ -465,6 +486,13 @@ local schema = Validate.record({
 		panelSlide = positive,
 		panelSlideSeconds = Validate.number({ min = 0 }),
 	}),
+})
+
+local schema = Validate.checkAll(fields, {
+	{
+		message = "the score tab's number columns must leave room for names, in the tab and the end screen",
+		holds = namesFit,
+	},
 })
 
 return {

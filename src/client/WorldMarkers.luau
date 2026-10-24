@@ -1,6 +1,6 @@
 --!strict
 -- The ball's and the next gate's markers (spec §9.4, §11.1), stepped before each frame is drawn (FrameController):
--- - a ring around the ball, seen through walls (a BillboardGui, AlwaysOnTop);
+-- - a ring around the ball, seen through walls (a BillboardGui, AlwaysOnTop), as wide as the ball plus ringSize pixels;
 -- - a line from the ball down to a disc on the ground below it (one ray through the ride surfaces), both hidden when
 --   nothing lies within groundProbe studs;
 -- - an arrow at the screen's edge pointing to the ball while it is off the screen (ScreenMarker);
@@ -249,7 +249,10 @@ local WorldMarkers: WorldMarkers = {
 		ring.Name = "BallRing"
 		ring.AlwaysOnTop = true
 		ring.ResetOnSpawn = false
-		ring.Size = UDim2.fromOffset(markers.ringSize, markers.ringSize)
+		-- A billboard's Size scale is in studs (Roblox's guide), so the ring stays as wide as the ball at any distance;
+		-- the offset keeps it ringSize pixels wider, around the ball.
+		local width = 2 * config.Ball.radius
+		ring.Size = UDim2.new(width, markers.ringSize, width, markers.ringSize)
 		ring.Enabled = false
 		local circle = Instance.new("Frame")
 		circle.Name = "Circle"

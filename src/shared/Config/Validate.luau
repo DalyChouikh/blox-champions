@@ -215,6 +215,13 @@ function Validate.check(inner: Validator, predicate: (value: any) -> boolean, me
 	end
 end
 
+-- A size in pixels: a UDim2 whose scales are 0 and whose offsets are above 0, for layouts measured in pixels.
+function Validate.pixels(): Validator
+	return Validate.check(Validate.datatype("UDim2"), function(size: UDim2): boolean
+		return size.X.Scale == 0 and size.Y.Scale == 0 and size.X.Offset > 0 and size.Y.Offset > 0
+	end, "must be in pixels (scales 0, offsets > 0)")
+end
+
 export type Rule = { message: string, holds: (value: any) -> boolean }
 
 -- Rules checked in order once the inner validator passes; only the first that fails is reported.

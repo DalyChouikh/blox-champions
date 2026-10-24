@@ -2,7 +2,8 @@
 -- A table of players' stats (spec §6.4): a header from Config.UI.text.columns, then a row per player in the order
 -- given (the score tab's: by team, then score), keyed by their id: name, score, goals, assists, saves and steals, in
 -- their team's colour. A player who left is faded (dimTransparency), and the local player's row is outlined. The
--- score tab and the end screen draw it. A plain function of its props.
+-- score tab and the end screen draw it (StatsTable.Table, a plain function of its props) and fit it to the screen by
+-- its height (StatsTable.height).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -64,7 +65,15 @@ local function row(
 	)
 end
 
-local function StatsTable(props: StatsTableProps): React.ReactElement
+local StatsTable = {}
+
+-- How tall the table is with `players` rows: a row each, and the header's, spacing apart (Style.list).
+function StatsTable.height(config: Config.GameConfig, players: number): number
+	local hud = config.UI.hud
+	return (players + 1) * hud.layout.scoreTab.rowHeight + players * hud.spacing
+end
+
+function StatsTable.Table(props: StatsTableProps): React.ReactElement
 	local config, text = props.config, props.text
 	local ui = config.UI
 	local columns = ui.text.columns
@@ -103,4 +112,4 @@ local function StatsTable(props: StatsTableProps): React.ReactElement
 	)
 end
 
-return StatsTable
+return table.freeze(StatsTable)
