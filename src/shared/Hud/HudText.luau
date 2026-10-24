@@ -61,6 +61,18 @@ function HudText.lap(self: HudText, match: MatchEngine.Snapshot): string?
 	return string.format(text.lap, match.streak, rules.lapsToOpenGoal)
 end
 
+-- The period named under the clock for as long as it lasts: OVERTIME or LAST CHANCE; nil in regulation.
+function HudText.period(self: HudText, match: MatchEngine.Snapshot): string?
+	local text = self._config.UI.text
+	local period = match.period
+	if period == "Overtime" then
+		return text.overtime
+	elseif period == "LastChance" then
+		return text.lastChance
+	end
+	return nil
+end
+
 function HudText.banner(self: HudText, banner: HudState.Banner): string
 	local text = self._config.UI.text
 	local kind = banner.kind

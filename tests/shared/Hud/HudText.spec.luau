@@ -16,6 +16,11 @@ local function lapOf(team: string?, streak: number): any
 	return { possessingTeam = team, streak = streak }
 end
 
+-- Only the field HudText:period reads.
+local function periodOf(period: string): any
+	return { period = period }
+end
+
 local function entry(
 	kind: HudState.FeedKind,
 	team: "Blue" | "Orange",
@@ -44,6 +49,12 @@ describe("HudText", function()
 		-- From the lap that opens the goal on, and still once a point closes it: the streak stays until the kickoff.
 		expect(text:lap(lapOf("Blue", 4))).toBe("Streak 4/12")
 		expect(text:lap(lapOf("Blue", 5))).toBe("Streak 5/12")
+	end)
+
+	it("names overtime and Last Chance under the clock, and nothing in regulation", function()
+		expect(text:period(periodOf("Overtime"))).toBe("OVERTIME")
+		expect(text:period(periodOf("LastChance"))).toBe("LAST CHANCE")
+		expect(text:period(periodOf("Regulation"))).toBeNil()
 	end)
 
 	it("writes each banner and feed entry from Config.UI.text", function()

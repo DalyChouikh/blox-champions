@@ -126,4 +126,17 @@ describe("Scoreboard", function()
 		rerender(board({ period = "Regulation" }))
 		expect(period.Visible).toBe(false)
 	end)
+
+	it("says LAST CHANCE through Last Chance, in the trailing team's colour", function()
+		local mounted, rerender =
+			Fixtures.mount(board({ period = "LastChance", trailingTeam = "Orange", secondsLeft = 0 }), folder)
+		local period = part(mounted, "Period")
+		expect(period.Visible).toBe(true)
+		expect(period.Text).toBe("LAST CHANCE")
+		expect(period.TextColor3 == colors.Orange).toBe(true)
+		-- A trailing team that equalises plays overtime, which is no team's.
+		rerender(board({ period = "Overtime" }))
+		expect(period.Text).toBe("OVERTIME")
+		expect(period.TextColor3 == config.UI.hud.textColor).toBe(true)
+	end)
 end)
