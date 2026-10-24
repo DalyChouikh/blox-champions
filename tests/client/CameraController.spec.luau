@@ -26,7 +26,7 @@ type FakeCamera = { CFrame: CFrame, FieldOfView: number, CameraType: Enum.Camera
 local folder: Folder
 local rig: Model
 local camera: FakeCamera
-local mouse: { MouseBehavior: Enum.MouseBehavior }
+local mouse: { MouseBehavior: Enum.MouseBehavior, MouseIconEnabled: boolean }
 local preferred: Enum.PreferredInput
 local menuOpen: boolean
 local ball: BasePart?
@@ -94,14 +94,9 @@ beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "CameraControllerTest"
 	folder.Parent = workspace
-	local floor = Instance.new("Part")
-	floor.Anchored = true
-	floor.Size = Vector3.new(400, 1, 400)
-	floor.CFrame = CFrame.new(0, -0.5, 0)
-	floor.Parent = folder
-	floor:AddTag(Tags.RideSurface)
+	Fixtures.floor(folder)
 	camera = { CFrame = CFrame.new(), FieldOfView = 70, CameraType = Enum.CameraType.Custom }
-	mouse = { MouseBehavior = Enum.MouseBehavior.Default }
+	mouse = { MouseBehavior = Enum.MouseBehavior.Default, MouseIconEnabled = true }
 	preferred = Enum.PreferredInput.KeyboardAndMouse
 	menuOpen = false
 	ball = nil
@@ -171,6 +166,21 @@ describe("CameraController", function()
 			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.LockCenter)
 		end
 	)
+
+	it("hides the cursor while the mouse is locked, and shows it when free", function()
+		CameraController:step(DT)
+		expect(mouse.MouseIconEnabled).toBe(false)
+		menuOpen = true
+		CameraController:step(DT)
+		expect(mouse.MouseIconEnabled).toBe(true)
+		menuOpen = false
+		preferred = Enum.PreferredInput.Gamepad
+		CameraController:step(DT)
+		expect(mouse.MouseIconEnabled).toBe(true)
+		preferred = Enum.PreferredInput.KeyboardAndMouse
+		CameraController:step(DT)
+		expect(mouse.MouseIconEnabled).toBe(false)
+	end)
 
 	it("pulls in in front of a wall behind the skater", function()
 		CameraController:step(DT)
@@ -277,8 +287,10 @@ describe("CameraController", function()
 		hold:Fire(true)
 		CameraController:step(10)
 		Fixtures.expectNear(camera.CFrame.LookVector, (target.Position - focus()).Unit, 1e-2)
+		expect(CameraController.focusing).toBe(true)
 		hold:Fire(false)
 		CameraController:step(1)
+		expect(CameraController.focusing).toBe(false)
 		Fixtures.expectNear(camera.CFrame.LookVector, (target.Position - focus()).Unit, 1e-2)
 	end)
 
@@ -289,6 +301,7 @@ describe("CameraController", function()
 		Fixtures.scriptedBinding(InputController.context, "BallFocus"):Fire(true)
 		CameraController:step(10)
 		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1))
+		expect(CameraController.focusing).toBe(false)
 	end)
 
 	it("ignores Ball Focus while there is no ball in the arena", function()

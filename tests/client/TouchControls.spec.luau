@@ -1,6 +1,5 @@
 --!strict
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerScriptService = game:GetService("ServerScriptService")
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
@@ -12,17 +11,13 @@ local BallCarrier = require(Client.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(Client.InputController)
-local RideSurfaces = require(Client.RideSurfaces)
 local SkateController = require(Client.SkateController)
-local SkaterBody = require(ServerScriptService.Server.SkaterBody)
-local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local TouchControls = require(Client.TouchControls)
 
 local config = Config.defaults()
 local touch = config.Input.touch
 local labels = config.UI.controlLabels
 local style = config.UI.touchStyle
-local movement = config.Movement
 local DT = 1 / 60
 local LOCAL_ID = "1"
 -- Each touch button's control, and the input action it works.
@@ -40,6 +35,8 @@ local ACTIONS: { { control: Config.TouchControl, action: string } } = {
 local folder: Folder
 local preferred: Enum.PreferredInput
 local screen: Vector2
+-- The camera as TouchControls reads it: whether Ball Focus is on.
+local camera: { focusing: boolean }
 
 -- Whether a binding of the input action `action` reads `button`.
 local function bound(action: string, button: GuiButton): boolean
@@ -71,48 +68,18 @@ beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "TouchControlsTest"
 	folder.Parent = workspace
-	local floor = Instance.new("Part")
-	floor.Anchored = true
-	floor.Size = Vector3.new(400, 1, 400)
-	floor.CFrame = CFrame.new(0, -0.5, 0)
-	floor.Parent = folder
-	floor:AddTag(Tags.RideSurface)
+	Fixtures.floor(folder)
 	preferred = Enum.PreferredInput.Touch
 	screen = Vector2.new(800, 400)
-	InputController:init({ Config = config, Parent = folder })
-	BallCarrier:init({})
-	RideSurfaces:init({})
-	SkateController:init({
-		Config = config,
-		InputController = InputController,
-		RideSurfaces = RideSurfaces,
-		Camera = { CFrame = CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)) },
-		Skaters = function(): { any }
-			return {}
-		end,
-		SendSkateState = function() end,
-		Gravity = Fixtures.GRAVITY,
-		Team = function(): string?
-			return "Blue"
-		end,
-	})
-	local rig = Fixtures.rig(folder, "Skater", CFrame.new(0, movement.hoverHeight, 0))
-	SkaterBody.build(rig, movement)
-	SkateController:bind(rig)
-	ActionController:init({
-		Config = config,
-		InputController = InputController,
-		BallCarrier = BallCarrier,
-		SkateController = SkateController,
-		Camera = { CFrame = CFrame.new() },
-		SendRequest = function() end,
-		LocalId = LOCAL_ID,
-	})
+	camera = { focusing = false }
+	Fixtures.startSkating(folder, config, LOCAL_ID)
+	Fixtures.spawnSkater(folder, config)
 	TouchControls:init({
 		Config = config,
 		InputController = InputController,
 		ActionController = ActionController,
 		SkateController = SkateController,
+		CameraController = camera,
 		Parent = folder,
 		PreferredInput = function(): Enum.PreferredInput
 			return preferred
@@ -246,6 +213,19 @@ describe("TouchControls", function()
 		SkateController.attachable = true
 		TouchControls:step(DT)
 		expect(button("attach").Visible).toBe(true)
+	end)
+
+	it("rings the throw button while Ball Focus is on", function()
+		TouchControls:step(DT)
+		local ring = button("throw"):FindFirstChild("Focus") :: UIStroke
+		expect(ring.Thickness).toBe(config.UI.hud.glowThickness)
+		expect(ring.Enabled).toBe(false)
+		camera.focusing = true
+		TouchControls:step(DT)
+		expect(ring.Enabled).toBe(true)
+		camera.focusing = false
+		TouchControls:step(DT)
+		expect(ring.Enabled).toBe(false)
 	end)
 
 	it("shows only on touch", function()

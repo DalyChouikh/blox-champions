@@ -47,6 +47,9 @@ export type SkateController = {
 	skater: SkateMath.Skater?,
 	-- The bound character's root; the camera follows it.
 	root: BasePart?,
+	-- Whether the player skates now: a skater is bound to a character still in the world. A spectator, or a player
+	-- whose character is gone before the next is bound, has none.
+	hasSkater: (self: SkateController) -> boolean,
 	pumping: boolean,
 	braking: boolean,
 	-- The last step's stick as a world direction (length 0..1).
@@ -405,14 +408,19 @@ local SkateController: SkateController = {
 		self._statePending = false
 	end,
 
+	hasSkater = function(self: SkateController): boolean
+		local root = self.root
+		return self.skater ~= nil and root ~= nil and root.Parent ~= nil
+	end,
+
 	step = function(self: SkateController, dt: number)
 		-- Only a free skater's step finds a teammate to attach behind.
 		self.attachable = false
-		local skater = self.skater
-		local root = self.root
-		if skater == nil or root == nil or root.Parent == nil then
+		if not self:hasSkater() then
 			return
 		end
+		local skater = self.skater :: SkateMath.Skater
+		local root = self.root :: BasePart
 		local character = self._character :: Model
 		self.knockedDown = character:GetAttribute(Attributes.KnockedDown) == true
 		self.frozen = root.Anchored

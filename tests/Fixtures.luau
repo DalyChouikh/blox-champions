@@ -9,6 +9,7 @@ local GeometryTypes = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
 local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
+local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
@@ -200,6 +201,67 @@ end
 -- A rig's root part, found by the name Roblox gives it in every character.
 function Fixtures.root(rig: Model): BasePart
 	return rig:FindFirstChild(SkaterRig.root) :: BasePart
+end
+
+-- A wide ride surface whose top is the plane y = 0, in `folder`.
+function Fixtures.floor(folder: Instance): Part
+	local floor = Instance.new("Part")
+	floor.Anchored = true
+	floor.Size = Vector3.new(400, 1, 400)
+	floor.CFrame = CFrame.new(0, -0.5, 0)
+	floor.Parent = folder
+	floor:AddTag(Tags.RideSurface)
+	return floor
+end
+
+-- Starts the local player's skating and actions as the client does, with fakes for the live game (a camera looking
+-- along -Z, nothing sent): InputController (its context in `folder`), BallCarrier, RideSurfaces, SkateController and
+-- ActionController, for the local player `localId`. Ride surfaces must be in place first, as RideSurfaces reads them
+-- here. The client's modules are required here, so specs that never skate never load them.
+function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, localId: Types.PlayerId)
+	local Client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
+	local InputController = require(Client.InputController) :: any
+	local BallCarrier = require(Client.BallCarrier) :: any
+	local RideSurfaces = require(Client.RideSurfaces) :: any
+	local SkateController = require(Client.SkateController) :: any
+	local ActionController = require(Client.ActionController) :: any
+	InputController:init({ Config = config, Parent = folder })
+	BallCarrier:init({})
+	RideSurfaces:init({})
+	SkateController:init({
+		Config = config,
+		InputController = InputController,
+		RideSurfaces = RideSurfaces,
+		Camera = { CFrame = CFrame.new() },
+		Skaters = function(): { any }
+			return {}
+		end,
+		SendSkateState = function() end,
+		Gravity = Fixtures.GRAVITY,
+		Team = function(): string?
+			return "Blue"
+		end,
+	})
+	ActionController:init({
+		Config = config,
+		InputController = InputController,
+		BallCarrier = BallCarrier,
+		SkateController = SkateController,
+		Camera = { CFrame = CFrame.new() },
+		SendRequest = function() end,
+		LocalId = localId,
+	})
+end
+
+-- The local player's skater: a rig built as the server builds it, standing at the origin and taken by the skating
+-- (Fixtures.startSkating first).
+function Fixtures.spawnSkater(folder: Instance, config: Config.GameConfig): Model
+	local SkaterBody = require(game:GetService("ServerScriptService").Server.SkaterBody) :: any
+	local SkateController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.SkateController) :: any
+	local rig = Fixtures.rig(folder, "Skater", CFrame.new(0, config.Movement.hoverHeight, 0))
+	SkaterBody.build(rig, config.Movement)
+	SkateController:bind(rig)
+	return rig
 end
 
 -- An R15 rig whose joints are Motor6Ds, named as the avatar's own joints are. The parts all sit on `cframe`: only the

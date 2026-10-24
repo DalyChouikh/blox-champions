@@ -24,6 +24,7 @@ local InputController = require(script.Parent.InputController)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local RideSurfaces = require(script.Parent.RideSurfaces)
 local SkateController = require(script.Parent.SkateController)
+local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
@@ -31,7 +32,7 @@ type PlayerId = Types.PlayerId
 
 -- What the controller sets on the camera and the mouse: workspace.CurrentCamera and UserInputService, or fakes.
 type CameraLike = { CFrame: CFrame, FieldOfView: number, CameraType: Enum.CameraType }
-type MouseLike = { MouseBehavior: Enum.MouseBehavior }
+type MouseLike = { MouseBehavior: Enum.MouseBehavior, MouseIconEnabled: boolean }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
 export type CameraController = {
@@ -41,6 +42,8 @@ export type CameraController = {
 	start: (self: CameraController) -> (),
 	step: (self: CameraController, dt: number) -> (),
 	chase: ChaseCamera.ChaseCamera,
+	-- Whether Ball Focus is on, as the last step applied it (the touch throw button rings while it is).
+	focusing: boolean,
 	_config: Config.GameConfig,
 	_input: InputController.InputController,
 	_surfaces: RideSurfaces.RideSurfaces,
@@ -66,13 +69,16 @@ export type CameraController = {
 }
 
 -- The mouse stays at the screen's center while a mouse plays, so it turns the camera; it is free otherwise and
--- while Roblox's menu is open.
+-- while Roblox's menu is open. The cursor hides while it is locked (the HUD's reticle marks the center).
 local function lockMouse(self: CameraController, usingMouse: boolean)
-	local behavior = if usingMouse and not self._menuOpen()
-		then Enum.MouseBehavior.LockCenter
-		else Enum.MouseBehavior.Default
-	if self._mouse.MouseBehavior ~= behavior then
-		self._mouse.MouseBehavior = behavior
+	local locked = usingMouse and not self._menuOpen()
+	local behavior = if locked then Enum.MouseBehavior.LockCenter else Enum.MouseBehavior.Default
+	local mouse = self._mouse
+	if mouse.MouseBehavior ~= behavior then
+		mouse.MouseBehavior = behavior
+	end
+	if mouse.MouseIconEnabled == locked then
+		mouse.MouseIconEnabled = not locked
 	end
 end
 
@@ -141,6 +147,7 @@ local CameraController: CameraController = {
 	name = "CameraController",
 	dependencies = { "Config", "InputController", "RideSurfaces", "SkateController", "BallCarrier" },
 	chase = nil :: any,
+	focusing = false,
 	_config = nil :: any,
 	_input = nil :: any,
 	_surfaces = nil :: any,
@@ -208,6 +215,7 @@ local CameraController: CameraController = {
 		self._root = nil
 		self._focusToggled = false
 		self._ballPart = nil
+		self.focusing = false
 	end,
 
 	-- Keeps the ball's part: the server tags it (Tags.Ball), and it reaches a client only while in the workspace.
@@ -238,12 +246,12 @@ local CameraController: CameraController = {
 		lockMouse(self, usingMouse)
 		self._input:readCamera(self._keys)
 		local focused = focusing(self, device)
+		self.focusing = focused
 		local ball = self._ball()
 		local settings = self._config.Camera
 
 		local skate = self._skate
-		local skater, root = skate.skater, skate.root
-		if skater == nil or root == nil or root.Parent == nil then
+		if not skate:hasSkater() then
 			-- A spectator, or a player whose character is gone before the next is bound, watches the ball, upright;
 			-- with no ball either, the camera holds still.
 			self._root = nil
@@ -253,6 +261,7 @@ local CameraController: CameraController = {
 			end
 			return
 		end
+		local skater, root = skate.skater :: SkateMath.Skater, skate.root :: BasePart
 		local chase = self.chase
 		if root ~= self._root or skate.frozen then
 			self._root = root
