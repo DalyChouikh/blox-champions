@@ -60,11 +60,11 @@ local function arena(self: MatchService): TaggedLayout.TaggedArena
 	return self._arena.arena :: TaggedLayout.TaggedArena
 end
 
+-- An open goal lets the ball through its panel; each client slides the panel out of the ring (ArenaGlow).
 local function setGoalOpen(self: MatchService, open: boolean)
 	local panel = arena(self).goalPanel
 	panel.CanCollide = not open
 	panel.CanQuery = not open
-	panel.Transparency = if open then 1 else self._config.Arena.goal.panelTransparency
 end
 
 local function newEngine(self: MatchService)

@@ -252,7 +252,8 @@ describe("A match on the generated arena", function()
 		expect(table.find(events(), "GoalOpened")).never.toBeNil()
 		local panel = tagged().goalPanel
 		expect(panel.CanCollide or panel.CanQuery).toBe(false)
-		expect(panel.Transparency).toBe(1)
+		-- Each client slides the panel out of the ring; the server only lets the ball through.
+		expect(panel.Transparency).toBeCloseTo(config.Arena.goal.panelTransparency, 4)
 	end)
 
 	it("scores through the open goal, then hides the ball and closes the goal for the next kickoff", function()
