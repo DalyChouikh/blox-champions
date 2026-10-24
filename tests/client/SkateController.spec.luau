@@ -43,6 +43,27 @@ local function skaterAt(name: string, ground: Vector3): Model
 	return model
 end
 
+-- A sphere cast's normal is off by up to about 1.5e-5 (measured), so a velocity of 120 studs/s it blocks keeps up to
+-- about 0.002 studs/s into the surface.
+local CAST_TOLERANCE = 0.01
+
+-- Another ride surface beside the floor: a slab in the floor's folder.
+local function addSlab(cframe: CFrame, size: Vector3)
+	local slab = Instance.new("Part")
+	slab.Anchored = true
+	slab.Size = size
+	slab.CFrame = cframe
+	slab.Parent = floor
+end
+
+-- Puts the skater in the air at `position`, flying at `velocity`.
+local function flying(position: Vector3, velocity: Vector3)
+	rig:PivotTo(CFrame.new(position))
+	local skater = SkateController.skater :: any
+	skater.mode = "Airborne"
+	skater.velocity = velocity
+end
+
 local function setup(overrides: { [string]: any }?)
 	RideSurfaces:init({})
 	local deps: { [string]: any } = {
@@ -253,6 +274,42 @@ describe("SkateController", function()
 		SkateController:step(0.1)
 		expect((SkateController.skater :: any).mode).toBe("Airborne")
 		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, -19.5808, 0))
+	end)
+
+	-- The skater body's velocity has no force limit, so a skater flying into a wall pressed its collider through the
+	-- arena's 1-stud slab (#176; in Studio, 5 launches in 8 at 120 studs/s and over). The collider is a ball of
+	-- radius 1 around the root; one step at 120 studs/s travels 2 studs.
+	it("slides along a ride surface its collider reaches before the next step, or already touches", function()
+		local dt = 1 / 60
+		-- A wall facing -X at x = 2.5, high above the floor.
+		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40))
+		local fall = Fixtures.GRAVITY * dt * (1 - movement.airDrag * dt)
+		-- 1.5 studs short of the wall, then 0.5 into it.
+		for _, x in { 0, 2 } do
+			flying(Vector3.new(x, 20, 0), Vector3.new(120, 0, 0))
+			SkateController:step(dt)
+			Fixtures.expectNear(velocityOf(rig), fall, CAST_TOLERANCE)
+		end
+		-- Beyond this step's travel, the wall takes nothing.
+		flying(Vector3.new(-10, 20, 0), Vector3.new(120, 0, 0))
+		SkateController:step(dt)
+		expect(velocityOf(rig).X).toBeCloseTo(120 * (1 - movement.airDrag * dt), 3)
+	end)
+
+	it("slides into a corner, losing its velocity into both surfaces", function()
+		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40)) -- a wall facing -X at x = 2.5
+		addSlab(CFrame.new(0, 23, 0), Vector3.new(40, 1, 40)) -- a ceiling facing -Y at y = 22.5
+		flying(Vector3.new(0, 20, 0), Vector3.new(120, 120, 0))
+		SkateController:step(1 / 60)
+		Fixtures.expectNear(velocityOf(rig), Vector3.zero, CAST_TOLERANCE)
+	end)
+
+	it("slides along a ride surface an action pushes it into", function()
+		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40))
+		flying(Vector3.new(0, 20, 0), Vector3.zero)
+		SkateController:step(1 / 60)
+		SkateController:push(Vector3.new(120, 0, 0), true)
+		expect(math.abs(velocityOf(rig).X)).toBeLessThan(CAST_TOLERANCE)
 	end)
 
 	it("drives a new character after a respawn", function()
