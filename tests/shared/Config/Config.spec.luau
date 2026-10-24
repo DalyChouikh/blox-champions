@@ -175,6 +175,7 @@ describe("Config defaults", function()
 			attachBoostSpeed = 40,
 			attachCooldown = 3,
 			knockdownDecel = 75,
+			speedometerScale = 1.2,
 		})
 	end)
 
@@ -325,6 +326,7 @@ describe("Config defaults", function()
 			MouseRightButton = "RMB",
 		})
 		expect(ui.text).toEqual({
+			clock = "%d:%02d",
 			lap = "Lap %d/%d",
 			streak = "Streak %d/%d",
 			overtime = "OVERTIME",
