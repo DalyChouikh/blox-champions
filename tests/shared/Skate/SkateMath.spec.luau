@@ -273,6 +273,18 @@ describe("SkateMath pushes and knockdowns", function()
 		s:step(input({ knockedDown = true }), ground(), 1)
 		Fixtures.expectNear(s.velocity, Vector3.zero)
 	end)
+
+	it("loses only its velocity into a surface that blocks it, and says whether that changed it", function()
+		local wall = Vector3.new(-1, 0, 0)
+		local s = skater(Vector3.new(120, -30, 5))
+		expect(s:block(wall)).toBe(true)
+		Fixtures.expectNear(s.velocity, Vector3.new(0, -30, 5))
+		-- Along the wall, or away from it, there is nothing to lose.
+		expect(s:block(wall)).toBe(false)
+		s.velocity = Vector3.new(-50, 10, 0)
+		expect(s:block(wall)).toBe(false)
+		Fixtures.expectNear(s.velocity, Vector3.new(-50, 10, 0))
+	end)
 end)
 
 -- Loop physics (A3). A roof is an arc around the origin with the skater inside the tube, so its normal at angle phi

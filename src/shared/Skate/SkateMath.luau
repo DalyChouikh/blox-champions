@@ -350,6 +350,17 @@ function SkateMath.push(self: Skater, change: Vector3, launch: boolean)
 	end
 end
 
+-- A surface in the way (the controller finds it): the velocity loses its part into the surface and keeps the rest, so
+-- the skater slides along it. Says whether anything was lost.
+function SkateMath.block(self: Skater, normal: Vector3): boolean
+	local into = self.velocity:Dot(normal)
+	if into >= 0 then
+		return false
+	end
+	self.velocity -= normal * into
+	return true
+end
+
 -- Still and on the ground: the kickoff freeze and a fresh character start from rest.
 function SkateMath.stop(self: Skater)
 	self.velocity = Vector3.zero
