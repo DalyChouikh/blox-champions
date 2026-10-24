@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local MatchClock = require(ReplicatedStorage.Shared.Rules.MatchClock)
 
 local function collector(): ({ number }, (secondsLeft: number) -> ())
@@ -56,6 +57,20 @@ describe("MatchClock", function()
 		expect(clock.secondsLeft).toBe(0)
 		expect(clock:advance(1, onWarning)).toBe(false)
 		expect(clock.secondsLeft).toBe(0)
+	end)
+
+	it("runs while play is live, and through kickoffs and celebrations only when they don't pause it", function()
+		local paused = Fixtures.config().Match
+		expect(MatchClock.runs(paused, "Live")).toBe(true)
+		expect(MatchClock.runs(paused, "Kickoff")).toBe(false)
+		expect(MatchClock.runs(paused, "Celebration")).toBe(false)
+		expect(MatchClock.runs(paused, "Waiting")).toBe(false)
+		expect(MatchClock.runs(paused, "Ended")).toBe(false)
+		local running = Fixtures.config({ Match = { clockPausesDuringKickoff = false } }).Match
+		expect(MatchClock.runs(running, "Kickoff")).toBe(true)
+		expect(MatchClock.runs(running, "Celebration")).toBe(true)
+		expect(MatchClock.runs(running, "Waiting")).toBe(false)
+		expect(MatchClock.runs(running, "Ended")).toBe(false)
 	end)
 
 	it("counts up in overtime without warnings", function()

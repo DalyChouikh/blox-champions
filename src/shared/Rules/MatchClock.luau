@@ -1,6 +1,10 @@
 --!strict
 -- The match clock (spec §5.1): counts regulation time down, reports each warning mark once as the clock
--- reaches it, and counts up during golden-goal overtime. The engine decides when the clock runs.
+-- reaches it, and counts up during golden-goal overtime. `runs` is the one rule for when it runs: the engine and the
+-- HUD both follow it.
+
+local Config = require(script.Parent.Parent.Config)
+local Types = require(script.Parent.Types)
 
 local MatchClock = {}
 MatchClock.__index = MatchClock
@@ -60,6 +64,15 @@ function MatchClock.advance(self: MatchClock, dt: number, onWarning: (secondsLef
 	self._nextWarning = index
 
 	return after == 0
+end
+
+-- Whether the clock runs in `state`: while play is live, and through kickoff countdowns and celebrations unless
+-- they pause it (Match.clockPausesDuringKickoff). Never before the match starts or after it ends.
+function MatchClock.runs(match: Config.MatchConfig, state: Types.MatchState): boolean
+	if state == "Live" then
+		return true
+	end
+	return (state == "Kickoff" or state == "Celebration") and not match.clockPausesDuringKickoff
 end
 
 function MatchClock.startOvertime(self: MatchClock)

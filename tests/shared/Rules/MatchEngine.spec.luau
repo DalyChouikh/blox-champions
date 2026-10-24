@@ -112,7 +112,8 @@ describe("MatchEngine options", function()
 		expect(creating({ gates = thinGates, goal = ring }, Fixtures.GRAVITY)).toThrow(
 			"arena.gates[3].width: must be > 0"
 		)
-		expect(creating({ gates = Fixtures.gates(), goal = { frame = ring.frame, radius = 0 / 0 } }, Fixtures.GRAVITY)).toThrow(
+		local nanRing = { frame = ring.frame, radius = 0 / 0 }
+		expect(creating({ gates = Fixtures.gates(), goal = nanRing }, Fixtures.GRAVITY)).toThrow(
 			"arena.goal.radius: must not be NaN"
 		)
 		expect(creating({ gates = Fixtures.gates(), goal = { frame = "ring", radius = 3 } }, Fixtures.GRAVITY)).toThrow(
@@ -225,6 +226,17 @@ describe("MatchEngine possession and laps", function()
 		local snapshot = engine:snapshot()
 		expect(snapshot.possessingTeam).toBe("Blue")
 		expect(snapshot.lastHolder).toBe("B2")
+	end)
+
+	it("reports the score tab, the gate count and the next gate in its snapshot", function()
+		local engine = liveEngine()
+		local snapshot = engine:snapshot()
+		expect(snapshot.stats).toEqual(engine:stats())
+		expect(snapshot.gateCount).toBe(4)
+		expect(snapshot.nextGate).toBeNil()
+		engine:pickedUp("B1", ZERO, ZERO)
+		crossGates(engine, { 1 })
+		expect(engine:snapshot().nextGate).toBe(2)
 	end)
 
 	it("counts gates only for a possessing team, forward and in order", function()

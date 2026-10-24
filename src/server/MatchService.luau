@@ -3,9 +3,11 @@
 -- (strikes, knockdowns and their drops), then the ball, then reports the ball's movement, a throw, a catch, a body
 -- touch and each knockdown to the rules engine in the order the engine documents, ticks it, reacts to its events —
 -- hiding and spawning the ball, clearing every action, knockdown and call at a kickoff, placing and freezing
--- characters, opening and closing the goal — and sends them to clients. It keeps the ball dead whenever play is not
--- live, so the ball is only ever carried by the engine's last holder. After a match ends it waits postMatchSeconds and
--- starts the next one with everyone reseated; once every player has left it starts over.
+-- characters, opening and closing the goal — and sends them to clients, each frame's batch followed by the match's
+-- snapshot, which clients draw from. A snapshot also goes to everyone whenever a seat changes, and to each player who
+-- joins; it names every player who ever joined, so the score tab can name those who left. It keeps the ball dead
+-- whenever play is not live, so the ball is only ever carried by the engine's last holder. After a match ends it waits
+-- postMatchSeconds and starts the next one with everyone reseated; once every player has left it starts over.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -17,6 +19,8 @@ local CharacterService = require(script.Parent.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
 local NetService = require(script.Parent.NetService)
+local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
+local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
@@ -46,6 +50,9 @@ export type MatchService = {
 	-- Counts down after MatchEnded; nil while a match is on.
 	_postMatchLeft: number?,
 	_carrier: PlayerId?,
+	-- Every player who joined, by id: their name as the HUD shows it, kept after they leave.
+	_names: { [PlayerId]: string },
+	_nameOf: (player: PlayerId) -> string,
 }
 
 -- The arena ArenaService built at init, before this module's init ran.
@@ -71,6 +78,16 @@ local function newEngine(self: MatchService)
 	self._postMatchLeft = nil
 	-- A new engine's goal is closed; the panel must say so even if the last match ended with it open.
 	setGoalOpen(self, false)
+end
+
+-- The match as clients draw it, to `to`, or to everyone.
+local function sendSnapshot(self: MatchService, to: PlayerId?)
+	local payload: Payloads.MatchSnapshot = { match = self.engine:snapshot(), names = self._names }
+	if to ~= nil then
+		self._net:fireTo(to, Remotes.names.MatchSnapshot, payload)
+	else
+		self._net:fireAll(Remotes.names.MatchSnapshot, payload)
+	end
 end
 
 local function dropIfCarrier(self: MatchService, player: PlayerId)
@@ -105,7 +122,7 @@ local function nextMatch(self: MatchService)
 	self._ball:hide()
 	-- Reseating announces every seat, which adds each player to the new engine.
 	self._teams:newMatch()
-	self._net:fireAll(Remotes.names.MatchSnapshot, self.engine:snapshot())
+	sendSnapshot(self)
 end
 
 local MatchService: MatchService = {
@@ -131,7 +148,12 @@ local MatchService: MatchService = {
 	_waiting = true,
 	_postMatchLeft = nil,
 	_carrier = nil,
+	_names = {},
+	_nameOf = function(player: PlayerId): string
+		return player
+	end,
 
+	-- deps.NameOf replaces the players' display names in tests.
 	init = function(self: MatchService, deps: { [string]: any })
 		self._config = deps.Config
 		self._arena = deps.ArenaService
@@ -141,11 +163,19 @@ local MatchService: MatchService = {
 		self._characters = deps.CharacterService
 		self._actions = deps.ActionService
 		self._carrier = nil
+		self._names = {}
+		self._nameOf = deps.NameOf
+			or function(player: PlayerId): string
+				local roblox = PlayerIds.player(player)
+				return if roblox ~= nil then roblox.DisplayName else player
+			end
 		newEngine(self)
 
 		self._teams.joined:Connect(function(player: PlayerId)
-			self._net:fireTo(player, Remotes.names.MatchSnapshot, self.engine:snapshot())
-			self._net:fireTo(player, Remotes.names.BallCarrier, { carrier = self._carrier })
+			self._names[player] = self._nameOf(player)
+			sendSnapshot(self, player)
+			local carrier: Payloads.BallCarrier = { carrier = self._carrier }
+			self._net:fireTo(player, Remotes.names.BallCarrier, carrier)
 		end)
 		self._teams.seated:Connect(function(player: PlayerId, team: Team.Team)
 			-- After the match the next one seats everyone.
@@ -153,6 +183,7 @@ local MatchService: MatchService = {
 				self.engine:addPlayer(player, team)
 				self._inEngine[player] = true
 			end
+			sendSnapshot(self)
 		end)
 		self._teams.unseated:Connect(function(player: PlayerId)
 			dropIfCarrier(self, player)
@@ -165,6 +196,7 @@ local MatchService: MatchService = {
 				newEngine(self)
 				self._ball:hide()
 			end
+			sendSnapshot(self)
 		end)
 		self._characters.characterRemoved:Connect(function(player: PlayerId)
 			dropIfCarrier(self, player)
@@ -206,10 +238,11 @@ local MatchService: MatchService = {
 		end
 		engine:tick(dt)
 
-		-- Sent before the reactions, so one that fails cannot keep the frame's events from the clients.
+		-- Sent before the reactions, so one that fails cannot keep the frame's events or its snapshot from the clients.
 		local events = engine:drainEvents()
 		if #events > 0 then
 			self._net:fireAll(Remotes.names.RuleEvents, events)
+			sendSnapshot(self)
 			for _, event in events do
 				react(self, event)
 			end
@@ -218,7 +251,8 @@ local MatchService: MatchService = {
 		local carrier: PlayerId? = self._ball.state.carrier
 		if carrier ~= self._carrier then
 			self._carrier = carrier
-			self._net:fireAll(Remotes.names.BallCarrier, { carrier = carrier })
+			local told: Payloads.BallCarrier = { carrier = carrier }
+			self._net:fireAll(Remotes.names.BallCarrier, told)
 		end
 
 		local postMatchLeft = self._postMatchLeft

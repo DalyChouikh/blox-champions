@@ -91,6 +91,9 @@ local function setup(match: { [string]: any }?)
 		TeamService = TeamService,
 		CharacterService = CharacterService,
 		ActionService = ActionService,
+		NameOf = function(player: string): string
+			return "Name" .. player
+		end,
 	})
 end
 
@@ -462,14 +465,46 @@ describe("A match on the generated arena", function()
 		expect(panel.Transparency).toBeCloseTo(config.Arena.goal.panelTransparency, 4)
 	end)
 
-	it("sends each frame's events as one batch and a snapshot to each player who joins", function()
+	it(
+		"sends each frame's events as one batch, then a snapshot to everyone, and one to each player who joins",
+		function()
+			setup()
+			seat(1)
+			frames(FRAME)
+			local batches = firedNamed(Remotes.names.RuleEvents)
+			expect(#batches).toBe(1)
+			expect(#batches[1].payload).toBe(2)
+			local after = fired[(table.find(fired, batches[1]) :: number) + 1]
+			expect(after.name).toBe(Remotes.names.MatchSnapshot)
+			expect(after.to).toBeNil()
+			expect(after.payload.match.state).toBe("Kickoff")
+			local toJoiner = false
+			for _, snapshot in firedNamed(Remotes.names.MatchSnapshot) do
+				toJoiner = toJoiner or snapshot.to == "1"
+			end
+			expect(toJoiner).toBe(true)
+		end
+	)
+
+	it("sends a snapshot to everyone whenever a seat changes, naming every player who ever joined", function()
 		setup()
-		seat(1)
-		frames(FRAME)
-		local batches = firedNamed(Remotes.names.RuleEvents)
-		expect(#batches).toBe(1)
-		expect(#batches[1].payload).toBe(2)
-		expect(lastFired(Remotes.names.MatchSnapshot).to).toBe("1")
+		local _, players = seat(2)
+		local function lastToEveryone(): any
+			local snapshots = firedNamed(Remotes.names.MatchSnapshot)
+			for index = #snapshots, 1, -1 do
+				if snapshots[index].to == nil then
+					return snapshots[index].payload
+				end
+			end
+			return nil
+		end
+		expect(#lastToEveryone().match.stats.players).toBe(2)
+		local before = #firedNamed(Remotes.names.MatchSnapshot)
+		TeamService:leave(players[2])
+		expect(#firedNamed(Remotes.names.MatchSnapshot)).toBe(before + 1)
+		local left = lastToEveryone()
+		expect(left.names["2"]).toBe("Name2")
+		expect(#left.match.stats.players).toBe(2)
 	end)
 
 	it("tells everyone who carries the ball", function()
