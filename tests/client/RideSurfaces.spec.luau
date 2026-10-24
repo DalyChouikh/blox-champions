@@ -47,4 +47,23 @@ describe("RideSurfaces", function()
 		RideSurfaces:refresh()
 		expect(hits(wall)).toBe(false)
 	end)
+
+	-- The arena is Persistent: it reaches a client whole, but after the client starts, and possibly after the
+	-- player's character (#177).
+	it("says whether the arena's surfaces have reached this client", function()
+		RideSurfaces:init({})
+		expect(RideSurfaces.ready).toBe(false)
+
+		local parent = Instance.new("Folder")
+		parent.Name = "RideSurfacesTest"
+		parent.Parent = workspace
+		folder = parent
+		parent:AddTag(Tags.RideSurface)
+		RideSurfaces:refresh()
+		expect(RideSurfaces.ready).toBe(true)
+
+		parent:RemoveTag(Tags.RideSurface)
+		RideSurfaces:refresh()
+		expect(RideSurfaces.ready).toBe(false)
+	end)
 end)
