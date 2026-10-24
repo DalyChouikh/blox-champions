@@ -9,6 +9,13 @@ on:
 permissions:
   contents: read
 
+# actions/checkout runs `git init`, and git prints a 13-line hint about the initial branch's name unless
+# init.defaultBranch is set: these set it for every git command in the jobs.
+env:
+  GIT_CONFIG_COUNT: 1
+  GIT_CONFIG_KEY_0: init.defaultBranch
+  GIT_CONFIG_VALUE_0: main
+
 jobs:
   quality:
     runs-on: ubuntu-latest
