@@ -71,6 +71,8 @@ export type InputConfig = {
 	ballFocus: { Enum.KeyCode },
 	ballFocusMode: FocusMode,
 	touchBallFocusMode: FocusMode,
+	-- Held to show the score tab.
+	scoreTab: { Enum.KeyCode },
 	-- The actions each action key may start, in order: the first whose requires.ball fits is the one.
 	actions: {
 		tackle: { Actions.ActionName },
@@ -105,6 +107,7 @@ local defaults: InputConfig = {
 	ballFocus = { Enum.KeyCode.MouseRightButton, Enum.KeyCode.ButtonL2 },
 	ballFocusMode = "Hold",
 	touchBallFocusMode = "Toggle",
+	scoreTab = { Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect },
 	actions = {
 		tackle = { "Tackle", "Dodge" },
 		uppercut = { "Uppercut" },
@@ -197,6 +200,7 @@ local fields = Validate.record({
 	ballFocus = keys,
 	ballFocusMode = focusMode,
 	touchBallFocusMode = focusMode,
+	scoreTab = keys,
 	actions = Validate.record({ tackle = actionList, uppercut = actionList, pass = actionList, throw = actionList }),
 	touch = Validate.checkAll(
 		Validate.record({
@@ -263,6 +267,7 @@ local function boundKeys(input: InputConfig): { Enum.KeyCode }
 		input.uppercut,
 		input.pass,
 		input.throw,
+		input.scoreTab,
 		{ input.look.mouse.key, input.look.stick.key, input.look.touch.key },
 	}
 	for _, list in lists do

@@ -42,6 +42,12 @@ export type ScoringConfig = Scoring.ScoringConfig
 export type UIConfig = UI.UIConfig
 export type ControlLabels = UI.ControlLabels
 export type TouchStyle = UI.TouchStyle
+export type UIText = UI.UIText
+export type HudSettings = UI.HudSettings
+export type HudLayout = UI.HudLayout
+export type MarkerSettings = UI.MarkerSettings
+export type NameTagSettings = UI.NameTagSettings
+export type ArenaGlowSettings = UI.ArenaGlowSettings
 
 export type GameConfig = {
 	Actions: ActionsConfig,
