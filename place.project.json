@@ -1,0 +1,50 @@
+{
+	"name": "blox-champions-place",
+	"tree": {
+		"$className": "DataModel",
+		"Workspace": {
+			"$properties": {
+				"SignalBehavior": "Deferred",
+				"PlayerScriptsUseInputActionSystem": "Enabled",
+				"StreamingEnabled": true,
+				"StreamingIntegrityMode": "PauseOutsideLoadedArea",
+				"StreamOutBehavior": "Opportunistic",
+				"PlayerCharacterDestroyBehavior": "Enabled"
+			}
+		},
+		"Players": {
+			"$properties": {
+				"RespawnTime": 3
+			}
+		},
+		"StarterGui": {
+			"$properties": {
+				"ScreenOrientation": "LandscapeSensor"
+			}
+		},
+		"SoundService": {
+			"$properties": {
+				"DefaultListenerLocation": "Camera",
+				"RespectFilteringEnabled": true
+			}
+		},
+		"StarterPlayer": {
+			"$properties": {
+				"EnableMouseLockOption": false,
+				"CharacterBreakJointsOnDeath": false,
+				"CharacterUseJumpPower": false,
+				"CameraMaxZoomDistance": 128
+			},
+			"StarterPlayerScripts": {
+				"Client": {
+					"$path": "src/client"
+				}
+			},
+			"StarterCharacterScripts": {
+				"Animate": {
+					"$path": "src/character/Animate.client.luau"
+				}
+			}
+		}
+	}
+}

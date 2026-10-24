@@ -43,7 +43,7 @@ bash scripts/install-rojo-plugin.sh
 2. In Roblox Studio, open the **Plugins** tab, click **Rojo**, then **Connect** (`localhost:34872`).
 3. Edit files in `src/` and `tests/`; Rojo updates Studio automatically.
 
-`test.project.json` includes the tests and test framework. `default.project.json` is the game without any test code. Both map `Packages/` to `ReplicatedStorage.Packages`.
+`test.project.json` includes the tests and test framework. `default.project.json` is the game without any test code. Both map `Packages/` to `ReplicatedStorage.Packages`, and both include `place.project.json`: the services' settings (event timing, streaming, the players' controls and more) and the player scripts, so the published game and the test place match the place everything is developed in.
 
 ## Running tests
 
@@ -75,7 +75,7 @@ The client that does this is `scripts/ci/cloud_tests.py`, which uses only Python
 - Roblox expires an API key that goes unused for 60 days. If `cloud-tests` starts failing with a rejected request after a long pause, open the [API Keys page](https://create.roblox.com/dashboard/credentials?activeTab=ApiKeysTab): an **Auto-Expired** key works again after you turn its **Enable Key** toggle off and on.
 - Lost the key? Keep no copy of it: on the same page, open `blox-champions-ci`, click **Regenerate Key**, and run the setup script again.
 
-To check the client locally (Python 3.12 or newer), run the same commands as CI. The unit tests answer every request with a fake, so they need no key and make no network call.
+To check the CI scripts locally (Python 3.12 or newer), run the same commands as CI. The cloud client's tests answer every request with a fake, so they need no key and make no network call; the place-settings test builds both projects with Rojo.
 
 ```bash
 python -m unittest discover -s scripts/ci -p "test_*.py"
