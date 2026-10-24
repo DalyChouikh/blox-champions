@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+# The jobs only read the repository; the token is passed to Rokit to read GitHub releases.
+permissions:
+  contents: read
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -12,7 +16,9 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Install toolchain (rokit.toml)
-        uses: CompeyDev/setup-rokit@v0.2.1
+        run: bash scripts/install-toolchain.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Install packages (and re-export their types)
         run: bash scripts/install-packages.sh
@@ -26,8 +32,47 @@ jobs:
       - name: Type check
         run: bash scripts/analyze.sh
 
+      - name: Check the CI scripts (Python)
+        run: |
+          ruff format --check scripts
+          ruff check scripts
+          python3 -m unittest discover -s scripts/ci -p "test_*.py"
+
       - name: Build game and test places
         run: |
           mkdir -p build
           rojo build default.project.json --output build/game.rbxl
           rojo build test.project.json --output build/test.rbxl
+
+  # The whole Jest suite in Roblox's cloud (Open Cloud Luau Execution), against the place version this job uploads.
+  cloud-tests:
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # A pull request's newer push cancels its older run. Every push to main gets its own group, because GitHub
+    # cancels a group's pending job whatever cancel-in-progress says.
+    concurrency:
+      group: cloud-tests-${{ github.event_name == 'push' && github.sha || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install toolchain (rokit.toml)
+        run: bash scripts/install-toolchain.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Install packages
+        run: bash scripts/install-packages.sh
+
+      - name: Build the test place
+        run: |
+          mkdir -p build
+          rojo build test.project.json --output build/test.rbxl
+
+      - name: Run the test suite in Roblox's cloud
+        run: python3 scripts/ci/cloud_tests.py build/test.rbxl scripts/ci/run-tests-task.luau
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+          ROBLOX_TEST_UNIVERSE_ID: ${{ vars.ROBLOX_TEST_UNIVERSE_ID }}
+          ROBLOX_TEST_PLACE_ID: ${{ vars.ROBLOX_TEST_PLACE_ID }}
