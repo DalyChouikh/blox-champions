@@ -135,7 +135,8 @@ export type MarkerSettings = {
 	edgeMargin: number,
 	arrowSize: number,
 	-- The arrows' image, pointing up and white, so it takes their colour. The default is Roblox's own chevron from
-	-- its content folder; the art pass swaps in ours.
+	-- its content folder (found in three installed Studio versions). No Roblox page documents it, so an update could
+	-- remove it and leave the arrows blank: the art pass swaps in ours, and Phase 9 checks it on real devices.
 	arrowImage: string,
 }
 
@@ -304,9 +305,11 @@ local function noDuplicates(values: { number }): boolean
 	return true
 end
 
--- How many values `text` takes: its %d and %s, each with an optional width (%02d).
+-- How many values `text` takes: its %d and %s, each with an optional width (%02d). A doubled %% prints a percent sign
+-- and takes none, so it is dropped first.
 local function placeholders(text: string): number
-	local _, count = string.gsub(text, "%%%d*[ds]", "")
+	local plain = string.gsub(text, "%%%%", "")
+	local _, count = string.gsub(plain, "%%%d*[ds]", "")
 	return count
 end
 

@@ -755,6 +755,11 @@ describe("Config.forMode", function()
 				overrides = { UI = { text = { possession = "has the ball" } } },
 				message = "UI.text.possession: placeholder count must be 1",
 			},
+			-- A doubled percent prints one; it takes no value.
+			{
+				overrides = { UI = { text = { clockWarning = "%%d SECONDS" } } },
+				message = "UI.text.clockWarning: placeholder count must be 1",
+			},
 			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
 			{ overrides = { UI = { hud = { pipSize = 0 } } }, message = "UI.hud.pipSize: must be > 0" },
 			{
@@ -788,6 +793,10 @@ describe("Config.forMode", function()
 				Fixtures.config(case.overrides)
 			end).toThrow(case.message)
 		end
+		-- Prints "60%s": one value, then a percent sign and an s.
+		expect(function()
+			Fixtures.config({ UI = { text = { clockWarning = "%d%%s" } } })
+		end).never.toThrow()
 	end)
 
 	it("rejects team spawns that would not fit on a straight", function()
