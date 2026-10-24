@@ -734,7 +734,7 @@ describe("Config.forMode", function()
 			-- The overlap rule measures pixels, so a button's size must be in pixels.
 			{
 				overrides = { Input = { touch = { buttonSize = UDim2.fromScale(0.1, 0.1) } } },
-				message = "Input.touch: buttonSize must be in pixels",
+				message = "Input.touch.buttonSize: must be in pixels (scales 0, offsets > 0)",
 			},
 		}
 		for _, case in cases do
@@ -768,6 +768,20 @@ describe("Config.forMode", function()
 			{ overrides = { UI = { hud = { spacing = -1 } } }, message = "UI.hud.spacing: must be >= 0" },
 			{ overrides = { UI = { hud = { screenMargin = -1 } } }, message = "UI.hud.screenMargin: must be >= 0" },
 			{ overrides = { UI = { keyNames = { Banana = "B" } } }, message = "UI.keyNames: Banana must name a key" },
+			-- The HUD fits its parts by their sizes in pixels.
+			{
+				overrides = { UI = { hud = { layout = { banner = { size = UDim2.fromScale(0.5, 0.2) } } } } },
+				message = "UI.hud.layout.banner.size: must be in pixels (scales 0, offsets > 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { size = UDim2.fromOffset(0, 360) } } } } },
+				message = "UI.hud.layout.scoreTab.size: must be in pixels (scales 0, offsets > 0)",
+			},
+			-- Five number columns of 120 and their gaps, inside the padding: 642 px, wider than the 640 px tab.
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { columnWidth = 120 } } } } },
+				message = "UI: the score tab's number columns must leave room for names, in the tab and the end screen",
+			},
 		}
 		for _, case in cases do
 			expect(function()

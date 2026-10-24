@@ -347,11 +347,27 @@ local textSize = Validate.number({ min = 1, max = 100, integer = true })
 local transparency = Validate.number({ min = 0, max = 1 })
 local positive = Validate.number({ above = 0 })
 local udim2 = Validate.datatype("UDim2")
-local place = Validate.record({ position = udim2, size = udim2 })
-local list = Validate.record({ position = udim2, size = udim2, rowHeight = positive })
-local columns = Validate.record({ position = udim2, size = udim2, rowHeight = positive, columnWidth = positive })
+local pixels = Validate.pixels()
+local place = Validate.record({ position = udim2, size = pixels })
+local list = Validate.record({ position = udim2, size = pixels, rowHeight = positive })
+local columns = Validate.record({ position = udim2, size = pixels, rowHeight = positive, columnWidth = positive })
 
-local schema = Validate.record({
+-- The score tab's table (StatsTable) gives each number column columnWidth and a spacing gap, inside its panel's
+-- padding (spacing at each side), and the name column what is left: the score tab and the end screen draw it, and
+-- both must leave the names some room.
+local function namesFit(ui: UIConfig): boolean
+	local hud = ui.hud
+	local layout = hud.layout
+	local count = 0
+	for _ in ui.text.columns do
+		count += 1
+	end
+	-- Every column but the name's.
+	local taken = (count - 1) * (layout.scoreTab.columnWidth + hud.spacing) + 2 * hud.spacing
+	return taken < layout.scoreTab.size.X.Offset and taken < layout.endScreen.size.X.Offset
+end
+
+local fields = Validate.record({
 	clockWarnings = Validate.check(
 		Validate.list(Validate.number({ min = 1, integer = true })),
 		noDuplicates,
@@ -437,7 +453,7 @@ local schema = Validate.record({
 			banner = place,
 			feed = list,
 			hints = list,
-			speedometer = Validate.record({ position = udim2, touchPosition = udim2, size = udim2 }),
+			speedometer = Validate.record({ position = udim2, touchPosition = udim2, size = pixels }),
 			reticle = Validate.record({ size = positive }),
 			scoreTab = columns,
 			scoreButton = place,
@@ -467,6 +483,13 @@ local schema = Validate.record({
 		panelSlide = positive,
 		panelSlideSeconds = Validate.number({ min = 0 }),
 	}),
+})
+
+local schema = Validate.checkAll(fields, {
+	{
+		message = "the score tab's number columns must leave room for names, in the tab and the end screen",
+		holds = namesFit,
+	},
 })
 
 return {

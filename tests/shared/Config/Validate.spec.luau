@@ -123,6 +123,17 @@ describe("Validate", function()
 		expect(v(CFrame.identity, "G")).toEqual({ "G: expected Vector3, got CFrame" })
 	end)
 
+	it("accepts a size in pixels, and rejects a scale or an offset of 0 or less", function()
+		local v = Validate.pixels()
+		local message = "S: must be in pixels (scales 0, offsets > 0)"
+		expect(v(UDim2.fromOffset(640, 110), "S")).toEqual({})
+		expect(v(UDim2.new(0.5, 0, 0, 110), "S")).toEqual({ message })
+		expect(v(UDim2.new(0, 640, 0.1, 110), "S")).toEqual({ message })
+		expect(v(UDim2.fromOffset(0, 110), "S")).toEqual({ message })
+		expect(v(UDim2.fromOffset(640, -1), "S")).toEqual({ message })
+		expect(v(Vector2.new(640, 110), "S")).toEqual({ "S: expected UDim2, got Vector2" })
+	end)
+
 	it("validates every item of a list with an indexed path", function()
 		local v = Validate.list(Validate.number({ min = 1 }))
 		expect(v({}, "UI.clockWarnings")).toEqual({})
