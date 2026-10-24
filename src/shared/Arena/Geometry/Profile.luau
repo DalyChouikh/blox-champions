@@ -30,16 +30,16 @@ local function arc(center: Vector2, radius: number, fromAngle: number, toAngle: 
 	end
 end
 
--- The roof's circle: its centre is the midpoint of the two wall tops and its radius half their distance, so the
--- arc is a half circle when the walls are level (the owner's enclosed arena).
-local function roofCircle(arena: ArenaConfig): (Vector2, number)
+-- The roof's circle, in the profile's (u, y): its centre is the midpoint of the two wall tops and its radius half
+-- their distance, so the arc is a half circle when the walls are level (the owner's enclosed arena).
+function Profile.roofCircle(arena: ArenaConfig): (Vector2, number)
 	local inner = Vector2.new(0, arena.infieldWallHeight)
 	local outer = Vector2.new(arena.trackWidth, arena.outerWallHeight)
 	return (inner + outer) / 2, (outer - inner).Magnitude / 2
 end
 
 local function roofArc(arena: ArenaConfig): Piece
-	local center, radius = roofCircle(arena)
+	local center, radius = Profile.roofCircle(arena)
 	local outer = Vector2.new(arena.trackWidth, arena.outerWallHeight)
 	local inner = Vector2.new(0, arena.infieldWallHeight)
 	local from = math.atan2(outer.Y - center.Y, outer.X - center.X)
@@ -140,7 +140,7 @@ end
 
 -- The highest point of the roof: the apex of its circle. The lap gates are as tall as it.
 function Profile.roofTop(arena: ArenaConfig): number
-	local center, radius = roofCircle(arena)
+	local center, radius = Profile.roofCircle(arena)
 	return center.Y + radius
 end
 
