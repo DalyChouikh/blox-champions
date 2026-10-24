@@ -27,6 +27,8 @@ beforeEach(function()
 		PoseController = recorder("poses"),
 		CameraController = recorder("camera"),
 		TouchControls = recorder("touch"),
+		HudStore = recorder("hudStore"),
+		Hud = recorder("hud"),
 	})
 end)
 
@@ -36,8 +38,11 @@ describe("FrameController", function()
 		expect(order).toEqual({ "skate 0.5", "actions 0.5", "poses 0.5" })
 	end)
 
-	it("renders the camera, then the touch controls, before each frame is drawn", function()
-		FrameController:render(0.25)
-		expect(order).toEqual({ "camera 0.25", "touch 0.25" })
-	end)
+	it(
+		"renders the camera, the touch controls, then the HUD's state and the HUD, before each frame is drawn",
+		function()
+			FrameController:render(0.25)
+			expect(order).toEqual({ "camera 0.25", "touch 0.25", "hudStore 0.25", "hud 0.25" })
+		end
+	)
 end)

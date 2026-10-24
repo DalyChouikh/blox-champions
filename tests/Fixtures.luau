@@ -7,7 +7,10 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local GeometryTypes = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
+local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
+local Team = require(ReplicatedStorage.Shared.Rules.Team)
+local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 
@@ -60,6 +63,46 @@ end
 
 function Fixtures.config(overrides: { [string]: any }?): Config.GameConfig
 	return Config.forMode(Fixtures.mode(overrides))
+end
+
+-- A player's line in the score tab, with no points yet.
+function Fixtures.playerStats(id: Types.PlayerId, team: Team.Team, present: boolean): Types.PlayerStats
+	return {
+		player = id,
+		team = team,
+		joinOrder = tonumber(id) :: number,
+		present = present,
+		score = 0,
+		goals = 0,
+		assists = 0,
+		saves = 0,
+		steals = 0,
+	}
+end
+
+-- What the server sends the HUD: a live match two minutes from the end with players "1" (Blue, Ana) and "2" (Orange,
+-- Rex), its fields changed by `overrides`.
+function Fixtures.matchSnapshot(overrides: { [string]: any }?): Payloads.MatchSnapshot
+	local match: { [string]: any } = {
+		state = "Live",
+		period = "Regulation",
+		phaseSecondsLeft = 0,
+		secondsLeft = 120,
+		overtimeSeconds = 0,
+		scores = { Blue = 0, Orange = 0 },
+		streak = 0,
+		lapProgress = 0,
+		gateCount = 4,
+		stats = {
+			scores = { Blue = 0, Orange = 0 },
+			players = { Fixtures.playerStats("1", "Blue", true), Fixtures.playerStats("2", "Orange", true) },
+		},
+	}
+	local changes: { [string]: any } = overrides or {}
+	for key, value in changes do
+		match[key] = value
+	end
+	return { match = match :: any, names = { ["1"] = "Ana", ["2"] = "Rex" } }
 end
 
 -- A straight synthetic "track": every gate faces +X, so a segment moving +X crosses it forward.
