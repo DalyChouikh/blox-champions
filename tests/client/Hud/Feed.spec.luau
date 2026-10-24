@@ -17,6 +17,8 @@ local text = HudText.new(config)
 local NAMES = { ["1"] = "Ana", ["2"] = "Rex" }
 
 local folder: Folder
+-- The HUD's area, as the Hud's binding gives it.
+local area: React.Binding<Vector2>, setArea: (Vector2) -> ()
 
 local function entry(id: number, kind: HudState.FeedKind, team: "Blue" | "Orange", player: string?, value: number?)
 	local made: HudState.FeedEntry = { id = id, kind = kind, team = team, player = player, value = value, timeLeft = 1 }
@@ -26,7 +28,7 @@ end
 -- The feed keyed as App keys it, which names its frame.
 local function feed(entries: { HudState.FeedEntry }): React.ReactElement
 	return React.createElement(React.Fragment, nil, {
-		Feed = React.createElement(Feed, { config = config, text = text, feed = entries, names = NAMES }),
+		Feed = React.createElement(Feed, { config = config, text = text, feed = entries, names = NAMES, area = area }),
 	})
 end
 
@@ -34,6 +36,7 @@ beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "FeedTest"
 	folder.Parent = workspace
+	area, setArea = React.createBinding(Vector2.zero)
 end)
 
 afterEach(function()
@@ -62,5 +65,15 @@ describe("Feed", function()
 		rerender(feed({ entry(7, "Possession", "Orange", "2") }))
 		expect(frame:FindFirstChild("6") == nil).toBe(true)
 		expect(kept ~= nil and frame:FindFirstChild("7") == kept).toBe(true)
+	end)
+
+	it("shrinks to fit a screen narrower than itself", function()
+		-- (400 - 2 margins) / 460.
+		setArea(Vector2.new(400, 323))
+		local mounted = Fixtures.mount(feed({ entry(1, "Possession", "Blue", "1") }), folder)
+		local fit = (mounted:FindFirstChild("Feed") :: Frame):FindFirstChild("Fit") :: UIScale
+		expect(fit.Scale).toBeCloseTo(384 / 460, 4)
+		setArea(Vector2.new(1920, 1000))
+		expect(fit.Scale).toBe(1)
 	end)
 end)

@@ -254,7 +254,7 @@ describe("Hud", function()
 		expect(part("ScoreTab")).toBeNil()
 	end)
 
-	it("fits the score tab and the end screen to the HUD's area", function()
+	it("fits the score tab, the end screen, the banner and the feed to the HUD's area", function()
 		local function fit(panel: string): number
 			return (part(panel):FindFirstChild("Fit") :: UIScale).Scale
 		end
@@ -268,6 +268,10 @@ describe("Hud", function()
 		expect(fit("EndScreen")).toBeCloseTo(307 / 520, 4)
 		Hud:resize(Vector2.new(1920, 1000))
 		expect(fit("EndScreen")).toBe(1)
+		-- Narrower than the banner and the feed: (400 - 2 margins) / 640 and / 460.
+		Hud:resize(Vector2.new(400, 323))
+		expect(fit("Banner")).toBeCloseTo(384 / 640, 4)
+		expect(fit("Feed")).toBeCloseTo(384 / 460, 4)
 	end)
 
 	it("steps in under 0.1 ms", function()

@@ -65,8 +65,14 @@ local function App(props: AppProps): React.ReactElement
 					clock = bindings.clock,
 				})
 				else nil,
-			Banner = React.createElement(Banner, { config = config, text = text, banner = state.banner }),
-			Feed = React.createElement(Feed, { config = config, text = text, feed = state.feed, names = state.names }),
+			Banner = React.createElement(
+				Banner,
+				{ config = config, text = text, banner = state.banner, area = bindings.area }
+			),
+			Feed = React.createElement(
+				Feed,
+				{ config = config, text = text, feed = state.feed, names = state.names, area = bindings.area }
+			),
 			ControlHints = if keys ~= nil
 				then React.createElement(ControlHints, { config = config, keys = keys, labels = bindings.labels })
 				else nil,
