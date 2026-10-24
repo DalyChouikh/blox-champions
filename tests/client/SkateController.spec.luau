@@ -125,6 +125,23 @@ describe("SkateController", function()
 		Fixtures.expectNear(alignOf(rig).PrimaryAxis, Vector3.xAxis)
 	end)
 
+	-- A player who joins a running match is placed unfrozen, and the arena can reach their client after their
+	-- character: with no floor below, the skater fell far under the arena and stayed there (#177).
+	it("holds still until the arena reaches this client, then skates", function()
+		floor:RemoveTag(Tags.RideSurface)
+		RideSurfaces:refresh()
+		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(0, 1))
+		SkateController:step(0.1)
+		expect(SkateController.frozen).toBe(true)
+		Fixtures.expectNear(velocityOf(rig), Vector3.zero)
+
+		floor:AddTag(Tags.RideSurface)
+		RideSurfaces:refresh()
+		SkateController:step(0.1)
+		expect(SkateController.frozen).toBe(false)
+		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -2.594))
+	end)
+
 	it("holds still while the root is anchored, then starts from rest", function()
 		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(0, 1))
 		for _ = 1, 10 do
