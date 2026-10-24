@@ -4,8 +4,9 @@
 -- (MatchClock.runs), and each ClockWarning sets it. Events raise banners (the kickoff's 3-2-1 while the countdown
 -- lasts, the others for UI.hud.bannerSeconds of play, held through a celebration so GOAL! lasts until the 3-2-1; a new
 -- one replaces the last) and add feed entries (each for UI.hud.feedSeconds, at most UI.hud.feedMaxEntries, oldest
--- first). The end of a match shows until the next match's first snapshot. `version` grows whenever anything it shows
--- changes, but not as the clocks count, so the HUD redraws only then; stepping allocates nothing.
+-- first). The end of a match shows from MatchEnded, or from a snapshot of the ended match for a player who joins then,
+-- until the next match's first snapshot. `version` grows whenever anything it shows changes, but not as the clocks
+-- count, so the HUD redraws only then; stepping allocates nothing.
 
 local Config = require(script.Parent.Parent.Config)
 local MatchClock = require(script.Parent.Parent.Rules.MatchClock)
@@ -87,6 +88,11 @@ local function addEntry(self: HudState, kind: FeedKind, team: Team, player: Play
 	end
 end
 
+-- What the end screen shows, from MatchEnded or from a snapshot of the ended match.
+local function endedOf(winner: Team, mvp: PlayerId?, stats: Types.MatchStats): Ended
+	return { winner = winner, mvp = mvp, stats = stats }
+end
+
 -- The team `player` plays for in `match`'s score tab; nil without a match or for a player it doesn't list.
 function HudState.teamOf(match: MatchEngine.Snapshot?, player: PlayerId): Team?
 	if match ~= nil then
@@ -103,9 +109,8 @@ function HudState.applySnapshot(self: HudState, payload: Payloads.MatchSnapshot)
 	local match = payload.match
 	self.match = match
 	self.names = payload.names
-	if match.state ~= "Ended" then
-		self.ended = nil
-	end
+	local winner: Team? = match.winner
+	self.ended = if match.state == "Ended" and winner ~= nil then endedOf(winner, match.mvp, match.stats) else nil
 	local banner = self.banner
 	if match.state == "Kickoff" then
 		if banner == nil or banner.kind ~= "Countdown" then
@@ -155,7 +160,7 @@ function HudState.applyEvents(self: HudState, events: { Types.Event })
 		elseif event.name == "OvertimeStarted" then
 			showBanner(self, "Overtime", nil, nil)
 		elseif event.name == "MatchEnded" then
-			self.ended = { winner = event.winner, mvp = event.mvp, stats = event.stats }
+			self.ended = endedOf(event.winner, event.mvp, event.stats)
 			self.banner = nil
 		else
 			shown = false

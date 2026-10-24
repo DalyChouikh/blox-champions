@@ -52,6 +52,10 @@ export type Snapshot = {
 	goalOpenFor: Team?,
 	-- The score tab: every player who played this match, by team, then score.
 	stats: Types.MatchStats,
+	-- Once the match has ended: the winning team, and its MVP (nil if none of its players is still in the match), as
+	-- MatchEnded gave them, so a player who joins afterwards sees the result too.
+	winner: Team?,
+	mvp: PlayerId?,
 }
 
 -- Returned on quiet ticks so draining never allocates.
@@ -98,6 +102,9 @@ type Fields = {
 	_period: Types.Period,
 	-- The team playing its Last Chance; set only while the period is "LastChance".
 	_trailingTeam: Team?,
+	-- Set when the match ends.
+	_winner: Team?,
+	_mvp: PlayerId?,
 	_phaseTimeLeft: number,
 	_now: number,
 	_ballThrown: boolean,
@@ -177,7 +184,9 @@ end
 local function endMatch(self: MatchEngine, winner: Team)
 	confirmBlock(self)
 	self._state = "Ended"
-	emit(self, { name = "MatchEnded", winner = winner, mvp = self._scores:mvp(winner), stats = self._scores:stats() })
+	self._winner = winner
+	self._mvp = self._scores:mvp(winner)
+	emit(self, { name = "MatchEnded", winner = winner, mvp = self._mvp, stats = self._scores:stats() })
 end
 
 local function startOvertime(self: MatchEngine)
@@ -274,6 +283,8 @@ function MatchEngine.new(options: EngineOptions): MatchEngine
 			_state = "Waiting",
 			_period = "Regulation",
 			_trailingTeam = nil,
+			_winner = nil,
+			_mvp = nil,
 			_phaseTimeLeft = 0,
 			_now = 0,
 			_ballThrown = false,
@@ -477,6 +488,8 @@ function MatchEngine.snapshot(self: MatchEngine): Snapshot
 		nextGate = self._laps.nextGate,
 		goalOpenFor = self._goal.openFor,
 		stats = self._scores:stats(),
+		winner = self._winner,
+		mvp = self._mvp,
 	}
 end
 
