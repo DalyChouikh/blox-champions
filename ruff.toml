@@ -1,0 +1,7 @@
+# Ruff formats and lints the Python in scripts/ (the CI tools), at StyLua's 120 columns.
+line-length = 120
+target-version = "py312"
+
+[lint]
+# pycodestyle errors and warnings, Pyflakes, isort, flake8-bugbear, pyupgrade, flake8-simplify.
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
