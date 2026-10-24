@@ -252,7 +252,8 @@ local defaults: UIConfig = {
 		screenMargin = 8,
 		layout = {
 			scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
-			banner = { position = UDim2.fromScale(0.5, 0.3), size = UDim2.fromOffset(640, 110) },
+			-- Its centre 200 px from the top: clear of the scoreboard on a phone too (the owner's choice).
+			banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(640, 110) },
 			feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
 			hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
 			speedometer = {
