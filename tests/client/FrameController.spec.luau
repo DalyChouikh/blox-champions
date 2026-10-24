@@ -22,6 +22,11 @@ end
 beforeEach(function()
 	table.clear(order)
 	FrameController:init({
+		InputController = {
+			watchOverlays = function(_self: any)
+				table.insert(order, "overlays")
+			end,
+		},
 		SkateController = recorder("skate"),
 		ActionController = recorder("actions"),
 		PoseController = recorder("poses"),
@@ -42,10 +47,12 @@ describe("FrameController", function()
 	end)
 
 	it(
-		"renders the camera, touch controls, HUD state, HUD, world markers, arena glow and name tags before each frame",
+		"checks Roblox's overlays, then renders the camera, touch controls, HUD state, HUD, world markers, "
+			.. "arena glow and name tags before each frame",
 		function()
 			FrameController:render(0.25)
 			expect(order).toEqual({
+				"overlays",
 				"camera 0.25",
 				"touch 0.25",
 				"hudStore 0.25",

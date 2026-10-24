@@ -1,15 +1,18 @@
 --!strict
 -- The client's frame, in one fixed order. Each physics step: the skating, then the actions, which read the skater as
--- the skating just left it, then the poses, which read both. Before each frame is drawn: the camera, which shows the
--- skater where physics left them, then the touch controls, which show what each button does now, then the HUD's
--- state, whose clocks count on, then the HUD, which shows it, then the world's markers and the arena's glow, which
--- read that state too, then the name tags. Roblox gives RunService handlers no documented order (they ran in
--- reverse of their connection order when measured), so only this module connects them, one per phase.
+-- the skating just left it, then the poses, which read both. Before each frame is drawn: whether Roblox's Developer
+-- Console is open (InputController, which pauses the controls), then the camera, which shows the skater where physics
+-- left them, then the touch controls, which show what each button does now, then the HUD's state, whose clocks count
+-- on, then the HUD, which shows it, then the world's markers and the arena's glow, which read that state too, then the
+-- name tags. Roblox gives RunService handlers no documented order (they ran in reverse of their connection order when
+-- measured), so only this module connects them, one per phase.
 
 local RunService = game:GetService("RunService")
 
 -- Anything stepped once per physics step.
 type Steppable = { step: (self: any, dt: number) -> () }
+-- What reads Roblox's overlays once a frame.
+type OverlayWatcher = { watchOverlays: (self: any) -> () }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
 export type FrameController = {
@@ -19,6 +22,7 @@ export type FrameController = {
 	start: (self: FrameController) -> (),
 	step: (self: FrameController, dt: number) -> (),
 	render: (self: FrameController, dt: number) -> (),
+	_input: OverlayWatcher,
 	_skate: Steppable,
 	_actions: Steppable,
 	_poses: Steppable,
@@ -34,6 +38,7 @@ export type FrameController = {
 local FrameController: FrameController = {
 	name = "FrameController",
 	dependencies = {
+		"InputController",
 		"SkateController",
 		"ActionController",
 		"PoseController",
@@ -45,6 +50,7 @@ local FrameController: FrameController = {
 		"ArenaGlow",
 		"NameTags",
 	},
+	_input = nil :: any,
 	_skate = nil :: any,
 	_actions = nil :: any,
 	_poses = nil :: any,
@@ -57,6 +63,7 @@ local FrameController: FrameController = {
 	_nameTags = nil :: any,
 
 	init = function(self: FrameController, deps: { [string]: any })
+		self._input = deps.InputController
 		self._skate = deps.SkateController
 		self._actions = deps.ActionController
 		self._poses = deps.PoseController
@@ -85,6 +92,7 @@ local FrameController: FrameController = {
 	end,
 
 	render = function(self: FrameController, dt: number)
+		self._input:watchOverlays()
 		self._camera:step(dt)
 		self._touch:step(dt)
 		self._hudStore:step(dt)
