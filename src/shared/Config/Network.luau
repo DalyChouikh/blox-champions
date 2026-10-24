@@ -1,6 +1,6 @@
 --!strict
 -- Allowances for network lag when the server judges what a player did (spec §10), and the thresholds of the movement
--- guard that catches a client moving faster than skating allows.
+-- guard that catches a client moving faster than skating allows or found outside the arena.
 
 local Validate = require(script.Parent.Validate)
 
@@ -17,6 +17,9 @@ export type NetworkConfig = {
 	guardStrikes: number,
 	-- A move this many times the allowed distance in one sample returns the skater at once.
 	guardTeleportFactor: number,
+	-- How far outside the arena's tube (past a wall, under the floor, over the roof) a skater's root may be before the
+	-- guard puts them back on their team's spawn.
+	guardOutsideMargin: number,
 	-- How many action requests a client may send (a burst of this many, refilled per second).
 	maxActionsPerSecond: number,
 	-- Extra reach for strikes judged on the server, which sees each player slightly behind their own screen.
@@ -33,6 +36,7 @@ local defaults: NetworkConfig = {
 	speedTolerance = 1.2,
 	guardStrikes = 3,
 	guardTeleportFactor = 2,
+	guardOutsideMargin = 2,
 	maxActionsPerSecond = 15,
 	hitLagToleranceStuds = 3,
 	actionTimingTolerance = 0.1,
@@ -45,6 +49,7 @@ local schema = Validate.record({
 	speedTolerance = Validate.number({ above = 0 }),
 	guardStrikes = Validate.number({ min = 1, integer = true }),
 	guardTeleportFactor = Validate.number({ above = 0 }),
+	guardOutsideMargin = Validate.number({ min = 0 }),
 	maxActionsPerSecond = Validate.number({ above = 0 }),
 	hitLagToleranceStuds = Validate.number({ min = 0 }),
 	actionTimingTolerance = Validate.number({ min = 0 }),
