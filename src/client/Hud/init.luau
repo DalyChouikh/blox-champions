@@ -48,6 +48,8 @@ export type Hud = {
 	toggleScoreTab: (self: Hud) -> (),
 	-- The HUD's area changed (the gui's AbsoluteSize): the big panels fit in it.
 	resize: (self: Hud, area: Vector2) -> (),
+	-- Unmounts both React roots (tests).
+	destroy: (self: Hud) -> (),
 	gui: ScreenGui,
 	-- Spans the whole screen: the reticle's.
 	centre: ScreenGui,
@@ -66,6 +68,7 @@ export type Hud = {
 	_keyString: (key: Enum.KeyCode) -> string,
 	_keyImage: (key: Enum.KeyCode) -> string,
 	_root: ReactRoblox.RootType,
+	_centreRoot: ReactRoblox.RootType,
 	_bindings: App.HudBindings,
 	_clock: Shown,
 	_speed: Shown,
@@ -148,6 +151,7 @@ local Hud: Hud = {
 		return ""
 	end,
 	_root = nil :: any,
+	_centreRoot = nil :: any,
 	_bindings = nil :: any,
 	_clock = nil :: any,
 	_speed = nil :: any,
@@ -229,7 +233,8 @@ local Hud: Hud = {
 		centre.ScreenInsets = Enum.ScreenInsets.None
 		centre.Parent = parent
 		self.centre = centre
-		ReactRoblox.createLegacyRoot(centre):render(React.createElement(React.Fragment, nil, {
+		self._centreRoot = ReactRoblox.createLegacyRoot(centre)
+		self._centreRoot:render(React.createElement(React.Fragment, nil, {
 			Reticle = React.createElement(Reticle, { config = config }),
 		}))
 	end,
@@ -245,6 +250,11 @@ local Hud: Hud = {
 
 	toggleScoreTab = function(self: Hud)
 		self._touchToggled = not self._touchToggled
+	end,
+
+	destroy = function(self: Hud)
+		self._root:unmount()
+		self._centreRoot:unmount()
 	end,
 
 	resize = function(self: Hud, area: Vector2)

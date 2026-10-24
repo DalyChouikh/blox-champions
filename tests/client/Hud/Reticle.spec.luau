@@ -14,6 +14,7 @@ local config = Fixtures.config()
 local folder: Folder?
 
 afterEach(function()
+	Fixtures.unmountAll()
 	if folder ~= nil then
 		folder:Destroy()
 		folder = nil

@@ -11,6 +11,7 @@ local React = require(ReplicatedStorage.Packages.React)
 local folder: Folder?
 
 afterEach(function()
+	Fixtures.unmountAll()
 	if folder then
 		folder:Destroy()
 		folder = nil
@@ -37,5 +38,17 @@ describe("React Luau", function()
 		expect(shown ~= nil and shown.Text).toBe("bye")
 		unmount()
 		expect(#mounted:GetChildren()).toBe(0)
+	end)
+
+	it("unmounts every root the fixtures mounted, as each component spec does after a test", function()
+		local parent = Instance.new("Folder")
+		parent.Name = "ReactLuauTest"
+		parent.Parent = workspace
+		folder = parent
+
+		local first = Fixtures.mount(label("a"), parent)
+		local second = Fixtures.mount(label("b"), parent)
+		Fixtures.unmountAll()
+		expect(#first:GetChildren() + #second:GetChildren()).toBe(0)
 	end)
 end)

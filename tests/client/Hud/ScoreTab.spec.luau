@@ -59,6 +59,7 @@ beforeEach(function()
 end)
 
 afterEach(function()
+	Fixtures.unmountAll()
 	folder:Destroy()
 end)
 
