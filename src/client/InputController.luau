@@ -48,6 +48,8 @@ export type InputController = {
 	-- The touch stick, as a move (x right, y forward, length 0..1).
 	setStick: (self: InputController, stick: Vector2) -> (),
 	setPaused: (self: InputController, paused: boolean) -> (),
+	-- The score tab's key (Tab, or Select) held now.
+	scoreTabHeld: (self: InputController) -> boolean,
 	-- Roblox's menu is open: every key is stopped.
 	paused: boolean,
 	destroy: (self: InputController) -> (),
@@ -59,6 +61,7 @@ export type InputController = {
 	_throw: InputAction,
 	_look: InputAction,
 	_ballFocus: InputAction,
+	_scoreTab: InputAction,
 	_lookBindings: LookBindings,
 	_stick: InputBinding,
 	_presses: Presses,
@@ -83,6 +86,7 @@ local NAMES = {
 	throw = "Throw",
 	look = "Look",
 	ballFocus = "BallFocus",
+	scoreTab = "ScoreTab",
 	touchMove = "TouchMove",
 	touchStick = "TouchStick",
 }
@@ -168,6 +172,7 @@ local InputController: InputController = {
 	_throw = nil :: any,
 	_look = nil :: any,
 	_ballFocus = nil :: any,
+	_scoreTab = nil :: any,
 	_lookBindings = nil :: any,
 	_stick = nil :: any,
 	_presses = { jump = 0, tackle = 0, uppercut = 0, pass = 0, ballFocus = 0 },
@@ -218,6 +223,7 @@ local InputController: InputController = {
 		newPressButton(self, NAMES.pass, input.pass, "pass")
 		self._throw = newButton(context, NAMES.throw, input.throw)
 		self._ballFocus = newPressButton(self, NAMES.ballFocus, input.ballFocus, "ballFocus")
+		self._scoreTab = newButton(context, NAMES.scoreTab, input.scoreTab)
 
 		local look = newAction(context, NAMES.look, Enum.InputActionType.Direction2D)
 		self._look = look
@@ -311,6 +317,10 @@ local InputController: InputController = {
 
 	setStick = function(self: InputController, stick: Vector2)
 		self._stick:Fire(stick)
+	end,
+
+	scoreTabHeld = function(self: InputController): boolean
+		return self._scoreTab:GetState() :: boolean
 	end,
 
 	setPaused = function(self: InputController, paused: boolean)

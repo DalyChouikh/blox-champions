@@ -86,7 +86,8 @@ export type HudLayout = {
 	-- touchPosition clears the touch buttons.
 	speedometer: { position: UDim2, touchPosition: UDim2, size: UDim2 },
 	reticle: { size: number },
-	scoreTab: { position: UDim2, size: UDim2, rowHeight: number },
+	-- columnWidth: each number column; the name column takes the rest.
+	scoreTab: { position: UDim2, size: UDim2, rowHeight: number, columnWidth: number },
 	-- The touch button that opens the score tab.
 	scoreButton: Place,
 	endScreen: Place,
@@ -250,7 +251,12 @@ local defaults: UIConfig = {
 				size = UDim2.fromOffset(160, 40),
 			},
 			reticle = { size = 6 },
-			scoreTab = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(640, 360), rowHeight = 28 },
+			scoreTab = {
+				position = UDim2.fromScale(0.5, 0.5),
+				size = UDim2.fromOffset(640, 360),
+				rowHeight = 28,
+				columnWidth = 80,
+			},
 			scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
 			endScreen = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(720, 520) },
 		},
@@ -330,6 +336,7 @@ local positive = Validate.number({ above = 0 })
 local udim2 = Validate.datatype("UDim2")
 local place = Validate.record({ position = udim2, size = udim2 })
 local list = Validate.record({ position = udim2, size = udim2, rowHeight = positive })
+local columns = Validate.record({ position = udim2, size = udim2, rowHeight = positive, columnWidth = positive })
 
 local schema = Validate.record({
 	clockWarnings = Validate.check(
@@ -418,7 +425,7 @@ local schema = Validate.record({
 			hints = list,
 			speedometer = Validate.record({ position = udim2, touchPosition = udim2, size = udim2 }),
 			reticle = Validate.record({ size = positive }),
-			scoreTab = list,
+			scoreTab = columns,
 			scoreButton = place,
 			endScreen = place,
 		}),

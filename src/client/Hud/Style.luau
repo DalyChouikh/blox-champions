@@ -6,7 +6,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local React = require(ReplicatedStorage.Packages.React)
 
-export type Props = { [string]: any }
+-- Keyed by property name, or by a React event (React.Event.Activated).
+export type Props = { [any]: any }
 
 local Style = {}
 

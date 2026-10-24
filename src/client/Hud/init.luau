@@ -7,7 +7,8 @@
 -- clock, the speed, what each control does now) goes through bindings instead, each set only when its text changes;
 -- the texts come from caches and the config, so a quiet frame allocates nothing. Hints name each key as the device
 -- shows it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout gives it, else
--- Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the labels.
+-- Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the labels. The score
+-- tab shows while its key is held; on touch a button toggles it, and the toggle clears once the device is not touch.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,6 +22,7 @@ local ControlHints = require(script.ControlHints)
 local ControlLabels = require(script.Parent.ControlLabels)
 local HudStore = require(script.Parent.HudStore)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
+local InputController = require(script.Parent.InputController)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local React = require(ReplicatedStorage.Packages.React)
 local ReactRoblox = require(ReplicatedStorage.Packages.ReactRoblox)
@@ -40,6 +42,8 @@ export type Hud = {
 	init: (self: Hud, deps: { [string]: any }) -> (),
 	start: ((self: Hud) -> ())?,
 	step: (self: Hud, dt: number) -> (),
+	-- What the touch score button does: opens the score tab, or closes it.
+	toggleScoreTab: (self: Hud) -> (),
 	gui: ScreenGui,
 	-- Spans the whole screen: the reticle's.
 	centre: ScreenGui,
@@ -49,6 +53,7 @@ export type Hud = {
 	_text: HudText.HudText,
 	_store: HudStore.HudStore,
 	_skate: SkateController.SkateController,
+	_input: InputController.InputController,
 	_actions: ActionController.ActionController,
 	_carrier: BallCarrier.BallCarrier,
 	_localId: PlayerId,
@@ -61,11 +66,16 @@ export type Hud = {
 	_clock: Shown,
 	_speed: Shown,
 	_labels: { [string]: Shown },
+	-- The score button's handler, made once.
+	_onScoreButton: () -> (),
+	-- The score tab toggled on by its touch button.
+	_touchToggled: boolean,
 	-- What App last rendered from; the version is nil before the first render.
 	_version: number?,
 	_device: Enum.PreferredInput?,
 	_shownCarrier: PlayerId?,
 	_hasSkater: boolean,
+	_scoreTabOpen: boolean,
 }
 
 local function newShown(text: string): Shown
@@ -109,7 +119,7 @@ end
 
 local Hud: Hud = {
 	name = "Hud",
-	dependencies = { "Config", "HudStore", "SkateController", "ActionController", "BallCarrier" },
+	dependencies = { "Config", "HudStore", "InputController", "SkateController", "ActionController", "BallCarrier" },
 	gui = nil :: any,
 	centre = nil :: any,
 	renders = 0,
@@ -117,6 +127,7 @@ local Hud: Hud = {
 	_text = nil :: any,
 	_store = nil :: any,
 	_skate = nil :: any,
+	_input = nil :: any,
 	_actions = nil :: any,
 	_carrier = nil :: any,
 	_localId = "",
@@ -134,10 +145,13 @@ local Hud: Hud = {
 	_clock = nil :: any,
 	_speed = nil :: any,
 	_labels = {},
+	_onScoreButton = function() end,
+	_touchToggled = false,
 	_version = nil,
 	_device = nil,
 	_shownCarrier = nil,
 	_hasSkater = false,
+	_scoreTabOpen = false,
 
 	-- deps.Parent keeps the guis out of the local player's PlayerGui in tests; deps.PreferredInput, deps.LocalId,
 	-- deps.KeyString and deps.KeyImage replace the live game there.
@@ -147,6 +161,7 @@ local Hud: Hud = {
 		self._text = HudText.new(config)
 		self._store = deps.HudStore
 		self._skate = deps.SkateController
+		self._input = deps.InputController
 		self._actions = deps.ActionController
 		self._carrier = deps.BallCarrier
 		self._localId = deps.LocalId or PlayerIds.of(Players.LocalPlayer :: Player)
@@ -167,6 +182,11 @@ local Hud: Hud = {
 		self._device = nil
 		self._shownCarrier = nil
 		self._hasSkater = false
+		self._scoreTabOpen = false
+		self._touchToggled = false
+		self._onScoreButton = function()
+			self:toggleScoreTab()
+		end
 
 		self._clock = newShown(self._text:clock(self._store.state:clockSeconds()))
 		self._speed = newShown("")
@@ -201,22 +221,32 @@ local Hud: Hud = {
 		}))
 	end,
 
+	toggleScoreTab = function(self: Hud)
+		self._touchToggled = not self._touchToggled
+	end,
+
 	step = function(self: Hud, _dt: number)
 		local state = self._store.state
 		local device = self._preferredInput()
 		local carrier = self._carrier.carrier
 		local skate = self._skate
 		local hasSkater = skate:hasSkater()
+		if device ~= Enum.PreferredInput.Touch then
+			self._touchToggled = false
+		end
+		local scoreTabOpen = self._input:scoreTabHeld() or self._touchToggled
 		if
 			state.version ~= self._version
 			or device ~= self._device
 			or carrier ~= self._shownCarrier
 			or hasSkater ~= self._hasSkater
+			or scoreTabOpen ~= self._scoreTabOpen
 		then
 			self._version = state.version
 			self._device = device
 			self._shownCarrier = carrier
 			self._hasSkater = hasSkater
+			self._scoreTabOpen = scoreTabOpen
 			self.renders += 1
 			self._root:render(React.createElement(App, {
 				config = self._config,
@@ -227,6 +257,8 @@ local Hud: Hud = {
 				carrier = carrier,
 				hasSkater = hasSkater,
 				keys = hintKeys(self, device, hasSkater),
+				scoreTabOpen = scoreTabOpen,
+				onScoreButton = self._onScoreButton,
 				bindings = self._bindings,
 			}))
 		end
