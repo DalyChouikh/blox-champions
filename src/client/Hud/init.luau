@@ -2,7 +2,8 @@
 -- The HUD on screen (spec §11.1), drawn with React Luau into its own ScreenGui through a legacy root, which renders
 -- at once. Before each frame is drawn (FrameController), after HudStore has counted the clocks, it renders App again
 -- only when something App shows has changed: the HUD state's version, the device, the carrier, or whether the local
--- player has a skater.
+-- player has a skater. What changes every frame (the clock) goes through bindings instead, each set only when its
+-- text changes; the texts come from HudText's caches, so a frame allocates nothing.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,6 +40,10 @@ export type Hud = {
 	_localId: PlayerId,
 	_preferredInput: () -> Enum.PreferredInput,
 	_root: ReactRoblox.RootType,
+	_bindings: App.HudBindings,
+	_setClock: (text: string) -> (),
+	-- The clock's text as last set.
+	_clock: string,
 	-- What App last rendered from; the version is nil before the first render.
 	_version: number?,
 	_device: Enum.PreferredInput?,
@@ -61,6 +66,9 @@ local Hud: Hud = {
 		return Enum.PreferredInput.KeyboardAndMouse
 	end,
 	_root = nil :: any,
+	_bindings = nil :: any,
+	_setClock = function(_text: string) end,
+	_clock = "",
 	_version = nil,
 	_device = nil,
 	_shownCarrier = nil,
@@ -95,35 +103,44 @@ local Hud: Hud = {
 		gui.Parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
 		self.gui = gui
 		self._root = ReactRoblox.createLegacyRoot(gui)
+		self._clock = self._text:clock(self._store.state:clockSeconds())
+		local clock, setClock = React.createBinding(self._clock)
+		self._bindings = { clock = clock }
+		self._setClock = setClock
 	end,
 
 	step = function(self: Hud, _dt: number)
-		local version = self._store.state.version
+		local state = self._store.state
 		local device = self._preferredInput()
 		local carrier = self._carrier.carrier
 		local hasSkater = self._skate.skater ~= nil
 		if
-			version == self._version
-			and device == self._device
-			and carrier == self._shownCarrier
-			and hasSkater == self._hasSkater
+			state.version ~= self._version
+			or device ~= self._device
+			or carrier ~= self._shownCarrier
+			or hasSkater ~= self._hasSkater
 		then
-			return
+			self._version = state.version
+			self._device = device
+			self._shownCarrier = carrier
+			self._hasSkater = hasSkater
+			self.renders += 1
+			self._root:render(React.createElement(App, {
+				config = self._config,
+				text = self._text,
+				state = state,
+				device = device,
+				localId = self._localId,
+				carrier = carrier,
+				hasSkater = hasSkater,
+				bindings = self._bindings,
+			}))
 		end
-		self._version = version
-		self._device = device
-		self._shownCarrier = carrier
-		self._hasSkater = hasSkater
-		self.renders += 1
-		self._root:render(React.createElement(App, {
-			config = self._config,
-			text = self._text,
-			state = self._store.state,
-			device = device,
-			localId = self._localId,
-			carrier = carrier,
-			hasSkater = hasSkater,
-		}))
+		local clock = self._text:clock(state:clockSeconds())
+		if clock ~= self._clock then
+			self._clock = clock
+			self._setClock(clock)
+		end
 	end,
 }
 

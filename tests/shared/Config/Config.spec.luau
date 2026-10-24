@@ -370,6 +370,8 @@ describe("Config defaults", function()
 			feedSeconds = 6,
 			feedMaxEntries = 5,
 			glowThickness = 3,
+			spacing = 6,
+			pipSize = 10,
 			layout = {
 				scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
 				banner = { position = UDim2.fromScale(0.5, 0.3), size = UDim2.fromOffset(640, 110) },
@@ -746,6 +748,8 @@ describe("Config.forMode", function()
 				message = "UI.text.possession: placeholder count must be 1",
 			},
 			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
+			{ overrides = { UI = { hud = { pipSize = 0 } } }, message = "UI.hud.pipSize: must be > 0" },
+			{ overrides = { UI = { hud = { spacing = -1 } } }, message = "UI.hud.spacing: must be >= 0" },
 			{ overrides = { UI = { keyNames = { Banana = "B" } } }, message = "UI.keyNames: Banana must name a key" },
 		}
 		for _, case in cases do

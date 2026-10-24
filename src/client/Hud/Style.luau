@@ -1,0 +1,75 @@
+--!strict
+-- The props and layout pieces the HUD's parts share, all from Config.UI.hud, so each part spells out only its own.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local React = require(ReplicatedStorage.Packages.React)
+
+export type Props = { [string]: any }
+
+local Style = {}
+
+-- `props` written over `base`, which the caller made fresh: React keeps each element's props.
+local function over(base: Props, props: Props?): Props
+	if props ~= nil then
+		for key, value in props do
+			base[key] = value
+		end
+	end
+	return base
+end
+
+-- A text label: the HUD's font and text colour at its text size, on no background.
+function Style.text(config: Config.GameConfig, props: Props?): Props
+	local hud = config.UI.hud
+	return over({
+		Font = hud.font,
+		TextColor3 = hud.textColor,
+		TextSize = hud.textSize,
+		BackgroundTransparency = 1,
+	}, props)
+end
+
+-- A panel: the HUD's panel colour, see-through by panelTransparency.
+function Style.panel(config: Config.GameConfig, props: Props?): Props
+	local hud = config.UI.hud
+	return over(
+		{ BackgroundColor3 = hud.panel, BackgroundTransparency = hud.panelTransparency, BorderSizePixel = 0 },
+		props
+	)
+end
+
+-- A frame that only holds others.
+function Style.holder(props: Props?): Props
+	return over({ BackgroundTransparency = 1, BorderSizePixel = 0 }, props)
+end
+
+-- Lines a frame's parts up one after another in their LayoutOrder, centred, `spacing` apart.
+function Style.list(config: Config.GameConfig, direction: Enum.FillDirection): React.ReactElement
+	return React.createElement("UIListLayout", {
+		FillDirection = direction,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, config.UI.hud.spacing),
+	})
+end
+
+-- Rounds a panel's corners.
+function Style.corner(config: Config.GameConfig): React.ReactElement
+	return React.createElement("UICorner", { CornerRadius = config.UI.hud.corner })
+end
+
+-- Keeps a panel's parts `spacing` inside its edge.
+function Style.padding(config: Config.GameConfig): React.ReactElement
+	local inset = UDim.new(0, config.UI.hud.spacing)
+	return React.createElement("UIPadding", {
+		PaddingTop = inset,
+		PaddingBottom = inset,
+		PaddingLeft = inset,
+		PaddingRight = inset,
+	})
+end
+
+return table.freeze(Style)
