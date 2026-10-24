@@ -14,8 +14,8 @@ jobs:
       - name: Install toolchain (rokit.toml)
         uses: CompeyDev/setup-rokit@v0.2.1
 
-      - name: Install packages
-        run: wally install
+      - name: Install packages (and re-export their types)
+        run: bash scripts/install-packages.sh
 
       - name: Check formatting
         run: stylua --check src tests scripts

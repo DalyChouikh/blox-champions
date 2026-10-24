@@ -26,6 +26,23 @@ function Fixtures.expectNear2(actual: Vector2, expected: Vector2, tolerance: num
 	JestGlobals.expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-3)
 end
 
+-- Renders `element` into a new folder under `parent` with React Luau's legacy root, which renders synchronously, so
+-- its instances exist as soon as this returns. Returns the folder, a function that renders another element in its
+-- place, and one that unmounts it. React is required here, so specs that never mount never load it.
+function Fixtures.mount(element: any, parent: Instance): (Folder, (element: any) -> (), () -> ())
+	local ReactRoblox = require(ReplicatedStorage.Packages.ReactRoblox) :: any
+	local folder = Instance.new("Folder")
+	folder.Name = "Mount"
+	folder.Parent = parent
+	local root = ReactRoblox.createLegacyRoot(folder)
+	root:render(element)
+	return folder, function(nextElement: any)
+		root:render(nextElement)
+	end, function()
+		root:unmount()
+	end
+end
+
 -- A binding tests can drive with Fire, added to the context's input action called `name`.
 function Fixtures.scriptedBinding(context: InputContext, name: string): InputBinding
 	local binding = Instance.new("InputBinding")

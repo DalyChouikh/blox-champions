@@ -1,5 +1,5 @@
 --!strict
--- Runs the Jest-Lua suite inside Studio and returns a summary table.
+-- Runs the Jest Roblox suite inside Studio and returns a summary table.
 -- Invoke from the Studio command bar or the Studio MCP `execute_luau` tool (Edit DataModel):
 --   return require(game:GetService("ServerStorage").RunTests)({ testPathPattern = "Freeze" })
 
@@ -19,7 +19,7 @@ export type Summary = {
 	failureMessages: { string },
 }
 
-local REQUIRED_CHILDREN = { "DevPackages", "Tests" }
+local REQUIRED_CHILDREN = { "Packages", "DevPackages", "Tests" }
 
 local NO_TESTS_GUIDANCE = "No tests matched, or Jest could not start. If you passed testPathPattern or "
 	.. "testNamePattern, check that it matches a test file or test name."
