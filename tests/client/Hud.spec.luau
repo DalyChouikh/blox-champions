@@ -104,6 +104,16 @@ describe("Hud", function()
 		expect(Hud.renders).toBe(5)
 	end)
 
+	it("shows the banner and the feed from the HUD's state", function()
+		HudStore:onEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } })
+		Hud:step(0)
+		local banner = Hud.gui:FindFirstChild("Banner", true) :: TextLabel
+		expect(banner.Visible).toBe(true)
+		expect(banner.Text).toBe("GOAL!")
+		local feed = Hud.gui:FindFirstChild("Feed", true) :: Frame
+		expect((feed:FindFirstChild("1") :: TextLabel).Text).toBe("Ana scored!")
+	end)
+
 	it("counts the clock down on the scoreboard without rendering again", function()
 		Hud:step(0)
 		local clock = Hud.gui:FindFirstChild("Clock", true) :: TextLabel

@@ -45,15 +45,18 @@ function Style.holder(props: Props?): Props
 	return over({ BackgroundTransparency = 1, BorderSizePixel = 0 }, props)
 end
 
--- Lines a frame's parts up one after another in their LayoutOrder, centred, `spacing` apart.
-function Style.list(config: Config.GameConfig, direction: Enum.FillDirection): React.ReactElement
-	return React.createElement("UIListLayout", {
-		FillDirection = direction,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, config.UI.hud.spacing),
-	})
+-- Lines a frame's parts up one after another in their LayoutOrder, centred, `spacing` apart, with `props` on top.
+function Style.list(config: Config.GameConfig, direction: Enum.FillDirection, props: Props?): React.ReactElement
+	return React.createElement(
+		"UIListLayout",
+		over({
+			FillDirection = direction,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, config.UI.hud.spacing),
+		}, props)
+	)
 end
 
 -- Rounds a panel's corners.

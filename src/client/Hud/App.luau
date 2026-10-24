@@ -7,6 +7,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
+local Banner = require(script.Parent.Banner)
+local Feed = require(script.Parent.Feed)
 local React = require(ReplicatedStorage.Packages.React)
 local Scoreboard = require(script.Parent.Scoreboard)
 local Style = require(script.Parent.Style)
@@ -46,6 +48,13 @@ local function App(props: AppProps): React.ReactElement
 					clock = props.bindings.clock,
 				})
 				else nil,
+			Banner = React.createElement(Banner, { config = props.config, text = props.text, banner = state.banner }),
+			Feed = React.createElement(Feed, {
+				config = props.config,
+				text = props.text,
+				feed = state.feed,
+				names = state.names,
+			}),
 		}),
 	})
 end
