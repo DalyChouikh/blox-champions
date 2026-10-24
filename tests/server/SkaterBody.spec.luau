@@ -37,6 +37,13 @@ describe("SkaterBody", function()
 		end
 	)
 
+	it("turns off Roblox's own name over the skater", function()
+		local rig = Fixtures.rig(folder, "Skater", CFrame.new(0, 5, 0))
+		SkaterBody.build(rig, Config.defaults().Movement)
+		local humanoid = rig:FindFirstChild(SkaterRig.humanoid) :: Humanoid
+		expect(humanoid.DisplayDistanceType).toBe(Enum.HumanoidDisplayDistanceType.None)
+	end)
+
 	it("registers the skater groups once: bodies touch nothing, colliders the arena but not each other", function()
 		local registered: { [string]: boolean } = { Default = true }
 		local collides: { [string]: boolean } = {}

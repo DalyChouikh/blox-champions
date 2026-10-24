@@ -31,6 +31,7 @@ beforeEach(function()
 		Hud = recorder("hud"),
 		WorldMarkers = recorder("worldMarkers"),
 		ArenaGlow = recorder("arenaGlow"),
+		NameTags = recorder("nameTags"),
 	})
 end)
 
@@ -41,7 +42,7 @@ describe("FrameController", function()
 	end)
 
 	it(
-		"renders the camera, touch controls, HUD state, HUD, world markers and arena glow before each frame is drawn",
+		"renders the camera, touch controls, HUD state, HUD, world markers, arena glow and name tags before each frame",
 		function()
 			FrameController:render(0.25)
 			expect(order).toEqual({
@@ -51,6 +52,7 @@ describe("FrameController", function()
 				"hud 0.25",
 				"worldMarkers 0.25",
 				"arenaGlow 0.25",
+				"nameTags 0.25",
 			})
 		end
 	)

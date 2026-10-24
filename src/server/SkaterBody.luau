@@ -2,7 +2,8 @@
 -- The skater body (spec §7.1), added by the server to each character it loads:
 -- - one collider of the same size for every avatar, welded to the root;
 -- - avatar parts that touch nothing;
--- - the velocity and facing constraints the owning client drives.
+-- - the velocity and facing constraints the owning client drives;
+-- - no name drawn by Roblox over it: each client draws its own tags (NameTags).
 -- Default animations never start: StarterCharacterScripts holds our own Animate (src/character).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -68,6 +69,8 @@ function SkaterBody.build(character: Model, movement: Config.MovementConfig)
 			part.CollisionGroup = SkaterRig.groups.body
 		end
 	end
+	local humanoid = character:FindFirstChild(SkaterRig.humanoid) :: Humanoid
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	local root = character:FindFirstChild(SkaterRig.root) :: BasePart
 	addCollider(root, movement, character)
 	addConstraints(root)

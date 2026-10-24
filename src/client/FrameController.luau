@@ -3,8 +3,8 @@
 -- the skating just left it, then the poses, which read both. Before each frame is drawn: the camera, which shows the
 -- skater where physics left them, then the touch controls, which show what each button does now, then the HUD's
 -- state, whose clocks count on, then the HUD, which shows it, then the world's markers and the arena's glow, which
--- read that state too. Roblox gives RunService handlers no documented order (they ran in reverse of their connection
--- order when measured), so only this module connects them, one per phase.
+-- read that state too, then the name tags. Roblox gives RunService handlers no documented order (they ran in
+-- reverse of their connection order when measured), so only this module connects them, one per phase.
 
 local RunService = game:GetService("RunService")
 
@@ -28,6 +28,7 @@ export type FrameController = {
 	_hud: Steppable,
 	_worldMarkers: Steppable,
 	_arenaGlow: Steppable,
+	_nameTags: Steppable,
 }
 
 local FrameController: FrameController = {
@@ -42,6 +43,7 @@ local FrameController: FrameController = {
 		"Hud",
 		"WorldMarkers",
 		"ArenaGlow",
+		"NameTags",
 	},
 	_skate = nil :: any,
 	_actions = nil :: any,
@@ -52,6 +54,7 @@ local FrameController: FrameController = {
 	_hud = nil :: any,
 	_worldMarkers = nil :: any,
 	_arenaGlow = nil :: any,
+	_nameTags = nil :: any,
 
 	init = function(self: FrameController, deps: { [string]: any })
 		self._skate = deps.SkateController
@@ -63,6 +66,7 @@ local FrameController: FrameController = {
 		self._hud = deps.Hud
 		self._worldMarkers = deps.WorldMarkers
 		self._arenaGlow = deps.ArenaGlow
+		self._nameTags = deps.NameTags
 	end,
 
 	start = function(self: FrameController)
@@ -87,6 +91,7 @@ local FrameController: FrameController = {
 		self._hud:step(dt)
 		self._worldMarkers:step(dt)
 		self._arenaGlow:step(dt)
+		self._nameTags:step(dt)
 	end,
 }
 
