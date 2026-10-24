@@ -88,8 +88,11 @@ function HudText.banner(self: HudText, banner: HudState.Banner): string
 		return string.format(text.clockWarning, banner.value :: number)
 	elseif kind == "LastChance" then
 		return text.lastChance
+	elseif kind == "Overtime" then
+		return text.overtime
 	end
-	return text.overtime
+	-- HudState.BannerKind has only the kinds above: any other is a wiring bug.
+	error(`HudText: no banner text for kind "{kind}"`, 0)
 end
 
 function HudText.name(self: HudText, player: PlayerId, names: { [PlayerId]: string }): string
@@ -118,8 +121,11 @@ function HudText.feed(self: HudText, entry: HudState.FeedEntry, names: { [Player
 		return string.format(text.possession, name)
 	elseif kind == "Goal" then
 		return string.format(text.scored, name)
+	elseif kind == "StreakPoint" then
+		return string.format(text.scoredStreak, name)
 	end
-	return string.format(text.scoredStreak, name)
+	-- HudState.FeedKind has only the kinds above: any other is a wiring bug.
+	error(`HudText: no feed text for kind "{kind}"`, 0)
 end
 
 return HudText
