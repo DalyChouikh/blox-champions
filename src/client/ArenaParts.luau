@@ -1,8 +1,9 @@
 --!strict
 -- The arena's parts the HUD points at and lights (spec §9.1): the corner markers by gate index, the goal hoop's parts
--- and the goal panel, found by their tags (Arena/Tags). The arena model is Persistent, so it reaches every client
--- whole, soon after the player joins, and stays; until it has, `parts` is nil. One cache every client module reads,
--- refreshed by the tags' signals from start on. Each refresh makes a new record, so a reader sees that it changed.
+-- and its up (its pivot's), and the goal panel, found by their tags (Arena/Tags). The arena model is Persistent, so it
+-- reaches every client whole, soon after the player joins, and stays; until it has, `parts` is nil. One cache every
+-- client module reads, refreshed by the tags' signals from start on. Each refresh makes a new record, so a reader sees
+-- that it changed.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,6 +14,8 @@ export type Parts = {
 	-- By GateIndex.
 	markers: { [number]: BasePart },
 	hoop: { BasePart },
+	-- Up in the ring's own plane: the panel slides along it, out of the ring.
+	hoopUp: Vector3,
 	panel: BasePart,
 }
 
@@ -74,7 +77,7 @@ local ArenaParts: ArenaParts = {
 		end
 		local hoopModel = CollectionService:GetTagged(Tags.GoalHoop)[1]
 		local panel = firstPart(Tags.GoalPanel)
-		if count == 0 or hoopModel == nil or panel == nil then
+		if count == 0 or hoopModel == nil or not hoopModel:IsA("PVInstance") or panel == nil then
 			self.parts = nil
 			return
 		end
@@ -84,7 +87,7 @@ local ArenaParts: ArenaParts = {
 				table.insert(hoop, descendant)
 			end
 		end
-		self.parts = { markers = markers, hoop = hoop, panel = panel }
+		self.parts = { markers = markers, hoop = hoop, hoopUp = hoopModel:GetPivot().UpVector, panel = panel }
 	end,
 
 	destroy = function(self: ArenaParts)

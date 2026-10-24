@@ -2,9 +2,9 @@
 -- The client's frame, in one fixed order. Each physics step: the skating, then the actions, which read the skater as
 -- the skating just left it, then the poses, which read both. Before each frame is drawn: the camera, which shows the
 -- skater where physics left them, then the touch controls, which show what each button does now, then the HUD's
--- state, whose clocks count on, then the HUD, which shows it, then the world's markers. Roblox gives RunService
--- handlers no documented order (they ran in reverse of their connection order when measured), so only this module
--- connects them, one per phase.
+-- state, whose clocks count on, then the HUD, which shows it, then the world's markers and the arena's glow, which
+-- read that state too. Roblox gives RunService handlers no documented order (they ran in reverse of their connection
+-- order when measured), so only this module connects them, one per phase.
 
 local RunService = game:GetService("RunService")
 
@@ -27,6 +27,7 @@ export type FrameController = {
 	_hudStore: Steppable,
 	_hud: Steppable,
 	_worldMarkers: Steppable,
+	_arenaGlow: Steppable,
 }
 
 local FrameController: FrameController = {
@@ -40,6 +41,7 @@ local FrameController: FrameController = {
 		"HudStore",
 		"Hud",
 		"WorldMarkers",
+		"ArenaGlow",
 	},
 	_skate = nil :: any,
 	_actions = nil :: any,
@@ -49,6 +51,7 @@ local FrameController: FrameController = {
 	_hudStore = nil :: any,
 	_hud = nil :: any,
 	_worldMarkers = nil :: any,
+	_arenaGlow = nil :: any,
 
 	init = function(self: FrameController, deps: { [string]: any })
 		self._skate = deps.SkateController
@@ -59,6 +62,7 @@ local FrameController: FrameController = {
 		self._hudStore = deps.HudStore
 		self._hud = deps.Hud
 		self._worldMarkers = deps.WorldMarkers
+		self._arenaGlow = deps.ArenaGlow
 	end,
 
 	start = function(self: FrameController)
@@ -82,6 +86,7 @@ local FrameController: FrameController = {
 		self._hudStore:step(dt)
 		self._hud:step(dt)
 		self._worldMarkers:step(dt)
+		self._arenaGlow:step(dt)
 	end,
 }
 
