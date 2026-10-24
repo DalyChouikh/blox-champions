@@ -2,6 +2,8 @@
 /DevPackages/
 /build/
 sourcemap.json
+__pycache__/
+.env
 globalTypes.d.luau
 *.rbxl
 *.rbxlx

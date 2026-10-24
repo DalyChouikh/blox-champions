@@ -22,13 +22,13 @@ A 3v3 roller-skate ball game for Roblox, inspired by Ubisoft's Roller Champions:
 From the repository folder:
 
 ```bash
-rokit trust rojo-rbx/rojo && rokit trust UpliftGames/wally && rokit trust JohnnyMorganz/StyLua && rokit trust Kampfkarren/selene && rokit trust JohnnyMorganz/luau-lsp && rokit trust JohnnyMorganz/wally-package-types
+rokit trust rojo-rbx/rojo && rokit trust UpliftGames/wally && rokit trust JohnnyMorganz/StyLua && rokit trust Kampfkarren/selene && rokit trust JohnnyMorganz/luau-lsp && rokit trust JohnnyMorganz/wally-package-types && rokit trust astral-sh/ruff
 rokit install
 bash scripts/install-packages.sh
 bash scripts/install-rojo-plugin.sh
 ```
 
-- `rokit install` installs the exact tool versions pinned in `rokit.toml` (Rojo, Wally, StyLua, selene, luau-lsp, wally-package-types).
+- `rokit install` installs the exact tool versions pinned in `rokit.toml` (Rojo, Wally, StyLua, selene, luau-lsp, wally-package-types, and Ruff for the CI scripts' Python).
 - `scripts/install-packages.sh` runs `wally install`, which downloads React Luau (it draws the HUD) into `Packages/` and the test framework (Jest Roblox) into `DevPackages/`; a few of Jest's helpers land in `Packages/` too. Both come from Roblox (`roblox/*` on Wally). It then makes each package's link file re-export the package's types, so the type checker knows names like `React.ReactElement`. Stop `rojo serve` before running it: it recreates folders Rojo watches.
 - `scripts/install-rojo-plugin.sh` builds and installs the Rojo Studio plugin (restart Studio if it was open). It applies an upstream fix ([rojo#1344](https://github.com/rojo-rbx/rojo/pull/1344)) that stops the stock plugin from printing three `rbxassetid://203785492` errors on every playtest; once a Rojo release includes that fix, this step goes back to `rojo plugin install`.
 
@@ -59,6 +59,30 @@ To run only some tests, pass a filter, e.g. `require(game:GetService("ServerStor
 
 Tests under `tests/server` and `tests/integration` build parts (a whole arena, for example) in the open place, under a temporary folder they remove when they finish, so a run leaves the place as it found it.
 
+## Cloud tests
+
+CI's `cloud-tests` check runs the whole suite inside Roblox on every pull request and every push to `main`, once the `quality` check has passed:
+
+1. It builds `build/test.rbxl` and uploads it to a private test game on the owner's Roblox account, **Blox Champions Tests**, as a saved version (saved, not published).
+2. Roblox runs `scripts/ci/run-tests-task.luau` in that exact version through [Open Cloud Luau Execution](https://create.roblox.com/docs/cloud/reference/features/luau-execution). The task returns the runner's summary, and its log (Jest's report) is printed in the job's output.
+3. The check passes only when the task completed and every test passed, with more than zero tests run.
+
+The client that does this is `scripts/ci/cloud_tests.py`, which uses only Python's standard library.
+
+**One-time setup** (the repository owner): run `bash scripts/ci/setup-cloud-tests.sh` in your own terminal. It walks you through creating the test game and an Open Cloud API key, then stores them in GitHub with `gh`: the secret `ROBLOX_API_KEY` and the variables `ROBLOX_TEST_UNIVERSE_ID` and `ROBLOX_TEST_PLACE_ID`. Until they exist, `cloud-tests` fails and names each missing value.
+
+- Pull requests from forks get no secrets, so their `cloud-tests` check fails. Test such a change locally before merging it.
+- Roblox expires an API key that goes unused for 60 days. If `cloud-tests` starts failing with a rejected request after a long pause, open the [API Keys page](https://create.roblox.com/dashboard/credentials?activeTab=ApiKeysTab): an **Auto-Expired** key works again after you turn its **Enable Key** toggle off and on.
+- Lost the key? Keep no copy of it: on the same page, open `blox-champions-ci`, click **Regenerate Key**, and run the setup script again.
+
+To check the client locally (Python 3.12 or newer), run the same commands as CI. The unit tests answer every request with a fake, so they need no key and make no network call.
+
+```bash
+python -m unittest discover -s scripts/ci -p "test_*.py"
+ruff format --check scripts
+ruff check scripts
+```
+
 ## Project layout
 
 | Folder | What lives there |
@@ -68,7 +92,7 @@ Tests under `tests/server` and `tests/integration` build parts (a whole arena, f
 | `src/client/` | Client scripts (synced to `StarterPlayer.StarterPlayerScripts.Client`) |
 | `src/character/` | Scripts every character gets (synced to `StarterPlayer.StarterCharacterScripts`); `Animate` replaces Roblox's default animations |
 | `tests/` | Jest Roblox tests (`*.spec.luau`), mirroring the `src/` folders, plus shared test data in `tests/Fixtures.luau` |
-| `scripts/` | Development scripts, such as the in-Studio test runner |
+| `scripts/` | Development scripts, such as the in-Studio test runner; `scripts/ci/` holds the cloud test job |
 | `docs/` | Design specs and implementation plans |
 
 ## Contributing
