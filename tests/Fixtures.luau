@@ -203,6 +203,38 @@ function Fixtures.root(rig: Model): BasePart
 	return rig:FindFirstChild(SkaterRig.root) :: BasePart
 end
 
+export type HudArena = { hoop: Model, rim: { BasePart }, panel: BasePart, markers: { BasePart } }
+
+-- The arena parts the HUD lights and points at, tagged as the arena builder tags them: a goal hoop of two rim parts,
+-- its panel, and four corner markers 100 studs apart along x, by gate index. Anchored, in `folder`.
+function Fixtures.hudArena(folder: Instance): HudArena
+	local function part(name: string, position: Vector3, parent: Instance): Part
+		local made = Instance.new("Part")
+		made.Name = name
+		made.Anchored = true
+		made.Size = Vector3.new(2, 2, 2)
+		made.Position = position
+		made.Parent = parent
+		return made
+	end
+	local hoop = Instance.new("Model")
+	hoop.Name = "GoalHoop"
+	local rim: { BasePart } =
+		{ part("Rim1", Vector3.new(0, 20, -40), hoop), part("Rim2", Vector3.new(4, 20, -40), hoop) }
+	hoop.Parent = folder
+	hoop:AddTag(Tags.GoalHoop)
+	local panel = part("GoalPanel", Vector3.new(2, 20, -40), folder)
+	panel:AddTag(Tags.GoalPanel)
+	local markers: { BasePart } = {}
+	for index = 1, 4 do
+		local marker = part(`Marker{index}`, Vector3.new(index * 100, 1, 0), folder)
+		marker:SetAttribute(Tags.Attribute.GateIndex, index)
+		marker:AddTag(Tags.CornerMarker)
+		markers[index] = marker
+	end
+	return { hoop = hoop, rim = rim, panel = panel, markers = markers }
+end
+
 -- A wide ride surface whose top is the plane y = 0, in `folder`.
 function Fixtures.floor(folder: Instance): Part
 	local floor = Instance.new("Part")

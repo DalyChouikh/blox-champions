@@ -399,9 +399,11 @@ describe("Config defaults", function()
 			lineWidth = 0.2,
 			groundProbe = 100,
 			groundMarkerSize = 4,
+			groundMarkerThickness = 0.2,
 			groundMarkerTransparency = 0.4,
 			edgeMargin = 48,
 			arrowSize = 28,
+			arrowImage = "rbxasset://textures/ui/MenuBar/arrow_up.png",
 		})
 		expect(ui.nameTag).toEqual({
 			size = UDim2.fromOffset(200, 48),
@@ -754,6 +756,10 @@ describe("Config.forMode", function()
 			},
 			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
 			{ overrides = { UI = { hud = { pipSize = 0 } } }, message = "UI.hud.pipSize: must be > 0" },
+			{
+				overrides = { UI = { markers = { arrowImage = "" } } },
+				message = "UI.markers.arrowImage: must not be empty",
+			},
 			{
 				overrides = { UI = { hud = { layout = { scoreTab = { columnWidth = 0 } } } } },
 				message = "UI.hud.layout.scoreTab.columnWidth: must be > 0",
