@@ -35,6 +35,18 @@ describe("Profile", function()
 		expect(apex).toBeLessThan(50.001)
 	end)
 
+	it("gives the roof's circle: centred between the wall tops, its radius half their distance", function()
+		local center, radius = Profile.roofCircle(arena)
+		near(center, Vector2.new(22, 28))
+		expect(radius).toBeCloseTo(22, 6)
+		local uneven = table.clone(arena)
+		uneven.outerWallHeight = 32
+		center, radius = Profile.roofCircle(uneven)
+		near(center, Vector2.new(22, 30))
+		-- Vector2 holds single-precision numbers.
+		expect(radius).toBeCloseTo(math.sqrt(44 * 44 + 4 * 4) / 2, 4)
+	end)
+
 	it("puts the roof's first point at the outer wall top, where the outer wall ends", function()
 		local counts = Profile.stripCounts(arena)
 		local roofStart = Profile.roofEdge(arena)

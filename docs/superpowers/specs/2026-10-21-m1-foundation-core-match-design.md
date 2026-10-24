@@ -393,7 +393,7 @@ Third-person chase camera with mouse lock. `Camera.distance = 12`, `Camera.heigh
 
 ### 10.3 Movement guard (`server/MovementGuard`)
 
-Samples each character every `Network.guardSampleSeconds = 0.25`. If the upward move in a sample exceeds `Movement.hardCap × Network.speedTolerance (1.2)` for `Network.guardStrikes = 3` consecutive samples, or one move exceeds `Network.guardTeleportFactor = 2` times that allowance, falling excluded, the character is returned to its last valid position and the event is logged. Thresholds are config.
+Samples each character every `Network.guardSampleSeconds = 0.25`. If the upward move in a sample exceeds `Movement.hardCap × Network.speedTolerance (1.2)` for `Network.guardStrikes = 3` consecutive samples, or one move exceeds `Network.guardTeleportFactor = 2` times that allowance, falling excluded, the character is returned to its last valid position and the event is logged. A character whose root is outside the arena's tube (past a wall, under the floor or over the roof) by more than `Network.guardOutsideMargin = 2` is placed back on its team spawn, and the event is logged (owner, 2026-10-24, #181). Thresholds are config.
 
 ---
 
