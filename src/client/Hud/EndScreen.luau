@@ -1,8 +1,9 @@
 --!strict
--- The end of the match (spec §6.5, §11.1), in the middle of the screen until the next match starts: the winner in
--- their team's colour, both teams' totals, the MVP's card (their row of the score tab; hidden without an MVP), and the
--- whole score tab, one under another. It shrinks to fit a small screen, as tall as its parts make it. A plain function
--- of its props.
+-- The end of the match (spec §6.5, §11.1), in the middle of the HUD's stage until the next match starts, solid: the
+-- winner in their team's colour, both teams' totals, the MVP's card (their row of the score tab; hidden without an
+-- MVP), and the whole score tab, one under another. Compact (on touch, the owner's choice) it leaves the score tab out,
+-- which the touch score button opens over it, and is only as tall as the rest. It shrinks to fit a small screen, as
+-- tall as its parts make it. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -21,8 +22,10 @@ export type EndScreenProps = {
 	ended: HudState.Ended,
 	names: { [Types.PlayerId]: string },
 	localId: Types.PlayerId,
-	-- The HUD's area, which the screen fits in.
+	-- The HUD's stage, which the screen fits in.
 	area: React.Binding<Vector2>,
+	-- Without the whole score tab.
+	compact: boolean,
 }
 
 -- A headline in `color`, as tall as the HUD's titles.
@@ -56,14 +59,17 @@ local function total(config: Config.GameConfig, team: Team.Team, scores: { [Team
 	)
 end
 
--- How tall the screen's parts stack, spacing apart (Style.list): the winner and the totals (each a title high), the
--- MVP's title and card while there is an MVP, and the table of `players`.
-local function contentHeight(config: Config.GameConfig, players: number, mvp: boolean): number
+-- How tall the screen's parts stack, a gap apart (Style.list): the winner and the totals (each a title high), the
+-- MVP's title and card while there is an MVP, and the table of `players` unless compact.
+local function contentHeight(config: Config.GameConfig, players: number, mvp: boolean, compact: boolean): number
 	local hud = config.UI.hud
 	local line = hud.titleSize + hud.spacing
-	local height = 2 * line + StatsTable.height(config, players)
+	local height = 2 * line - hud.spacing
 	if mvp then
-		height += line + StatsTable.height(config, 1) + hud.spacing
+		height += hud.spacing + line + StatsTable.height(config, 1)
+	end
+	if not compact then
+		height += hud.spacing + StatsTable.height(config, players)
 	end
 	return height
 end
@@ -79,18 +85,21 @@ local function EndScreen(props: EndScreenProps): React.ReactElement
 			mvpStats = player
 		end
 	end
+	local compact = props.compact
+	-- Compact, it is only as tall as its parts (AutomaticSize Y).
+	local size = if compact then UDim2.fromOffset(place.size.X.Offset, 0) else place.size
 	return React.createElement(
 		"Frame",
-		Style.panel(config, {
+		Style.overlay(config, {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = place.position,
-			Size = place.size,
+			Size = size,
 			AutomaticSize = Enum.AutomaticSize.Y,
 		}),
 		{
 			Corner = Style.corner(config),
 			Padding = Style.padding(config),
-			Fit = Style.fit(config, props.area, place.size, contentHeight(config, #stats.players, mvpStats ~= nil)),
+			Fit = Style.fit(config, props.area, size, contentHeight(config, #stats.players, mvpStats ~= nil, compact)),
 			Layout = Style.list(config, Enum.FillDirection.Vertical),
 			Winner = title(config, 1, text:wins(ended.winner), ui.teamColors[ended.winner]),
 			Totals = React.createElement(
@@ -123,14 +132,16 @@ local function EndScreen(props: EndScreenProps): React.ReactElement
 					}),
 				}
 			),
-			Table = React.createElement(StatsTable.Table, {
-				config = config,
-				text = text,
-				players = stats.players,
-				names = props.names,
-				localId = props.localId,
-				order = 4,
-			}),
+			Table = if compact
+				then nil
+				else React.createElement(StatsTable.Table, {
+					config = config,
+					text = text,
+					players = stats.players,
+					names = props.names,
+					localId = props.localId,
+					order = 4,
+				}),
 		}
 	)
 end

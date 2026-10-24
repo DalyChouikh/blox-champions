@@ -21,8 +21,8 @@ local folder: Folder
 -- The HUD's area, as the Hud's binding gives it.
 local area: React.Binding<Vector2>, setArea: (Vector2) -> ()
 
--- Blue won 5-3: Ana (Blue) scored 5, Rex (Orange) 3; or `players` instead of them.
-local function screen(mvp: string?, players: { Types.PlayerStats }?): React.ReactElement
+-- Blue won 5-3: Ana (Blue) scored 5, Rex (Orange) 3; or `players` instead of them. Compact on touch.
+local function screen(mvp: string?, players: { Types.PlayerStats }?, compact: boolean?): React.ReactElement
 	local ana = Fixtures.playerStats("1", "Blue", true)
 	ana.score, ana.goals = 5, 5
 	local rex = Fixtures.playerStats("2", "Orange", true)
@@ -33,10 +33,15 @@ local function screen(mvp: string?, players: { Types.PlayerStats }?): React.Reac
 		stats = { scores = { Blue = 5, Orange = 3 }, players = players or { ana, rex } },
 	}
 	return React.createElement(React.Fragment, nil, {
-		EndScreen = React.createElement(
-			EndScreen,
-			{ config = config, text = text, ended = ended, names = NAMES, localId = "2", area = area }
-		),
+		EndScreen = React.createElement(EndScreen, {
+			config = config,
+			text = text,
+			ended = ended,
+			names = NAMES,
+			localId = "2",
+			area = area,
+			compact = compact == true,
+		}),
 	})
 end
 
@@ -74,6 +79,8 @@ describe("EndScreen", function()
 		-- The whole score tab below, everyone in it.
 		local everyone = frame:FindFirstChild("Table") :: Frame
 		expect(everyone:FindFirstChild("1") ~= nil and everyone:FindFirstChild("2") ~= nil).toBe(true)
+		-- Solid: nothing behind shows through.
+		expect(frame.BackgroundTransparency).toBe(config.UI.hud.overlayTransparency)
 
 		rerender(screen(nil))
 		expect(mvp.Visible).toBe(false)
@@ -99,5 +106,20 @@ describe("EndScreen", function()
 		local mounted = Fixtures.mount(screen("1", Fixtures.roster(12)), folder)
 		local fit = (mounted:FindFirstChild("EndScreen") :: Frame):FindFirstChild("Fit") :: UIScale
 		expect(fit.Scale).toBeCloseTo((323 - 2 * hud.screenMargin) / tall, 4)
+	end)
+
+	it("on touch, leaves out the full table and shrinks to what is left", function()
+		-- Left of a phone's touch buttons (504 x 323): only as tall as the winner, the totals and the MVP's card (188
+		-- px with the defaults, as Edit lays it out), so its width decides: (504 - 2 margins) / 720.
+		setArea(Vector2.new(504, 323))
+		local mounted = Fixtures.mount(screen("1", Fixtures.roster(12), true), folder)
+		local frame = mounted:FindFirstChild("EndScreen") :: Frame
+		expect(frame:FindFirstChild("Table")).toBeNil()
+		expect((frame:FindFirstChild("Mvp") :: Frame).Visible).toBe(true)
+		local hud = config.UI.hud
+		local width = hud.layout.endScreen.size.X.Offset
+		expect(frame.Size).toEqual(UDim2.fromOffset(width, 0))
+		local fit = frame:FindFirstChild("Fit") :: UIScale
+		expect(fit.Scale).toBeCloseTo((504 - 2 * hud.screenMargin) / width, 4)
 	end)
 end)

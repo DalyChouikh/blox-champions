@@ -3,10 +3,11 @@
 -- (RobloxDefaults). A touch that starts on the stick pad (the lower left) grows a stick under the thumb, with Roblox's
 -- own stick math (TouchStick) and sizes. One button per control sits in the lower right, placed in pixels from the
 -- corner (Config.Input.touch), each working its control through InputController as its keys do; the throw button also
--- works Ball Focus. On a big screen the stick and the buttons grow, as Roblox's own do, and they follow the screen's
--- size. Before each frame is drawn (FrameController), every button reads what its control does now (ControlLabels),
--- hiding while it would do nothing, and the throw button rings while Ball Focus is on (CameraController.focusing). A
--- property is written only when it changes. Hiding the controls under a thumb ends that touch.
+-- works Ball Focus. On a big screen the stick and the buttons grow, as Roblox's own do (TouchArea), and they follow the
+-- screen's size. Before each frame is drawn (FrameController), every button reads what its control does now
+-- (ControlLabels), hiding while it would do nothing, and the throw button rings while Ball Focus is on
+-- (CameraController.focusing). A property is written only when it changes. Hiding the controls under a thumb ends that
+-- touch.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -18,6 +19,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local ControlLabels = require(script.Parent.ControlLabels)
 local InputController = require(script.Parent.InputController)
 local SkateController = require(script.Parent.SkateController)
+local TouchArea = require(ReplicatedStorage.Shared.Input.TouchArea)
 local TouchStick = require(ReplicatedStorage.Shared.Input.TouchStick)
 
 -- Where Roblox reports a touch on the pad that has ended (or none yet).
@@ -268,9 +270,8 @@ local TouchControls: TouchControls = {
 	layout = function(self: TouchControls)
 		local touch = self._config.Input.touch
 		local screen = self._screenSize()
-		local big = math.min(screen.X, screen.Y) > touch.bigScreenSide
-		self._stickScale = if big then touch.bigScreenStickScale else 1
-		local scale = if big then touch.bigScreenButtonScale else 1
+		self._stickScale = TouchArea.stickScale(touch, screen)
+		local scale = TouchArea.buttonScale(touch, screen)
 		if scale == self._buttonScale then
 			return
 		end

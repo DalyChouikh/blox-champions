@@ -22,20 +22,27 @@ afterEach(function()
 end)
 
 describe("Reticle", function()
-	it("draws a dot at the screen's centre", function()
+	it("draws a dot at the screen's centre, unless told to hide", function()
 		local parent = Instance.new("Folder")
 		parent.Name = "ReticleTest"
 		parent.Parent = workspace
 		folder = parent
-		local mounted = Fixtures.mount(
-			React.createElement(React.Fragment, nil, { Reticle = React.createElement(Reticle, { config = config }) }),
-			parent
-		)
+		local function dotOf(visible: boolean): React.ReactElement
+			return React.createElement(
+				React.Fragment,
+				nil,
+				{ Reticle = React.createElement(Reticle, { config = config, visible = visible }) }
+			)
+		end
+		local mounted, rerender = Fixtures.mount(dotOf(true), parent)
 		local dot = mounted:FindFirstChild("Reticle") :: Frame
 		local size = config.UI.hud.layout.reticle.size
 		expect(dot.AnchorPoint == Vector2.new(0.5, 0.5)).toBe(true)
 		expect(dot.Position == UDim2.fromScale(0.5, 0.5)).toBe(true)
 		expect(dot.Size == UDim2.fromOffset(size, size)).toBe(true)
 		expect(dot.BackgroundColor3 == config.UI.hud.textColor).toBe(true)
+		expect(dot.Visible).toBe(true)
+		rerender(dotOf(false))
+		expect(dot.Visible).toBe(false)
 	end)
 end)

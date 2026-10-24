@@ -1,7 +1,8 @@
 --!strict
--- The score tab (spec §6.4, §11.1), in the middle of the screen while its key is held (or its touch button toggled
--- on): every player who played this match, by team, then score (StatsTable). It shrinks to fit a small screen, as
--- tall as its rows make it. A plain function of its props.
+-- The score tab (spec §6.4, §11.1), in the middle of the HUD's stage while its key is held (or its touch button toggled
+-- on), solid: every player who played this match, by team, then score (StatsTable). It draws over the end screen, which
+-- it opens over on touch: siblings with equal ZIndex draw in the order they were parented (probed), and React's order
+-- is not fixed. It shrinks to fit a small screen, as tall as its rows make it. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -18,7 +19,7 @@ export type ScoreTabProps = {
 	stats: Types.MatchStats,
 	names: { [Types.PlayerId]: string },
 	localId: Types.PlayerId,
-	-- The HUD's area, which the tab fits in.
+	-- The HUD's stage, which the tab fits in.
 	area: React.Binding<Vector2>,
 }
 
@@ -27,11 +28,13 @@ local function ScoreTab(props: ScoreTabProps): React.ReactElement
 	local place = config.UI.hud.layout.scoreTab
 	return React.createElement(
 		"Frame",
-		Style.panel(config, {
+		Style.overlay(config, {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = place.position,
 			Size = place.size,
 			AutomaticSize = Enum.AutomaticSize.Y,
+			-- Above the end screen's 1, the default.
+			ZIndex = 2,
 		}),
 		{
 			Corner = Style.corner(config),
