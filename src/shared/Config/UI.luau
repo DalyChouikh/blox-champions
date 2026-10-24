@@ -83,7 +83,8 @@ export type HudLayout = {
 	banner: Place,
 	feed: { position: UDim2, size: UDim2, rowHeight: number },
 	hints: { position: UDim2, size: UDim2, rowHeight: number },
-	-- touchPosition clears the touch buttons.
+	-- position is the bottom-right corner's; on touch, touchPosition is the top-left corner's, clear of the touch
+	-- buttons and the score button.
 	speedometer: { position: UDim2, touchPosition: UDim2, size: UDim2 },
 	reticle: { size: number },
 	-- columnWidth: each number column; the name column takes the rest.
@@ -114,6 +115,8 @@ export type HudSettings = {
 	spacing: number,
 	-- A score pip's side and the lap bar's height, in pixels.
 	pipSize: number,
+	-- Pixels kept clear at each edge of the HUD's area by a panel shrunk to fit it (the score tab, the end screen).
+	screenMargin: number,
 	layout: HudLayout,
 }
 
@@ -245,6 +248,7 @@ local defaults: UIConfig = {
 		glowThickness = 3,
 		spacing = 6,
 		pipSize = 10,
+		screenMargin = 8,
 		layout = {
 			scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
 			banner = { position = UDim2.fromScale(0.5, 0.3), size = UDim2.fromOffset(640, 110) },
@@ -252,7 +256,7 @@ local defaults: UIConfig = {
 			hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
 			speedometer = {
 				position = UDim2.new(1, -24, 1, -24),
-				touchPosition = UDim2.new(1, -24, 1, -300),
+				touchPosition = UDim2.fromOffset(16, 8),
 				size = UDim2.fromOffset(160, 40),
 			},
 			reticle = { size = 6 },
@@ -425,6 +429,7 @@ local schema = Validate.record({
 		glowThickness = Validate.number({ min = 0 }),
 		spacing = Validate.number({ min = 0 }),
 		pipSize = positive,
+		screenMargin = Validate.number({ min = 0 }),
 		layout = Validate.record({
 			scoreboard = place,
 			banner = place,

@@ -1,8 +1,8 @@
 --!strict
 -- The whole HUD as one React element: a full-screen frame, "Root", that holds every part of the HUD. The scoreboard
 -- shows from the first snapshot on; the hints wherever the Hud gives their keys; the score tab while it is open, except
--- once the match is over, when the end screen (which holds its own) shows until the next match; the score button on
--- touch. A plain function of its props.
+-- once the match is over, when the end screen shows until the next match in place of the score tab and the scoreboard
+-- (it holds the final score and its own score tab); the score button on touch. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -26,6 +26,8 @@ export type HudBindings = {
 	clock: React.Binding<string>,
 	speed: React.Binding<string>,
 	labels: ControlHints.HintLabels,
+	-- The HUD's area in pixels, which the score tab and the end screen fit in; zero until it is known.
+	area: React.Binding<Vector2>,
 }
 
 -- Everything the HUD shows; the Hud renders App again whenever one of them changes.
@@ -52,7 +54,7 @@ local function App(props: AppProps): React.ReactElement
 	local match, keys, ended = state.match, props.keys, state.ended
 	return React.createElement(React.Fragment, nil, {
 		Root = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1) }), {
-			Scoreboard = if match ~= nil
+			Scoreboard = if match ~= nil and ended == nil
 				then React.createElement(Scoreboard, {
 					config = config,
 					text = text,
@@ -82,6 +84,7 @@ local function App(props: AppProps): React.ReactElement
 					stats = match.stats,
 					names = state.names,
 					localId = props.localId,
+					area = bindings.area,
 				})
 				else nil,
 			EndScreen = if ended ~= nil
@@ -91,6 +94,7 @@ local function App(props: AppProps): React.ReactElement
 					ended = ended,
 					names = state.names,
 					localId = props.localId,
+					area = bindings.area,
 				})
 				else nil,
 			ScoreButton = if props.device == Enum.PreferredInput.Touch

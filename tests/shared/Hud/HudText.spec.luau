@@ -12,8 +12,8 @@ local text = HudText.new(Fixtures.config())
 local NAMES = { ["1"] = "Ana", ["2"] = "Rex" }
 
 -- Only the fields HudText:lap reads.
-local function lapOf(team: string?, streak: number, goalOpenFor: string?): any
-	return { possessingTeam = team, streak = streak, goalOpenFor = goalOpenFor }
+local function lapOf(team: string?, streak: number): any
+	return { possessingTeam = team, streak = streak }
 end
 
 local function entry(
@@ -39,9 +39,11 @@ describe("HudText", function()
 	end)
 
 	it("names the lap or the streak of the team with the ball", function()
-		expect(text:lap(lapOf(nil, 0, nil))).toBeNil()
-		expect(text:lap(lapOf("Blue", 2, nil))).toBe("Lap 2/4")
-		expect(text:lap(lapOf("Blue", 5, "Blue"))).toBe("Streak 5/12")
+		expect(text:lap(lapOf(nil, 0))).toBeNil()
+		expect(text:lap(lapOf("Blue", 2))).toBe("Lap 2/4")
+		-- From the lap that opens the goal on, and still once a point closes it: the streak stays until the kickoff.
+		expect(text:lap(lapOf("Blue", 4))).toBe("Streak 4/12")
+		expect(text:lap(lapOf("Blue", 5))).toBe("Streak 5/12")
 	end)
 
 	it("writes each banner and feed entry from Config.UI.text", function()

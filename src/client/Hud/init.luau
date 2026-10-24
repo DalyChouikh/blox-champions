@@ -9,6 +9,8 @@
 -- shows it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout gives it, else
 -- Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the labels. The score
 -- tab shows while its key is held; on touch a button toggles it, and the toggle clears once the device is not touch.
+-- The score tab and the end screen shrink to fit the HUD's area on a small screen: its size goes to them through a
+-- binding, followed from start on.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -40,10 +42,12 @@ export type Hud = {
 	name: string,
 	dependencies: { string },
 	init: (self: Hud, deps: { [string]: any }) -> (),
-	start: ((self: Hud) -> ())?,
+	start: (self: Hud) -> (),
 	step: (self: Hud, dt: number) -> (),
 	-- What the touch score button does: opens the score tab, or closes it.
 	toggleScoreTab: (self: Hud) -> (),
+	-- The HUD's area changed (the gui's AbsoluteSize): the big panels fit in it.
+	resize: (self: Hud, area: Vector2) -> (),
 	gui: ScreenGui,
 	-- Spans the whole screen: the reticle's.
 	centre: ScreenGui,
@@ -66,6 +70,9 @@ export type Hud = {
 	_clock: Shown,
 	_speed: Shown,
 	_labels: { [string]: Shown },
+	-- The HUD's area last set on its binding, and the setter.
+	_area: Vector2,
+	_setArea: (area: Vector2) -> (),
 	-- The score button's handler, made once.
 	_onScoreButton: () -> (),
 	-- The score tab toggled on by its touch button.
@@ -145,6 +152,8 @@ local Hud: Hud = {
 	_clock = nil :: any,
 	_speed = nil :: any,
 	_labels = {},
+	_area = Vector2.zero,
+	_setArea = function(_area: Vector2) end,
 	_onScoreButton = function() end,
 	_touchToggled = false,
 	_version = nil,
@@ -198,7 +207,11 @@ local Hud: Hud = {
 			labelBindings[control] = shown.binding
 		end
 		self._labels = labels
-		self._bindings = { clock = self._clock.binding, speed = self._speed.binding, labels = labelBindings }
+		local area, setArea = React.createBinding(Vector2.zero)
+		self._area = Vector2.zero
+		self._setArea = setArea
+		self._bindings =
+			{ clock = self._clock.binding, speed = self._speed.binding, labels = labelBindings, area = area }
 
 		local parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
 		-- Both are kept across respawns.
@@ -221,8 +234,24 @@ local Hud: Hud = {
 		}))
 	end,
 
+	-- The HUD's area changes when the window is resized or the device turned.
+	start = function(self: Hud)
+		local gui = self.gui
+		gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			self:resize(gui.AbsoluteSize)
+		end)
+		self:resize(gui.AbsoluteSize)
+	end,
+
 	toggleScoreTab = function(self: Hud)
 		self._touchToggled = not self._touchToggled
+	end,
+
+	resize = function(self: Hud, area: Vector2)
+		if area ~= self._area then
+			self._area = area
+			self._setArea(area)
+		end
 	end,
 
 	step = function(self: Hud, _dt: number)

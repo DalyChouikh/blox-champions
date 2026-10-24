@@ -4,6 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fit = require(ReplicatedStorage.Shared.Hud.Fit)
 local React = require(ReplicatedStorage.Packages.React)
 
 -- Keyed by property name, or by a React event (React.Event.Activated).
@@ -63,6 +64,16 @@ end
 -- Rounds a panel's corners.
 function Style.corner(config: Config.GameConfig): React.ReactElement
 	return React.createElement("UICorner", { CornerRadius = config.UI.hud.corner })
+end
+
+-- Shrinks a panel of `size` to fit the HUD's area (a binding), screenMargin inside each edge (Fit).
+function Style.fit(config: Config.GameConfig, area: React.Binding<Vector2>, size: UDim2): React.ReactElement
+	local margin = config.UI.hud.screenMargin
+	return React.createElement("UIScale", {
+		Scale = area:map(function(shown: Vector2): number
+			return Fit.scale(shown, size, margin)
+		end),
+	})
 end
 
 -- Keeps a panel's parts `spacing` inside its edge.
