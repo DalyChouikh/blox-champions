@@ -5,13 +5,12 @@
 -- back behind the skater once the look rests; its view widens with speed. Two rays through the ride surfaces keep it
 -- inside the arena: the point it looks past stops below a roof, and the camera stops in front of a wall, so it never
 -- sees through either, however close that brings it (the owner's choice). With a mouse it keeps the mouse locked to the
--- screen's center, except while Roblox's menu is open. At a kickoff, and for a new character, it starts behind the
--- skater's facing, at its resting view. Ball Focus (§8.2) turns it toward the ball while the player doesn't carry it:
--- held on PC and gamepad, toggled by a tap on touch (Config.Input). A player with no character (or whose character is
--- gone before the next is bound) watches the ball, from the spectator's distance and height above it; with no ball
--- either, the camera holds still.
+-- screen's center, except while the controls are paused (Roblox's menu or Developer Console is open). At a kickoff, and
+-- for a new character, it starts behind the skater's facing, at its resting view. Ball Focus (§8.2) turns it toward the
+-- ball while the player doesn't carry it: held on PC and gamepad, toggled by a tap on touch (Config.Input). A player
+-- with no character (or whose character is gone before the next is bound) watches the ball, from the spectator's
+-- distance and height above it; with no ball either, the camera holds still.
 
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -51,7 +50,6 @@ export type CameraController = {
 	_camera: CameraLike,
 	_mouse: MouseLike,
 	_preferredInput: () -> Enum.PreferredInput,
-	_menuOpen: () -> boolean,
 	_raycast: (origin: Vector3, direction: Vector3, params: RaycastParams) -> RaycastResult?,
 	_ballPart: BallPart.BallPart,
 	_localId: PlayerId,
@@ -65,9 +63,10 @@ export type CameraController = {
 }
 
 -- The mouse stays at the screen's center while a mouse plays, so it turns the camera; it is free otherwise and
--- while Roblox's menu is open. The cursor hides while it is locked (the HUD's reticle marks the center).
+-- while the controls are paused: Roblox's menu or Developer Console is open (InputController). The cursor hides while
+-- it is locked (the HUD's reticle marks the center).
 local function lockMouse(self: CameraController, usingMouse: boolean)
-	local locked = usingMouse and not self._menuOpen()
+	local locked = usingMouse and not self._input.paused
 	local behavior = if locked then Enum.MouseBehavior.LockCenter else Enum.MouseBehavior.Default
 	local mouse = self._mouse
 	if mouse.MouseBehavior ~= behavior then
@@ -154,9 +153,6 @@ local CameraController: CameraController = {
 	_preferredInput = function(): Enum.PreferredInput
 		return Enum.PreferredInput.KeyboardAndMouse
 	end,
-	_menuOpen = function(): boolean
-		return false
-	end,
 	_raycast = function(_origin: Vector3, _direction: Vector3, _params: RaycastParams): RaycastResult?
 		return nil
 	end,
@@ -167,8 +163,7 @@ local CameraController: CameraController = {
 	_root = nil,
 	_focusToggled = false,
 
-	-- deps.Camera, deps.Mouse, deps.PreferredInput, deps.MenuOpen, deps.Raycast and deps.LocalId replace the live game
-	-- in tests.
+	-- deps.Camera, deps.Mouse, deps.PreferredInput, deps.Raycast and deps.LocalId replace the live game in tests.
 	init = function(self: CameraController, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -182,9 +177,6 @@ local CameraController: CameraController = {
 			or function(): Enum.PreferredInput
 				return UserInputService.PreferredInput
 			end
-		self._menuOpen = deps.MenuOpen or function(): boolean
-			return GuiService.MenuIsOpen
-		end
 		self._raycast = deps.Raycast
 			or function(origin: Vector3, direction: Vector3, params: RaycastParams): RaycastResult?
 				return workspace:Raycast(origin, direction, params)

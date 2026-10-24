@@ -4,13 +4,15 @@
 -- skating keys once per physics step, ActionController the action keys, and CameraController the look and Ball Focus.
 -- A press is counted when it happens, so one that starts and ends between two reads still counts; a hold is read as
 -- it is now, and the look as the rate Roblox's own camera reads (turn = state × dt). Touch controls hook their stick
--- pad and buttons in here. Every key stops while Roblox's menu is open (also when it is open as this starts): the keys
--- fire then too (measured), and a hold lets go. `paused` tells the skating and the actions that a hold let go because
--- of the menu, not the player.
+-- pad and buttons in here. Every key stops while Roblox's menu or its Developer Console is open (also when the menu is
+-- open as this starts): the keys fire then too (measured), and a hold lets go. The menu has signals; the console has
+-- none, so watchOverlays reads it once a frame. `paused` tells the skating and the actions that a hold let go because
+-- of Roblox's menu or console, not the player, and the camera to free the cursor.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 
@@ -48,9 +50,11 @@ export type InputController = {
 	-- The touch stick, as a move (x right, y forward, length 0..1).
 	setStick: (self: InputController, stick: Vector2) -> (),
 	setPaused: (self: InputController, paused: boolean) -> (),
+	-- Reads whether Roblox's Developer Console is open, once a frame (FrameController), and pauses while it is.
+	watchOverlays: (self: InputController) -> (),
 	-- The score tab's key (Tab, or Select) held now.
 	scoreTabHeld: (self: InputController) -> boolean,
-	-- Roblox's menu is open: every key is stopped.
+	-- Roblox's menu or Developer Console is open: every key is stopped.
 	paused: boolean,
 	destroy: (self: InputController) -> (),
 	_input: Config.InputConfig,
@@ -71,7 +75,24 @@ export type InputController = {
 	_mouseSensitivity: number,
 	_stickSensitivity: number,
 	_invertY: boolean,
+	-- Which of Roblox's overlays are open, and where the console's state is read.
+	_menuOpen: boolean,
+	_consoleOpen: boolean,
+	_devConsoleVisible: () -> boolean,
 }
+
+-- Whether Roblox's Developer Console is open. StarterGui:GetCore errors until Roblox's own scripts register the key,
+-- which counts as closed. Measured in a Studio client (2026-10-24): it answered without yielding, in about 2
+-- microseconds a call.
+local function devConsoleVisible(): boolean
+	local ok, visible = pcall(StarterGui.GetCore, StarterGui, "DevConsoleVisible")
+	return ok and visible == true
+end
+
+-- Pauses while either of Roblox's overlays is open.
+local function pauseForOverlays(self: InputController)
+	self:setPaused(self._menuOpen or self._consoleOpen)
+end
 
 -- Every action's name in the context, spelled once.
 local NAMES = {
@@ -183,9 +204,12 @@ local InputController: InputController = {
 	_mouseSensitivity = 1,
 	_stickSensitivity = 1,
 	_invertY = false,
+	_menuOpen = false,
+	_consoleOpen = false,
+	_devConsoleVisible = devConsoleVisible,
 
 	-- deps.Parent keeps the context out of the local player's PlayerScripts in tests; deps.GuiService (its menu
-	-- signals) and deps.LookSettings replace the live game there.
+	-- signals), deps.DevConsoleVisible and deps.LookSettings replace the live game there.
 	init = function(self: InputController, deps: { [string]: any })
 		local input: Config.InputConfig = (deps.Config :: Config.GameConfig).Input
 		self._input = input
@@ -239,16 +263,21 @@ local InputController: InputController = {
 		table.insert(
 			self._connections,
 			menu.MenuOpened:Connect(function()
-				self:setPaused(true)
+				self._menuOpen = true
+				pauseForOverlays(self)
 			end)
 		)
 		table.insert(
 			self._connections,
 			menu.MenuClosed:Connect(function()
-				self:setPaused(false)
+				self._menuOpen = false
+				pauseForOverlays(self)
 			end)
 		)
-		self:setPaused(menu.MenuIsOpen == true)
+		self._devConsoleVisible = deps.DevConsoleVisible or devConsoleVisible
+		self._menuOpen = menu.MenuIsOpen == true
+		self._consoleOpen = false
+		pauseForOverlays(self)
 		context.Parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerScripts")
 	end,
 
@@ -326,6 +355,14 @@ local InputController: InputController = {
 	setPaused = function(self: InputController, paused: boolean)
 		self.paused = paused
 		self.context.Enabled = not paused
+	end,
+
+	watchOverlays = function(self: InputController)
+		local open = self._devConsoleVisible()
+		if open ~= self._consoleOpen then
+			self._consoleOpen = open
+			pauseForOverlays(self)
+		end
 	end,
 
 	destroy = function(self: InputController)
