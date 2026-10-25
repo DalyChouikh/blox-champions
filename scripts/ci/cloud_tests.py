@@ -144,13 +144,13 @@ class Client:
         version_path = f"universes/{universe_id}/places/{place_id}/versions/{version}"
         url = f"{API}/cloud/v2/{version_path}/luau-execution-session-tasks"
         body = json.dumps({"script": script, "timeout": TASK_TIMEOUT}).encode()
-        return self._request("POST", url, body, "application/json")
+        return _named(self._request("POST", url, body, "application/json"))
 
     def wait(self, task: dict) -> dict:
         """Polls the task every POLL_SECONDS while it is QUEUED or PROCESSING, until DEADLINE_SECONDS have passed."""
         started = self._clock()
         while True:
-            task = self._request("GET", f"{API}/cloud/v2/{task['path']}")
+            task = _named(self._request("GET", f"{API}/cloud/v2/{task['path']}"))
             if task.get("state") not in WAITING:
                 return task
             if self._clock() - started >= DEADLINE_SECONDS:
@@ -170,6 +170,13 @@ class Client:
             token = page.get("nextPageToken")
             if not token:
                 return messages
+
+
+def _named(task: dict) -> dict:
+    """The task Roblox answered with, once it names its path: every later request about it is made on that path."""
+    if not isinstance(task.get("path"), str) or task["path"] == "":
+        raise CloudError(f"Roblox answered with a task without a path: {task}")
+    return task
 
 
 def _retry_after(headers) -> float | None:

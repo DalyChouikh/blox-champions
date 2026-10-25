@@ -267,6 +267,20 @@ class CloudTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(self.clock.sleeps, [first, first, first, second, first])
 
+    def test_fails_cleanly_on_a_task_answer_without_a_path(self):
+        # Every later request is made on the task's path.
+        answers = {
+            "created": (1, route("POST", CREATE, ok({"state": "QUEUED"}))),
+            "polled": (2, route("GET", POLL, ok({"state": "COMPLETE"}))),
+        }
+        for name, (index, answer) in answers.items():
+            with self.subTest(answer=name):
+                routes = green_routes()
+                routes[index] = answer
+                code, output = self.run_main(Cloud(routes))
+                self.assertEqual(code, 1)
+                self.assertIn("without a path", output)
+
     def test_fails_with_the_status_of_a_rejected_request_and_never_prints_the_key(self):
         cloud = Cloud([route("POST", UPLOAD, fails(403, {"message": "Forbidden"}))])
         code, output = self.run_main(cloud)
