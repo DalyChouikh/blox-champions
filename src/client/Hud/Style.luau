@@ -47,6 +47,12 @@ function Style.overlay(config: Config.GameConfig, props: Props?): Props
 	return Style.panel(config, over({ BackgroundTransparency = config.UI.hud.overlayTransparency }, props))
 end
 
+-- Drawn above its siblings that keep the default ZIndex (1): with equal ZIndex, the sibling parented later draws on
+-- top (probed), and React's order of keyed children is not fixed.
+function Style.above(props: Props?): Props
+	return over({ ZIndex = 2 }, props)
+end
+
 -- A frame that only holds others.
 function Style.holder(props: Props?): Props
 	return over({ BackgroundTransparency = 1, BorderSizePixel = 0 }, props)

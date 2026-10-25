@@ -19,16 +19,11 @@ local config = Config.defaults()
 local LOCAL_ID = "1"
 local DT = 1 / 60
 
--- A screen's two areas: the HUD's (CoreUISafeInsets) and the touch controls' (DeviceSafeInsets), which also spans
--- Roblox's 58 px top bar. PHONE is the emulated iPhone 17 Pro in landscape (probed in Play); BIG is a big screen,
--- where the touch buttons grow 1.5 times.
-type Screen = { hud: Rect, controls: Rect }
-local PHONE: Screen = { hud = Rect.new(0, 0, 750, 323), controls = Rect.new(0, -58, 750, 323) }
-local BIG: Screen = { hud = Rect.new(0, 0, 1280, 742), controls = Rect.new(0, -58, 1280, 742) }
+local PHONE, BIG = Fixtures.PHONE, Fixtures.BIG_SCREEN
 
 local folder: Folder
 local preferred: Enum.PreferredInput
-local screen: Screen
+local screen: Fixtures.Screen
 
 -- Roblox's key names, as GetStringForKeyCode gives them: a letter key its letter, Space a space, a gamepad button its
 -- KeyCode's name, and nothing for Shift, Ctrl, Tab or a mouse button.

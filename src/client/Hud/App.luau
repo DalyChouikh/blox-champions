@@ -96,8 +96,8 @@ local function App(props: AppProps): React.ReactElement
 			ScoreButton = if touch
 				then React.createElement(ScoreButton, { config = config, onActivated = props.onScoreButton })
 				else nil,
-			-- Above the other parts (ZIndex 1, the default), so the solid score tab and end screen cover them.
-			Stage = React.createElement("Frame", Style.holder({ Size = bindings.stage:map(stageSize), ZIndex = 2 }), {
+			-- Above the other parts, so the solid score tab and end screen cover them.
+			Stage = React.createElement("Frame", Style.holder(Style.above({ Size = bindings.stage:map(stageSize) })), {
 				Banner = React.createElement(
 					Banner,
 					{ config = config, text = text, banner = state.banner, area = bindings.stage }
