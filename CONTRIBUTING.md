@@ -38,4 +38,4 @@ Never leave a warning or error unaddressed — from tests, CI, StyLua, selene, l
 - Inside `src/`, require siblings relative to `script`; tests require through service paths (`ReplicatedStorage.Shared...`).
 - Gameplay numbers live in `src/shared/Config/`, never hard-coded in logic.
 - Place settings (services' properties such as `Workspace.SignalBehavior`) live in `place.project.json`, which `default.project.json` and `test.project.json` both include. Neither project may declare a service that file declares: Rojo would build the service twice. `scripts/ci/test_place_settings.py` checks both.
-- The CI scripts' Python (`scripts/ci/`) uses only the standard library. Formatting and linting are Ruff (`ruff format scripts`, `ruff check scripts`), and its unit tests run with `python -m unittest discover -s scripts/ci -p "test_*.py"`. CI fails on any of them.
+- The CI scripts' Python (`scripts/ci/`) uses only the standard library. Formatting and linting are Ruff (`ruff format scripts`, `ruff check scripts`), and its unit tests run with `python -m unittest discover -s scripts/ci -p "test_*.py"`. CI fails on any of them, and on any warning the unit tests print.

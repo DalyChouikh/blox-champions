@@ -1,12 +1,14 @@
 """Unit tests for cloud_tests.py. A fake opener plays Roblox's Open Cloud API and a fake clock drives the waits, so
 nothing touches the network. Run: python -m unittest discover -s scripts/ci -p "test_*.py"."""
 
+import gc
 import http.client
 import io
 import json
 import tempfile
 import unittest
 import urllib.error
+import warnings
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -273,6 +275,17 @@ class CloudTests(unittest.TestCase):
         self.assertIn(UPLOAD, output)
         self.assertIn("Forbidden", output)
         self.assertNotIn(KEY, output)
+
+    def test_closes_every_error_answer_it_reads(self):
+        # An HTTPError holds its answer open, and one never closed prints a ResourceWarning once it is collected.
+        retried = [route("POST", UPLOAD, fails(503, {"message": "Unavailable"}))] + green_routes()
+        rejected = [route("POST", UPLOAD, fails(403, {"message": "Forbidden"}))]
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            codes = [self.run_main(Cloud(retried))[0], self.run_main(Cloud(rejected))[0]]
+            gc.collect()
+        self.assertEqual(codes, [0, 1])
+        self.assertEqual([str(w.message) for w in caught if issubclass(w.category, ResourceWarning)], [])
 
     def test_fails_loudly_naming_each_missing_setting(self):
         code, output = self.run_main(Cloud([]), env={})
