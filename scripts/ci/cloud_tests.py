@@ -36,8 +36,10 @@ POLL_SECONDS = 3
 TASK_TIMEOUT = "300s"
 # How long after creating the task the client gives up: the task's 5 minutes plus time spent queued.
 DEADLINE_SECONDS = 600
-# Waits before each retry of a rate-limited (429), failing (5xx) or dropped request, unless Roblox sends Retry-After.
-RETRY_SECONDS = (5, 10, 20)
+# Waits before each retry of a rate-limited (429), failing (5xx) or dropped request, unless Roblox says how long
+# (Retry-After, else x-ratelimit-reset). Without them Roblox's rate-limit page asks for exponential backoff; these
+# add up to 155 s, past a second one-minute window of its 5-task-creations-a-minute limit.
+RETRY_SECONDS = (5, 10, 20, 40, 80)
 # Seconds a single request may take.
 REQUEST_SECONDS = 60
 WAITING = {"QUEUED", "PROCESSING"}
@@ -171,11 +173,18 @@ class Client:
 
 
 def _retry_after(headers) -> float | None:
-    value = headers.get("Retry-After") if headers is not None else None
-    try:
-        return float(value) if value is not None else None
-    except ValueError:
+    """Seconds Roblox asks a rate-limited client to wait: Retry-After, else x-ratelimit-reset (until its quota resets).
+    None when it sends neither."""
+    if headers is None:
         return None
+    for name in ("Retry-After", "x-ratelimit-reset"):
+        value = headers.get(name)
+        try:
+            if value is not None:
+                return float(value)
+        except ValueError:
+            continue
+    return None
 
 
 def print_logs(client: Client, task: dict, out: TextIO):
