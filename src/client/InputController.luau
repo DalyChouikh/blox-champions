@@ -78,14 +78,19 @@ export type InputController = {
 	-- Which of Roblox's overlays are open, and where the console's state is read.
 	_menuOpen: boolean,
 	_consoleOpen: boolean,
-	_devConsoleVisible: () -> boolean,
+	-- StarterGui:GetCore, which errors for a key Roblox's own scripts have not registered yet.
+	_getCore: (key: string) -> any,
 }
+
+local function getCore(key: string): any
+	return StarterGui:GetCore(key)
+end
 
 -- Whether Roblox's Developer Console is open. StarterGui:GetCore errors until Roblox's own scripts register the key,
 -- which counts as closed. Measured in a Studio client (2026-10-24): it answered without yielding, in about 2
 -- microseconds a call.
-local function devConsoleVisible(): boolean
-	local ok, visible = pcall(StarterGui.GetCore, StarterGui, "DevConsoleVisible")
+local function devConsoleVisible(self: InputController): boolean
+	local ok, visible = pcall(self._getCore, "DevConsoleVisible")
 	return ok and visible == true
 end
 
@@ -206,10 +211,10 @@ local InputController: InputController = {
 	_invertY = false,
 	_menuOpen = false,
 	_consoleOpen = false,
-	_devConsoleVisible = devConsoleVisible,
+	_getCore = getCore,
 
 	-- deps.Parent keeps the context out of the local player's PlayerScripts in tests; deps.GuiService (its menu
-	-- signals), deps.DevConsoleVisible and deps.LookSettings replace the live game there.
+	-- signals), deps.GetCore (StarterGui:GetCore) and deps.LookSettings replace the live game there.
 	init = function(self: InputController, deps: { [string]: any })
 		local input: Config.InputConfig = (deps.Config :: Config.GameConfig).Input
 		self._input = input
@@ -274,7 +279,7 @@ local InputController: InputController = {
 				pauseForOverlays(self)
 			end)
 		)
-		self._devConsoleVisible = deps.DevConsoleVisible or devConsoleVisible
+		self._getCore = deps.GetCore or getCore
 		self._menuOpen = menu.MenuIsOpen == true
 		self._consoleOpen = false
 		pauseForOverlays(self)
@@ -358,7 +363,7 @@ local InputController: InputController = {
 	end,
 
 	watchOverlays = function(self: InputController)
-		local open = self._devConsoleVisible()
+		local open = devConsoleVisible(self)
 		if open ~= self._consoleOpen then
 			self._consoleOpen = open
 			pauseForOverlays(self)

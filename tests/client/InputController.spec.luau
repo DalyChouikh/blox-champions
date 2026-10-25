@@ -292,8 +292,8 @@ describe("InputController", function()
 			Parent = folder,
 			LookSettings = defaultLookSettings,
 			GuiService = menu,
-			DevConsoleVisible = function(): boolean
-				return console
+			GetCore = function(key: string): any
+				return key == "DevConsoleVisible" and console
 			end,
 		})
 		InputController:watchOverlays()
@@ -315,6 +315,22 @@ describe("InputController", function()
 		InputController:watchOverlays()
 		expect(InputController.paused).toBe(false)
 		expect(InputController.context.Enabled).toBe(true)
+	end)
+
+	-- StarterGui:GetCore errors until Roblox's own scripts register a key.
+	it("counts the Developer Console as closed until Roblox has registered it", function()
+		InputController:destroy()
+		InputController:init({
+			Config = Fixtures.config(),
+			Parent = folder,
+			LookSettings = defaultLookSettings,
+			GuiService = { MenuOpened = Signal.new(), MenuClosed = Signal.new() },
+			GetCore = function(key: string): any
+				error(`{key} has not been registered by the CoreScripts`)
+			end,
+		})
+		InputController:watchOverlays()
+		expect(InputController.paused).toBe(false)
 	end)
 
 	it("starts paused when Roblox's menu is already open", function()
