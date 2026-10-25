@@ -1,13 +1,13 @@
 --!strict
--- The ball in the arena (spec §9.3): one server-owned physics part, in its own model that streams to every client,
--- that BallState says what to do with. It is hidden (in ServerStorage, so its next spawn is never replicated early)
--- until a kickoff ends, then spawns at a random ball spawn. A ball that leaves the arena is recovered in any state,
--- and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each frame `step` reports how it really
--- moved, a throw since the last frame, who caught it, and whose body it touched. Jumps the server makes (a spawn, a
--- respawn, the snap to a catcher's side) are never reported as movement, so they can never cross a gate or the ring.
--- A pass flies flat, its weight cancelled, and homes on its target, until it touches anything or anyone or the target
--- can no longer catch; then it falls like any ball. A ball passes through the player who let go of it until it is
--- clear of them.
+-- The ball in the arena (spec §9.3): one server-owned physics part, in its own model that streams to every client, that
+-- BallState says what to do with. It is hidden (in ServerStorage, so its next spawn is never replicated early) until a
+-- kickoff ends, then spawns at a random ball spawn. A ball that leaves the arena is recovered in any state, and one
+-- Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each frame `step` reports how it really moved, a
+-- throw since the last frame, who caught it, and whose body it touched. Jumps the server makes (a spawn, a respawn, the
+-- snap to a catcher's side, a carrier it moves, a drop it places) are never reported as movement, so they can never
+-- cross a gate or the ring. A pass flies flat, its weight cancelled, and homes on its target, until it touches anything
+-- or anyone or the target can no longer catch; then it falls like any ball. A ball passes through the player who let go
+-- of it until it is clear of them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -64,6 +64,10 @@ export type BallService = {
 	pass: (self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId?) -> (),
 	-- A given velocity replaces the ball's (a knocked-down carrier's momentum). Either is held to the speed limit.
 	drop: (self: BallService, velocity: Vector3?) -> (),
+	-- Lets go of a carried ball, still, at `position`: where its carrier was last in the arena (MovementGuard).
+	dropAt: (self: BallService, position: Vector3) -> (),
+	-- The server moved the carrier, and the ball welded to them: the next step reports no movement.
+	jumped: (self: BallService) -> (),
 	onTouched: (self: BallService, hit: BasePart) -> (),
 	step: (self: BallService, dt: number, holders: { Holder }) -> BallFrame,
 	destroy: (self: BallService) -> (),
@@ -427,6 +431,18 @@ local BallService: BallService = {
 			self.part.AssemblyLinearVelocity = Vectors.clampMagnitude(velocity, self._speedLimit)
 		end
 		self.state:drop()
+	end,
+
+	dropAt = function(self: BallService, position: Vector3)
+		self:drop(Vector3.zero)
+		local part = self.part
+		part.CFrame = CFrame.new(position)
+		part.AssemblyAngularVelocity = Vector3.zero
+		self._teleported = true
+	end,
+
+	jumped = function(self: BallService)
+		self._teleported = true
 	end,
 
 	onTouched = function(self: BallService, hit: BasePart)
