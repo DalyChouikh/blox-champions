@@ -7,7 +7,6 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.InputController)
-local Signal = require(ReplicatedStorage.Shared.Util.Signal)
 
 -- The player's Roblox look settings as a player who never changed them has them.
 local function defaultLookSettings(): (number, number, boolean)
@@ -255,7 +254,7 @@ describe("InputController", function()
 
 	it("stops every key while Roblox's menu is open, and lets go of every hold", function()
 		InputController:destroy()
-		local menu = { MenuOpened = Signal.new(), MenuClosed = Signal.new() }
+		local menu = Fixtures.menu()
 		InputController:init({
 			Config = Fixtures.config(),
 			Parent = folder,
@@ -285,7 +284,7 @@ describe("InputController", function()
 
 	it("stops every key while Roblox's Developer Console is open too, until both it and the menu are closed", function()
 		InputController:destroy()
-		local menu = { MenuOpened = Signal.new(), MenuClosed = Signal.new() }
+		local menu = Fixtures.menu()
 		local console = false
 		InputController:init({
 			Config = Fixtures.config(),
@@ -324,7 +323,7 @@ describe("InputController", function()
 			Config = Fixtures.config(),
 			Parent = folder,
 			LookSettings = defaultLookSettings,
-			GuiService = { MenuOpened = Signal.new(), MenuClosed = Signal.new() },
+			GuiService = Fixtures.menu(),
 			GetCore = function(key: string): any
 				error(`{key} has not been registered by the CoreScripts`)
 			end,
@@ -335,7 +334,7 @@ describe("InputController", function()
 
 	it("starts paused when Roblox's menu is already open", function()
 		InputController:destroy()
-		local menu = { MenuOpened = Signal.new(), MenuClosed = Signal.new(), MenuIsOpen = true }
+		local menu = Fixtures.menu(true)
 		InputController:init({
 			Config = Fixtures.config(),
 			Parent = folder,
@@ -347,5 +346,11 @@ describe("InputController", function()
 		menu.MenuClosed:Fire()
 		expect(InputController.paused).toBe(false)
 		expect(InputController.context.Enabled).toBe(true)
+	end)
+
+	-- `paused` follows the menu and the console only: a pause set by hand would disagree with both until the next
+	-- change of either (Phase 9 review).
+	it("pauses for Roblox's overlays only, with no way to pause by hand", function()
+		expect((InputController :: any).setPaused).toBeNil()
 	end)
 end)

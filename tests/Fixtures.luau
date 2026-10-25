@@ -8,6 +8,7 @@ local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local GeometryTypes = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
 local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
+local Signal = require(ReplicatedStorage.Shared.Util.Signal)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
@@ -17,8 +18,17 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 
 local Fixtures = {}
 
+-- A stand-in for GuiService's menu (InputController's deps.GuiService): fire MenuOpened and MenuClosed to open
+-- and close Roblox's menu, which pauses the controls.
+export type Menu = { MenuOpened: Signal.Signal<>, MenuClosed: Signal.Signal<>, MenuIsOpen: boolean? }
+
 -- Roblox's default workspace.Gravity, pointing down.
 Fixtures.GRAVITY = Vector3.new(0, -196.2, 0)
+
+-- Roblox's menu, closed unless `isOpen`.
+function Fixtures.menu(isOpen: boolean?): Menu
+	return { MenuOpened = Signal.new(), MenuClosed = Signal.new(), MenuIsOpen = isOpen }
+end
 
 -- Asserts two vectors are within `tolerance` (default 1e-3) of each other.
 function Fixtures.expectNear(actual: Vector3, expected: Vector3, tolerance: number?)

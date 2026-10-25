@@ -49,7 +49,6 @@ export type InputController = {
 	bindTouchStick: (self: InputController, pad: GuiButton) -> InputAction,
 	-- The touch stick, as a move (x right, y forward, length 0..1).
 	setStick: (self: InputController, stick: Vector2) -> (),
-	setPaused: (self: InputController, paused: boolean) -> (),
 	-- Reads whether Roblox's Developer Console is open, once a frame (FrameController), and pauses while it is.
 	watchOverlays: (self: InputController) -> (),
 	-- The score tab's key (Tab, or Select) held now.
@@ -96,7 +95,9 @@ end
 
 -- Pauses while either of Roblox's overlays is open.
 local function pauseForOverlays(self: InputController)
-	self:setPaused(self._menuOpen or self._consoleOpen)
+	local paused = self._menuOpen or self._consoleOpen
+	self.paused = paused
+	self.context.Enabled = not paused
 end
 
 -- Every action's name in the context, spelled once.
@@ -355,11 +356,6 @@ local InputController: InputController = {
 
 	scoreTabHeld = function(self: InputController): boolean
 		return self._scoreTab:GetState() :: boolean
-	end,
-
-	setPaused = function(self: InputController, paused: boolean)
-		self.paused = paused
-		self.context.Enabled = not paused
 	end,
 
 	watchOverlays = function(self: InputController)

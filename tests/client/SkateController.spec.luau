@@ -23,6 +23,8 @@ local movement = config.Movement
 local CAMERA = { CFrame = CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)) }
 
 local folder: Folder
+-- Roblox's menu: opening it pauses the controls.
+local menu: Fixtures.Menu
 local floor: Folder
 local rig: Model
 local sent: { { boolean } }
@@ -105,7 +107,8 @@ beforeEach(function()
 	floor:AddTag(Tags.RideSurface)
 	sent = {}
 	others = {}
-	InputController:init({ Config = config, Parent = folder })
+	menu = Fixtures.menu()
+	InputController:init({ Config = config, Parent = folder, GuiService = menu })
 	rig = skaterAt("Skater", Vector3.zero)
 	setup()
 	SkateController:bind(rig)
@@ -263,7 +266,7 @@ describe("SkateController", function()
 		SkateController:step(1 / 60)
 		expect((SkateController.skater :: any).mode).toBe("Attached")
 		-- The menu lets go of the key, not the player: no release boost.
-		InputController:setPaused(true)
+		menu.MenuOpened:Fire()
 		SkateController:step(1 / 60)
 		expect((SkateController.skater :: any).mode).never.toBe("Attached")
 		expect(velocityOf(rig).Magnitude).toBeLessThan(movement.attachBoostSpeed)
