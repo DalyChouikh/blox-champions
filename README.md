@@ -65,7 +65,7 @@ CI's `cloud-tests` check runs the whole suite inside Roblox on every pull reques
 
 1. It builds `build/test.rbxl` and uploads it to a private test game on the owner's Roblox account, **Blox Champions Tests**, as a saved version (saved, not published).
 2. Roblox runs `scripts/ci/run-tests-task.luau` in that exact version through [Open Cloud Luau Execution](https://create.roblox.com/docs/cloud/reference/features/luau-execution). The task returns the runner's summary, and its log (Jest's report) is printed in the job's output. Jest Roblox loads each module with `loadstring` there, which a Roblox server allows only with `ServerScriptService.LoadStringEnabled` on, so `test.project.json` turns it on; the game's `default.project.json` leaves it off.
-3. The check passes only when the task completed and every test passed, with more than zero tests run.
+3. The check passes only when the task completed and every test passed, with more than zero tests run and none skipped (a stray `it.only` or `it.skip` fails it).
 
 The client that does this is `scripts/ci/cloud_tests.py`, which uses only Python's standard library.
 

@@ -203,6 +203,14 @@ class CloudTests(unittest.TestCase):
                 code, _ = self.run_main(Cloud(green_routes(final=task("COMPLETE", results))))
                 self.assertEqual(code, 1)
 
+    def test_fails_when_a_test_was_skipped(self):
+        # A stray `it.only` or `it.skip`: nothing failed, but not every test ran.
+        skipped = summary(numPassedTests=600)
+        code, output = self.run_main(Cloud(green_routes(final=task("COMPLETE", [skipped]))))
+        self.assertEqual(code, 1)
+        self.assertIn("600/658", output)
+        self.assertIn("skipped", output)
+
     def test_fails_when_the_task_failed_or_was_cancelled(self):
         failed = task("FAILED", error={"code": "SCRIPT_ERROR", "message": "attempt to call a nil value"})
         code, output = self.run_main(Cloud(green_routes(final=failed)))

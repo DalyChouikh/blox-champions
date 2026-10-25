@@ -9,7 +9,7 @@ scripts/ci/setup-cloud-tests.sh).
 2. Runs the task script against that exact version, so runs from different branches never test each other's code.
 3. Waits while the task is QUEUED or PROCESSING, then prints its logs.
 4. Passes only when the task is COMPLETE and its result is RunTests' summary with success, no failed test or suite,
-   and more than zero tests.
+   more than zero tests, and every test passed (a stray `it.only` or `it.skip` leaves some unrun).
 
 The endpoints, states and limits are Roblox's (create.roblox.com/docs: cloud/reference/features/luau-execution and
 cloud/reference/features/places). Standard library only.
@@ -219,6 +219,8 @@ def verdict(task: dict) -> tuple[bool, str]:
         and total > 0
     )
     line = f"{passed}/{total} tests passed"
+    if green and passed != total:
+        return False, f"{line}: the others were skipped (an `it.only` or `it.skip`?)"
     if green:
         return True, line
     failures = "\n".join(ANSI.sub("", str(message)) for message in summary.get("failureMessages") or [])
