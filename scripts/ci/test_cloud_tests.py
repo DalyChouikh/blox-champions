@@ -299,11 +299,14 @@ class CloudTests(unittest.TestCase):
         self.assertIn("ROBLOX_TEST_PLACE_ID", output)
 
     def test_prints_every_page_of_the_logs(self):
+        # A page token is opaque and may hold characters a query must escape.
         routes = green_routes(
-            logs={"luauExecutionSessionTaskLogs": [{"messages": ["one", "two"]}], "nextPageToken": "p2"}
+            logs={"luauExecutionSessionTaskLogs": [{"messages": ["one", "two"]}], "nextPageToken": "a+b/c="}
         )
         routes.append(
-            route("GET", LOGS, ok({"luauExecutionSessionTaskLogs": [{"messages": ["three"]}]}), "pageToken=p2")
+            route(
+                "GET", LOGS, ok({"luauExecutionSessionTaskLogs": [{"messages": ["three"]}]}), "pageToken=a%2Bb%2Fc%3D"
+            )
         )
         code, output = self.run_main(Cloud(routes))
         self.assertEqual(code, 0)

@@ -27,7 +27,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 API = "https://apis.roblox.com"
 # Seconds between polls of a waiting task (Roblox's own place-ci-cd-demo polls every 3).
@@ -163,7 +163,7 @@ class Client:
         while True:
             url = f"{API}/cloud/v2/{task['path']}/logs"
             if token:
-                url += f"?pageToken={token}"
+                url += "?" + urlencode({"pageToken": token})
             page = self._request("GET", url)
             for chunk in page.get("luauExecutionSessionTaskLogs", []):
                 messages.extend(chunk.get("messages", []))
