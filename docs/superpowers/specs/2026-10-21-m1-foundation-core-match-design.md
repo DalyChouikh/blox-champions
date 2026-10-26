@@ -444,11 +444,12 @@ All strings and colors in `Config/UI` (team colors: Blue and Orange).
 
 ### 12.3 CI (GitHub Actions, on every pull request and push to `main`)
 
-1. `stylua --check src tests`
-2. `selene src tests`
-3. `luau-lsp analyze` with Roblox type definitions
+1. `stylua --check src tests scripts`
+2. `selene src tests scripts`
+3. `luau-lsp analyze` with Roblox type definitions (`bash scripts/analyze.sh`, strict)
 4. `rojo build default.project.json` and `rojo build test.project.json`
-5. **Jest suite via Open Cloud Luau Execution** — Roblox's API that runs Luau in a place headlessly; tasks run up to 5 minutes, 10 concurrent per place. Requires the owner to create an Open Cloud API key and a test place once and store them as GitHub secrets; this is its own M1 issue.
+5. The CI scripts' Python (Phase 9): `ruff format --check scripts`, `ruff check scripts` and their unit tests, which must print no warning
+6. **Jest suite via Open Cloud Luau Execution** — Roblox's API that runs Luau in a place headlessly; tasks run up to 5 minutes, at most 10 unfinished per place. The owner set it up once (#170, `scripts/ci/setup-cloud-tests.sh`): a private test game, whose universe and place IDs are GitHub repository variables (`ROBLOX_TEST_UNIVERSE_ID`, `ROBLOX_TEST_PLACE_ID`), and an Open Cloud API key restricted to that game, stored as the GitHub secret `ROBLOX_API_KEY`.
 
 ### 12.4 Git and GitHub workflow
 
