@@ -328,6 +328,46 @@ describe("SkateController", function()
 		expect(velocityOf(rig).Z).toBeCloseTo(-120 * (1 - movement.airDrag * dt), 3)
 	end)
 
+	-- A barrier (the arena's top, A7) stops a skater's collider like a ceiling, but no ground ray sees it: a skater
+	-- sliding under it keeps its speed along it, and one on the floor below still rides the floor.
+	it("slides under a barrier its collider reaches, which no ground ray sees", function()
+		local dt = 1 / 60
+		local barrier = Instance.new("Folder")
+		barrier.Name = "Top"
+		barrier.Parent = folder
+		barrier:AddTag(Tags.Barrier)
+		local function addBarrier(cframe: CFrame, size: Vector3)
+			local slab = Instance.new("Part")
+			slab.Anchored = true
+			slab.Size = size
+			slab.CFrame = cframe
+			slab.Parent = barrier
+		end
+		-- A ceiling facing -Y 0.5 studs above the collider's top, and a sheet tilted 30 degrees across the ground ray,
+		-- under the collider.
+		local ceiling = 20 + movement.colliderDiameter / 2 + 0.5
+		addBarrier(CFrame.new(0, ceiling + 0.5, 0), Vector3.new(40, 1, 40))
+		addBarrier(CFrame.new(-20, 0.6, 0) * CFrame.Angles(0, 0, math.rad(30)), Vector3.new(2, 0.2, 2))
+		RideSurfaces:refresh()
+
+		-- At 120 studs/s, 72 of them up: it reaches the ceiling within the step.
+		flying(Vector3.new(0, 20, 0), Vector3.new(0, 72, -96))
+		SkateController:step(dt)
+		expect(velocityOf(rig).Y).toBeLessThan(CAST_TOLERANCE)
+		expect(velocityOf(rig).Z).toBeCloseTo(-96 * (1 - movement.airDrag * dt), 1)
+
+		rig:PivotTo(CFrame.new(-20, movement.hoverHeight, 0))
+		local skater = SkateController.skater :: any
+		skater.mode = "Grounded"
+		skater.velocity = Vector3.zero
+		for _ = 1, 10 do
+			SkateController:step(dt)
+		end
+		expect(skater.mode).toBe("Grounded")
+		expect(skater.up:Dot(Vector3.yAxis)).toBeCloseTo(1, 4)
+		expect(Fixtures.root(rig).Position.Y).toBeCloseTo(movement.hoverHeight, 1)
+	end)
+
 	it("sweeps nothing for a skater brought to rest", function()
 		local casts = 0
 		setup({

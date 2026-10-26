@@ -8,11 +8,13 @@ local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Features = require(ReplicatedStorage.Shared.Arena.Geometry.Features)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 
 local arena = Config.defaults().Arena
 -- Glass thicker than the surface's slabs, so a rule that took one thickness for the other shows. It shares every
 -- other length with `arena`.
 local thickGlass = Fixtures.config({ Arena = { barrier = { thickness = 2 } } }).Arena
+local openArena = Fixtures.config({ Arena = { top = { kind = "Open" } } }).Arena
 
 -- How far across the track a point is, from the inner glass's face (u in the profile), seen from above.
 local function lateral(position: Vector3): number
@@ -22,7 +24,7 @@ local function lateral(position: Vector3): number
 end
 
 describe("Features.gates", function()
-	it("spans the track at each corner, facing the travel direction, as tall as the glass", function()
+	it("spans the track at each corner, facing the travel direction, as tall as the top", function()
 		local gates = Features.gates(arena)
 		expect(#gates).toBe(4)
 		Fixtures.expectNear(gates[1].frame.Position, Vector3.new(100, 42.5, -70))
@@ -30,7 +32,78 @@ describe("Features.gates", function()
 		Fixtures.expectNear(gates[3].frame.Position, Vector3.new(-100, 42.5, 70))
 		expect(gates[2].width).toBe(60)
 		expect(gates[2].height).toBe(85)
+		local open = Features.gates(openArena)
+		expect(open[2].height).toBe(105)
+		Fixtures.expectNear(open[1].frame.Position, Vector3.new(100, 52.5, -70))
 	end)
+end)
+
+describe("Features.top", function()
+	-- Every piece's face, the side away from its slab: a block's face is its +Y side (Surface's block), and every
+	-- wedge of the top lies flat, its face downward.
+	local function faceCorners(piece: Types.Piece): { Vector3 }
+		if piece.shape == "Wedge" then
+			return Fixtures.wedgeFace(piece, -Vector3.yAxis)
+		end
+		local frame, half = piece.cframe, piece.size / 2
+		local face = frame.Position + frame.UpVector * half.Y
+		local corners: { Vector3 } = {}
+		for _, x in { -1, 1 } do
+			for _, z in { -1, 1 } do
+				table.insert(corners, face + frame.RightVector * (x * half.X) + frame.LookVector * (z * half.Z))
+			end
+		end
+		return corners
+	end
+
+	it(
+		"closes the arena with the top: a roof between the glass faces, or an open map's ceiling and its strips",
+		function()
+			local blocks, wedges = 0, 0
+			for _, piece in Features.top(arena) do
+				if piece.shape == "Block" then
+					blocks += 1
+					-- The slab above its face, outside the track.
+					expect(piece.cframe.UpVector.Y).toBeCloseTo(-1, 4)
+				else
+					wedges += 1
+					for _, corner in Fixtures.wedgeFace(piece, Vector3.yAxis) do
+						expect(corner.Y).toBeCloseTo(85 + arena.surfaceThickness, 3)
+					end
+				end
+				for _, corner in faceCorners(piece) do
+					expect(corner.Y).toBeCloseTo(85, 3)
+					local u = lateral(corner)
+					expect(u > -0.05 and u < arena.trackWidth + 0.05).toBe(true)
+				end
+			end
+			-- One block along each straight, and four wedges for each of the 55 station steps around each curved end.
+			expect(blocks).toBe(2)
+			expect(wedges).toBe(440)
+
+			-- Strips up from both glass faces to the ceiling (one block per straight and per station step around each
+			-- end, as the glass), and the ceiling as the roof was.
+			local width = arena.trackWidth
+			local open = Features.top(openArena)
+			expect(#open).toBe(666)
+			for _, piece in open do
+				if piece.shape == "Block" and piece.cframe.UpVector.Y > -0.99 then
+					-- A strip's slab hangs outside the track: its face points back across it.
+					local center = piece.cframe.Position
+					local offMiddle = math.abs(lateral(center) - width / 2)
+					expect(math.abs(lateral(center + piece.cframe.UpVector) - width / 2) < offMiddle).toBe(true)
+				end
+				for _, corner in faceCorners(piece) do
+					local u = lateral(corner)
+					local onStrip = (math.abs(u) < 0.05 or math.abs(u - width) < 0.05)
+						and corner.Y > 85 - 1e-3
+						and corner.Y < 105 + 1e-3
+					local onCeiling = math.abs(corner.Y - 105) < 1e-3 and u > -0.05 and u < width + 0.05
+					expect(onStrip or onCeiling).toBe(true)
+				end
+			end
+		end
+	)
 end)
 
 describe("Features.barriers", function()

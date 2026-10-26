@@ -10,6 +10,7 @@ local BallService = require(game:GetService("ServerScriptService").Server.BallSe
 local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local Features = require(ReplicatedStorage.Shared.Arena.Geometry.Features)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local SkaterBody = require(game:GetService("ServerScriptService").Server.SkaterBody)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
@@ -190,8 +191,8 @@ describe("BallService", function()
 		expect(out.respawned).toBe(true)
 		expect(isSpawn(BallService.part.Position)).toBe(true)
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
-		-- Over the glass top (R10): out at once, never flying on, as an untargeted pass straight up would.
-		BallService.part.CFrame = CFrame.new(0, config.Arena.barrier.top + 5, 57)
+		-- Found over the top (only a fault puts it there, R9): out at once, never flying on.
+		BallService.part.CFrame = CFrame.new(0, Profile.topHeight(config.Arena) + 5, 57)
 		expect(BallService:step(1 / 60, {}).respawned).toBe(true)
 		expect(isSpawn(BallService.part.Position)).toBe(true)
 		expect(BallService:step(15, {}).respawned).toBe(true)

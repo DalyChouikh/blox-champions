@@ -3,7 +3,7 @@
 -- guardSampleSeconds it samples each seated skater's root, stepped by MatchService before the ball, so the ball sees
 -- the guard's moves in the same frame. A move beyond the allowance is a strike, and a run of strikes (or one move far
 -- beyond it) returns the skater to their last valid place, a carrier with the ball. Otherwise a root outside the
--- glass (Bounds.inArena, by more than guardOutsideMargin) is put back on its team's spawn: nothing else would ever
+-- arena (Bounds.inArena, by more than guardOutsideMargin) is put back on its team's spawn: nothing else would ever
 -- bring it back (#177, #181). A carrier first lets go of the ball where they were last inside the arena (owner,
 -- 2026-10-25), so leaving the arena never takes the ball home. The ball is told of every move of a carrier, so none
 -- counts as the ball crossing a gate. Anchored roots are reset, not judged, and every server placement starts the

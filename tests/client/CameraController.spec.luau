@@ -197,6 +197,20 @@ describe("CameraController", function()
 		expect((camera.CFrame.Position - focus()).Magnitude).toBeCloseTo(5, 3)
 	end)
 
+	-- A barrier (the arena's top, A7) stops skaters and the ball, never the view.
+	it("looks through a barrier behind the skater", function()
+		CameraController:step(DT)
+		local barrier = Instance.new("Part")
+		barrier.Anchored = true
+		barrier.Size = Vector3.new(40, 40, 1)
+		barrier.CFrame = CFrame.new(focus() + Vector3.new(0, 0, 6))
+		barrier.Parent = folder
+		barrier:AddTag(Tags.Barrier)
+		RideSurfaces:refresh()
+		CameraController:step(DT)
+		expect((camera.CFrame.Position - focus()).Magnitude).toBeCloseTo(config.Camera.distance, 3)
+	end)
+
 	it("keeps its focus inside the arena, under a roof just above the skater", function()
 		local root = Fixtures.root(rig)
 		local roof = Instance.new("Part")

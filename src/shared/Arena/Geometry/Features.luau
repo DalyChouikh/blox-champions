@@ -1,6 +1,7 @@
 --!strict
--- Everything in the arena besides the riding surface (spec §9.1, Arena spec §5): the glass on the two tops, the lap
--- gates, the raised goal ring and its panel, the corner markers, the team and ball spawns, and the infield floor.
+-- Everything in the arena besides the riding surface (spec §9.1, Arena spec §5): the glass on the two tops, the top
+-- that closes the arena (a roof, or an open map's ceiling), the lap gates, the raised goal ring and its panel, the
+-- corner markers, the team and ball spawns, and the infield floor.
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
@@ -29,31 +30,41 @@ local function sectionMiddle(arena: ArenaConfig, section: number): number
 	return (Centerline.gateDistance(arena, section) + nextStart) / 2
 end
 
+-- A cross-section that never changes along the loop (the glass, the top), swept around it with the surface's merge
+-- rule, each slab `thickness` behind its face.
+local function sweepFixed(arena: ArenaConfig, section: { Vector2 }, thickness: number): { Piece }
+	local rings = Surface.rings(arena, function(): { Vector2 }
+		return section
+	end)
+	return Surface.sweep(rings, thickness)
+end
+
 -- The glass (A7): two vertical strips swept around the loop, the inner one standing on the bank's top and the outer
 -- one on the outer wall's top, both up to barrier.top. Each runs the way the profile does (down the inner glass, up
 -- the outer one), so its slab hangs barrier.thickness behind its face, outside the track. Every strip between two
 -- stations is a flat rectangle: one block per station step around the ends, one per side along each straight.
 function Features.barriers(arena: ArenaConfig): { Piece }
-	local top, width = arena.barrier.top, arena.trackWidth
+	local top, width, thickness = arena.barrier.top, arena.trackWidth, arena.barrier.thickness
 	local inner = { Vector2.new(0, top), Vector2.new(0, arena.innerBankHeight) }
 	local outer = { Vector2.new(width, arena.outerWallHeight), Vector2.new(width, top) }
-	local pieces: { Piece } = {}
-	for _, section in { inner, outer } do
-		local rings = Surface.rings(arena, function(): { Vector2 }
-			return section
-		end)
-		for _, piece in Surface.sweep(rings, arena.barrier.thickness) do
-			table.insert(pieces, piece)
-		end
+	local pieces = sweepFixed(arena, inner, thickness)
+	for _, piece in sweepFixed(arena, outer, thickness) do
+		table.insert(pieces, piece)
 	end
 	return pieces
 end
 
--- Gate g spans the track at the start of section g and faces the travel direction, as tall as the glass, so no ball
--- in play passes over it (Bounds.inArena).
+-- The top (R14): Profile.top swept around the loop, its slabs surfaceThickness thick above it (and behind an open
+-- map's strips), outside the track.
+function Features.top(arena: ArenaConfig): { Piece }
+	return sweepFixed(arena, Profile.top(arena), arena.surfaceThickness)
+end
+
+-- Gate g spans the track at the start of section g and faces the travel direction, as tall as the top, so no ball in
+-- play passes over it (Bounds.inArena).
 function Features.gates(arena: ArenaConfig): { Crossing.Rectangle }
 	local gates: { Crossing.Rectangle } = {}
-	local top = arena.barrier.top
+	local top = Profile.topHeight(arena)
 	for gate = 1, Centerline.gateCount do
 		table.insert(gates, {
 			frame = Centerline.at(arena, Centerline.gateDistance(arena, gate), arena.trackWidth / 2, top / 2),

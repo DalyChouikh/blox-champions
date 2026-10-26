@@ -105,7 +105,7 @@ export type SkateController = {
 
 -- Who playersAround walks before start.
 local NO_PLAYERS: { Player } = table.freeze({})
--- How many surfaces one step slides along: a wall, the floor or roof it meets, and a third at a corner.
+-- How many surfaces one step slides along: a wall or a barrier, the floor it meets, and a third at a corner.
 local CONTACT_PASSES = 3
 
 local function worldUp(self: SkateController): Vector3
@@ -250,12 +250,13 @@ local function moveSkater(self: SkateController, root: BasePart, skater: SkateMa
 end
 
 -- The skater body's velocity has no force limit, so a skater moving into a surface pressed its collider through it
--- (measured: through the arena's 1-stud wall at 120 studs/s and over, #176). So each ride surface the collider
--- touches, or reaches before the next step, takes its part of the velocity, and the skater slides along it. A sphere
--- cast misses a part it starts touching (measured), so the collider is swept from a radius behind the root. A cast
--- that meets an edge reports a normal from the edge, and sliding along a wall it presses into, the collider meets the
--- next slab's edge at their seam (measured: normal (-0.49, 0, 0.87), and 120 studs/s along the wall became 28). So the
--- skater slides along the face that a ray from its root, along the cast's normal, meets: at a seam, the wall itself.
+-- (measured: through the arena's 1-stud wall at 120 studs/s and over, #176). So each ride surface or barrier
+-- (RideSurfaces.solid, A7) the collider touches, or reaches before the next step, takes its part of the velocity, and
+-- the skater slides along it. A sphere cast misses a part it starts touching (measured), so the collider is swept from
+-- a radius behind the root. A cast that meets an edge reports a normal from the edge, and sliding along a wall it
+-- presses into, the collider meets the next slab's edge at their seam (measured: normal (-0.49, 0, 0.87), and 120
+-- studs/s along the wall became 28). So the skater slides along the face that a ray from its root, along the cast's
+-- normal, meets: at a seam, the wall itself.
 local function collide(self: SkateController, root: BasePart, skater: SkateMath.Skater, dt: number)
 	local radius = self._config.Movement.colliderDiameter / 2
 	for _ = 1, CONTACT_PASSES do
@@ -267,7 +268,7 @@ local function collide(self: SkateController, root: BasePart, skater: SkateMath.
 		local direction = velocity / speed
 		local origin = root.Position - direction * radius
 		local travel = radius + speed * dt
-		local params = self._surfaces.params
+		local params = self._surfaces.solid
 		local hit = self._spherecast(origin, radius, direction * travel, params)
 		if hit == nil then
 			return

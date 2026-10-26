@@ -16,7 +16,7 @@ local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 type ArenaConfig = Config.ArenaConfig
 type Piece = Types.Piece
 
--- Invisible tag-only parts: gates and ball spawns.
+-- Invisible parts: the tag-only gates and ball spawns, and an open map's ceiling.
 local HIDDEN = 1
 
 local Builder = {}
@@ -38,6 +38,7 @@ local function validate(geometry: Geometry.ArenaGeometry)
 	local groups: { { name: string, pieces: { Piece } } } = {
 		{ name = "surface", pieces = geometry.surface },
 		{ name = "barrier", pieces = geometry.barriers },
+		{ name = "top", pieces = geometry.top },
 		{ name = "infield", pieces = geometry.infield },
 		{ name = "goal rim", pieces = geometry.goal.rim },
 		{ name = "goal panel", pieces = { geometry.goal.panel } },
@@ -115,16 +116,37 @@ local function addTaggedSolids(pieces: { Piece }, name: string, tag: string, col
 	return folder
 end
 
--- The glass (A7): skaters and the ball bounce off it and the collider's sweep finds it, but it is touched by nothing,
--- and it casts no shadow, or 85 studs of it would keep the track in its shade (a roof that did was seen in a playtest).
+-- Glass is see-through and casts no shadow, or 85 studs of it would keep the track in its shade (a roof that did was
+-- seen in a playtest).
+local function lookLikeGlass(part: BasePart, arena: ArenaConfig)
+	part.Material = Enum.Material.Glass
+	part.Transparency = arena.barrier.transparency
+	part.CastShadow = false
+end
+
+-- The glass (A7): skaters and the ball bounce off it and the collider's sweep finds it, but it is touched by nothing.
 local function addBarriers(pieces: { Piece }, arena: ArenaConfig, parent: Instance)
 	local folder = addTaggedSolids(pieces, "Barriers", Tags.Barrier, arena.colors.glass, parent)
 	for _, child in folder:GetChildren() do
 		local glass = child :: BasePart
-		glass.Material = Enum.Material.Glass
-		glass.Transparency = arena.barrier.transparency
+		lookLikeGlass(glass, arena)
 		glass.CanTouch = false
-		glass.CastShadow = false
+	end
+end
+
+-- The top (R14): skaters and the ball bounce off it and the collider's sweep finds it, and it is touchable, so the
+-- ball's flight (a pass's lift included) ends on it: Roblox fires a touch only between two parts that can both touch.
+-- A closed map's roof looks like the glass; an open map's ceiling and strips are invisible, casting no shadow either.
+local function addTop(pieces: { Piece }, arena: ArenaConfig, parent: Instance)
+	local folder = addTaggedSolids(pieces, "Top", Tags.Barrier, arena.colors.glass, parent)
+	for _, child in folder:GetChildren() do
+		local part = child :: BasePart
+		if arena.top.kind == "Open" then
+			part.Transparency = HIDDEN
+			part.CastShadow = false
+		else
+			lookLikeGlass(part, arena)
+		end
 	end
 end
 
@@ -169,9 +191,11 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 	-- Every client gets the whole arena soon after joining and never loses it, so client code can rely on it.
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 
-	-- Skaters' rays hit the ride surfaces only: not the glass, and not the infield behind it, which no skater reaches.
+	-- Skaters' rays hit the ride surfaces only: not the glass or the top, and not the infield behind the glass, which
+	-- no skater reaches.
 	addTaggedSolids(geometry.surface, "Surface", Tags.RideSurface, colors.surface, model)
 	addBarriers(geometry.barriers, arena, model)
+	addTop(geometry.top, arena, model)
 	addSolids(geometry.infield, "Infield", colors.infield, newFolder("Infield", model))
 
 	local gates = newFolder("Gates", model)
