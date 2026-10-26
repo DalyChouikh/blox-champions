@@ -117,6 +117,9 @@ revised before any more Arena code. Their words, then what still needs a questio
 - **Gate markers** (recommended, replaces the approved thin arch of R6): RC's **hanging panel** - a glass panel fills
   the track's cross-section from the top down to a rounded opening that skaters pass through; nothing collides with it;
   lit in the team's colour on the next gate as before (the carrier's beam on the outer glass stays).
+- **The revised Arena spec approved** (2026-10-26, main 979ce49), with its 14 smaller decisions (2.3): among them the
+  widths x4/3 (foot curve 18, step 18, upper floor 8), lips r 12, the reach check removed (the top holds everyone), A3's
+  loop rule kept for the lips, the top touchable, the goal's arm from the outer glass. Next: a new plan file.
 
 ## Roller Champions
 
