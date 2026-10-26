@@ -5,8 +5,9 @@
 -- - works out the draft and the attach;
 -- - steps SkateMath, slides the skater along any ride surface in its way, and writes the result into the skater body
 --   the server built.
--- A knocked-down skater (the server's KnockedDown attribute) lets go of any attach and only slides; while Roblox's menu
--- holds the keys the skater lets go of any attach too, with no release boost. Actions push the skater through `push`.
+-- It holds the skater still during the kickoff freeze and until the arena has reached this client. A knocked-down
+-- skater (the server's KnockedDown attribute) lets go of any attach and only slides; while Roblox's menu holds the keys
+-- the skater lets go of any attach too, with no release boost. Actions push the skater through `push`.
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
 -- humanoid's state machine off here, on the owning client only: the server keeps it on so deaths still fire Died.
 
@@ -55,7 +56,9 @@ export type SkateController = {
 	braking: boolean,
 	-- The last step's stick as a world direction (length 0..1).
 	move: Vector3,
-	-- Read each step: the character's KnockedDown attribute, and the root anchored (the kickoff freeze).
+	-- Read each step: the character's KnockedDown attribute, and whether the skater is held still: the root anchored
+	-- (the kickoff freeze), or no arena on this client yet (RideSurfaces.ready), where the skater would fall through
+	-- the floor to come (#177).
 	knockedDown: boolean,
 	frozen: boolean,
 	-- Set each step: attached, or right behind a teammate with no cooldown, so holding Attach would attach.
@@ -291,9 +294,9 @@ local function shareState(self: SkateController)
 	end
 end
 
--- The kickoff freeze (the server anchors every root while it places them): the skater starts from rest, upright and
--- facing where the server put them, with no attach held over and no jump pressed during the countdown. Pump and brake
--- are still shared, so other players see what this one holds.
+-- The kickoff freeze (the server anchors every root while it places them), and the wait for the arena: the skater
+-- starts from rest, upright and facing where the server put them, with no attach held over and no jump pressed during
+-- the countdown. Pump and brake are still shared, so other players see what this one holds.
 local function freeze(self: SkateController, root: BasePart, skater: SkateMath.Skater)
 	self._inputController:read(self._keys)
 	skater:stop()
@@ -451,7 +454,7 @@ local SkateController: SkateController = {
 		local root = self.root :: BasePart
 		local character = self._character :: Model
 		self.knockedDown = character:GetAttribute(Attributes.KnockedDown) == true
-		self.frozen = root.Anchored
+		self.frozen = root.Anchored or not self._surfaces.ready
 		if self.frozen then
 			freeze(self, root, skater)
 			return
