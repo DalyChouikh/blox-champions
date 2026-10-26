@@ -1,13 +1,16 @@
 --!strict
--- Catches a client that moves faster than skating allows (spec §10). Every guardSampleSeconds it samples each seated
--- skater's root. A move beyond the allowance is a strike, and a run of strikes returns the skater to their last valid
--- place. Anchored roots are reset, not judged, and every server placement starts the skater over, so the server's own
--- jumps and the kickoff freeze never count.
+-- Catches a client that moves faster than skating allows (spec §10), and any skater found outside the arena. Every
+-- guardSampleSeconds it samples each seated skater's root. A root outside the arena's tube (Bounds.inTube, by more
+-- than guardOutsideMargin) is put back on its team's spawn: nothing else would ever bring it back (#177, #181). A
+-- move beyond the allowance is a strike, and a run of strikes returns the skater to their last valid place. Anchored
+-- roots are reset, not judged, and every server placement starts the skater over, so the server's own jumps and the
+-- kickoff freeze never count.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local BallService = require(script.Parent.BallService)
+local Bounds = require(ReplicatedStorage.Shared.Arena.Geometry.Bounds)
 local Config = require(ReplicatedStorage.Shared.Config)
 local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 
@@ -19,9 +22,13 @@ export type MovementGuard = {
 	start: (self: MovementGuard) -> (),
 	step: (self: MovementGuard, dt: number) -> (),
 	_check: MovementCheck.MovementCheck,
+	_arena: Config.ArenaConfig,
+	_outsideMargin: number,
 	_sampleSeconds: number,
 	_elapsed: number,
 	_holders: () -> { BallService.Holder },
+	-- Stands a seated player's character on their team's spawn (CharacterService), unfrozen.
+	_place: (player: string) -> (),
 	_clock: () -> number,
 	_log: (line: string) -> (),
 }
@@ -45,11 +52,14 @@ local MovementGuard: MovementGuard = {
 	name = "MovementGuard",
 	dependencies = { "Config", "CharacterService" },
 	_check = nil :: any,
+	_arena = nil :: any,
+	_outsideMargin = 0,
 	_sampleSeconds = 0,
 	_elapsed = 0,
 	_holders = function(): { BallService.Holder }
 		return {}
 	end,
+	_place = function(_player: string) end,
 	_clock = os.clock,
 	_log = logLine,
 
@@ -58,10 +68,15 @@ local MovementGuard: MovementGuard = {
 		local config: Config.GameConfig = deps.Config
 		local characters = deps.CharacterService
 		self._check = MovementCheck.new(config.Movement, config.Network)
+		self._arena = config.Arena
+		self._outsideMargin = config.Network.guardOutsideMargin
 		self._sampleSeconds = config.Network.guardSampleSeconds
 		self._elapsed = 0
 		self._holders = function(): { BallService.Holder }
 			return characters:holders()
+		end
+		self._place = function(player: string)
+			characters:place(player, false)
 		end
 		self._clock = deps.Clock or os.clock
 		self._log = deps.Log or logLine
@@ -87,9 +102,14 @@ local MovementGuard: MovementGuard = {
 		self._elapsed = 0
 		local now = self._clock()
 		for _, holder in self._holders() do
+			local position = holder.root.Position
 			if holder.root.Anchored then
-				self._check:reset(holder.player, holder.root.Position, now)
-			elseif self._check:sample(holder.player, holder.root.Position, now) == "Return" then
+				self._check:reset(holder.player, position, now)
+			elseif not Bounds.inTube(self._arena, position, self._outsideMargin) then
+				-- The placement starts the skater over (CharacterService.placed).
+				self._place(holder.player)
+				self._log(`[BloxChampions] MovementGuard: {holder.player} was outside the arena, placed on their spawn`)
+			elseif self._check:sample(holder.player, position, now) == "Return" then
 				returnToValid(self, holder)
 			end
 		end

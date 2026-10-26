@@ -56,6 +56,7 @@ describe("Config defaults", function()
 			speedTolerance = 1.2,
 			guardStrikes = 3,
 			guardTeleportFactor = 2,
+			guardOutsideMargin = 2,
 			maxActionsPerSecond = 15,
 			hitLagToleranceStuds = 3,
 			actionTimingTolerance = 0.1,
@@ -503,6 +504,9 @@ describe("Config.forMode", function()
 				overrides = { Network = { guardStrikes = 0 } },
 			})
 		end).toThrow()
+		expect(function()
+			Fixtures.config({ Network = { guardOutsideMargin = -1 } })
+		end).toThrow("Network.guardOutsideMargin: must be >= 0 (got -1)")
 	end)
 
 	it("rejects an override with the wrong type", function()
