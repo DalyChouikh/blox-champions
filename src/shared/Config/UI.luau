@@ -4,6 +4,7 @@
 -- Control labels name each control as it acts now: a touch button reads Dodge with the ball, Tackle without. Every
 -- string the HUD shows, its style and layout, the world markers, the name tags and the arena's glow live here too.
 
+local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
 
 -- One label per action, plus the controls that start none (Ball Focus and the skating buttons).
@@ -145,9 +146,15 @@ export type MarkerSettings = {
 -- A name tag's size, how far above a player's root it sits (studs), and its text sizes.
 export type NameTagSettings = { size: UDim2, studsOffset: Vector3, textSize: number, callSize: number }
 
--- The goal ring and the next gate's corner marker glow in `material`; the goal panel slides panelSlide studs up out
--- of the ring over panelSlideSeconds.
-export type ArenaGlowSettings = { material: Enum.Material, panelSlide: number, panelSlideSeconds: number }
+-- The goal ring, the next gate's panel and the carrier's beam glow in `material`; the goal panel slides panelSlide
+-- studs up out of the ring over panelSlideSeconds. The beam (Arena spec §5.4) is `width` studs along the track and
+-- `thickness` across it, on the outer glass's face, as tall as the vertical glass.
+export type ArenaGlowSettings = {
+	material: Enum.Material,
+	panelSlide: number,
+	panelSlideSeconds: number,
+	beam: { width: number, thickness: number },
+}
 
 export type UIConfig = {
 	clockWarnings: { number },
@@ -295,7 +302,12 @@ local defaults: UIConfig = {
 		textSize = 20,
 		callSize = 28,
 	},
-	arenaGlow = { material = Enum.Material.Neon, panelSlide = 16, panelSlideSeconds = 0.4 },
+	arenaGlow = {
+		material = Enum.Material.Neon,
+		panelSlide = 16,
+		panelSlideSeconds = 0.4,
+		beam = { width = 2, thickness = 0.5 },
+	},
 }
 
 local function noDuplicates(values: { number }): boolean
@@ -353,6 +365,7 @@ end
 local textSize = Validate.number({ min = 1, max = 100, integer = true })
 local transparency = Validate.number({ min = 0, max = 1 })
 local positive = Validate.number({ above = 0 })
+local beamSize = Validate.number({ above = 0, max = PartSize.MAX })
 local udim2 = Validate.datatype("UDim2")
 local pixels = Validate.pixels()
 local place = Validate.record({ position = udim2, size = pixels })
@@ -490,6 +503,8 @@ local fields = Validate.record({
 		material = Validate.enumItem(Enum.Material),
 		panelSlide = positive,
 		panelSlideSeconds = Validate.number({ min = 0 }),
+		-- The beam is one part: Roblox would clamp a bigger one.
+		beam = Validate.record({ width = beamSize, thickness = beamSize }),
 	}),
 })
 

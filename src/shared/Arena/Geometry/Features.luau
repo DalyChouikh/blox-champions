@@ -125,7 +125,7 @@ local function checkFit(arena: ArenaConfig, corners: { Vector2 }, lateral: numbe
 	if rimTop(arena) >= armHeight then
 		fail("the goal ring must hang under its arm")
 	end
-	if armHeight >= arena.glass.top - arena.glass.lipRadius then
+	if armHeight >= Profile.lipStart(arena) then
 		fail("the goal's arm must stay under the lips")
 	end
 end

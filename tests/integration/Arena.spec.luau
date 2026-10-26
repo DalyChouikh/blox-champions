@@ -49,7 +49,8 @@ describe("The generated arena", function()
 			-- Left curved end, flat floor: a stud past the apex, whose station is a seam a ray exactly on misses.
 			{ Vector3.new(-160, 60, 1), 0 },
 			{ Vector3.new(0, 60, 0), 0 }, -- the infield, at the lower floor's height
-			{ Vector3.new(-110, 60, 10), 0 }, -- the infield under the left curved end
+			-- The infield under the left curved end, a stud off the station line at 135° (another seam).
+			{ Vector3.new(-110, 60, 11), 0 },
 		}
 		for _, case in floors do
 			local hit = cast(case[1], Vector3.new(0, -100, 0))

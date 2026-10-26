@@ -123,12 +123,18 @@ function Profile.lowerFloorCenter(arena: ArenaConfig): number
 	return (arena.innerBankHeight + stepStart(arena)) / 2
 end
 
+-- Where the glass stops being vertical and its lip starts curling inward (R15): the goal's arm stays under it, and
+-- the carrier's beam ends there.
+function Profile.lipStart(arena: ArenaConfig): number
+	return arena.glass.top - arena.glass.lipRadius
+end
+
 -- The outer lip (R15): a quarter circle of glass.lipRadius curling inward from the outer glass's face, where it
--- stops being vertical (glass.top - lipRadius), to the top (glass.top). Its lipStrips + 1 points are evenly spaced by
--- angle; the inner lip mirrors it across the track.
+-- stops being vertical (lipStart), to the top (glass.top). Its lipStrips + 1 points are evenly spaced by angle; the
+-- inner lip mirrors it across the track.
 local function outerLip(arena: ArenaConfig): { Vector2 }
 	local glass = arena.glass
-	local center = Vector2.new(arena.trackWidth - glass.lipRadius, glass.top - glass.lipRadius)
+	local center = Vector2.new(arena.trackWidth - glass.lipRadius, Profile.lipStart(arena))
 	local points: { Vector2 } = {}
 	for strip = 0, glass.lipStrips do
 		local angle = (math.pi / 2) * strip / glass.lipStrips

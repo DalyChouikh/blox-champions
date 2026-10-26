@@ -21,6 +21,7 @@ local modules: { Loader.LoadableModule } = {
 	require(script.Parent.Hud),
 	require(script.Parent.WorldMarkers),
 	require(script.Parent.ArenaGlow),
+	require(script.Parent.CarrierBeam),
 	require(script.Parent.NameTags),
 	require(script.Parent.FrameController),
 }

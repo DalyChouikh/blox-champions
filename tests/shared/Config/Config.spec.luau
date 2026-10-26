@@ -414,7 +414,12 @@ describe("Config defaults", function()
 			textSize = 20,
 			callSize = 28,
 		})
-		expect(ui.arenaGlow).toEqual({ material = Enum.Material.Neon, panelSlide = 16, panelSlideSeconds = 0.4 })
+		expect(ui.arenaGlow).toEqual({
+			material = Enum.Material.Neon,
+			panelSlide = 16,
+			panelSlideSeconds = 0.4,
+			beam = { width = 2, thickness = 0.5 },
+		})
 	end)
 
 	it("match the spec's arena layout", function()
@@ -862,6 +867,15 @@ describe("Config.forMode", function()
 				message = "UI.hud.layout.scoreTab.columnWidth: must be > 0",
 			},
 			{ overrides = { UI = { hud = { spacing = -1 } } }, message = "UI.hud.spacing: must be >= 0" },
+			-- The carrier's beam is one part, which Roblox would clamp to its size limits.
+			{
+				overrides = { UI = { arenaGlow = { beam = { width = 0 } } } },
+				message = "UI.arenaGlow.beam.width: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { arenaGlow = { beam = { thickness = 3000 } } } },
+				message = "UI.arenaGlow.beam.thickness: must be <= 2048 (got 3000)",
+			},
 			{ overrides = { UI = { hud = { screenMargin = -1 } } }, message = "UI.hud.screenMargin: must be >= 0" },
 			{ overrides = { UI = { keyNames = { Banana = "B" } } }, message = "UI.keyNames: Banana must name a key" },
 			-- The HUD fits its parts by their sizes in pixels.

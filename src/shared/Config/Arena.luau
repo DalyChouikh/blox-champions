@@ -173,6 +173,11 @@ local fields = Validate.record({
 	colors = Validate.record({ surface = color, infield = color, goal = color, glass = color }),
 })
 
+-- Where the glass's lip starts curling inward: Arena/Geometry's Profile.lipStart, which config cannot require.
+local function lipStart(arena: ArenaConfig): number
+	return arena.glass.top - arena.glass.lipRadius
+end
+
 -- Checked in order; the first that fails is reported. Whether the goal ring and its arm fit is judged by Arena/Geometry
 -- against the arena as built (Features.goal), which config cannot require.
 local crossFieldRules: { Validate.Rule } = {
@@ -203,8 +208,8 @@ local crossFieldRules: { Validate.Rule } = {
 	{
 		message = "the glass must rise above the inner bank's and the outer wall's tops before its lip",
 		holds = function(arena: ArenaConfig): boolean
-			local lipStart = arena.glass.top - arena.glass.lipRadius
-			return lipStart > arena.outerWallHeight and lipStart > arena.innerBankHeight
+			local start = lipStart(arena)
+			return start > arena.outerWallHeight and start > arena.innerBankHeight
 		end,
 	},
 	{
@@ -217,7 +222,7 @@ local crossFieldRules: { Validate.Rule } = {
 		message = "the gate panel's opening must stand between the outer wall's top and the lips",
 		holds = function(arena: ArenaConfig): boolean
 			local opening = arena.gatePanel.openingHeight
-			return opening > arena.outerWallHeight and opening < arena.glass.top - arena.glass.lipRadius
+			return opening > arena.outerWallHeight and opening < lipStart(arena)
 		end,
 	},
 	{
