@@ -6,7 +6,7 @@
 - **Phones:** the big panels, the banner and the feed sit left of the touch buttons. The score tab and the end screen are solid, and the end screen is compact on a phone.
 - **CI:** CI runs the whole Jest suite in Roblox's cloud on every pull request and every push to `main`.
 - **Playtests:** the game is played on a real phone, a gamepad and with a second player.
-- **Tuning:** the owner's tuning pass changes Config values only.
+- **Tuning:** the owner's tuning pass changes Config values only. *(Replaced on 2026-10-25 by the M1 overhaul: see Task 4.)*
 
 **Architecture:**
 - **The stage.** On touch, the HUD's centred parts centre in the space left of the touch buttons:
@@ -443,6 +443,8 @@ These are owner sessions. **Each finding becomes its own issue** (`bug` plus its
 
 ### Task 4: The tuning pass (labels `chore`, `skate`)
 
+> **Not executed: replaced by the M1 overhaul (the owner, 2026-10-25; spec decision A6).** After Task 3's playtests and a study of Roller Champions and Illegal Soccer, the owner asked for the game to match Roller Champions in play, which takes more than Config values. M1 continues in four parts, each with its own spec and plan: Arena → Feel → Ball & rules → Presentation. The tuning below happens inside them, test-first.
+
 **Issue:** to be created · **Branch:** `chore/<issue>-tuning` · **Stacked on:** Task 3's last branch
 
 **The starting notes** (session-10 measurements; the owner's feel decides):
@@ -476,7 +478,7 @@ These are owner sessions. **Each finding becomes its own issue** (`bug` plus its
 - **The phase summary to the owner:**
   - what changed;
   - every ruling with its cost if wrong;
-  - the cloud run, the playtest record and the tuning table.
+  - the cloud run, the playtest record, and that the tuning task was replaced by the overhaul (Task 4).
 
   Then ask before deleting the ledger folder.
-- **M1 closes** when every M1 issue is closed by a merged PR (spec §1.2 #5). M2 (bots) starts with brainstorming.
+- **M1 continues** with the overhaul's parts (spec A6), each starting with its own brainstorm. **M1 closes** when every M1 issue is closed by a merged PR (spec §1.2 #5); then M2 (bots) starts with brainstorming.
