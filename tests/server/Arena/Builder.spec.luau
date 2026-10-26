@@ -221,6 +221,15 @@ describe("Builder.build", function()
 		expect(function()
 			Builder.build(flatTop, config, parent)
 		end).toThrow("ArenaBuilder: top piece 1 is invalid (size 1, 0, 1)")
+		local thinPanel = table.clone(geometry)
+		thinPanel.gatePanels = table.clone(geometry.gatePanels)
+		thinPanel.gatePanels[3] = {
+			pieces = { { shape = "Block", cframe = CFrame.identity, size = Vector3.new(1, 1, 0) } },
+			apex = CFrame.identity,
+		}
+		expect(function()
+			Builder.build(thinPanel, config, parent)
+		end).toThrow("ArenaBuilder: gate panel 3 piece 1 is invalid (size 1, 1, 0)")
 		expect(#parent:GetChildren()).toBe(0)
 	end)
 end)

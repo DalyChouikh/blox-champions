@@ -82,15 +82,25 @@ describe("TaggedLayout.read", function()
 		end
 	end)
 
-	it("reads the goal's disc and panel, the markers and the spawns", function()
-		local arena = TaggedLayout.read(arenaRoot())
+	it("reads the goal's disc and panel, the markers, and the spawns in name order", function()
+		local root = arenaRoot()
+		-- Tagged out of name order (Blue1, at x 0, came first), so only sorting by name reads them in order.
+		for _, index in { 3, 0, 4, 2 } do
+			local pad = tagged(root, `Blue{index}`, Tags.TeamSpawn, CFrame.new(10 * (index - 1), 0, -53))
+			pad:SetAttribute(Tags.Attribute.Team, "Blue")
+		end
+		local arena = TaggedLayout.read(root)
 		expect(arena.layout.goal.frame.Position).toEqual(Vector3.new(0, 18, -73))
 		expect(arena.layout.goal.radius).toBe(7)
 		expect(arena.goalPanel.Name).toBe("GoalPanel")
 		expect(#arena.markers).toBe(4)
 		expect(arena.markers[2].Name).toBe("Marker2")
 		expect(arena.markers[2]:GetPivot().Position).toEqual(Vector3.new(200, 60, 0))
-		expect(arena.teamSpawns.Blue[1].Position).toEqual(Vector3.new(0, 0, -53))
+		expect(#arena.teamSpawns.Blue).toBe(5)
+		for position, frame in arena.teamSpawns.Blue do
+			-- Blue0 first, at x -10.
+			expect(frame.Position).toEqual(Vector3.new(10 * (position - 2), 0, -53))
+		end
 		expect(arena.teamSpawns.Orange[1].Position).toEqual(Vector3.new(0, 0, 53))
 		expect(arena.ballSpawns[1].Position).toEqual(Vector3.new(-140, 6, 0))
 	end)
@@ -153,13 +163,16 @@ describe("TaggedLayout.read", function()
 
 	it("rejects a tagged non-part, a gate without an index, an arena with no gates and a team with no spawn", function()
 		local root = arenaRoot()
-		local folder = Instance.new("Folder")
-		folder.Name = "Gate9"
-		folder:AddTag(Tags.LapGate)
-		folder.Parent = root
+		-- Of several, the first by name is the one named, whatever order they were tagged in.
+		for _, name in { "Gate9", "Gate7", "Gate8" } do
+			local folder = Instance.new("Folder")
+			folder.Name = name
+			folder:AddTag(Tags.LapGate)
+			folder.Parent = root
+		end
 		expect(function()
 			TaggedLayout.read(root)
-		end).toThrow('TaggedLayout: LapGate "Gate9" must be a part (got Folder)')
+		end).toThrow('TaggedLayout: LapGate "Gate7" must be a part (got Folder)')
 		local markerFolder = arenaRoot()
 		local stray = Instance.new("Folder")
 		stray.Name = "Marker9"

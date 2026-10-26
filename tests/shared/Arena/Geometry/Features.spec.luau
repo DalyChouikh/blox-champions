@@ -280,11 +280,13 @@ describe("Features.gatePanels", function()
 		local lowest: { [number]: number } = {}
 		local highest: { [number]: number } = {}
 		local highestInside = -math.huge
+		local deepest = 0
 		for _, piece in Features.gatePanels(arena)[1].pieces do
 			for _, corner in corners(piece) do
 				-- In the gate's frame: x across the track from its middle, z along it.
 				local at = gate:PointToObjectSpace(corner)
 				expect(math.abs(at.Z) <= panel.depth + 1e-3).toBe(true)
+				deepest = math.max(deepest, math.abs(at.Z))
 				local opening = arena.outerWallHeight
 					+ (panel.openingHeight - arena.outerWallHeight) * math.sqrt(math.max(0, 1 - (at.X / half) ^ 2))
 				expect(at.Y > opening - 1e-3 and at.Y < Profile.topOutline(arena, at.X + half) + 1e-3).toBe(true)
@@ -304,6 +306,8 @@ describe("Features.gatePanels", function()
 		expect(highestInside).toBeCloseTo(120, 3)
 		expect(highest[-40]).toBeCloseTo(108, 3)
 		expect(highest[40]).toBeCloseTo(108, 3)
+		-- gatePanel.depth thick along the track.
+		expect(deepest).toBeCloseTo(panel.depth, 3)
 	end)
 
 	it("builds each panel from gatePanel.segments slices, in gate order", function()
