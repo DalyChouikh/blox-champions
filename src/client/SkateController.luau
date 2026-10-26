@@ -3,7 +3,8 @@
 -- - reads the keys and casts the ground ray against the ride surfaces only;
 -- - filters the ray's normal;
 -- - works out the draft and the attach;
--- - steps SkateMath and writes the result into the skater body the server built.
+-- - steps SkateMath, slides the skater along any ride surface in its way, and writes the result into the skater body
+--   the server built.
 -- A knocked-down skater (the server's KnockedDown attribute) lets go of any attach and only slides; while Roblox's menu
 -- holds the keys the skater lets go of any attach too, with no release boost. Actions push the skater through `push`.
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
@@ -84,6 +85,8 @@ export type SkateController = {
 	_attach: Attach.Attach,
 	-- The ride surfaces every ray goes through.
 	_surfaces: RideSurfaces.RideSurfaces,
+	-- The last physics step's length: an action's push comes during a step and holds until the next.
+	_stepSeconds: number,
 	-- Records reused every step, so a step allocates nothing.
 	_keys: InputController.SkateKeys,
 	_input: SkateTypes.SkateInput,
@@ -97,6 +100,8 @@ export type SkateController = {
 
 -- Who playersAround walks before start.
 local NO_PLAYERS: { Player } = table.freeze({})
+-- How many surfaces one step slides along: a wall, the floor or roof it meets, and a third at a corner.
+local CONTACT_PASSES = 3
 
 local function worldUp(self: SkateController): Vector3
 	return -self._gravity.Unit
@@ -239,6 +244,27 @@ local function moveSkater(self: SkateController, root: BasePart, skater: SkateMa
 	skater:step(self._input, self._ground, dt)
 end
 
+-- The skater body's velocity has no force limit, so a skater moving into a surface pressed its collider through it
+-- (measured: through the arena's 1-stud wall at 120 studs/s and over, #176). So each ride surface the collider
+-- touches, or reaches before the next step, takes its part of the velocity, and the skater slides along it. A sphere
+-- cast misses a part it starts touching (measured), so the collider is swept from a radius behind the root.
+local function collide(self: SkateController, root: BasePart, skater: SkateMath.Skater, dt: number)
+	local radius = self._config.Movement.colliderDiameter / 2
+	for _ = 1, CONTACT_PASSES do
+		local velocity = skater.velocity
+		local speed = velocity.Magnitude
+		if speed <= Vectors.EPSILON then
+			return
+		end
+		local direction = velocity / speed
+		local origin = root.Position - direction * radius
+		local result = workspace:Spherecast(origin, radius, direction * (radius + speed * dt), self._surfaces.params)
+		if result == nil or not skater:block(result.Normal) then
+			return
+		end
+	end
+end
+
 local function apply(self: SkateController, skater: SkateMath.Skater)
 	(self._velocity :: LinearVelocity).VectorVelocity = skater.velocity
 	-- A facing along the up vector (flying straight off a wall) has no right: keep the last orientation.
@@ -317,6 +343,7 @@ local SkateController: SkateController = {
 	_filter = nil :: any,
 	_attach = nil :: any,
 	_surfaces = nil :: any,
+	_stepSeconds = 0,
 	_keys = nil :: any,
 	_input = nil :: any,
 	_ground = nil :: any,
@@ -354,6 +381,7 @@ local SkateController: SkateController = {
 		self._filter = NormalFilter.new(config.Movement.normalFilter, worldUp(self))
 		self._attach = Attach.new(config.Movement)
 		self._surfaces = deps.RideSurfaces
+		self._stepSeconds = 0
 		self._keys = InputController.newKeys()
 		self._input =
 			{ move = Vector3.zero, pump = false, brake = false, jump = false, draftAccel = 0, knockedDown = false }
@@ -442,14 +470,18 @@ local SkateController: SkateController = {
 		gatherOthers(self)
 		input.draftAccel = Draft.accel(self._config.Movement, root.Position, self._sources)
 		moveSkater(self, root, skater, dt)
+		self._stepSeconds = dt
+		collide(self, root, skater, dt)
 		apply(self, skater)
 		shareState(self)
 	end,
 
 	push = function(self: SkateController, change: Vector3, launch: boolean)
 		local skater = self.skater
-		if skater ~= nil and self._velocity ~= nil then
+		local root = self.root
+		if skater ~= nil and root ~= nil and self._velocity ~= nil then
 			skater:push(change, launch)
+			collide(self, root, skater, self._stepSeconds)
 			apply(self, skater)
 		end
 	end,
