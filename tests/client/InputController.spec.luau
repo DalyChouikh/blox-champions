@@ -283,6 +283,40 @@ describe("InputController", function()
 		expect(keys.pump).toBe(true)
 	end)
 
+	it("stops every key while Roblox's Developer Console is open too, until both it and the menu are closed", function()
+		InputController:destroy()
+		local menu = { MenuOpened = Signal.new(), MenuClosed = Signal.new() }
+		local console = false
+		InputController:init({
+			Config = Fixtures.config(),
+			Parent = folder,
+			LookSettings = defaultLookSettings,
+			GuiService = menu,
+			DevConsoleVisible = function(): boolean
+				return console
+			end,
+		})
+		InputController:watchOverlays()
+		expect(InputController.paused).toBe(false)
+		console = true
+		InputController:watchOverlays()
+		expect(InputController.paused).toBe(true)
+		expect(InputController.context.Enabled).toBe(false)
+
+		menu.MenuOpened:Fire()
+		console = false
+		InputController:watchOverlays()
+		expect(InputController.paused).toBe(true)
+		console = true
+		InputController:watchOverlays()
+		menu.MenuClosed:Fire()
+		expect(InputController.paused).toBe(true)
+		console = false
+		InputController:watchOverlays()
+		expect(InputController.paused).toBe(false)
+		expect(InputController.context.Enabled).toBe(true)
+	end)
+
 	it("starts paused when Roblox's menu is already open", function()
 		InputController:destroy()
 		local menu = { MenuOpened = Signal.new(), MenuClosed = Signal.new(), MenuIsOpen = true }

@@ -28,7 +28,6 @@ local rig: Model
 local camera: FakeCamera
 local mouse: { MouseBehavior: Enum.MouseBehavior, MouseIconEnabled: boolean }
 local preferred: Enum.PreferredInput
-local menuOpen: boolean
 local ball: BasePart?
 local LOCAL_ID = "1"
 
@@ -80,9 +79,6 @@ local function initCamera()
 		PreferredInput = function(): Enum.PreferredInput
 			return preferred
 		end,
-		MenuOpen = function(): boolean
-			return menuOpen
-		end,
 		BallPart = {
 			get = function(_self: any): BasePart?
 				return ball
@@ -100,7 +96,6 @@ beforeEach(function()
 	camera = { CFrame = CFrame.new(), FieldOfView = 70, CameraType = Enum.CameraType.Custom }
 	mouse = { MouseBehavior = Enum.MouseBehavior.Default, MouseIconEnabled = true }
 	preferred = Enum.PreferredInput.KeyboardAndMouse
-	menuOpen = false
 	ball = nil
 	InputController:init({
 		Config = config,
@@ -152,14 +147,14 @@ describe("CameraController", function()
 	end)
 
 	it(
-		"locks the mouse to the center with a mouse, and frees it on other devices or while Roblox's menu is open",
+		"locks the mouse to the center with a mouse, and frees it on other devices or while the controls are paused",
 		function()
 			CameraController:step(DT)
 			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.LockCenter)
-			menuOpen = true
+			InputController:setPaused(true)
 			CameraController:step(DT)
 			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.Default)
-			menuOpen = false
+			InputController:setPaused(false)
 			preferred = Enum.PreferredInput.Touch
 			CameraController:step(DT)
 			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.Default)
@@ -172,10 +167,10 @@ describe("CameraController", function()
 	it("hides the cursor while the mouse is locked, and shows it when free", function()
 		CameraController:step(DT)
 		expect(mouse.MouseIconEnabled).toBe(false)
-		menuOpen = true
+		InputController:setPaused(true)
 		CameraController:step(DT)
 		expect(mouse.MouseIconEnabled).toBe(true)
-		menuOpen = false
+		InputController:setPaused(false)
 		preferred = Enum.PreferredInput.Gamepad
 		CameraController:step(DT)
 		expect(mouse.MouseIconEnabled).toBe(true)
