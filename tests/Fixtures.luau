@@ -8,6 +8,7 @@ local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local GeometryTypes = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
 local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
+local Signal = require(ReplicatedStorage.Shared.Util.Signal)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
@@ -17,8 +18,27 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 
 local Fixtures = {}
 
+-- A stand-in for GuiService's menu (InputController's deps.GuiService): fire MenuOpened and MenuClosed to open
+-- and close Roblox's menu, which pauses the controls.
+export type Menu = { MenuOpened: Signal.Signal<>, MenuClosed: Signal.Signal<>, MenuIsOpen: boolean? }
+
+-- A screen's two areas: the HUD's (CoreUISafeInsets) and the touch controls' (DeviceSafeInsets), which also spans
+-- Roblox's 58 px top bar.
+export type Screen = { hud: Rect, controls: Rect }
+
 -- Roblox's default workspace.Gravity, pointing down.
 Fixtures.GRAVITY = Vector3.new(0, -196.2, 0)
+
+-- The emulated iPhone 17 Pro in landscape (probed in Play), and a big screen, whose touch area is 1280 x 800 (the
+-- touch buttons grow 1.5 times there).
+Fixtures.PHONE = table.freeze({ hud = Rect.new(0, 0, 750, 323), controls = Rect.new(0, -58, 750, 323) }) :: Screen
+Fixtures.BIG_SCREEN =
+	table.freeze({ hud = Rect.new(0, 0, 1280, 742), controls = Rect.new(0, -58, 1280, 742) }) :: Screen
+
+-- Roblox's menu, closed unless `isOpen`.
+function Fixtures.menu(isOpen: boolean?): Menu
+	return { MenuOpened = Signal.new(), MenuClosed = Signal.new(), MenuIsOpen = isOpen }
+end
 
 -- Asserts two vectors are within `tolerance` (default 1e-3) of each other.
 function Fixtures.expectNear(actual: Vector3, expected: Vector3, tolerance: number?)

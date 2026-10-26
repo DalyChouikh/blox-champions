@@ -26,6 +26,8 @@ local CAMERA = { CFrame = CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5,
 local LOCAL_ID = "1"
 
 local folder: Folder
+-- Roblox's menu: opening it pauses the controls.
+local menu: Fixtures.Menu
 local rig: Model
 local requests: { { [string]: any } }
 local bindings: { [string]: InputBinding }
@@ -64,7 +66,8 @@ local function setup(surfaces: { BasePart }?)
 		surface.Parent = folder
 		surface:AddTag(Tags.RideSurface)
 	end
-	InputController:init({ Config = config, Parent = folder })
+	menu = Fixtures.menu()
+	InputController:init({ Config = config, Parent = folder, GuiService = menu })
 	BallCarrier:init({})
 	RideSurfaces:init({})
 	SkateController:init({
@@ -241,10 +244,10 @@ describe("ActionController", function()
 			frame()
 		end
 		-- The menu lets go of the key, not the player.
-		InputController:setPaused(true)
+		menu.MenuOpened:Fire()
 		frame()
 		frame()
-		InputController:setPaused(false)
+		menu.MenuClosed:Fire()
 		frame()
 		expect(requests).toEqual({})
 	end)

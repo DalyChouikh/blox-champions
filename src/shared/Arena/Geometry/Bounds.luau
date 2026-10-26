@@ -44,8 +44,8 @@ function Bounds.inTube(arena: ArenaConfig, position: Vector3, margin: number): b
 	if y <= arena.infieldWallHeight + (arena.outerWallHeight - arena.infieldWallHeight) * across then
 		return true
 	end
-	local center, radius = Profile.roofCircle(arena)
-	local du, dy = u - center.X, y - center.Y
+	local centerU, centerY, radius = Profile.roofCircle(arena)
+	local du, dy = u - centerU, y - centerY
 	return du * du + dy * dy <= (radius + margin) * (radius + margin)
 end
 

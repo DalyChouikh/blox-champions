@@ -23,6 +23,8 @@ local movement = config.Movement
 local CAMERA = { CFrame = CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)) }
 
 local folder: Folder
+-- Roblox's menu: opening it pauses the controls.
+local menu: Fixtures.Menu
 local floor: Folder
 local rig: Model
 local sent: { { boolean } }
@@ -105,7 +107,8 @@ beforeEach(function()
 	floor:AddTag(Tags.RideSurface)
 	sent = {}
 	others = {}
-	InputController:init({ Config = config, Parent = folder })
+	menu = Fixtures.menu()
+	InputController:init({ Config = config, Parent = folder, GuiService = menu })
 	rig = skaterAt("Skater", Vector3.zero)
 	setup()
 	SkateController:bind(rig)
@@ -263,7 +266,7 @@ describe("SkateController", function()
 		SkateController:step(1 / 60)
 		expect((SkateController.skater :: any).mode).toBe("Attached")
 		-- The menu lets go of the key, not the player: no release boost.
-		InputController:setPaused(true)
+		menu.MenuOpened:Fire()
 		SkateController:step(1 / 60)
 		expect((SkateController.skater :: any).mode).never.toBe("Attached")
 		expect(velocityOf(rig).Magnitude).toBeLessThan(movement.attachBoostSpeed)
@@ -311,6 +314,37 @@ describe("SkateController", function()
 		flying(Vector3.new(-10, 20, 0), Vector3.new(120, 0, 0))
 		SkateController:step(dt)
 		expect(velocityOf(rig).X).toBeCloseTo(120 * (1 - movement.airDrag * dt), 3)
+	end)
+
+	-- Every arena surface is slabs side by side (spec §7.1): sliding along a wall crosses their seams.
+	it("keeps its speed along a wall across a seam between two of its slabs", function()
+		local dt = 1 / 60
+		-- One wall facing -X at x = 2.5, in two slabs meeting at z = 0.
+		addSlab(CFrame.new(3, 20, 10), Vector3.new(1, 40, 20))
+		addSlab(CFrame.new(3, 20, -10), Vector3.new(1, 40, 20))
+		-- Touching the wall (0.5 studs in), 1 stud before the seam, flying along it.
+		flying(Vector3.new(2, 20, 1), Vector3.new(0, 0, -120))
+		SkateController:step(dt)
+		expect(velocityOf(rig).Z).toBeCloseTo(-120 * (1 - movement.airDrag * dt), 3)
+	end)
+
+	it("sweeps nothing for a skater brought to rest", function()
+		local casts = 0
+		setup({
+			Spherecast = function(): RaycastResult?
+				casts += 1
+				return nil
+			end,
+		})
+		SkateController:bind(rig)
+		flying(Vector3.new(0, 20, 0), Vector3.zero)
+		SkateController:step(1 / 60)
+		local before = casts
+		-- The falling step swept through the cast it was given.
+		expect(before > 0).toBe(true)
+		SkateController:push(-velocityOf(rig), false)
+		expect(casts).toBe(before)
+		Fixtures.expectNear(velocityOf(rig), Vector3.zero)
 	end)
 
 	it("slides into a corner, losing its velocity into both surfaces", function()

@@ -1,12 +1,12 @@
 --!strict
 -- Runs matches on the server (spec §4–§5, §10), in the server's one frame order. Each frame it steps the actions first
--- (strikes, knockdowns and their drops), then the ball, then reports the ball's movement, a throw, a catch, a body
--- touch and each knockdown to the rules engine in the order the engine documents, ticks it, reacts to its events —
--- hiding and spawning the ball, clearing every action, knockdown and call at a kickoff, placing and freezing
--- characters, opening and closing the goal — and sends them to clients, each frame's batch followed by the match's
--- snapshot, which clients draw from, both marked with the frame's number. A snapshot also goes to everyone whenever a
--- seat changes, and to each player who joins, marked with the last frame's number; it names every player in the server
--- and each who left during the match, so the score tab can name them. It
+-- (strikes, knockdowns and their drops), then the movement guard (its moves of skaters and carriers), then the ball,
+-- then reports the ball's movement, a throw, a catch, a body touch and each knockdown to the rules engine in the order
+-- the engine documents, ticks it, reacts to its events — hiding and spawning the ball, clearing every action, knockdown
+-- and call at a kickoff, placing and freezing characters, opening and closing the goal — and sends them to clients,
+-- each frame's batch followed by the match's snapshot, which clients draw from, both marked with the frame's number. A
+-- snapshot also goes to everyone whenever a seat changes, and to each player who joins, marked with the last frame's
+-- number; it names every player in the server and each who left during the match, so the score tab can name them. It
 -- keeps the ball dead whenever play is not live, so the ball is only ever carried by the engine's last holder. After a
 -- match ends it waits postMatchSeconds and starts the next one with everyone reseated; once every player has left it
 -- starts over.
@@ -20,6 +20,7 @@ local BallService = require(script.Parent.BallService)
 local CharacterService = require(script.Parent.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
+local MovementGuard = require(script.Parent.MovementGuard)
 local NetService = require(script.Parent.NetService)
 local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
@@ -46,6 +47,7 @@ export type MatchService = {
 	_teams: TeamService.TeamService,
 	_characters: CharacterService.CharacterService,
 	_actions: ActionService.ActionService,
+	_guard: MovementGuard.MovementGuard,
 	-- Players the current engine knows, so only they are removed from it.
 	_inEngine: { [PlayerId]: boolean },
 	_waiting: boolean,
@@ -146,6 +148,7 @@ local MatchService: MatchService = {
 		"TeamService",
 		"CharacterService",
 		"ActionService",
+		"MovementGuard",
 	},
 	engine = nil :: any,
 	_config = nil :: any,
@@ -155,6 +158,7 @@ local MatchService: MatchService = {
 	_teams = nil :: any,
 	_characters = nil :: any,
 	_actions = nil :: any,
+	_guard = nil :: any,
 	_inEngine = {},
 	_waiting = true,
 	_postMatchLeft = nil,
@@ -174,6 +178,7 @@ local MatchService: MatchService = {
 		self._teams = deps.TeamService
 		self._characters = deps.CharacterService
 		self._actions = deps.ActionService
+		self._guard = deps.MovementGuard
 		self._carrier = nil
 		self._names = {}
 		self._frame = 0
@@ -222,9 +227,9 @@ local MatchService: MatchService = {
 		end)
 	end,
 
-	-- One server frame: the actions first (strikes, knockdowns and their drops, before the ball moves), then the ball,
-	-- then the engine's facts in its order (ballMoved, thrown, pickedUp, touched, knockedDown), tick, and the drained
-	-- events.
+	-- One server frame: the actions first (strikes, knockdowns and their drops, before the ball moves), then the
+	-- guard, then the ball, then the engine's facts in its order (ballMoved, thrown, pickedUp, touched, knockedDown),
+	-- tick, and the drained events.
 	step = function(self: MatchService, dt: number)
 		self._frame += 1
 		local engine = self.engine
@@ -234,6 +239,7 @@ local MatchService: MatchService = {
 		end
 
 		local knockdowns = self._actions:step(dt)
+		self._guard:step(dt)
 		local frame = self._ball:step(dt, self._characters:holders())
 		if frame.moved then
 			engine:ballMoved(frame.from, frame.to)

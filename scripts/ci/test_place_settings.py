@@ -1,7 +1,8 @@
 """Checks that both built places, the game (default.project.json) and the test place (test.project.json), declare each
 service once and carry the service settings the game is developed and tested with: the ones stored in the dev place
 (BloxChampions.rbxl, read from its file on 2026-10-24), with StarterGui.ScreenOrientation LandscapeSensor (the owner's
-choice). Builds both projects with Rojo, which must be on PATH, into a temporary folder.
+choice), and that only the test place may run loadstring. Builds both projects with Rojo, which must be on PATH, into
+a temporary folder.
 Run: python -m unittest discover -s scripts/ci -p "test_*.py"."""
 
 import subprocess
@@ -33,6 +34,10 @@ SETTINGS = {
     "StarterGui": {"ScreenOrientation": "2"},  # LandscapeSensor
     "SoundService": {"DefaultListenerLocation": "3", "RespectFilteringEnabled": "true"},  # Camera
 }
+# The one setting the two places differ in: Jest Roblox loads modules with loadstring, which a Roblox server allows
+# only with ServerScriptService.LoadStringEnabled on. The test place turns it on for the cloud tests; the game leaves
+# it at its default, off.
+LOADSTRING = {"default.project.json": "false", "test.project.json": "true"}
 
 
 def build(project: str, folder: str) -> list[tuple[str, dict[str, str]]]:
@@ -70,6 +75,12 @@ class PlaceSettingsTests(unittest.TestCase):
                 for name, value in settings.items():
                     with self.subTest(project=project, setting=f"{service}.{name}"):
                         self.assertEqual(properties.get(service, {}).get(name), value)
+
+    def test_allows_loadstring_in_the_test_place_only(self):
+        for project, services in self.places.items():
+            with self.subTest(project=project):
+                value = dict(services).get("ServerScriptService", {}).get("LoadStringEnabled", "false")
+                self.assertEqual(value, LOADSTRING[project])
 
 
 if __name__ == "__main__":

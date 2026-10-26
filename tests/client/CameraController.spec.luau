@@ -24,6 +24,8 @@ local DT = 1 / 60
 type FakeCamera = { CFrame: CFrame, FieldOfView: number, CameraType: Enum.CameraType }
 
 local folder: Folder
+-- Roblox's menu: opening it pauses the controls.
+local menu: Fixtures.Menu
 local rig: Model
 local camera: FakeCamera
 local mouse: { MouseBehavior: Enum.MouseBehavior, MouseIconEnabled: boolean }
@@ -97,9 +99,11 @@ beforeEach(function()
 	mouse = { MouseBehavior = Enum.MouseBehavior.Default, MouseIconEnabled = true }
 	preferred = Enum.PreferredInput.KeyboardAndMouse
 	ball = nil
+	menu = Fixtures.menu()
 	InputController:init({
 		Config = config,
 		Parent = folder,
+		GuiService = menu,
 		LookSettings = function(): (number, number, boolean)
 			return 1, 1, false
 		end,
@@ -151,10 +155,10 @@ describe("CameraController", function()
 		function()
 			CameraController:step(DT)
 			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.LockCenter)
-			InputController:setPaused(true)
+			menu.MenuOpened:Fire()
 			CameraController:step(DT)
 			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.Default)
-			InputController:setPaused(false)
+			menu.MenuClosed:Fire()
 			preferred = Enum.PreferredInput.Touch
 			CameraController:step(DT)
 			expect(mouse.MouseBehavior).toBe(Enum.MouseBehavior.Default)
@@ -167,10 +171,10 @@ describe("CameraController", function()
 	it("hides the cursor while the mouse is locked, and shows it when free", function()
 		CameraController:step(DT)
 		expect(mouse.MouseIconEnabled).toBe(false)
-		InputController:setPaused(true)
+		menu.MenuOpened:Fire()
 		CameraController:step(DT)
 		expect(mouse.MouseIconEnabled).toBe(true)
-		InputController:setPaused(false)
+		menu.MenuClosed:Fire()
 		preferred = Enum.PreferredInput.Gamepad
 		CameraController:step(DT)
 		expect(mouse.MouseIconEnabled).toBe(true)

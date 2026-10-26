@@ -58,6 +58,7 @@ M1 does include the **registries** (ball skin, skate skin) holding one default e
 | A3 | Riding the roof (2026-10-22) | **Walls by speed, roof by loop physics.** Walls keep `minWallSpeed`. Past straight up, a skater stays on only while `speed² × curvature ≥ gravity's pull off the surface`. A flat ceiling never holds, at any speed. |
 | A4 | Future art and maps (2026-10-22) | **Glass walls** in the art pass (ground stays opaque). **More maps, picked at random each game**, later: the arena stays data-driven. |
 | A5 | Packages (2026-10-23) | **Roblox's own maintained packages:** React Luau (`roblox/react`, `roblox/react-roblox` 17.3.13) for the HUD and Jest Roblox (`roblox/jest`, `roblox/jest-globals` 3.20.1) for tests. They replace the `jsdotlua` copies, which had not changed since December 2024. |
+| A6 | The M1 overhaul (2026-10-25) | **Match Roller Champions 1:1 in play, with Illegal Soccer's polish**, after the owner studied both games (videos in §15): their feel, rules and layout ideas, never their art, logos, names or music. Phase 9's Config tuning pass is replaced. After Phase 9, M1 continues in four parts, in this order, each with its own spec, plan and test-first tasks: **Arena** (RC's size and shape, an open top with glass barriers, gate arches and a beam beside the carrier) → **Feel** (camera, real physics on walls, jumps, landings, double jump, no action spam) → **Ball & rules** (passes through the air, shooting, 1/3/5 points for 1/2/3 laps, kickoff, leavers, team switching, networking) → **Presentation** (a lighter HUD and phone buttons, goal replay and celebration, cutscenes). Sound, music, art, animations, the stadium and crowd, more maps and the tutorial move to a later milestone; fans to M6; the practice park to M3. |
 
 ---
 
@@ -393,7 +394,7 @@ Third-person chase camera with mouse lock. `Camera.distance = 12`, `Camera.heigh
 
 ### 10.3 Movement guard (`server/MovementGuard`)
 
-Samples each character every `Network.guardSampleSeconds = 0.25`. If the upward move in a sample exceeds `Movement.hardCap × Network.speedTolerance (1.2)` for `Network.guardStrikes = 3` consecutive samples, or one move exceeds `Network.guardTeleportFactor = 2` times that allowance, falling excluded, the character is returned to its last valid position and the event is logged. A character whose root is outside the arena's tube (past a wall, under the floor or over the roof) by more than `Network.guardOutsideMargin = 2` is placed back on its team spawn, and the event is logged (owner, 2026-10-24, #181). Thresholds are config.
+Samples each character every `Network.guardSampleSeconds = 0.25`. If the upward move in a sample exceeds `Movement.hardCap × Network.speedTolerance (1.2)` for `Network.guardStrikes = 3` consecutive samples, or one move exceeds `Network.guardTeleportFactor = 2` times that allowance, falling excluded, the character is returned to its last valid position and the event is logged. A character whose root is outside the arena's tube (past a wall, under the floor or over the roof) by more than `Network.guardOutsideMargin = 2` is placed back on its team spawn, and the event is logged (owner, 2026-10-24, #181). The speed rule is judged first, so a jump out of the arena is a return, not a placement. A carrier placed on their spawn first drops the ball, still, where they were last inside the arena (owner, 2026-10-25), so leaving the arena never takes the ball home. The guard runs in MatchService's frame before the ball, and no move of a carrier by the server counts as the ball crossing a gate or the ring. Thresholds are config.
 
 ---
 
@@ -444,11 +445,12 @@ All strings and colors in `Config/UI` (team colors: Blue and Orange).
 
 ### 12.3 CI (GitHub Actions, on every pull request and push to `main`)
 
-1. `stylua --check src tests`
-2. `selene src tests`
-3. `luau-lsp analyze` with Roblox type definitions
+1. `stylua --check src tests scripts`
+2. `selene src tests scripts`
+3. `luau-lsp analyze` with Roblox type definitions (`bash scripts/analyze.sh`, strict)
 4. `rojo build default.project.json` and `rojo build test.project.json`
-5. **Jest suite via Open Cloud Luau Execution** — Roblox's API that runs Luau in a place headlessly; tasks run up to 5 minutes, 10 concurrent per place. Requires the owner to create an Open Cloud API key and a test place once and store them as GitHub secrets; this is its own M1 issue.
+5. The CI scripts' Python (Phase 9): `ruff format --check scripts`, `ruff check scripts` and their unit tests, which must print no warning
+6. **Jest suite via Open Cloud Luau Execution** — Roblox's API that runs Luau in a place headlessly; tasks run up to 5 minutes, at most 10 unfinished per place. The owner set it up once (#170, `scripts/ci/setup-cloud-tests.sh`): a private test game, whose universe and place IDs are GitHub repository variables (`ROBLOX_TEST_UNIVERSE_ID`, `ROBLOX_TEST_PLACE_ID`), and an Open Cloud API key restricted to that game, stored as the GitHub secret `ROBLOX_API_KEY`.
 
 ### 12.4 Git and GitHub workflow
 
@@ -482,7 +484,9 @@ M1 is large, so the implementation plan is written and executed **per phase**, e
 6. **Actions:** ActionRunner, each action, ActionService validation.
 7. **Input + camera:** Config/Input bindings for PC/gamepad/mobile, CameraController, Ball Focus, §8.5 defaults.
 8. **HUD:** React Luau HUD, score tab, end screen, MVP.
-9. **CI test execution + tuning:** Open Cloud Luau Execution job, multi-client playtests, config tuning pass.
+9. **CI test execution + playtests:** Open Cloud Luau Execution job, real-device and multi-client playtests. Its config tuning pass was replaced by the overhaul (A6).
+
+M1 then continues with the overhaul's four parts (A6), each designed in its own spec and planned on its own: **10. Arena**, **11. Feel**, **12. Ball & rules**, **13. Presentation**. Each part's spec states which sections of this one it replaces.
 
 ---
 
@@ -495,8 +499,9 @@ M1 is large, so the implementation plan is written and executed **per phase**, e
 - Video observations — "Trying ROLLER CHAMPIONS Almost 2 YEARS LATER" (https://www.youtube.com/watch?v=t2JZw0nMcic): feed "Lap 1/2/3 Completed", "Orange goal is active", "Three points on the line", banners GOAL / DENIED! / 30 SECONDS REMAINING! / LAST CHANCE; HUD with score pips, timer, carrier name, segmented lap bar, km/h speedometer, context-sensitive control hints (L2 Ball Focus ↔ Charge Throw); ball ring + vertical line to ground marker; at 5:07–5:09 the goal is a raised upright ring at the end of a straight on the carrier's right, glowing in the possessing team's color.
 - "8 MUST Know Tips For Roller Champions!" (https://www.youtube.com/watch?v=4Ofq9CFUWnQ) narration: pump on downward slopes; draft behind opponents; grabbing a teammate and letting go gives a large speed boost; dive tackles cover more area but recover slower; holding brake = tiptoe; uppercut near a wall gives a big leap.
 - "Roller Champions: Wild Ones Launch Trailer" (https://www.youtube.com/watch?v=oTxqS3wVqGw): 55 s trailer; "pick a prize" unlock system.
+- The overhaul's study (A6, 2026-10-25): "Roller Champions Gameplay", the E3 2019 pre-alpha with its tutorial (https://www.youtube.com/watch?v=GItLiPXpoZw), and "Let's Play Roller Champions in 2025", the released game (https://www.youtube.com/watch?v=DvufnT_DigM), sampled every 2 s. The observations are committed with the Arena part's spec.
 
-**Illegal Soccer (Roblox)** — user's screen recording (2026-10-21): lobby overlooking the live match with Join Red/Join Blue pads showing open spots; separate "Legal Ranked"/"Illegal Ranked" queues each beside a "Top Elo" board; cosmetic pedestals (Jersey, Goal Effect, Emote); end-of-match awards (Guardian Angel – most saves, Box to Box – studs covered, Safe Hands, Final Boss). Item boxes/loadout/rolls: https://allthings.how/illegal-soccer-on-roblox-how-to-play-controls-and-item-boxes/ (informs M4–M8, not M1).
+**Illegal Soccer (Roblox)** — user's screen recording (2026-10-21): lobby overlooking the live match with Join Red/Join Blue pads showing open spots; separate "Legal Ranked"/"Illegal Ranked" queues each beside a "Top Elo" board; cosmetic pedestals (Jersey, Goal Effect, Emote); end-of-match awards (Guardian Angel – most saves, Box to Box – studs covered, Safe Hands, Final Boss). Item boxes/loadout/rolls: https://allthings.how/illegal-soccer-on-roblox-how-to-play-controls-and-item-boxes/ (informs M4–M8, not M1). The user's second recording (2026-10-25, 10:40) informs the overhaul's polish (A6): the HUD, the goal replay and celebration, knockdowns.
 
 **Roblox platform**
 - Luau Execution (Open Cloud): https://create.roblox.com/docs/en-us/cloud/reference/features/luau-execution.md

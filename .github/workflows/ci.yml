@@ -21,6 +21,8 @@ env:
 jobs:
   quality:
     runs-on: ubuntu-26.04
+    # It takes under 20 s (measured); a hung download would otherwise hold the runner for GitHub's default 6 hours.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -41,11 +43,15 @@ jobs:
       - name: Type check
         run: bash scripts/analyze.sh
 
+      # Python prints some warnings without failing the run (a finalizer's ResourceWarning, say), so the step also
+      # fails when the unit tests print one.
       - name: Check the CI scripts (Python)
         run: |
           ruff format --check scripts
           ruff check scripts
-          python3 -m unittest discover -s scripts/ci -p "test_*.py"
+          output=$(python3 -m unittest discover -s scripts/ci -p "test_*.py" 2>&1) || { echo "$output"; exit 1; }
+          echo "$output"
+          if grep -qi "warning" <<< "$output"; then echo "::error::The Python unit tests printed a warning."; exit 1; fi
 
       - name: Build game and test places
         run: |

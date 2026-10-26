@@ -9,7 +9,7 @@ scripts/ci/setup-cloud-tests.sh).
 2. Runs the task script against that exact version, so runs from different branches never test each other's code.
 3. Waits while the task is QUEUED or PROCESSING, then prints its logs.
 4. Passes only when the task is COMPLETE and its result is RunTests' summary with success, no failed test or suite,
-   and more than zero tests.
+   more than zero tests, and every test passed (a stray `it.only` or `it.skip` leaves some unrun).
 
 The endpoints, states and limits are Roblox's (create.roblox.com/docs: cloud/reference/features/luau-execution and
 cloud/reference/features/places). Standard library only.
@@ -27,7 +27,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 API = "https://apis.roblox.com"
 # Seconds between polls of a waiting task (Roblox's own place-ci-cd-demo polls every 3).
@@ -36,8 +36,10 @@ POLL_SECONDS = 3
 TASK_TIMEOUT = "300s"
 # How long after creating the task the client gives up: the task's 5 minutes plus time spent queued.
 DEADLINE_SECONDS = 600
-# Waits before each retry of a rate-limited (429), failing (5xx) or dropped request, unless Roblox sends Retry-After.
-RETRY_SECONDS = (5, 10, 20)
+# Waits before each retry of a rate-limited (429), failing (5xx) or dropped request, unless Roblox says how long
+# (Retry-After, else x-ratelimit-reset). Without them Roblox's rate-limit page asks for exponential backoff; these
+# add up to 155 s, past a second one-minute window of its 5-task-creations-a-minute limit.
+RETRY_SECONDS = (5, 10, 20, 40, 80)
 # Seconds a single request may take.
 REQUEST_SECONDS = 60
 WAITING = {"QUEUED", "PROCESSING"}
@@ -142,13 +144,13 @@ class Client:
         version_path = f"universes/{universe_id}/places/{place_id}/versions/{version}"
         url = f"{API}/cloud/v2/{version_path}/luau-execution-session-tasks"
         body = json.dumps({"script": script, "timeout": TASK_TIMEOUT}).encode()
-        return self._request("POST", url, body, "application/json")
+        return _named(self._request("POST", url, body, "application/json"))
 
     def wait(self, task: dict) -> dict:
         """Polls the task every POLL_SECONDS while it is QUEUED or PROCESSING, until DEADLINE_SECONDS have passed."""
         started = self._clock()
         while True:
-            task = self._request("GET", f"{API}/cloud/v2/{task['path']}")
+            task = _named(self._request("GET", f"{API}/cloud/v2/{task['path']}"))
             if task.get("state") not in WAITING:
                 return task
             if self._clock() - started >= DEADLINE_SECONDS:
@@ -161,7 +163,7 @@ class Client:
         while True:
             url = f"{API}/cloud/v2/{task['path']}/logs"
             if token:
-                url += f"?pageToken={token}"
+                url += "?" + urlencode({"pageToken": token})
             page = self._request("GET", url)
             for chunk in page.get("luauExecutionSessionTaskLogs", []):
                 messages.extend(chunk.get("messages", []))
@@ -170,12 +172,26 @@ class Client:
                 return messages
 
 
+def _named(task: dict) -> dict:
+    """The task Roblox answered with, once it names its path: every later request about it is made on that path."""
+    if not isinstance(task.get("path"), str) or task["path"] == "":
+        raise CloudError(f"Roblox answered with a task without a path: {task}")
+    return task
+
+
 def _retry_after(headers) -> float | None:
-    value = headers.get("Retry-After") if headers is not None else None
-    try:
-        return float(value) if value is not None else None
-    except ValueError:
+    """Seconds Roblox asks a rate-limited client to wait: Retry-After, else x-ratelimit-reset (until its quota resets).
+    None when it sends neither."""
+    if headers is None:
         return None
+    for name in ("Retry-After", "x-ratelimit-reset"):
+        value = headers.get(name)
+        try:
+            if value is not None:
+                return float(value)
+        except ValueError:
+            continue
+    return None
 
 
 def print_logs(client: Client, task: dict, out: TextIO):
@@ -210,6 +226,8 @@ def verdict(task: dict) -> tuple[bool, str]:
         and total > 0
     )
     line = f"{passed}/{total} tests passed"
+    if green and passed != total:
+        return False, f"{line}: the others were skipped (an `it.only` or `it.skip`?)"
     if green:
         return True, line
     failures = "\n".join(ANSI.sub("", str(message)) for message in summary.get("failureMessages") or [])

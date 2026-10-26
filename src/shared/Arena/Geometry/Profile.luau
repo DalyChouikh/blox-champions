@@ -30,24 +30,22 @@ local function arc(center: Vector2, radius: number, fromAngle: number, toAngle: 
 	end
 end
 
--- The roof's circle, in the profile's (u, y): its centre is the midpoint of the two wall tops and its radius half
--- their distance, so the arc is a half circle when the walls are level (the owner's enclosed arena).
-function Profile.roofCircle(arena: ArenaConfig): (Vector2, number)
-	local inner = Vector2.new(0, arena.infieldWallHeight)
-	local outer = Vector2.new(arena.trackWidth, arena.outerWallHeight)
-	return (inner + outer) / 2, (outer - inner).Magnitude / 2
+-- The roof's circle, in the profile's (u, y): its centre (u, y) is the midpoint of the two wall tops and its radius
+-- half their distance, so the arc is a half circle when the walls are level (the owner's enclosed arena). Plain
+-- numbers, because Bounds.inTube reads it on each check over the wall tops and a Vector2 is a heap object.
+function Profile.roofCircle(arena: ArenaConfig): (number, number, number)
+	local width, rise = arena.trackWidth, arena.outerWallHeight - arena.infieldWallHeight
+	return width / 2, arena.infieldWallHeight + rise / 2, math.sqrt(width * width + rise * rise) / 2
 end
 
 local function roofArc(arena: ArenaConfig): Piece
-	local center, radius = Profile.roofCircle(arena)
-	local outer = Vector2.new(arena.trackWidth, arena.outerWallHeight)
-	local inner = Vector2.new(0, arena.infieldWallHeight)
-	local from = math.atan2(outer.Y - center.Y, outer.X - center.X)
-	local to = math.atan2(inner.Y - center.Y, inner.X - center.X)
+	local centerU, centerY, radius = Profile.roofCircle(arena)
+	local from = math.atan2(arena.outerWallHeight - centerY, arena.trackWidth - centerU)
+	local to = math.atan2(arena.infieldWallHeight - centerY, -centerU)
 	if to < from then
 		to += 2 * math.pi
 	end
-	return arc(center, radius, from, to)
+	return arc(Vector2.new(centerU, centerY), radius, from, to)
 end
 
 local function stepStart(arena: ArenaConfig): number
@@ -140,8 +138,8 @@ end
 
 -- The highest point of the roof: the apex of its circle. The lap gates are as tall as it.
 function Profile.roofTop(arena: ArenaConfig): number
-	local center, radius = Profile.roofCircle(arena)
-	return center.Y + radius
+	local _, centerY, radius = Profile.roofCircle(arena)
+	return centerY + radius
 end
 
 -- The point where the roof starts, at the outer wall's top: the roof's strips run from here to the last point.

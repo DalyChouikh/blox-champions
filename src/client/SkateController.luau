@@ -81,6 +81,8 @@ export type SkateController = {
 	_gravity: Vector3,
 	-- workspace:Raycast; a fake in tests, which can then hand the controller a seam's side face.
 	_raycast: (origin: Vector3, direction: Vector3, params: RaycastParams) -> RaycastResult?,
+	-- workspace:Spherecast, the collider's sweep; a fake in tests.
+	_spherecast: (origin: Vector3, radius: number, direction: Vector3, params: RaycastParams) -> RaycastResult?,
 	_character: Model?,
 	_velocity: LinearVelocity?,
 	_align: AlignOrientation?,
@@ -250,7 +252,10 @@ end
 -- The skater body's velocity has no force limit, so a skater moving into a surface pressed its collider through it
 -- (measured: through the arena's 1-stud wall at 120 studs/s and over, #176). So each ride surface the collider
 -- touches, or reaches before the next step, takes its part of the velocity, and the skater slides along it. A sphere
--- cast misses a part it starts touching (measured), so the collider is swept from a radius behind the root.
+-- cast misses a part it starts touching (measured), so the collider is swept from a radius behind the root. A cast
+-- that meets an edge reports a normal from the edge, and sliding along a wall it presses into, the collider meets the
+-- next slab's edge at their seam (measured: normal (-0.49, 0, 0.87), and 120 studs/s along the wall became 28). So the
+-- skater slides along the face that a ray from its root, along the cast's normal, meets: at a seam, the wall itself.
 local function collide(self: SkateController, root: BasePart, skater: SkateMath.Skater, dt: number)
 	local radius = self._config.Movement.colliderDiameter / 2
 	for _ = 1, CONTACT_PASSES do
@@ -261,8 +266,14 @@ local function collide(self: SkateController, root: BasePart, skater: SkateMath.
 		end
 		local direction = velocity / speed
 		local origin = root.Position - direction * radius
-		local result = workspace:Spherecast(origin, radius, direction * (radius + speed * dt), self._surfaces.params)
-		if result == nil or not skater:block(result.Normal) then
+		local travel = radius + speed * dt
+		local params = self._surfaces.params
+		local hit = self._spherecast(origin, radius, direction * travel, params)
+		if hit == nil then
+			return
+		end
+		local face = self._raycast(root.Position, -hit.Normal * (radius + travel), params)
+		if face == nil or not skater:block(face.Normal) then
 			return
 		end
 	end
@@ -339,6 +350,14 @@ local SkateController: SkateController = {
 	_raycast = function(_origin: Vector3, _direction: Vector3, _params: RaycastParams): RaycastResult?
 		return nil
 	end,
+	_spherecast = function(
+		_origin: Vector3,
+		_radius: number,
+		_direction: Vector3,
+		_params: RaycastParams
+	): RaycastResult?
+		return nil
+	end,
 	_character = nil,
 	root = nil,
 	_velocity = nil,
@@ -355,8 +374,8 @@ local SkateController: SkateController = {
 	_views = {},
 	_playerList = nil,
 
-	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.Clock, deps.Gravity, deps.Team and deps.Raycast replace
-	-- the live game in tests.
+	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.Clock, deps.Gravity, deps.Team, deps.Raycast and
+	-- deps.Spherecast replace the live game in tests.
 	init = function(self: SkateController, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -380,6 +399,10 @@ local SkateController: SkateController = {
 		self._raycast = deps.Raycast
 			or function(origin: Vector3, direction: Vector3, params: RaycastParams): RaycastResult?
 				return workspace:Raycast(origin, direction, params)
+			end
+		self._spherecast = deps.Spherecast
+			or function(origin: Vector3, radius: number, direction: Vector3, params: RaycastParams): RaycastResult?
+				return workspace:Spherecast(origin, radius, direction, params)
 			end
 		self._filter = NormalFilter.new(config.Movement.normalFilter, worldUp(self))
 		self._attach = Attach.new(config.Movement)

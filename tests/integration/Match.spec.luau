@@ -3,7 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
-local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
+local describe, it, expect, jest = JestGlobals.describe, JestGlobals.it, JestGlobals.expect, JestGlobals.jest
 local beforeAll, afterAll, afterEach = JestGlobals.beforeAll, JestGlobals.afterAll, JestGlobals.afterEach
 
 local ActionService = require(ServerScriptService.Server.ActionService)
@@ -28,6 +28,14 @@ local BASE_MATCH = { lapsToOpenGoal = 1, lapsForStreakPoint = 2 }
 local config: Config.GameConfig
 local folder: Folder
 local fired: { Fired } = {}
+-- Stands in for MovementGuard (its own spec tests it; a real one would return the rigs these tests move by hand):
+-- each step it calls `guardStep`, nothing by default.
+local guardStep: () -> () = function() end
+local fakeGuard = {
+	step = function(_self: any, _dt: number)
+		guardStep()
+	end,
+}
 
 -- The name of the ball's model's parent. Assertions compare names: Jest prints a failing Instance with all its
 -- descendants, which for the workspace (the whole arena) takes minutes.
@@ -55,6 +63,7 @@ end)
 afterEach(function()
 	BallService:destroy()
 	folder:Destroy()
+	guardStep = function() end
 end)
 
 -- The arena ArenaService built in beforeAll.
@@ -91,6 +100,7 @@ local function setup(match: { [string]: any }?)
 		TeamService = TeamService,
 		CharacterService = CharacterService,
 		ActionService = ActionService,
+		MovementGuard = fakeGuard,
 		NameOf = function(player: string): string
 			return "Name" .. player
 		end,
@@ -410,6 +420,22 @@ describe("A match on the generated arena", function()
 		expect(lastFired(Remotes.names.MatchSnapshot).to).toBeNil()
 		expect(MatchService.engine:snapshot().state).toBe("Kickoff")
 		expect(#MatchService.engine:stats().players).toBe(1)
+	end)
+
+	-- The guard's placements move carriers and their ball (Phase 9 review): the ball's step must see them that frame.
+	it("steps the movement guard each frame after the actions and before the ball", function()
+		local actionSteps = jest.spyOn(ActionService, "step")
+		local ballSteps = jest.spyOn(BallService, "step")
+		local seen: { string } = {}
+		guardStep = function()
+			table.insert(seen, `{#actionSteps.mock.calls} actions, {#ballSteps.mock.calls} balls`)
+		end
+		setup()
+		seat(1)
+		frames(3 * FRAME)
+		actionSteps.mockRestore()
+		ballSteps.mockRestore()
+		expect(seen).toEqual({ "1 actions, 0 balls", "2 actions, 1 balls", "3 actions, 2 balls" })
 	end)
 
 	it("sends a frame's events before reacting to them", function()

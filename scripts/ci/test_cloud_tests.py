@@ -1,12 +1,14 @@
 """Unit tests for cloud_tests.py. A fake opener plays Roblox's Open Cloud API and a fake clock drives the waits, so
 nothing touches the network. Run: python -m unittest discover -s scripts/ci -p "test_*.py"."""
 
+import gc
 import http.client
 import io
 import json
 import tempfile
 import unittest
 import urllib.error
+import warnings
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -203,6 +205,14 @@ class CloudTests(unittest.TestCase):
                 code, _ = self.run_main(Cloud(green_routes(final=task("COMPLETE", results))))
                 self.assertEqual(code, 1)
 
+    def test_fails_when_a_test_was_skipped(self):
+        # A stray `it.only` or `it.skip`: nothing failed, but not every test ran.
+        skipped = summary(numPassedTests=600)
+        code, output = self.run_main(Cloud(green_routes(final=task("COMPLETE", [skipped]))))
+        self.assertEqual(code, 1)
+        self.assertIn("600/658", output)
+        self.assertIn("skipped", output)
+
     def test_fails_when_the_task_failed_or_was_cancelled(self):
         failed = task("FAILED", error={"code": "SCRIPT_ERROR", "message": "attempt to call a nil value"})
         code, output = self.run_main(Cloud(green_routes(final=failed)))
@@ -226,6 +236,18 @@ class CloudTests(unittest.TestCase):
         code, _ = self.run_main(Cloud(routes))
         self.assertEqual(code, 0)
         self.assertIn(12, self.clock.sleeps)
+        self.clock = Clock()
+        reset = green_routes()
+        reset.insert(1, route("POST", CREATE, fails(429, {"message": "Too many"}, {"x-ratelimit-reset": "41"})))
+        code, _ = self.run_main(Cloud(reset))
+        self.assertEqual(code, 0)
+        self.assertEqual(self.clock.sleeps, [41])
+        self.clock = Clock()
+        minute = green_routes()
+        minute[1:1] = [route("POST", CREATE, fails(429, {"message": "Too many"}))] * 4
+        code, _ = self.run_main(Cloud(minute))
+        self.assertEqual(code, 0)
+        self.assertGreater(sum(self.clock.sleeps), 60)
         limited = green_routes()
         limited[1] = route("POST", CREATE, fails(429, {"message": "Too many"}), repeats=True)
         code, output = self.run_main(Cloud(limited))
@@ -245,6 +267,20 @@ class CloudTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(self.clock.sleeps, [first, first, first, second, first])
 
+    def test_fails_cleanly_on_a_task_answer_without_a_path(self):
+        # Every later request is made on the task's path.
+        answers = {
+            "created": (1, route("POST", CREATE, ok({"state": "QUEUED"}))),
+            "polled": (2, route("GET", POLL, ok({"state": "COMPLETE"}))),
+        }
+        for name, (index, answer) in answers.items():
+            with self.subTest(answer=name):
+                routes = green_routes()
+                routes[index] = answer
+                code, output = self.run_main(Cloud(routes))
+                self.assertEqual(code, 1)
+                self.assertIn("without a path", output)
+
     def test_fails_with_the_status_of_a_rejected_request_and_never_prints_the_key(self):
         cloud = Cloud([route("POST", UPLOAD, fails(403, {"message": "Forbidden"}))])
         code, output = self.run_main(cloud)
@@ -253,6 +289,17 @@ class CloudTests(unittest.TestCase):
         self.assertIn(UPLOAD, output)
         self.assertIn("Forbidden", output)
         self.assertNotIn(KEY, output)
+
+    def test_closes_every_error_answer_it_reads(self):
+        # An HTTPError holds its answer open, and one never closed prints a ResourceWarning once it is collected.
+        retried = [route("POST", UPLOAD, fails(503, {"message": "Unavailable"}))] + green_routes()
+        rejected = [route("POST", UPLOAD, fails(403, {"message": "Forbidden"}))]
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            codes = [self.run_main(Cloud(retried))[0], self.run_main(Cloud(rejected))[0]]
+            gc.collect()
+        self.assertEqual(codes, [0, 1])
+        self.assertEqual([str(w.message) for w in caught if issubclass(w.category, ResourceWarning)], [])
 
     def test_fails_loudly_naming_each_missing_setting(self):
         code, output = self.run_main(Cloud([]), env={})
@@ -266,11 +313,14 @@ class CloudTests(unittest.TestCase):
         self.assertIn("ROBLOX_TEST_PLACE_ID", output)
 
     def test_prints_every_page_of_the_logs(self):
+        # A page token is opaque and may hold characters a query must escape.
         routes = green_routes(
-            logs={"luauExecutionSessionTaskLogs": [{"messages": ["one", "two"]}], "nextPageToken": "p2"}
+            logs={"luauExecutionSessionTaskLogs": [{"messages": ["one", "two"]}], "nextPageToken": "a+b/c="}
         )
         routes.append(
-            route("GET", LOGS, ok({"luauExecutionSessionTaskLogs": [{"messages": ["three"]}]}), "pageToken=p2")
+            route(
+                "GET", LOGS, ok({"luauExecutionSessionTaskLogs": [{"messages": ["three"]}]}), "pageToken=a%2Bb%2Fc%3D"
+            )
         )
         code, output = self.run_main(Cloud(routes))
         self.assertEqual(code, 0)

@@ -497,13 +497,11 @@ describe("Config.forMode", function()
 
 	it("rejects a movement guard that could never return a skater", function()
 		expect(function()
-			Config.forMode({
-				id = "guard",
-				displayName = "Guard",
-				itemsEnabled = false,
-				overrides = { Network = { guardStrikes = 0 } },
-			})
-		end).toThrow()
+			Fixtures.config({ Network = { guardStrikes = 0 } })
+		end).toThrow("Network.guardStrikes: must be >= 1 (got 0)")
+	end)
+
+	it("rejects an outside margin below zero, which would place skaters still inside the arena", function()
 		expect(function()
 			Fixtures.config({ Network = { guardOutsideMargin = -1 } })
 		end).toThrow("Network.guardOutsideMargin: must be >= 0 (got -1)")
