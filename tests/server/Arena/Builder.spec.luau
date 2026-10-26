@@ -9,11 +9,13 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 local Builder = require(game:GetService("ServerScriptService").Server.Arena.Builder)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
+local Features = require(ReplicatedStorage.Shared.Arena.Geometry.Features)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
 local config = Config.defaults()
+local GRAVITY = Fixtures.GRAVITY.Magnitude
 local parent: Folder
 beforeEach(function()
 	parent = Instance.new("Folder")
@@ -30,11 +32,13 @@ end
 
 describe("Builder.build", function()
 	it("builds one part per piece, grouped by what it is", function()
-		local arena = Builder.build(Geometry.build(config), config, parent)
+		local geometry = Geometry.build(config, GRAVITY)
+		local arena = Builder.build(geometry, config, parent)
 		expect(arena.Parent).toBe(parent)
-		expect(#folder(arena, "Surface"):GetChildren()).toBe(7334)
-		expect(#folder(arena, "Roof"):GetChildren()).toBe(8106)
-		expect(#folder(arena, "Infield"):GetChildren()).toBe(193)
+		expect(#folder(arena, "Surface"):GetChildren()).toBe(#geometry.surface)
+		expect(#folder(arena, "Barriers"):GetChildren()).toBe(#Features.barriers(config.Arena))
+		expect(arena:FindFirstChild("Roof")).toBeNil()
+		expect(#folder(arena, "Infield"):GetChildren()).toBe(#geometry.infield)
 		expect(#folder(arena, "Gates"):GetChildren()).toBe(4)
 		expect(#folder(arena, "Markers"):GetChildren()).toBe(4)
 		expect(#folder(arena, "Spawns"):GetChildren()).toBe(8)
@@ -43,7 +47,7 @@ describe("Builder.build", function()
 	end)
 
 	it("makes gates and spawns invisible to physics and queries, and solids smooth and anchored", function()
-		local arena = Builder.build(Geometry.build(config), config, parent)
+		local arena = Builder.build(Geometry.build(config, GRAVITY), config, parent)
 		local gate = folder(arena, "Gates"):FindFirstChild("Gate2") :: Part
 		expect(gate.Transparency).toBe(1)
 		expect(gate.CanCollide or gate.CanQuery or gate.CanTouch).toBe(false)
@@ -59,9 +63,27 @@ describe("Builder.build", function()
 		end
 	end)
 
-	it("tags the roof as a riding surface, and makes the corner markers panels that never block a skater", function()
-		local arena = Builder.build(Geometry.build(config), config, parent)
-		expect(folder(arena, "Roof"):HasTag(Tags.RideSurface)).toBe(true)
+	it("tags the glass as barriers, and keeps the corner markers panels that never block a skater", function()
+		local arena = Builder.build(Geometry.build(config, GRAVITY), config, parent)
+		local barriers = folder(arena, "Barriers")
+		expect(barriers:HasTag(Tags.Barrier)).toBe(true)
+		-- Skaters and the ball bounce off glass, and the collider's sweep finds it; nothing is touched by it.
+		for _, part in barriers:GetChildren() do
+			local glass = part :: BasePart
+			if
+				not (
+					glass.Anchored
+					and glass.Material == Enum.Material.Glass
+					and glass.Color == config.Arena.colors.glass
+					and math.abs(glass.Transparency - config.Arena.barrier.transparency) < 1e-4
+					and glass.CanCollide
+					and glass.CanQuery
+					and not glass.CanTouch
+				)
+			then
+				error(`{glass.Name} does not look or act like glass`)
+			end
+		end
 		local markers = folder(arena, "Markers"):GetChildren()
 		expect(#markers).toBe(Centerline.gateCount)
 		for _, marker in markers do
@@ -69,10 +91,10 @@ describe("Builder.build", function()
 		end
 	end)
 
-	-- A roof that casts shadows keeps the whole track in its shade (seen in a playtest).
-	it("lets the light into the tube: the roof casts no shadow, while the track still does", function()
-		local arena = Builder.build(Geometry.build(config), config, parent)
-		for _, part in folder(arena, "Roof"):GetChildren() do
+	-- A roof that cast shadows kept the whole track in its shade (seen in a playtest); 85 studs of glass would too.
+	it("lets the light in: the glass casts no shadow, while the track still does", function()
+		local arena = Builder.build(Geometry.build(config, GRAVITY), config, parent)
+		for _, part in folder(arena, "Barriers"):GetChildren() do
 			if (part :: BasePart).CastShadow then
 				error(`{part.Name} casts a shadow`)
 			end
@@ -81,7 +103,7 @@ describe("Builder.build", function()
 	end)
 
 	it("tags the riding surfaces so skaters' rays find only them", function()
-		local arena = Builder.build(Geometry.build(config), config, parent)
+		local arena = Builder.build(Geometry.build(config, GRAVITY), config, parent)
 		local tagged: { string } = {}
 		for _, instance in arena:GetDescendants() do
 			if instance:HasTag(Tags.RideSurface) then
@@ -89,11 +111,12 @@ describe("Builder.build", function()
 			end
 		end
 		table.sort(tagged)
-		expect(tagged).toEqual({ "Infield", "Roof", "Surface" })
+		-- Not the glass, and not the infield behind it, which no skater reaches.
+		expect(tagged).toEqual({ "Surface" })
 	end)
 
 	it("sends the whole arena to every client and never streams it out", function()
-		local arena = Builder.build(Geometry.build(config), config, parent)
+		local arena = Builder.build(Geometry.build(config, GRAVITY), config, parent)
 		expect(arena.ModelStreamingMode).toBe(Enum.ModelStreamingMode.Persistent)
 	end)
 
@@ -106,7 +129,7 @@ describe("Builder.build", function()
 				goal = { panelTransparency = 0.6 },
 			},
 		})
-		local arena = Builder.build(Geometry.build(custom), custom, parent)
+		local arena = Builder.build(Geometry.build(custom, GRAVITY), custom, parent)
 		expect((folder(arena, "Gates"):FindFirstChild("Gate1") :: Part).Size.Z).toBeCloseTo(0.5, 4)
 		local pad = folder(arena, "Spawns"):FindFirstChild("Orange2") :: Part
 		expect(pad.Size).toEqual(Vector3.new(6, 0.3, 6))
@@ -116,7 +139,7 @@ describe("Builder.build", function()
 	end)
 
 	it("leaves nothing behind when a piece is invalid", function()
-		local geometry = Geometry.build(config)
+		local geometry = Geometry.build(config, GRAVITY)
 		local broken = table.clone(geometry)
 		broken.surface = table.clone(geometry.surface)
 		broken.surface[2] = { shape = "Block", cframe = CFrame.identity, size = Vector3.new(0, 1, 1) }
@@ -130,10 +153,10 @@ describe("Builder.build", function()
 		end).toThrow("ArenaBuilder: infield piece 1 is invalid (cframe ")
 		-- Roblox would silently clamp it to 2048, leaving a hole.
 		local oversized = table.clone(geometry)
-		oversized.markers = { { shape = "Block", cframe = CFrame.identity, size = Vector3.new(3000, 1, 1) } }
+		oversized.barriers = { { shape = "Block", cframe = CFrame.identity, size = Vector3.new(3000, 1, 1) } }
 		expect(function()
 			Builder.build(oversized, config, parent)
-		end).toThrow("ArenaBuilder: marker piece 1 is invalid (size 3000, 1, 1)")
+		end).toThrow("ArenaBuilder: barrier piece 1 is invalid (size 3000, 1, 1)")
 		expect(#parent:GetChildren()).toBe(0)
 	end)
 end)

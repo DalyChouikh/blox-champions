@@ -1,11 +1,12 @@
 --!strict
--- Everything in the arena besides the riding surface (spec §9.1): the lap gates, the raised goal ring and its
--- panel, the corner markers, the team and ball spawns, and the solid infield.
+-- Everything in the arena besides the riding surface (spec §9.1, Arena spec §5): the glass on the two tops, the lap
+-- gates, the raised goal ring and its panel, the corner markers, the team and ball spawns, and the infield floor.
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
 local Crossing = require(script.Parent.Parent.Parent.Rules.Crossing)
 local Profile = require(script.Parent.Profile)
+local Surface = require(script.Parent.Surface)
 local Team = require(script.Parent.Parent.Parent.Rules.Team)
 local Triangles = require(script.Parent.Triangles)
 local Types = require(script.Parent.Types)
@@ -28,16 +29,36 @@ local function sectionMiddle(arena: ArenaConfig, section: number): number
 	return (Centerline.gateDistance(arena, section) + nextStart) / 2
 end
 
--- Gate g spans the track at the start of section g and faces the travel direction, as tall as the roof (A2), so a
--- throw inside the tube cannot pass over it.
+-- The glass (A7): two vertical strips swept around the loop, the inner one standing on the bank's top and the outer
+-- one on the outer wall's top, both up to barrier.top. Each runs the way the profile does (down the inner glass, up
+-- the outer one), so its slab hangs barrier.thickness behind its face, outside the track. Every strip between two
+-- stations is a flat rectangle: one block per station step around the ends, one per side along each straight.
+function Features.barriers(arena: ArenaConfig): { Piece }
+	local top, width = arena.barrier.top, arena.trackWidth
+	local inner = { Vector2.new(0, top), Vector2.new(0, arena.innerBankHeight) }
+	local outer = { Vector2.new(width, arena.outerWallHeight), Vector2.new(width, top) }
+	local pieces: { Piece } = {}
+	for _, section in { inner, outer } do
+		local rings = Surface.rings(arena, function(): { Vector2 }
+			return section
+		end)
+		for _, piece in Surface.sweep(rings, arena.barrier.thickness) do
+			table.insert(pieces, piece)
+		end
+	end
+	return pieces
+end
+
+-- Gate g spans the track at the start of section g and faces the travel direction, as tall as the glass, so no ball
+-- in play passes over it (Bounds.inArena).
 function Features.gates(arena: ArenaConfig): { Crossing.Rectangle }
 	local gates: { Crossing.Rectangle } = {}
-	local roofTop = Profile.roofTop(arena)
+	local top = arena.barrier.top
 	for gate = 1, Centerline.gateCount do
 		table.insert(gates, {
-			frame = Centerline.at(arena, Centerline.gateDistance(arena, gate), arena.trackWidth / 2, roofTop / 2),
+			frame = Centerline.at(arena, Centerline.gateDistance(arena, gate), arena.trackWidth / 2, top / 2),
 			width = arena.trackWidth,
-			height = roofTop,
+			height = top,
 		})
 	end
 	return gates
@@ -141,8 +162,8 @@ function Features.goal(arena: ArenaConfig): Types.Goal
 	}
 end
 
--- A flat panel on the outer wall's inner face at each gate, its top flush with the wall top (A2): the roof spans above
--- it, so it never pokes into the roof. Its thickness is the surface's, and it stays out of the skaters' way.
+-- A flat panel on the outer wall's inner face at each gate, its top flush with the wall top, under the glass. Its
+-- thickness is the surface's, and it stays out of the skaters' way.
 function Features.markers(arena: ArenaConfig): { Piece }
 	local markers: { Piece } = {}
 	for gate = 1, Centerline.gateCount do
@@ -186,32 +207,33 @@ function Features.ballSpawns(arena: ArenaConfig): { CFrame }
 	return spawns
 end
 
--- Solid up to the inner wall's top, meeting the back of the inner wall's slab (surfaceThickness behind its face)
--- instead of overlapping it: a block between the straights, and under each curved end a fan of prisms from the
--- end's center to the slab's back at every station, because the wall there is flat strips, not a circle.
+-- The infield floor behind the inner glass (Arena spec §5.5): a slab surfaceThickness thick, its top at the lower
+-- floor's height, meeting the back of the glass's slab (barrier.thickness behind its face) instead of overlapping it:
+-- a block between the straights, and under each curved end a fan of prisms from the end's center to the glass's back
+-- at every station, because the glass there is flat strips, not a circle. It is no ride surface: no skater reaches it.
 function Features.infield(arena: ArenaConfig): { Piece }
-	local behindWall = -arena.surfaceThickness
-	local height = arena.infieldWallHeight
+	local behindGlass = -arena.barrier.thickness
+	local thickness = arena.surfaceThickness
 	local pieces: { Piece } = {
 		{
 			shape = "Block",
-			cframe = CFrame.new(0, height / 2, 0),
+			cframe = CFrame.new(0, -thickness / 2, 0),
 			size = Vector3.new(
 				arena.straightLength,
-				height,
-				2 * (arena.endRadius - arena.trackWidth / 2 - arena.surfaceThickness)
+				thickness,
+				2 * (arena.endRadius - arena.trackWidth / 2 - arena.barrier.thickness)
 			),
 		},
 	}
 	for _, section in CURVED_ENDS do
 		local stations = Centerline.sectionStations(arena, section)
 		-- The end's center: endRadius from the centerline, on the infield side.
-		local center = Centerline.at(arena, stations[1], arena.trackWidth / 2 - arena.endRadius, height).Position
-		local previous = Centerline.at(arena, stations[1], behindWall, height).Position
+		local center = Centerline.at(arena, stations[1], arena.trackWidth / 2 - arena.endRadius, 0).Position
+		local previous = Centerline.at(arena, stations[1], behindGlass, 0).Position
 		for step = 2, #stations do
-			local current = Centerline.at(arena, stations[step], behindWall, height).Position
-			-- Each wedge's slab hangs `height` below the top face: a prism down to the base.
-			for _, wedge in Triangles.wedges(center, previous, current, Vector3.yAxis, height) do
+			local current = Centerline.at(arena, stations[step], behindGlass, 0).Position
+			-- Each wedge's slab hangs `thickness` below the top face.
+			for _, wedge in Triangles.wedges(center, previous, current, Vector3.yAxis, thickness) do
 				table.insert(pieces, wedge)
 			end
 			previous = current

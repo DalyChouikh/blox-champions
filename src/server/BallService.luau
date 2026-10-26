@@ -1,13 +1,13 @@
 --!strict
 -- The ball in the arena (spec §9.3): one server-owned physics part, in its own model that streams to every client, that
 -- BallState says what to do with. It is hidden (in ServerStorage, so its next spawn is never replicated early) until a
--- kickoff ends, then spawns at a random ball spawn. A ball that leaves the arena is recovered in any state, and one
--- Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each frame `step` reports how it really moved, a
--- throw since the last frame, who caught it, and whose body it touched. Jumps the server makes (a spawn, a respawn, the
--- snap to a catcher's side, a carrier it moves, a drop it places) are never reported as movement, so they can never
--- cross a gate or the ring. A pass flies flat, its weight cancelled, and homes on its target, until it touches anything
--- or anyone or the target can no longer catch; then it falls like any ball. A ball passes through the player who let go
--- of it until it is clear of them.
+-- kickoff ends, then spawns at a random ball spawn. A ball that leaves the arena (the box inside the glass, its top
+-- included: Bounds.inArena) is recovered in any state, and one Roblox destroys (fallen past FallenPartsDestroyHeight)
+-- is rebuilt. Each frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose
+-- body it touched. Jumps the server makes (a spawn, a respawn, the snap to a catcher's side, a carrier it moves, a drop
+-- it places) are never reported as movement, so they can never cross a gate or the ring. A pass flies flat, its weight
+-- cancelled, and homes on its target, until it touches anything or anyone or the target can no longer catch; then it
+-- falls like any ball. A ball passes through the player who let go of it until it is clear of them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -486,7 +486,7 @@ local BallService: BallService = {
 		self._pendingThrower = nil
 
 		local ball = self._config.Ball
-		local out = Bounds.isOut(self._config.Arena, position, ball.outOfBoundsMargin)
+		local out = not Bounds.inArena(self._config.Arena, position, ball.outOfBoundsMargin)
 		if state.status == "Dead" then
 			-- Out of play anyway: parked until the next kickoff, before it can fall out of the world.
 			if out then

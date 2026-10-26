@@ -24,6 +24,8 @@ type Fired = { name: string, payload: any, to: string?, ballAt: string? }
 
 local FRAME = 1 / 60
 local BASE_MATCH = { lapsToOpenGoal = 1, lapsForStreakPoint = 2 }
+-- The middle of the track, where the ball spawns: carried and lined-up rigs skate along it.
+local MIDDLE = Config.defaults().Arena.trackWidth / 2
 
 local config: Config.GameConfig
 local folder: Folder
@@ -185,7 +187,7 @@ end
 local function carry(rig: Model, from: number, to: number)
 	local count = math.max(1, math.ceil(math.abs(to - from) / 2))
 	for index = 0, count do
-		rig:PivotTo(Centerline.at(config.Arena, from + (to - from) * index / count, 22, 3))
+		rig:PivotTo(Centerline.at(config.Arena, from + (to - from) * index / count, MIDDLE, 3))
 		MatchService:step(FRAME)
 	end
 end
@@ -230,7 +232,7 @@ end
 -- Stands `attacker` on the track facing the way of travel, `victim` `gap` studs ahead of it, at an arbitrary spot.
 -- Returns the attacker's frame.
 local function lineUp(attacker: Model, victim: Model, gap: number): CFrame
-	local frame = Centerline.at(config.Arena, Centerline.gateDistance(config.Arena, 1) + 10, 22, 3)
+	local frame = Centerline.at(config.Arena, Centerline.gateDistance(config.Arena, 1) + 10, MIDDLE, 3)
 	attacker:PivotTo(frame)
 	victim:PivotTo(frame * CFrame.new(0, 0, -gap))
 	return frame
@@ -581,16 +583,17 @@ describe("A match on the generated arena", function()
 		kickoff()
 		local from = ballDistance()
 		local total = 0
-		-- A free ball moving along the outside of the track: the catch scan and the bounds check every frame.
+		-- A free ball moving along the outside of the track (over the upper floor): the catch scan and the bounds check
+		-- every frame.
 		for step = 1, 300 do
-			BallService.part.CFrame = Centerline.at(config.Arena, from + step, 35, 8)
+			BallService.part.CFrame = Centerline.at(config.Arena, from + step, MIDDLE + 13, 8)
 			local started = os.clock()
 			MatchService:step(FRAME)
 			total += os.clock() - started
 		end
 		catchWith(rigs[1])
 		for step = 1, 300 do
-			rigs[1]:PivotTo(Centerline.at(config.Arena, from + step * 0.5, 22, 3))
+			rigs[1]:PivotTo(Centerline.at(config.Arena, from + step * 0.5, MIDDLE, 3))
 			local started = os.clock()
 			MatchService:step(FRAME)
 			total += os.clock() - started

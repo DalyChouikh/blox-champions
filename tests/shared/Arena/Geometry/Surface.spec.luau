@@ -46,17 +46,17 @@ end)
 describe("Surface.build", function()
 	it("sweeps the profile around the whole loop: blocks on flat rectangles, wedges everywhere else", function()
 		local blocks, wedges = 0, 0
-		for _, piece in Surface.build(Config.defaults().Arena).surface do
+		for _, piece in Surface.build(Config.defaults().Arena) do
 			if piece.shape == "Block" then
 				blocks += 1
 			elseif piece.shape == "Wedge" then
 				wedges += 1
 			end
 		end
-		-- Measured, not derived: the walls and floors only (A2 moved the roof to Surface.build's roof list). The
-		-- straights keep one block per constant strip; the curves' wedges follow their strip counts.
-		expect(blocks).toBe(230)
-		expect(wedges).toBe(7104)
+		-- Measured, not derived: the straights keep one block per constant strip; the curves' wedges follow their
+		-- strip counts.
+		expect(blocks).toBe(150)
+		expect(wedges).toBe(9032)
 	end)
 
 	-- Fewer parts, and no seams across a straight for a rolling ball to bump on.
@@ -64,40 +64,24 @@ describe("Surface.build", function()
 		local arena = Config.defaults().Arena
 		local whole, between = 0, 0
 		local lowerFloor: Types.Piece? = nil
-		for _, piece in Surface.build(arena).surface do
+		for _, piece in Surface.build(arena) do
 			if piece.shape == "Block" then
-				if math.abs(piece.size.Z - 160) < 1e-3 then
+				if math.abs(piece.size.Z - 200) < 1e-3 then
 					whole += 1
-					if (piece.cframe.Position - Vector3.new(0, -0.5, -53)).Magnitude < 1e-3 then
+					if (piece.cframe.Position - Vector3.new(0, -0.5, -57)).Magnitude < 1e-3 then
 						lowerFloor = piece
 					end
-				elseif math.abs(piece.size.Z - 136) < 1e-3 then
+				elseif math.abs(piece.size.Z - 176) < 1e-3 then
 					between += 1
 				end
 			end
 		end
-		expect(whole).toBe(2 * 7)
-		-- The outer foot has six strips now (A2), one more constant strip than before, on each straight.
-		expect(between).toBe(2 * 12)
+		-- The bank's five strips and the lower floor never change along a straight. The step's five, the upper
+		-- floor, the foot curve's seven and the outer wall change in the 20-stud blend at each corner, so they run
+		-- 176 studs, between the first and last stations past the blends (12 and 188).
+		expect(whole).toBe(2 * 6)
+		expect(between).toBe(2 * 14)
 		expect(lowerFloor).never.toBeNil()
-		expect(((lowerFloor :: Types.Piece).size - Vector3.new(10, 1, 160)).Magnitude).toBeLessThan(1e-3)
-	end)
-
-	-- The roof's axis is the centerline at the wall tops' height (the walls are level): its strips lie 22 studs from
-	-- it, and a slab that hangs behind a strip, outside the tube, lies farther. A roof facing away from the track would
-	-- hang its slabs inside.
-	it("hangs every roof piece behind the roof, outside the tube, so the roof faces the track", function()
-		local arena = Config.defaults().Arena
-		local half = arena.straightLength / 2
-		local radius = arena.trackWidth / 2
-		local roof = Surface.build(arena).roof
-		expect(#roof > 0).toBe(true)
-		for _, piece in roof do
-			local position = piece.cframe.Position
-			local along = math.clamp(position.X, -half, half)
-			local fromCenterline = Vector2.new(position.X - along, position.Z).Magnitude - arena.endRadius
-			local fromAxis = Vector2.new(fromCenterline, position.Y - arena.outerWallHeight).Magnitude
-			expect(fromAxis).toBeGreaterThan(radius)
-		end
+		expect(((lowerFloor :: Types.Piece).size - Vector3.new(18, 1, 200)).Magnitude).toBeLessThan(1e-3)
 	end)
 end)

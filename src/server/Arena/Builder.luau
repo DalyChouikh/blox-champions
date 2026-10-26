@@ -37,7 +37,7 @@ end
 local function validate(geometry: Geometry.ArenaGeometry)
 	local groups: { { name: string, pieces: { Piece } } } = {
 		{ name = "surface", pieces = geometry.surface },
-		{ name = "roof", pieces = geometry.roof },
+		{ name = "barrier", pieces = geometry.barriers },
 		{ name = "infield", pieces = geometry.infield },
 		{ name = "goal rim", pieces = geometry.goal.rim },
 		{ name = "goal panel", pieces = { geometry.goal.panel } },
@@ -107,12 +107,25 @@ local function addSolids(pieces: { Piece }, prefix: string, color: Color3, paren
 	end
 end
 
--- A folder of surfaces skaters ride, tagged so their rays hit nothing else.
-local function addRideSurface(pieces: { Piece }, name: string, color: Color3, parent: Instance): Folder
+-- A folder of solids carrying `tag` on the folder: what they are to the game (Tags.RideSurface, Tags.Barrier).
+local function addTaggedSolids(pieces: { Piece }, name: string, tag: string, color: Color3, parent: Instance): Folder
 	local folder = newFolder(name, parent)
-	folder:AddTag(Tags.RideSurface)
+	folder:AddTag(tag)
 	addSolids(pieces, name, color, folder)
 	return folder
+end
+
+-- The glass (A7): skaters and the ball bounce off it and the collider's sweep finds it, but it is touched by nothing,
+-- and it casts no shadow, or 85 studs of it would keep the track in its shade (a roof that did was seen in a playtest).
+local function addBarriers(pieces: { Piece }, arena: ArenaConfig, parent: Instance)
+	local folder = addTaggedSolids(pieces, "Barriers", Tags.Barrier, arena.colors.glass, parent)
+	for _, child in folder:GetChildren() do
+		local glass = child :: BasePart
+		glass.Material = Enum.Material.Glass
+		glass.Transparency = arena.barrier.transparency
+		glass.CanTouch = false
+		glass.CastShadow = false
+	end
 end
 
 local function buildGoal(goal: Types.Goal, arena: ArenaConfig, parent: Instance)
@@ -156,13 +169,10 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 	-- Every client gets the whole arena soon after joining and never loses it, so client code can rely on it.
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 
-	addRideSurface(geometry.surface, "Surface", colors.surface, model)
-	-- The roof is its own folder so its lighting can be tuned apart from the floor (A2). It casts no shadow: under
-	-- one, the whole track sat in its shade.
-	for _, part in addRideSurface(geometry.roof, "Roof", colors.surface, model):GetChildren() do
-		(part :: BasePart).CastShadow = false
-	end
-	addRideSurface(geometry.infield, "Infield", colors.infield, model)
+	-- Skaters' rays hit the ride surfaces only: not the glass, and not the infield behind it, which no skater reaches.
+	addTaggedSolids(geometry.surface, "Surface", Tags.RideSurface, colors.surface, model)
+	addBarriers(geometry.barriers, arena, model)
+	addSolids(geometry.infield, "Infield", colors.infield, newFolder("Infield", model))
 
 	local gates = newFolder("Gates", model)
 	for index, gate in geometry.gates do

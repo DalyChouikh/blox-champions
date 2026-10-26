@@ -23,19 +23,16 @@ beforeAll(function()
 	root.Name = "ArenaIntegrationTest"
 	root.Parent = workspace
 	local started = os.clock()
-	arena = Builder.build(Geometry.build(config), config, root)
+	arena = Builder.build(Geometry.build(config, Fixtures.GRAVITY.Magnitude), config, root)
 	buildSeconds = os.clock() - started
 end)
 afterAll(function()
 	root:Destroy()
 end)
 
--- The roof spans the track (A2), so a ray from above it would stop there: the floors are read with the roof excluded.
+-- The top is open (A7): a ray from above finds the floors, and one across finds the walls and the glass.
 local function cast(origin: Vector3, direction: Vector3): RaycastResult
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { arena:FindFirstChild("Roof") :: Instance }
-	return workspace:Raycast(origin, direction, params) :: RaycastResult
+	return workspace:Raycast(origin, direction) :: RaycastResult
 end
 
 describe("The generated arena", function()
@@ -45,13 +42,13 @@ describe("The generated arena", function()
 
 	it("puts the riding surface where the profile says, including the blend at a corner", function()
 		local floors: { { any } } = {
-			{ Vector3.new(30, 60, -53), 0 }, -- top straight, lower floor
-			{ Vector3.new(30, 60, -70), 4 }, -- top straight, upper floor
-			{ Vector3.new(30, 60, -63), 2 }, -- top straight, middle of the step
-			{ Vector3.new(-80, 60, -63), 1 }, -- Gate 2: the step is half blended away
-			{ Vector3.new(-130, 60, 0), 0 }, -- left curved end, flat floor
-			{ Vector3.new(0, 60, 0), 28 }, -- infield top
-			{ Vector3.new(-110, 60, 15), 28 }, -- infield top under the left curved end
+			{ Vector3.new(30, 60, -57), 0 }, -- top straight, lower floor
+			{ Vector3.new(30, 60, -83), 4 }, -- top straight, upper floor
+			{ Vector3.new(30, 60, -73), 2 }, -- top straight, middle of the step
+			{ Vector3.new(-100, 60, -73), 1 }, -- Gate 2: the step is half blended away
+			{ Vector3.new(-160, 60, 0), 0 }, -- left curved end, flat floor
+			{ Vector3.new(0, 60, 0), 0 }, -- the infield, at the lower floor's height
+			{ Vector3.new(-130, 60, 15), 0 }, -- the infield under the left curved end
 		}
 		for _, case in floors do
 			local hit = cast(case[1], Vector3.new(0, -100, 0))
@@ -59,7 +56,7 @@ describe("The generated arena", function()
 			expect(hit.Position.Y).toBeCloseTo(case[2], 2)
 		end
 		-- Inside a step strip, not on a seam: a ray exactly on a seam may report the neighboring slab's side face.
-		expect(cast(Vector3.new(30, 60, -64), Vector3.new(0, -100, 0)).Normal.Z).toBeGreaterThan(0)
+		expect(cast(Vector3.new(30, 60, -70), Vector3.new(0, -100, 0)).Normal.Z).toBeGreaterThan(0)
 	end)
 
 	-- Between stations and between profile points, where only correctly oriented wedges cover the surface.
@@ -69,23 +66,30 @@ describe("The generated arena", function()
 				cast(Centerline.at(config.Arena, distance, lateral, 60).Position, Vector3.new(0, -100, 0))
 			return if hit then hit.Position.Y else nil
 		end
-		-- The left curved end's flat floor, mid-way between two stations, across every floor strip.
-		for _, lateral in { 15, 21.25, 23.75, 26.25, 28.75, 32 } do
-			expect(floorAt(201.2, lateral)).toBeCloseTo(0, 2)
+		-- The left curved end's flat floor, mid-way between two stations (55 of them, 3.998 studs apart, from 200),
+		-- across every floor strip: the lower floor, the step's five and the upper floor.
+		for _, lateral in { 17, 27.4, 30.2, 33, 35.8, 38.6, 43 } do
+			expect(floorAt(242, lateral)).toBeCloseTo(0, 2)
 		end
-		-- The middle of a step strip just before and just after Gate 2 (distance 160): between the heights of the
-		-- strip's corners on the neighboring stations (the step there is 3.18 and 2 high, then 2 and 0.84).
-		local before = floorAt(158, 26.25) :: number
-		expect(before > 1 and before < 2.71).toBe(true)
-		local after = floorAt(162, 26.25) :: number
-		expect(after > 0.41 and after < 1.71).toBe(true)
+		-- The middle of the step's third strip (31.6 to 34.4) just before and just after Gate 2 (distance 200): between
+		-- the heights of the strip's corners on the neighboring stations (the step there is 3.18 and 2 high, then 2
+		-- and 0.82).
+		local before = floorAt(198, 33) :: number
+		expect(before > 0.69 and before < 2.08).toBe(true)
+		local after = floorAt(202, 33) :: number
+		expect(after > 0.28 and after < 1.31).toBe(true)
 	end)
 
-	it("stands the walls where the profile says", function()
-		local outer = cast(Vector3.new(30, 24, -60), Vector3.new(0, 0, -100))
-		expect(outer.Position.Z).toBeCloseTo(-82, 2)
-		local inner = cast(Vector3.new(30, 15, -60), Vector3.new(0, 0, 100))
-		expect(inner.Position.Z).toBeCloseTo(-38, 2)
+	it("stands the walls and the glass where the profile says", function()
+		local outer = cast(Vector3.new(30, 24, -70), Vector3.new(0, 0, -100))
+		expect(outer.Position.Z).toBeCloseTo(-100, 2)
+		expect(outer.Instance.Parent == arena:FindFirstChild("Surface")).toBe(true)
+		local outerGlass = cast(Vector3.new(30, 50, -70), Vector3.new(0, 0, -100))
+		expect(outerGlass.Position.Z).toBeCloseTo(-100, 2)
+		expect(outerGlass.Instance.Parent == arena:FindFirstChild("Barriers")).toBe(true)
+		local innerGlass = cast(Vector3.new(30, 40, -70), Vector3.new(0, 0, 100))
+		expect(innerGlass.Position.Z).toBeCloseTo(-40, 2)
+		expect(innerGlass.Instance.Parent == arena:FindFirstChild("Barriers")).toBe(true)
 	end)
 
 	it("lets the rules count a lap around the generated track and score through its goal", function()
@@ -96,9 +100,11 @@ describe("The generated arena", function()
 		engine:tick(3)
 		engine:pickedUp("B1", Vector3.zero, Vector3.zero)
 		local length = Centerline.length(config.Arena)
-		local previous = Centerline.at(config.Arena, 1, 22, 5).Position
-		for distance = 3, length + 1, 2 do
-			local current = Centerline.at(config.Arena, distance, 22, 5).Position
+		local middle = config.Arena.trackWidth / 2
+		local previous = Centerline.at(config.Arena, 1, middle, 5).Position
+		-- On past gate 1 at `length`, whatever the length: the lap's fourth crossing.
+		for distance = 3, length + 3, 2 do
+			local current = Centerline.at(config.Arena, distance, middle, 5).Position
 			engine:ballMoved(previous, current)
 			previous = current
 		end
