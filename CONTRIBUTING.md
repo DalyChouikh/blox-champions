@@ -5,7 +5,7 @@
 1. Every change starts from a GitHub issue in a milestone.
 2. Create a branch named `<type>/<issue>-<slug>`, where `<type>` is one of `feat`, `fix`, `chore`, `docs`, `test`. Example: `feat/12-lap-tracker`.
 3. Open one pull request per issue. Its description contains `Closes #<issue>`.
-4. CI (`quality` check) must be green before the pull request is merged into `main`.
+4. CI (the `quality` and `cloud-tests` checks) must be green before the pull request is merged into `main`. `cloud-tests` runs the whole suite inside Roblox ([Cloud tests](README.md#cloud-tests)).
 
 ## Commits
 
@@ -29,7 +29,7 @@ Tests live in `tests/`, mirror the `src/` folders, and are named `<Module>.spec.
 
 ## Zero warnings
 
-Never leave a warning or error unaddressed — from tests, CI, StyLua, selene, luau-lsp, or Studio's Output window during playtests. Find the cause and fix it in the same change; if it comes from outside our code, change our setup so it no longer appears. Code-review findings of every severity are fixed, not deferred.
+Never leave a warning or error unaddressed — from tests, CI, StyLua, selene, luau-lsp, Ruff, Python's unittest, or Studio's Output window during playtests. Find the cause and fix it in the same change; if it comes from outside our code, change our setup so it no longer appears. Code-review findings of every severity are fixed, not deferred.
 
 ## Code rules
 
@@ -37,3 +37,4 @@ Never leave a warning or error unaddressed — from tests, CI, StyLua, selene, l
 - Formatting is StyLua (`stylua src tests scripts`); linting is selene (`selene src tests scripts`); type checking is `bash scripts/analyze.sh` (strict luau-lsp, the same script CI runs). CI fails on any of them.
 - Inside `src/`, require siblings relative to `script`; tests require through service paths (`ReplicatedStorage.Shared...`).
 - Gameplay numbers live in `src/shared/Config/`, never hard-coded in logic.
+- The CI scripts' Python (`scripts/ci/`) uses only the standard library. Formatting and linting are Ruff (`ruff format scripts`, `ruff check scripts`), and its unit tests run with `python -m unittest discover -s scripts/ci -p "test_*.py"`. CI fails on any of them.

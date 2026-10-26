@@ -1,7 +1,8 @@
 --!strict
--- Runs the Jest Roblox suite inside Studio and returns a summary table.
--- Invoke from the Studio command bar or the Studio MCP `execute_luau` tool (Edit DataModel):
---   return require(game:GetService("ServerStorage").RunTests)({ testPathPattern = "Freeze" })
+-- Runs the Jest Roblox suite inside Roblox and returns a summary table. Its callers:
+-- - Studio's command bar or the Studio MCP `execute_luau` tool (Edit DataModel):
+--     return require(game:GetService("ServerStorage").RunTests)({ testPathPattern = "Freeze" })
+-- - CI's cloud task, scripts/ci/run-tests-task.luau (Open Cloud Luau Execution), which returns the summary.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
