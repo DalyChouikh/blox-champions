@@ -50,8 +50,11 @@ export type ArenaConfig = {
 		panelTransparency: number,
 		rimThickness: number,
 		rimSegments: number,
-		-- Gap between the ring's outer edge and the outer wall.
-		wallGap: number,
+		-- Where the ring's centre hangs across the track (R7): a fraction of trackWidth from the inner glass's face.
+		across: number,
+		-- The decorative arm the ring hangs from (Arena spec §5.3): a post from the rim's top up to `height` above the
+		-- lower floor, then a beam at that height out to the outer glass's face, both `thickness` square.
+		arm: { thickness: number, height: number },
 	},
 	-- The glass panel hanging across the track at each gate (R18): it fills the track's cross-section from the walls'
 	-- top down to a rounded opening (half an ellipse, its feet on the outer wall's top at both glass faces, its apex
@@ -92,7 +95,8 @@ local defaults: ArenaConfig = {
 		panelTransparency = 0.3,
 		rimThickness = 1,
 		rimSegments = 16,
-		wallGap = 1,
+		across = 0.75,
+		arm = { thickness = 1, height = 40 },
 	},
 	gatePanel = { openingHeight = 60, depth = 2, segments = 16 },
 	teamSpawnSpacing = 10,
@@ -109,11 +113,12 @@ local defaults: ArenaConfig = {
 }
 
 local size = Validate.number({ above = 0 })
--- Sizes one part directly (the infield, a gate, a wall slab, a glass slab, a gate panel, the goal's panel), so it must
--- be a size Roblox builds as given instead of clamping.
+-- Sizes one part directly (the infield, a gate, a wall slab, a glass slab, a gate panel, the goal's panel and arm), so
+-- it must be a size Roblox builds as given instead of clamping.
 local partSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
 local nonNegative = Validate.number({ min = 0 })
-local transparency = Validate.number({ min = 0, max = 1 })
+local fraction = Validate.number({ min = 0, max = 1 })
+local transparency = fraction
 local color = Validate.datatype("Color3")
 
 local fields = Validate.record({
@@ -150,8 +155,9 @@ local fields = Validate.record({
 		panelTransparency = transparency,
 		rimThickness = partSize,
 		rimSegments = Validate.number({ min = 3, integer = true }),
-		-- A ring touching the wall would put a rim face in the wall's plane, where the two flicker.
-		wallGap = size,
+		across = fraction,
+		-- Its height is judged against the ring and the lips by Arena/Geometry.
+		arm = Validate.record({ thickness = partSize, height = size }),
 	}),
 	-- The opening's height is judged against the walls (rule below); at least three slices round it.
 	gatePanel = Validate.record({
@@ -167,8 +173,8 @@ local fields = Validate.record({
 	colors = Validate.record({ surface = color, infield = color, goal = color, glass = color }),
 })
 
--- Checked in order; the first that fails is reported. Whether the goal ring fits is judged by Arena/Geometry
--- against the surface as built (Features.goal), which config cannot require.
+-- Checked in order; the first that fails is reported. Whether the goal ring and its arm fit is judged by Arena/Geometry
+-- against the arena as built (Features.goal), which config cannot require.
 local crossFieldRules: { Validate.Rule } = {
 	{
 		message = "trackWidth must fit the inner bank, the outer wall's foot curve, the step, the upper floor and a "

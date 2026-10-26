@@ -203,13 +203,17 @@ describe("Features.top", function()
 end)
 
 describe("Features.goal", function()
-	it("raises the ring on the outer wall at the goal gate, facing oncoming skaters", function()
-		local goal = Features.goal(arena)
-		-- The rim's outline reaches 8 studs out (ringRadius 7 + rimThickness 1), wallGap 1 from the outer glass at 80.
-		Fixtures.expectNear(goal.frame.Position, Vector3.new(-100, 18, -91))
-		Fixtures.expectNear(goal.frame.LookVector, Vector3.new(-1, 0, 0))
-		expect(goal.openingRadius).toBe(7)
-	end)
+	-- R7: the ring hangs over the track, 0.75 of the way across (u 60): 80 out from the long axis at gate 2.
+	it(
+		"hangs the ring over the track at the goal gate, goal.across of the way to the outer glass, facing oncoming "
+			.. "skaters",
+		function()
+			local goal = Features.goal(arena)
+			Fixtures.expectNear(goal.frame.Position, Vector3.new(-100, 18, -80))
+			Fixtures.expectNear(goal.frame.LookVector, Vector3.new(-1, 0, 0))
+			expect(goal.openingRadius).toBe(7)
+		end
+	)
 
 	it("rings the opening with the rim and covers it with the panel", function()
 		local goal = Features.goal(arena)
@@ -224,6 +228,44 @@ describe("Features.goal", function()
 		expect(math.abs(goal.panel.cframe.RightVector:Dot(goal.frame.LookVector))).toBeCloseTo(1, 4)
 		Fixtures.expectNear(goal.panel.size, Vector3.new(0.5, 14, 14))
 	end)
+
+	-- Arena spec §5.3: decoration in the goal gate's plane.
+	it(
+		"hangs the ring from an arm: a post from the rim's top, and a beam out to the outer glass, under the lips",
+		function()
+			local goal = Features.goal(arena)
+			local ring, arm = arena.goal, arena.goal.arm
+			local gate = Centerline.frameAt(arena, Centerline.gateDistance(arena, arena.goalGateIndex))
+			-- A piece's extent in the gate's frame: x across the track from its middle, y up, z along the track.
+			local function extent(piece: Types.Piece): (Vector3, Vector3)
+				local low, high = Vector3.one * math.huge, -Vector3.one * math.huge
+				for _, corner in corners(piece) do
+					local at = gate:PointToObjectSpace(corner)
+					low, high = low:Min(at), high:Max(at)
+				end
+				return low, high
+			end
+			local half, side = arena.trackWidth / 2, arm.thickness / 2
+			-- Over the ring's centre (u 60), and the rim's flat top (26).
+			local centre = ring.across * arena.trackWidth - half
+			local rimTop = ring.heightAboveFloor + ring.ringRadius + ring.rimThickness
+			expect(#goal.arm).toBe(2)
+			-- The post: 14 tall, from the rim's top up to the arm's height (40).
+			local low, high = extent(goal.arm[1])
+			Fixtures.expectNear(low, Vector3.new(centre - side, rimTop, -side))
+			Fixtures.expectNear(high, Vector3.new(centre + side, arm.height, side))
+			-- The beam: 20 long, at the arm's height, from over the ring's centre out to the outer glass's face (u 80).
+			low, high = extent(goal.arm[2])
+			Fixtures.expectNear(low, Vector3.new(centre, arm.height - side, -side))
+			Fixtures.expectNear(high, Vector3.new(half, arm.height + side, side))
+			-- At or over where the lips start (108), the beam would cross into them.
+			for _, height in { 108, 110 } do
+				expect(function()
+					Features.goal(Fixtures.config({ Arena = { goal = { arm = { height = height } } } }).Arena)
+				end).toThrow("Arena: the goal's arm must stay under the lips")
+			end
+		end
+	)
 end)
 
 describe("Features.goal fit", function()
@@ -234,39 +276,44 @@ describe("Features.goal fit", function()
 		end
 	end
 
-	it("keeps the rim's farthest corner wallGap from the outer wall, whatever its number of segments", function()
-		-- 20 up, so these rims clear the outer wall's foot curve beside them (a 4-segment rim no longer does under the
-		-- wall's top).
-		for _, segments in { 5, 6, 16 } do
-			local a = Fixtures.config({ Arena = { goal = { rimSegments = segments, heightAboveFloor = 20 } } }).Arena
-			local goal = Features.goal(a)
-			local gate = Centerline.frameAt(a, Centerline.gateDistance(a, a.goalGateIndex))
-			local farthest = -math.huge
-			for _, piece in goal.rim do
-				for _, side in { -1, 1 } do
-					local corner = Vector3.new(side * piece.size.X / 2, piece.size.Y / 2, 0)
-					farthest = math.max(farthest, gate:PointToObjectSpace(piece.cframe:PointToWorldSpace(corner)).X)
+	-- Its centre 71.5 (or 8.5) across, so the circle its faces touch (radius ringRadius + rimThickness, 8) ends 0.5
+	-- inside the outer (or inner) glass. A rim of 4 or 16 segments turns a face toward each glass and fits; one of 5 or
+	-- 6 turns a corner toward it, reaching 9.405 or 9.238 from the centre, and does not. High up (60, its arm at 80),
+	-- it clears the floor and its arm.
+	it("keeps the rim inside the glass, judged by its corners, whatever its number of segments", function()
+		for _, across in { 0.89375, 0.10625 } do
+			for _, segments in { 4, 5, 6, 16 } do
+				local fit = goalWith({
+					goal = { rimSegments = segments, heightAboveFloor = 60, across = across, arm = { height = 80 } },
+				})
+				if segments == 4 or segments == 16 then
+					expect(fit).never.toThrow()
+				else
+					expect(fit).toThrow("Arena: the goal ring must stay inside the glass")
 				end
 			end
-			expect(farthest).toBeCloseTo(a.trackWidth / 2 - a.goal.wallGap, 3)
 		end
 	end)
 
-	it("rejects a ring that does not fit across the track or between the upper floor and the wall top", function()
-		expect(goalWith({ goal = { wallGap = 70 } })).toThrow("Arena: the goal ring must fit across the track")
-		expect(goalWith({ goal = { heightAboveFloor = 24 } })).toThrow(
-			"Arena: the goal ring must sit between the upper floor and the outer wall top"
-		)
-		expect(goalWith({ goal = { rimSegments = 3 } })).toThrow(
-			"Arena: the goal ring must sit between the upper floor and the outer wall top"
-		)
+	it("rejects a ring outside the glass or over its arm", function()
+		for _, across in { 0.05, 0.95 } do
+			expect(goalWith({ goal = { across = across } })).toThrow("Arena: the goal ring must stay inside the glass")
+		end
+		-- The rim's top is 26: an arm there or lower leaves no room for its post.
+		for _, height in { 25, 26 } do
+			expect(goalWith({ goal = { arm = { height = height } } })).toThrow(
+				"Arena: the goal ring must hang under its arm"
+			)
+		end
 	end)
 
-	it("rejects a low ring whose rim would cut into the outer wall's foot curve at the goal gate", function()
-		expect(goalWith({ stepHeight = 0, goal = { heightAboveFloor = 8, wallGap = 0.01 } })).toThrow(
+	-- At the goal gate the upper floor under the ring stands 2 high (the step half blended there): a ring whose flat
+	-- bottom (heightAboveFloor - 8) is at 1 cuts into it, one at 3 clears it.
+	it("rejects a low ring whose rim would cut into the floor under it", function()
+		expect(goalWith({ goal = { heightAboveFloor = 9 } })).toThrow(
 			"Arena: the goal ring must clear the track's surface at the goal gate"
 		)
-		expect(goalWith({ stepHeight = 0, goal = { heightAboveFloor = 19.5, wallGap = 0.01 } })).never.toThrow()
+		expect(goalWith({ goal = { heightAboveFloor = 11 } })).never.toThrow()
 	end)
 end)
 

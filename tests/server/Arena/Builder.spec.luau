@@ -47,8 +47,25 @@ describe("Builder.build", function()
 		end
 		expect(arena:FindFirstChild("Markers")).toBeNil()
 		expect(#folder(arena, "Spawns"):GetChildren()).toBe(8)
+		-- The hoop, its panel and the arm's two blocks.
+		expect(#folder(arena, "Goal"):GetChildren()).toBe(4)
 		local hoop = folder(arena, "Goal"):FindFirstChild("GoalHoop") :: Model
 		expect(#hoop:GetChildren()).toBe(16)
+	end)
+
+	-- Arena spec §5.3: decoration in the goal's colour that skaters and the ball pass through.
+	it("builds the goal's arm from blocks nothing hits, sees or touches", function()
+		local geometry = Geometry.build(config)
+		local goal = folder(Builder.build(geometry, config, parent), "Goal")
+		expect(#geometry.goal.arm).toBe(2)
+		for index, piece in geometry.goal.arm do
+			local part = goal:FindFirstChild(`Arm{index}`) :: BasePart
+			expect(part:IsA("Part")).toBe(true)
+			Fixtures.expectNear(part.Position, piece.cframe.Position)
+			Fixtures.expectNear(part.Size, piece.size)
+			expect(part.Anchored and part.Color == config.Arena.colors.goal).toBe(true)
+			expect(part.CanCollide or part.CanQuery or part.CanTouch).toBe(false)
+		end
 	end)
 
 	it("makes gates and spawns invisible to physics and queries, and solids smooth and anchored", function()
@@ -230,6 +247,15 @@ describe("Builder.build", function()
 		expect(function()
 			Builder.build(thinPanel, config, parent)
 		end).toThrow("ArenaBuilder: gate panel 3 piece 1 is invalid (size 1, 1, 0)")
+		local longArm = table.clone(geometry)
+		longArm.goal = table.clone(geometry.goal)
+		longArm.goal.arm = {
+			geometry.goal.arm[1],
+			{ shape = "Block", cframe = CFrame.identity, size = Vector3.new(3000, 1, 1) },
+		}
+		expect(function()
+			Builder.build(longArm, config, parent)
+		end).toThrow("ArenaBuilder: goal arm piece 2 is invalid (size 3000, 1, 1)")
 		expect(#parent:GetChildren()).toBe(0)
 	end)
 end)

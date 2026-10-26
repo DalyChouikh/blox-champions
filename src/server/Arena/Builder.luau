@@ -42,6 +42,7 @@ local function validate(geometry: Geometry.ArenaGeometry)
 		{ name = "infield", pieces = geometry.infield },
 		{ name = "goal rim", pieces = geometry.goal.rim },
 		{ name = "goal panel", pieces = { geometry.goal.panel } },
+		{ name = "goal arm", pieces = geometry.goal.arm },
 	}
 	for index, panel in geometry.gatePanels do
 		table.insert(groups, { name = `gate panel {index}`, pieces = panel.pieces })
@@ -186,6 +187,11 @@ local function buildGoal(goal: Types.Goal, arena: ArenaConfig, parent: Instance)
 	local panel = addSolid(goal.panel, "GoalPanel", color, parent)
 	panel.Transparency = arena.goal.panelTransparency
 	panel:AddTag(Tags.GoalPanel)
+
+	-- The arm the ring hangs from is decoration: skaters and the ball pass through it, and no ray sees it.
+	for index, piece in goal.arm do
+		ghost(addSolid(piece, `Arm{index}`, color, parent))
+	end
 end
 
 local function buildSpawns(geometry: Geometry.ArenaGeometry, config: Config.GameConfig, parent: Instance)

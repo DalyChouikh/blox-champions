@@ -442,8 +442,10 @@ describe("Config defaults", function()
 			panelTransparency = 0.3,
 			rimThickness = 1,
 			rimSegments = 16,
-			wallGap = 1,
+			across = 0.75,
+			arm = { thickness = 1, height = 40 },
 		})
+		expect((a.goal :: any).wallGap).toBeNil()
 		expect(a.gatePanel).toEqual({ openingHeight = 60, depth = 2, segments = 16 })
 		expect((a :: any).marker).toBeNil()
 		expect(a.teamSpawnSpacing).toBe(10)
@@ -599,7 +601,10 @@ describe("Config.forMode", function()
 				overrides = { profileBlendLength = 250 },
 				message = "Arena: profileBlendLength must fit within a straight and a curved end",
 			},
-			{ overrides = { goal = { wallGap = 0 } }, message = "Arena.goal.wallGap: must be > 0 (got 0)" },
+			-- The ring's centre lies between the glass faces, as a fraction of the track's width.
+			{ overrides = { goal = { across = 1.2 } }, message = "Arena.goal.across: must be <= 1 (got 1.2)" },
+			{ overrides = { goal = { across = -0.1 } }, message = "Arena.goal.across: must be >= 0 (got -0.1)" },
+			{ overrides = { goal = { arm = { height = 0 } } }, message = "Arena.goal.arm.height: must be > 0 (got 0)" },
 			{ overrides = { stripsPerSection = 5 }, message = "Arena.stripsPerSection: must be >= 6 (got 5)" },
 			{ overrides = { goalGateIndex = 5 }, message = "Arena.goalGateIndex: must be <= 4 (got 5)" },
 			{ overrides = { glass = { lipStrips = 0 } }, message = "Arena.glass.lipStrips: must be >= 1 (got 0)" },
@@ -662,6 +667,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { gatePanel = { depth = 2500 } },
 				message = "Arena.gatePanel.depth: must be <= 2048 (got 2500)",
+			},
+			{
+				overrides = { goal = { arm = { thickness = 2500 } } },
+				message = "Arena.goal.arm.thickness: must be <= 2048 (got 2500)",
 			},
 			{ overrides = { glass = { top = 3000 } }, message = "Arena.glass.top: must be <= 2048 (got 3000)" },
 			{

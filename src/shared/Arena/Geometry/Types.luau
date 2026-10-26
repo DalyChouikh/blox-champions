@@ -10,8 +10,9 @@ export type Piece = { shape: Shape, cframe: CFrame, size: Vector3 }
 -- `spawns[team]` type-check.
 export type TeamSpawns = { Blue: { CFrame }, Orange: { CFrame } }
 
--- The upright goal ring. frame faces oncoming skaters; its opening is also the scoring disc.
-export type Goal = { frame: CFrame, openingRadius: number, rim: { Piece }, panel: Piece }
+-- The upright goal ring. frame faces oncoming skaters; its opening is also the scoring disc. arm is the post and the
+-- beam it hangs from, decoration only.
+export type Goal = { frame: CFrame, openingRadius: number, rim: { Piece }, panel: Piece, arm: { Piece } }
 
 -- A gate's glass panel: its slices, and its pivot at the opening's apex, facing the travel direction.
 export type GatePanel = { pieces: { Piece }, apex: CFrame }
