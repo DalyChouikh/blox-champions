@@ -250,7 +250,7 @@ docs/playtests/2026-10-26-m1-arena.md          the Studio checks and the owner's
 
 ### Task 3: Rideable glass with lips, a wider track and taller walls (labels `feature`, `arena`)
 
-**Issue:** new (created with this plan) · **Branch:** `feat/<issue>-rideable-glass` · **Stacked on:** Task 2
+**Issue:** #193 · **Branch:** `feat/193-rideable-glass` · **Stacked on:** Task 2
 
 **Files:**
 - Modify:
