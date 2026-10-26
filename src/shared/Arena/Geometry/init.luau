@@ -12,10 +12,11 @@ local Types = require(script.Types)
 type Piece = Types.Piece
 
 export type ArenaGeometry = {
+	-- The solid surface: the floors, the inner bank and the outer wall.
 	surface: { Piece },
-	-- The glass on the inner bank's and the outer wall's tops.
-	barriers: { Piece },
-	-- What closes the arena above the glass: a roof, or an open map's ceiling and the strips up to it.
+	-- The rideable glass on the inner bank's and the outer wall's tops, with its lips.
+	glass: { Piece },
+	-- What closes the arena between the lips' ends: a roof, or an open map's ceiling and the strips up to it.
 	top: { Piece },
 	infield: { Piece },
 	gates: { Crossing.Rectangle },
@@ -31,7 +32,7 @@ function Geometry.build(config: Config.GameConfig): ArenaGeometry
 	local arena = config.Arena
 	return {
 		surface = Surface.build(arena),
-		barriers = Features.barriers(arena),
+		glass = Features.glass(arena),
 		top = Features.top(arena),
 		infield = Features.infield(arena),
 		gates = Features.gates(arena),

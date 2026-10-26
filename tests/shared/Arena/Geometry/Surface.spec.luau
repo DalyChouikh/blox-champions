@@ -55,8 +55,8 @@ describe("Surface.build", function()
 		end
 		-- Measured, not derived: the straights keep one block per constant strip; the curves' wedges follow their
 		-- strip counts.
-		expect(blocks).toBe(150)
-		expect(wedges).toBe(9032)
+		expect(blocks).toBe(136)
+		expect(wedges).toBe(8016)
 	end)
 
 	-- Fewer parts, and no seams across a straight for a rolling ball to bump on.
@@ -68,7 +68,7 @@ describe("Surface.build", function()
 			if piece.shape == "Block" then
 				if math.abs(piece.size.Z - 200) < 1e-3 then
 					whole += 1
-					if (piece.cframe.Position - Vector3.new(0, -0.5, -57)).Magnitude < 1e-3 then
+					if (piece.cframe.Position - Vector3.new(0, -0.5, -42)).Magnitude < 1e-3 then
 						lowerFloor = piece
 					end
 				elseif math.abs(piece.size.Z - 176) < 1e-3 then
@@ -76,12 +76,12 @@ describe("Surface.build", function()
 				end
 			end
 		end
-		-- The bank's five strips and the lower floor never change along a straight. The step's five, the upper
-		-- floor, the foot curve's seven and the outer wall change in the 20-stud blend at each corner, so they run
+		-- The bank's four strips and the lower floor never change along a straight. The step's five, the upper
+		-- floor, the foot curve's eight and the outer wall change in the 20-stud blend at each corner, so they run
 		-- 176 studs, between the first and last stations past the blends (12 and 188).
-		expect(whole).toBe(2 * 6)
-		expect(between).toBe(2 * 14)
+		expect(whole).toBe(2 * 5)
+		expect(between).toBe(2 * 15)
 		expect(lowerFloor).never.toBeNil()
-		expect(((lowerFloor :: Types.Piece).size - Vector3.new(18, 1, 200)).Magnitude).toBeLessThan(1e-3)
+		expect(((lowerFloor :: Types.Piece).size - Vector3.new(28, 1, 200)).Magnitude).toBeLessThan(1e-3)
 	end)
 end)

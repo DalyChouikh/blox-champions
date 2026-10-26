@@ -13,38 +13,38 @@ local arena = Config.defaults().Arena
 local openArena = Fixtures.config({ Arena = { top = { kind = "Open" } } }).Arena
 local MARGIN = 2
 
--- The arena is the box inside the glass (Arena spec §4.4): seen from above, between the inner glass (40 studs from the
--- long axis) and the outer glass (100), from the lower floor (0) up to the top (85 closed, 105 open), each within the
+-- The arena is the box inside the glass (Arena spec §4.4): seen from above, between the inner glass (20 studs from the
+-- long axis) and the outer glass (100), from the lower floor (0) up to the top (120 closed, 140 open), each within the
 -- margin.
 describe("Bounds.inArena", function()
 	it("holds the ball or a skater anywhere inside the glass, and up to the margin past it", function()
 		local inside = {
-			Vector3.new(0, 2.5, 57), -- on a straight's lower floor
-			Vector3.new(0, 8, 40.5), -- on the inner bank's top, beside the glass
-			Vector3.new(0, 20, 99), -- riding the outer wall
-			Vector3.new(0, 86.5, 99), -- high beside the outer glass, within the margin over its top
-			Vector3.new(-170, 2.5, 0), -- across a curved end
-			Vector3.new(0, -1.5, 57), -- within the margin under the floor
+			Vector3.new(0, 2.5, 42), -- on a straight's lower floor
+			Vector3.new(0, 8, 20.5), -- on the inner bank's top, beside the glass
+			Vector3.new(0, 60, 99), -- riding the outer glass
+			Vector3.new(0, 121.5, 70), -- under the roof, within the margin over it
+			Vector3.new(-160, 2.5, 0), -- across a curved end
+			Vector3.new(0, -1.5, 42), -- within the margin under the floor
 		}
 		for _, position in inside do
 			expect(Bounds.inArena(arena, position, MARGIN)).toBe(true)
 		end
 		-- Under an open map's ceiling, within the margin over it.
-		expect(Bounds.inArena(openArena, Vector3.new(0, 106.5, 60), MARGIN)).toBe(true)
+		expect(Bounds.inArena(openArena, Vector3.new(0, 141.5, 70), MARGIN)).toBe(true)
 	end)
 
 	it("puts the ball or a skater out past either glass, under the floor or over the top", function()
 		local outside = {
-			Vector3.new(0, 20, 103), -- past the outer glass
+			Vector3.new(0, 60, 103), -- past the outer glass
 			Vector3.new(-203, 5, 0), -- past a curved end's outer glass
-			Vector3.new(0, 20, 37), -- past the inner glass
+			Vector3.new(0, 60, 17), -- past the inner glass
 			Vector3.new(0, 30, 0), -- over the infield
-			Vector3.new(0, -3, 57), -- under the floor
-			Vector3.new(0, 88, 60), -- over the top
+			Vector3.new(0, -3, 42), -- under the floor
+			Vector3.new(0, 123, 60), -- over the top
 		}
 		for _, position in outside do
 			expect(Bounds.inArena(arena, position, MARGIN)).toBe(false)
 		end
-		expect(Bounds.inArena(openArena, Vector3.new(0, 108, 60), MARGIN)).toBe(false)
+		expect(Bounds.inArena(openArena, Vector3.new(0, 143, 60), MARGIN)).toBe(false)
 	end)
 end)

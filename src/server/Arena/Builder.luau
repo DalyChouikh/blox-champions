@@ -37,7 +37,7 @@ end
 local function validate(geometry: Geometry.ArenaGeometry)
 	local groups: { { name: string, pieces: { Piece } } } = {
 		{ name = "surface", pieces = geometry.surface },
-		{ name = "barrier", pieces = geometry.barriers },
+		{ name = "glass", pieces = geometry.glass },
 		{ name = "top", pieces = geometry.top },
 		{ name = "infield", pieces = geometry.infield },
 		{ name = "goal rim", pieces = geometry.goal.rim },
@@ -116,21 +116,20 @@ local function addTaggedSolids(pieces: { Piece }, name: string, tag: string, col
 	return folder
 end
 
--- Glass is see-through and casts no shadow, or 85 studs of it would keep the track in its shade (a roof that did was
+-- Glass is see-through and casts no shadow, or 120 studs of it would keep the track in its shade (a roof that did was
 -- seen in a playtest).
 local function lookLikeGlass(part: BasePart, arena: ArenaConfig)
 	part.Material = Enum.Material.Glass
-	part.Transparency = arena.barrier.transparency
+	part.Transparency = arena.glass.transparency
 	part.CastShadow = false
 end
 
--- The glass (A7): skaters and the ball bounce off it and the collider's sweep finds it, but it is touched by nothing.
-local function addBarriers(pieces: { Piece }, arena: ArenaConfig, parent: Instance)
-	local folder = addTaggedSolids(pieces, "Barriers", Tags.Barrier, arena.colors.glass, parent)
+-- The glass (R5): a ride surface like the floor, so skaters ride it and their rays find it, and the ball bounces off it
+-- and ends its flight on its touch; only its look is glass's.
+local function addGlass(pieces: { Piece }, arena: ArenaConfig, parent: Instance)
+	local folder = addTaggedSolids(pieces, "Glass", Tags.RideSurface, arena.colors.glass, parent)
 	for _, child in folder:GetChildren() do
-		local glass = child :: BasePart
-		lookLikeGlass(glass, arena)
-		glass.CanTouch = false
+		lookLikeGlass(child :: BasePart, arena)
 	end
 end
 
@@ -191,10 +190,10 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 	-- Every client gets the whole arena soon after joining and never loses it, so client code can rely on it.
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 
-	-- Skaters' rays hit the ride surfaces only: not the glass or the top, and not the infield behind the glass, which
-	-- no skater reaches.
+	-- Skaters' rays hit the ride surfaces only (the solid surface and the glass): not the top, and not the infield
+	-- behind the glass, which no skater reaches.
 	addTaggedSolids(geometry.surface, "Surface", Tags.RideSurface, colors.surface, model)
-	addBarriers(geometry.barriers, arena, model)
+	addGlass(geometry.glass, arena, model)
 	addTop(geometry.top, arena, model)
 	addSolids(geometry.infield, "Infield", colors.infield, newFolder("Infield", model))
 

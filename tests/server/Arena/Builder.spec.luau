@@ -35,7 +35,8 @@ describe("Builder.build", function()
 		local arena = Builder.build(geometry, config, parent)
 		expect(arena.Parent).toBe(parent)
 		expect(#folder(arena, "Surface"):GetChildren()).toBe(#geometry.surface)
-		expect(#folder(arena, "Barriers"):GetChildren()).toBe(#Features.barriers(config.Arena))
+		expect(#folder(arena, "Glass"):GetChildren()).toBe(#Features.glass(config.Arena))
+		expect(arena:FindFirstChild("Barriers")).toBeNil()
 		expect(#folder(arena, "Top"):GetChildren()).toBe(#geometry.top)
 		expect(#folder(arena, "Infield"):GetChildren()).toBe(#geometry.infield)
 		expect(#folder(arena, "Gates"):GetChildren()).toBe(4)
@@ -62,27 +63,29 @@ describe("Builder.build", function()
 		end
 	end)
 
-	it("tags the glass as barriers, and keeps the corner markers panels that never block a skater", function()
+	-- Skaters ride the glass (R5), their rays find it, the ball bounces off it and its flight ends on its touch.
+	it("makes the glass a ride surface that looks like glass, which skaters, the ball and touches all meet", function()
 		local arena = Builder.build(Geometry.build(config), config, parent)
-		local barriers = folder(arena, "Barriers")
-		expect(barriers:HasTag(Tags.Barrier)).toBe(true)
-		-- Skaters and the ball bounce off glass, and the collider's sweep finds it; nothing is touched by it.
-		for _, part in barriers:GetChildren() do
+		local glassFolder = folder(arena, "Glass")
+		expect(glassFolder:HasTag(Tags.RideSurface)).toBe(true)
+		expect(glassFolder:HasTag(Tags.Barrier)).toBe(false)
+		for _, part in glassFolder:GetChildren() do
 			local glass = part :: BasePart
 			if
 				not (
 					glass.Anchored
 					and glass.Material == Enum.Material.Glass
 					and glass.Color == config.Arena.colors.glass
-					and math.abs(glass.Transparency - config.Arena.barrier.transparency) < 1e-4
+					and math.abs(glass.Transparency - config.Arena.glass.transparency) < 1e-4
 					and glass.CanCollide
 					and glass.CanQuery
-					and not glass.CanTouch
+					and glass.CanTouch
 				)
 			then
 				error(`{glass.Name} does not look or act like glass`)
 			end
 		end
+		-- The corner markers are panels that never block a skater (A2).
 		local markers = folder(arena, "Markers"):GetChildren()
 		expect(#markers).toBe(Centerline.gateCount)
 		for _, marker in markers do
@@ -107,7 +110,7 @@ describe("Builder.build", function()
 		expectTop(Builder.build(Geometry.build(config), config, parent), function(part: BasePart): boolean
 			return part.Material == Enum.Material.Glass
 				and part.Color == config.Arena.colors.glass
-				and math.abs(part.Transparency - config.Arena.barrier.transparency) < 1e-4
+				and math.abs(part.Transparency - config.Arena.glass.transparency) < 1e-4
 		end)
 		local open = Fixtures.config({ Arena = { top = { kind = "Open" } } })
 		expectTop(Builder.build(Geometry.build(open), open, parent), function(part: BasePart): boolean
@@ -115,10 +118,10 @@ describe("Builder.build", function()
 		end)
 	end)
 
-	-- A roof that cast shadows kept the whole track in its shade (seen in a playtest); 85 studs of glass would too.
+	-- A roof that cast shadows kept the whole track in its shade (seen in a playtest); 120 studs of glass would too.
 	it("lets the light in: the glass and the top cast no shadow, while the track still does", function()
 		local arena = Builder.build(Geometry.build(config), config, parent)
-		for _, name in { "Barriers", "Top" } do
+		for _, name in { "Glass", "Top" } do
 			for _, part in folder(arena, name):GetChildren() do
 				if (part :: BasePart).CastShadow then
 					error(`{part.Name} casts a shadow`)
@@ -137,8 +140,8 @@ describe("Builder.build", function()
 			end
 		end
 		table.sort(tagged)
-		-- Not the glass, and not the infield behind it, which no skater reaches.
-		expect(tagged).toEqual({ "Surface" })
+		-- The glass is ridden too; not the top, and not the infield behind the glass, which no skater reaches.
+		expect(tagged).toEqual({ "Glass", "Surface" })
 	end)
 
 	it("sends the whole arena to every client and never streams it out", function()
@@ -179,10 +182,10 @@ describe("Builder.build", function()
 		end).toThrow("ArenaBuilder: infield piece 1 is invalid (cframe ")
 		-- Roblox would silently clamp it to 2048, leaving a hole.
 		local oversized = table.clone(geometry)
-		oversized.barriers = { { shape = "Block", cframe = CFrame.identity, size = Vector3.new(3000, 1, 1) } }
+		oversized.glass = { { shape = "Block", cframe = CFrame.identity, size = Vector3.new(3000, 1, 1) } }
 		expect(function()
 			Builder.build(oversized, config, parent)
-		end).toThrow("ArenaBuilder: barrier piece 1 is invalid (size 3000, 1, 1)")
+		end).toThrow("ArenaBuilder: glass piece 1 is invalid (size 3000, 1, 1)")
 		local flatTop = table.clone(geometry)
 		flatTop.top = { { shape = "Block", cframe = CFrame.identity, size = Vector3.new(1, 0, 1) } }
 		expect(function()

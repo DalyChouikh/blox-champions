@@ -420,19 +420,19 @@ describe("Config defaults", function()
 	it("match the spec's arena layout", function()
 		local a = Config.defaults().Arena
 		expect(a.straightLength).toBe(200)
-		expect(a.endRadius).toBe(70)
-		expect(a.trackWidth).toBe(60)
+		expect(a.endRadius).toBe(60)
+		expect(a.trackWidth).toBe(80)
 		expect(a.outerWallHeight).toBe(28)
 		expect(a.innerBankHeight).toBe(8)
-		expect(a.wallCurveRadius).toBe(14)
+		expect(a.wallCurveRadius).toBe(18)
 		expect(a.stepHeight).toBe(4)
-		expect(a.stepWidth).toBe(14)
-		expect(a.upperFloorWidth).toBe(6)
+		expect(a.stepWidth).toBe(18)
+		expect(a.upperFloorWidth).toBe(8)
 		expect(a.profileBlendLength).toBe(20)
 		expect(a.segmentLength).toBe(4)
 		expect(a.stripsPerSection).toBe(20)
 		expect(a.surfaceThickness).toBe(1)
-		expect(a.barrier).toEqual({ top = 85, thickness = 1, transparency = 0.7 })
+		expect(a.glass).toEqual({ top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.7 })
 		expect(a.top).toEqual({ kind = "Closed", ceilingAbove = 20 })
 		expect(a.goalGateIndex).toBe(2)
 		expect(a.goal).toEqual({
@@ -562,7 +562,7 @@ describe("Config.forMode", function()
 	it("rejects arena sizes that cannot be built", function()
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			{
-				overrides = { trackWidth = 40 },
+				overrides = { trackWidth = 52 },
 				message = "Arena: trackWidth must fit the inner bank, the outer wall's foot curve, the step, the upper "
 					.. "floor and a lower floor",
 			},
@@ -571,8 +571,8 @@ describe("Config.forMode", function()
 				message = "Arena: endRadius must leave room for the infield behind the inner glass",
 			},
 			{
-				-- 1.2 studs behind the inner glass's face: room for a surface slab (1), not for this glass (1.5).
-				overrides = { endRadius = 31.2, barrier = { thickness = 1.5 } },
+				-- 1.2 studs behind the inner glass's face: room for a 1-stud slab, not for a 1.5-stud one.
+				overrides = { endRadius = 41.2, surfaceThickness = 1.5 },
 				message = "Arena: endRadius must leave room for the infield behind the inner glass",
 			},
 			{
@@ -580,13 +580,19 @@ describe("Config.forMode", function()
 				message = "Arena: the outer wall must rise above its foot curve and the step",
 			},
 			{
-				overrides = { barrier = { top = 20 } },
-				message = "Arena: the glass must rise above the inner bank's and the outer wall's tops",
+				-- The lip (12) would start at the outer wall's top (28).
+				overrides = { glass = { top = 40 } },
+				message = "Arena: the glass must rise above the inner bank's and the outer wall's tops before its lip",
 			},
 			{
-				-- Over the outer wall (28), under a bank of 30 on a track wide enough for it.
-				overrides = { innerBankHeight = 30, trackWidth = 80, barrier = { top = 29 } },
-				message = "Arena: the glass must rise above the inner bank's and the outer wall's tops",
+				-- Its lip would start over the outer wall (28), under a bank of 30.
+				overrides = { innerBankHeight = 30, glass = { top = 41 } },
+				message = "Arena: the glass must rise above the inner bank's and the outer wall's tops before its lip",
+			},
+			{
+				-- Two lips of 40 would meet across the 80-stud track.
+				overrides = { glass = { lipRadius = 40 } },
+				message = "Arena: the lips must leave the top open between them",
 			},
 			{
 				-- Longer than a straight (200), so the blends at its two ends would overlap.
@@ -596,6 +602,7 @@ describe("Config.forMode", function()
 			{ overrides = { goal = { wallGap = 0 } }, message = "Arena.goal.wallGap: must be > 0 (got 0)" },
 			{ overrides = { stripsPerSection = 5 }, message = "Arena.stripsPerSection: must be >= 6 (got 5)" },
 			{ overrides = { goalGateIndex = 5 }, message = "Arena.goalGateIndex: must be <= 4 (got 5)" },
+			{ overrides = { glass = { lipStrips = 0 } }, message = "Arena.glass.lipStrips: must be >= 1 (got 0)" },
 			{
 				overrides = { top = { kind = "Lid" } },
 				message = 'Arena.top.kind: must be one of Closed, Open (got "Lid")',
@@ -621,10 +628,7 @@ describe("Config.forMode", function()
 				message = "Arena.goal.panelThickness: must be >= 0.001 (got 0.0005)",
 			},
 			{ overrides = { marker = { height = 2500 } }, message = "Arena.marker.height: must be <= 2048 (got 2500)" },
-			{
-				overrides = { barrier = { thickness = 0.0005 } },
-				message = "Arena.barrier.thickness: must be >= 0.001 (got 0.0005)",
-			},
+			{ overrides = { glass = { top = 3000 } }, message = "Arena.glass.top: must be <= 2048 (got 3000)" },
 			{
 				overrides = { top = { ceilingAbove = 3000 } },
 				message = "Arena.top.ceilingAbove: must be <= 2048 (got 3000)",

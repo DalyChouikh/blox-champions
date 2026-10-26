@@ -1,8 +1,8 @@
 --!strict
--- The graybox arena (spec §9.1, Arena spec §3): the track loop, its cross-section, the glass on its tops, the top that
--- closes it, the goal ring, corner markers, spawns and colors. Lengths are in studs. Arena/Geometry turns these numbers
--- into parts; the cross-field checks here, and the goal ring's fit checked in Arena/Geometry, reject sizes that could
--- not be built without overlaps or gaps.
+-- The graybox arena (spec §9.1, Arena spec §3): the track loop, its cross-section, the rideable glass walls with their
+-- lips, the top that closes it, the goal ring, corner markers, spawns and colors. Lengths are in studs. Arena/Geometry
+-- turns these numbers into parts; the cross-field checks here, and the goal ring's fit checked in Arena/Geometry,
+-- reject sizes that could not be built without overlaps or gaps.
 
 local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
@@ -32,13 +32,13 @@ export type ArenaConfig = {
 	stripsPerSection: number,
 	-- Every surface part is a slab this thick behind the riding surface.
 	surfaceThickness: number,
-	-- The glass standing on the inner bank's and the outer wall's tops (A7): up to `top` above the lower floor, a slab
-	-- `thickness` thick behind its face, outside the track. Skaters and the ball bounce off it; it never darkens the
-	-- track.
-	barrier: { top: number, thickness: number, transparency: number },
-	-- The top that closes the arena, set per map (R14): a closed map's roof spans the walls' top; an open map's ceiling
-	-- stands `ceilingAbove` higher, joined to the walls by strips. Either stops skaters and the ball, and neither is
-	-- ridden.
+	-- The rideable glass (R5) rising from the inner bank's and the outer wall's tops up to `top` above the lower floor,
+	-- each wall curling inward at the top into a lip (R15): a quarter circle of `lipRadius` in `lipStrips` strips. Its
+	-- slabs are surfaceThickness thick behind its faces, outside the track; it never darkens the track.
+	glass: { top: number, lipRadius: number, lipStrips: number, transparency: number },
+	-- The top that closes the arena, set per map (R14): a closed map's roof spans the walls' top between the lips'
+	-- ends; an open map's ceiling stands `ceilingAbove` higher, joined to the lips by strips. Either stops skaters and
+	-- the ball, and neither is ridden.
 	top: { kind: TopKind, ceilingAbove: number },
 	goalGateIndex: number,
 	goal: {
@@ -61,25 +61,25 @@ export type ArenaConfig = {
 	gateThickness: number,
 	spawnPad: { width: number, thickness: number, transparency: number },
 	ballSpawnSize: number,
-	-- glass: the barriers'.
+	-- glass: the glass walls' and a closed map's roof.
 	colors: { surface: Color3, infield: Color3, goal: Color3, marker: Color3, glass: Color3 },
 }
 
 local defaults: ArenaConfig = {
 	straightLength = 200,
-	endRadius = 70,
-	trackWidth = 60,
+	endRadius = 60,
+	trackWidth = 80,
 	outerWallHeight = 28,
 	innerBankHeight = 8,
-	wallCurveRadius = 14,
+	wallCurveRadius = 18,
 	stepHeight = 4,
-	stepWidth = 14,
-	upperFloorWidth = 6,
+	stepWidth = 18,
+	upperFloorWidth = 8,
 	profileBlendLength = 20,
 	segmentLength = 4,
 	stripsPerSection = 20,
 	surfaceThickness = 1,
-	barrier = { top = 85, thickness = 1, transparency = 0.7 },
+	glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.7 },
 	top = { kind = "Closed", ceilingAbove = 20 },
 	goalGateIndex = 2,
 	goal = {
@@ -131,7 +131,12 @@ local fields = Validate.record({
 	stripsPerSection = Validate.number({ min = 6, integer = true }),
 	surfaceThickness = partSize,
 	-- The glass's height sizes each of its slabs.
-	barrier = Validate.record({ top = partSize, thickness = partSize, transparency = transparency }),
+	glass = Validate.record({
+		top = partSize,
+		lipRadius = size,
+		lipStrips = Validate.number({ min = 1, integer = true }),
+		transparency = transparency,
+	}),
 	-- The ceiling's height above the walls sizes the strips up to it.
 	top = Validate.record({ kind = Validate.string({ oneOf = { "Closed", "Open" } }), ceilingAbove = partSize }),
 	-- The loop has four sections (two straights, two curved ends), and a lap gate starts each one.
@@ -173,7 +178,7 @@ local crossFieldRules: { Validate.Rule } = {
 	{
 		message = "endRadius must leave room for the infield behind the inner glass",
 		holds = function(arena: ArenaConfig): boolean
-			return arena.endRadius - arena.trackWidth / 2 - arena.barrier.thickness > 0
+			return arena.endRadius - arena.trackWidth / 2 - arena.surfaceThickness > 0
 		end,
 	},
 	{
@@ -183,9 +188,16 @@ local crossFieldRules: { Validate.Rule } = {
 		end,
 	},
 	{
-		message = "the glass must rise above the inner bank's and the outer wall's tops",
+		message = "the glass must rise above the inner bank's and the outer wall's tops before its lip",
 		holds = function(arena: ArenaConfig): boolean
-			return arena.barrier.top > arena.outerWallHeight and arena.barrier.top > arena.innerBankHeight
+			local lipStart = arena.glass.top - arena.glass.lipRadius
+			return lipStart > arena.outerWallHeight and lipStart > arena.innerBankHeight
+		end,
+	},
+	{
+		message = "the lips must leave the top open between them",
+		holds = function(arena: ArenaConfig): boolean
+			return 2 * arena.glass.lipRadius < arena.trackWidth
 		end,
 	},
 	{

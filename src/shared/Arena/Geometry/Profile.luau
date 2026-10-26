@@ -2,10 +2,11 @@
 -- The track's cross-sections (Arena spec §3.1) as points (u, y): u is the lateral distance from the inner glass's face
 -- toward the outer glass, y the height above the lower floor. The solid section has six pieces, from the inner bank's
 -- top down and across: the inner bank (a quarter circle, vertical where the glass stands on it), the lower floor, the
--- step, the upper floor, the outer wall's foot curve and the outer wall, up to its top. Glass stands on the two tops
--- (Features.barriers), and the top section closes the arena above them (R14). Every solid section has the same point
--- layout and only the step's height changes, so the straights' stepped profile blends point by point into the curved
--- ends' flat one.
+-- step, the upper floor, the outer wall's foot curve and the outer wall, up to its top. Every solid section has the
+-- same point layout and only the step's height changes, so the straights' stepped profile blends point by point into
+-- the curved ends' flat one. Rideable glass rises from the two solid tops and curls inward into its lips (R15), and
+-- the top section closes the arena between the lips' ends (R14). Every section runs the same way around the track's
+-- "O" (down the inner side, across, up the outer side, back across the top), so every slab hangs outside the track.
 
 local Config = require(script.Parent.Parent.Parent.Config)
 
@@ -122,24 +123,60 @@ function Profile.lowerFloorCenter(arena: ArenaConfig): number
 	return (arena.innerBankHeight + stepStart(arena)) / 2
 end
 
+-- The outer lip (R15): a quarter circle of glass.lipRadius curling inward from the outer glass's face, where it
+-- stops being vertical (glass.top - lipRadius), to the top (glass.top). Its lipStrips + 1 points are evenly spaced by
+-- angle; the inner lip mirrors it across the track.
+local function outerLip(arena: ArenaConfig): { Vector2 }
+	local glass = arena.glass
+	local center = Vector2.new(arena.trackWidth - glass.lipRadius, glass.top - glass.lipRadius)
+	local points: { Vector2 } = {}
+	for strip = 0, glass.lipStrips do
+		local angle = (math.pi / 2) * strip / glass.lipStrips
+		table.insert(points, center + glass.lipRadius * Vector2.new(math.cos(angle), math.sin(angle)))
+	end
+	return points
+end
+
+-- The outer glass, run up the profile's way: from the outer wall's top up its face and round its lip to where the
+-- top begins.
+function Profile.outerGlass(arena: ArenaConfig): { Vector2 }
+	local points = { Vector2.new(arena.trackWidth, arena.outerWallHeight) }
+	for _, point in outerLip(arena) do
+		table.insert(points, point)
+	end
+	return points
+end
+
+-- The inner glass, the outer one mirrored across the track and run down the profile's way: from where the top
+-- begins, round its lip and down its face to the inner bank's top.
+function Profile.innerGlass(arena: ArenaConfig): { Vector2 }
+	local lip = outerLip(arena)
+	local points: { Vector2 } = {}
+	for index = #lip, 1, -1 do
+		table.insert(points, Vector2.new(arena.trackWidth - lip[index].X, lip[index].Y))
+	end
+	table.insert(points, Vector2.new(0, arena.innerBankHeight))
+	return points
+end
+
 -- How high the arena is closed (R14): at the walls' top under a closed map's roof, or ceilingAbove higher under an
 -- open map's ceiling. The gates are this tall, and nothing in play is found above it (Bounds.inArena).
 function Profile.topHeight(arena: ArenaConfig): number
-	local wallTop = arena.barrier.top
+	local wallTop = arena.glass.top
 	return if arena.top.kind == "Open" then wallTop + arena.top.ceilingAbove else wallTop
 end
 
--- The top's cross-section. It closes the track's "O", running on from the outer glass's top back across to the inner
--- glass's, so its slabs hang above it, outside the track, as every section's do: a closed map's roof across the walls'
--- top, or an open map's strip up from the outer glass, its ceiling, and a strip down to the inner glass.
+-- The top's cross-section. It closes the track's "O", running on from the outer lip's end back across to the inner
+-- lip's, so its slabs hang above it, outside the track, as every section's do: a closed map's roof between the lips'
+-- ends, or an open map's strip up from the outer lip's end, its ceiling, and a strip down to the inner lip's end.
 function Profile.top(arena: ArenaConfig): { Vector2 }
-	local width, wallTop = arena.trackWidth, arena.barrier.top
-	local outerTop, innerTop = Vector2.new(width, wallTop), Vector2.new(0, wallTop)
+	local outer = Profile.outerGlass(arena)
+	local outerEnd, innerEnd = outer[#outer], Profile.innerGlass(arena)[1]
 	if arena.top.kind ~= "Open" then
-		return { outerTop, innerTop }
+		return { outerEnd, innerEnd }
 	end
 	local ceiling = Profile.topHeight(arena)
-	return { outerTop, Vector2.new(width, ceiling), Vector2.new(0, ceiling), innerTop }
+	return { outerEnd, Vector2.new(outerEnd.X, ceiling), Vector2.new(innerEnd.X, ceiling), innerEnd }
 end
 
 return Profile
