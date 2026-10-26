@@ -13,4 +13,7 @@ export type TeamSpawns = { Blue: { CFrame }, Orange: { CFrame } }
 -- The upright goal ring. frame faces oncoming skaters; its opening is also the scoring disc.
 export type Goal = { frame: CFrame, openingRadius: number, rim: { Piece }, panel: Piece }
 
+-- A gate's glass panel: its slices, and its pivot at the opening's apex, facing the travel direction.
+export type GatePanel = { pieces: { Piece }, apex: CFrame }
+
 return table.freeze({})

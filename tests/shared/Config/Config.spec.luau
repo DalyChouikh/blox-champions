@@ -444,7 +444,8 @@ describe("Config defaults", function()
 			rimSegments = 16,
 			wallGap = 1,
 		})
-		expect(a.marker).toEqual({ width = 2, height = 8 })
+		expect(a.gatePanel).toEqual({ openingHeight = 60, depth = 2, segments = 16 })
+		expect((a :: any).marker).toBeNil()
 		expect(a.teamSpawnSpacing).toBe(10)
 		expect(a.ballSpawnHeight).toBe(6)
 	end)
@@ -463,7 +464,6 @@ describe("Config defaults", function()
 			surface = Color3.fromRGB(163, 162, 165),
 			infield = Color3.fromRGB(99, 95, 98),
 			goal = Color3.fromRGB(248, 248, 248),
-			marker = Color3.fromRGB(27, 42, 53),
 			glass = Color3.fromRGB(200, 225, 240),
 		})
 	end)
@@ -604,6 +604,38 @@ describe("Config.forMode", function()
 			{ overrides = { goalGateIndex = 5 }, message = "Arena.goalGateIndex: must be <= 4 (got 5)" },
 			{ overrides = { glass = { lipStrips = 0 } }, message = "Arena.glass.lipStrips: must be >= 1 (got 0)" },
 			{
+				overrides = { gatePanel = { segments = 2 } },
+				message = "Arena.gatePanel.segments: must be >= 3 (got 2)",
+			},
+			-- Counts of parts and gates are whole numbers.
+			{
+				overrides = { stripsPerSection = 20.5 },
+				message = "Arena.stripsPerSection: must be an integer (got 20.5)",
+			},
+			{ overrides = { goalGateIndex = 2.5 }, message = "Arena.goalGateIndex: must be an integer (got 2.5)" },
+			{
+				overrides = { glass = { lipStrips = 4.5 } },
+				message = "Arena.glass.lipStrips: must be an integer (got 4.5)",
+			},
+			{
+				overrides = { goal = { rimSegments = 16.5 } },
+				message = "Arena.goal.rimSegments: must be an integer (got 16.5)",
+			},
+			{
+				overrides = { gatePanel = { segments = 16.5 } },
+				message = "Arena.gatePanel.segments: must be an integer (got 16.5)",
+			},
+			{
+				-- Over where the lips start (108).
+				overrides = { gatePanel = { openingHeight = 110 } },
+				message = "Arena: the gate panel's opening must stand between the outer wall's top and the lips",
+			},
+			{
+				-- No higher than its feet on the outer wall's top (28).
+				overrides = { gatePanel = { openingHeight = 28 } },
+				message = "Arena: the gate panel's opening must stand between the outer wall's top and the lips",
+			},
+			{
 				overrides = { top = { kind = "Lid" } },
 				message = 'Arena.top.kind: must be one of Closed, Open (got "Lid")',
 			},
@@ -627,7 +659,10 @@ describe("Config.forMode", function()
 				overrides = { goal = { panelThickness = 0.0005 } },
 				message = "Arena.goal.panelThickness: must be >= 0.001 (got 0.0005)",
 			},
-			{ overrides = { marker = { height = 2500 } }, message = "Arena.marker.height: must be <= 2048 (got 2500)" },
+			{
+				overrides = { gatePanel = { depth = 2500 } },
+				message = "Arena.gatePanel.depth: must be <= 2048 (got 2500)",
+			},
 			{ overrides = { glass = { top = 3000 } }, message = "Arena.glass.top: must be <= 2048 (got 3000)" },
 			{
 				overrides = { top = { ceilingAbove = 3000 } },

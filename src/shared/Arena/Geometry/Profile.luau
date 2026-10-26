@@ -159,6 +159,38 @@ function Profile.innerGlass(arena: ArenaConfig): { Vector2 }
 	return points
 end
 
+-- The walls' top across the track as built, as points in u order: the inner lip from the inner glass's face up to its
+-- end, then the outer lip from its end down to the outer glass's face (glass.top between the two ends).
+local function wallTopOutline(arena: ArenaConfig): { Vector2 }
+	local lip = outerLip(arena)
+	local points: { Vector2 } = {}
+	for index = 1, #lip do
+		table.insert(points, Vector2.new(arena.trackWidth - lip[index].X, lip[index].Y))
+	end
+	for index = #lip, 1, -1 do
+		table.insert(points, lip[index])
+	end
+	return points
+end
+
+-- The height of a cross-section at a lateral position: along the first of its segments that spans it running toward
+-- the outer glass (a vertical one never does), or nil where none does.
+function Profile.heightAt(points: { Vector2 }, lateral: number): number?
+	for index = 1, #points - 1 do
+		local from, to = points[index], points[index + 1]
+		if from.X < to.X and from.X <= lateral and lateral <= to.X then
+			return from.Y + (to.Y - from.Y) * (lateral - from.X) / (to.X - from.X)
+		end
+	end
+	return nil
+end
+
+-- The walls' top at a lateral position between the glass faces, as built (R15): on the lips' chords near the faces,
+-- glass.top between them. A gate panel ends at it, so it meets the lips and never pokes through them.
+function Profile.topOutline(arena: ArenaConfig, lateral: number): number
+	return Profile.heightAt(wallTopOutline(arena), lateral) :: number
+end
+
 -- How high the arena is closed (R14): at the walls' top under a closed map's roof, or ceilingAbove higher under an
 -- open map's ceiling. The gates are this tall, and nothing in play is found above it (Bounds.inArena).
 function Profile.topHeight(arena: ArenaConfig): number

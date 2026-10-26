@@ -7,6 +7,7 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local ArenaParts = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.ArenaParts)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
 local folder: Folder
 
@@ -29,11 +30,30 @@ describe("ArenaParts", function()
 		ArenaParts:refresh()
 		local parts = ArenaParts.parts :: any
 		expect(parts ~= nil).toBe(true)
+		-- A marker model's panes, and its pivot: where the carrier's arrow points.
 		for index = 1, 4 do
-			expect(parts.markers[index] == arena.markers[index]).toBe(true)
+			local marker = parts.markers[index]
+			expect(#marker.parts).toBe(2)
+			for _, pane in marker.parts do
+				expect(pane.Parent == arena.markers[index]).toBe(true)
+			end
+			Fixtures.expectNear(marker.position, arena.markers[index]:GetPivot().Position)
 		end
 		expect(#parts.hoop).toBe(2)
 		expect(parts.panel == arena.panel).toBe(true)
+
+		-- A marker that is a single part (an art pass may tag one): its parts are itself, its position its own.
+		arena.markers[3]:Destroy()
+		local single = Instance.new("Part")
+		single.Anchored = true
+		single.Position = Vector3.new(300, 20, 0)
+		single:SetAttribute(Tags.Attribute.GateIndex, 3)
+		single:AddTag(Tags.CornerMarker)
+		single.Parent = folder
+		ArenaParts:refresh()
+		local three = (ArenaParts.parts :: any).markers[3]
+		expect(#three.parts == 1 and three.parts[1] == single).toBe(true)
+		Fixtures.expectNear(three.position, single.Position)
 
 		-- A new record whenever the arena changes, so readers see it; none once it is gone.
 		arena.panel:Destroy()

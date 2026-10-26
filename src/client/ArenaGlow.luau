@@ -4,8 +4,9 @@
 -- - while the goal is open for a team, the hoop's parts take that team's colour and Config.UI.arenaGlow.material, and
 --   the goal panel slides panelSlide studs up out of the ring over panelSlideSeconds (the server only lets the ball
 --   through it); when the goal closes, the hoop looks as before and the panel slides back;
--- - the next gate's corner marker glows in the colour of the team with the ball, none before their first gate (the
---   owner's choice, as the snapshot's nextGate is nil then); the marker it leaves looks as before.
+-- - every part of the next gate's corner marker (its glass panel) glows in the colour of the team with the ball, none
+--   before their first gate (the owner's choice, as the snapshot's nextGate is nil then); the marker it leaves looks
+--   as before.
 -- "As before" is how each part looked when it reached this client. Everything here is this client's own view.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,7 +39,7 @@ export type ArenaGlow = {
 	_parts: ArenaParts.Parts?,
 	_version: number?,
 	_goalTeam: Team?,
-	_gate: BasePart?,
+	_gate: ArenaParts.Marker?,
 	_gateTeam: Team?,
 	_open: boolean,
 }
@@ -59,7 +60,9 @@ local function remember(self: ArenaGlow, parts: ArenaParts.Parts)
 		keep(part)
 	end
 	for _, marker in parts.markers do
-		keep(marker)
+		for _, part in marker.parts do
+			keep(part)
+		end
 	end
 	keep(parts.panel)
 end
@@ -99,14 +102,18 @@ local function glowGoal(self: ArenaGlow, parts: ArenaParts.Parts, team: Team?)
 	end
 end
 
-local function glowGate(self: ArenaGlow, gate: BasePart?, team: Team?)
+local function glowGate(self: ArenaGlow, gate: ArenaParts.Marker?, team: Team?)
 	local previous = self._gate
 	if previous ~= nil and previous ~= gate then
-		restore(self, previous)
+		for _, part in previous.parts do
+			restore(self, part)
+		end
 	end
 	self._gate, self._gateTeam = gate, team
 	if gate ~= nil and team ~= nil then
-		light(self, gate, team)
+		for _, part in gate.parts do
+			light(self, part, team)
+		end
 	end
 end
 

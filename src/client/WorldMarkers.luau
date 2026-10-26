@@ -4,8 +4,9 @@
 -- - a line from the ball down to a disc on the ground below it (one ray through the ride surfaces), both hidden when
 --   nothing lies within groundProbe studs;
 -- - an arrow at the screen's edge pointing to the ball while it is off the screen (ScreenMarker);
--- - for the local player while they carry the ball, an arrow to their team's next gate: over its corner marker, or
---   pinned to the screen's edge. None before their first gate (the owner's choice): the snapshot's nextGate is nil.
+-- - for the local player while they carry the ball, an arrow to their team's next gate: over its corner marker's pivot
+--   (its glass panel's opening), or pinned to the screen's edge. None before their first gate (the owner's choice): the
+--   snapshot's nextGate is nil.
 -- All of them take the colour of the team with the ball, or the HUD's text colour while it is loose, and hide while
 -- there is no ball. The arrows sit in a ScreenGui without insets, so their pixels are the camera's. A property is
 -- written only when it changes; a step allocates only the disc's frame, the ray's result and a shown arrow's place.
@@ -173,7 +174,7 @@ local function placeGate(self: WorldMarkers, nextGate: number?)
 		showArrow(self.gateArrow, nil)
 		return
 	end
-	local point, onScreen = self._project(gate.Position)
+	local point, onScreen = self._project(gate.position)
 	local placement = self._gatePlacement
 	ScreenMarker.place(point, onScreen, self._viewportSize(), self._config.UI.markers.edgeMargin, placement)
 	showArrow(self.gateArrow, placement)

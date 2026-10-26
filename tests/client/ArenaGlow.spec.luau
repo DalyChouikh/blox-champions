@@ -37,6 +37,16 @@ local function glows(part: BasePart, color: Color3?): boolean
 	return part.Color == color and part.Material == glow.material
 end
 
+-- Whether every pane of a gate's panel glows in `color`, or looks as before (`color` nil).
+local function panelGlows(marker: Model, color: Color3?): boolean
+	for _, pane in marker:GetChildren() do
+		if not glows(pane :: BasePart, color) then
+			return false
+		end
+	end
+	return true
+end
+
 beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "ArenaGlowTest"
@@ -77,23 +87,28 @@ describe("ArenaGlow", function()
 		end
 	end)
 
-	it("lights the next gate's corner marker for the team with the ball, and none before their first gate", function()
-		local markers = arena.markers
-		snapshot({ possessingTeam = "Blue" })
-		for _, marker in markers do
-			expect(glows(marker, nil)).toBe(true)
+	it(
+		"lights every part of the next gate's panel for the team with the ball, and none before their first gate",
+		function()
+			local markers = arena.markers
+			snapshot({ possessingTeam = "Blue" })
+			for _, marker in markers do
+				expect(panelGlows(marker, nil)).toBe(true)
+			end
+			snapshot({ possessingTeam = "Blue", nextGate = 2 })
+			expect(panelGlows(markers[2], colors.Blue)).toBe(true)
+			expect(panelGlows(markers[1], nil) and panelGlows(markers[3], nil) and panelGlows(markers[4], nil)).toBe(
+				true
+			)
+			snapshot({ possessingTeam = "Blue", nextGate = 3 })
+			expect(panelGlows(markers[2], nil)).toBe(true)
+			expect(panelGlows(markers[3], colors.Blue)).toBe(true)
+			snapshot({ possessingTeam = "Orange", nextGate = 3 })
+			expect(panelGlows(markers[3], colors.Orange)).toBe(true)
+			snapshot()
+			expect(panelGlows(markers[3], nil)).toBe(true)
 		end
-		snapshot({ possessingTeam = "Blue", nextGate = 2 })
-		expect(glows(markers[2], colors.Blue)).toBe(true)
-		expect(glows(markers[1], nil) and glows(markers[3], nil) and glows(markers[4], nil)).toBe(true)
-		snapshot({ possessingTeam = "Blue", nextGate = 3 })
-		expect(glows(markers[2], nil)).toBe(true)
-		expect(glows(markers[3], colors.Blue)).toBe(true)
-		snapshot({ possessingTeam = "Orange", nextGate = 3 })
-		expect(glows(markers[3], colors.Orange)).toBe(true)
-		snapshot()
-		expect(glows(markers[3], nil)).toBe(true)
-	end)
+	)
 
 	it("keeps each part's first look when the arena's parts are found again while they glow", function()
 		snapshot({ possessingTeam = "Blue", goalOpenFor = "Blue" })

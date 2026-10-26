@@ -1,18 +1,22 @@
 --!strict
--- The arena's parts the HUD points at and lights (spec §9.1): the corner markers by gate index, the goal hoop's parts
--- and its up (its pivot's), and the goal panel, found by their tags (Arena/Tags). The arena model is Persistent, so it
--- reaches every client whole, soon after the player joins, and stays; until it has, `parts` is nil. One cache every
--- client module reads, refreshed by the tags' signals from start on. Each refresh makes a new record, so a reader sees
--- that it changed.
+-- The arena's parts the HUD points at and lights (spec §9.1): the corner markers (the gates' glass panels) by gate
+-- index, the goal hoop's parts and its up (its pivot's), and the goal panel, found by their tags (Arena/Tags). The
+-- arena model is Persistent, so it reaches every client whole, soon after the player joins, and stays; until it has,
+-- `parts` is nil. One cache every client module reads, refreshed by the tags' signals from start on. Each refresh makes
+-- a new record, so a reader sees that it changed.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
+-- A corner marker: every part of it (a model's parts, or the marker itself when it is a part), and its pivot's
+-- position, where the carrier's arrow points (a gate panel's opening's apex).
+export type Marker = { parts: { BasePart }, position: Vector3 }
+
 export type Parts = {
 	-- By GateIndex.
-	markers: { [number]: BasePart },
+	markers: { [number]: Marker },
 	hoop: { BasePart },
 	-- Up in the ring's own plane: the panel slides along it, out of the ring.
 	hoopUp: Vector3,
@@ -34,6 +38,20 @@ export type ArenaParts = {
 
 -- Every tag `refresh` reads.
 local WATCHED = { Tags.CornerMarker, Tags.GoalHoop, Tags.GoalPanel }
+
+-- Every part of `instance`: its descendants that are parts, and itself when it is one.
+local function partsOf(instance: Instance): { BasePart }
+	local parts: { BasePart } = {}
+	if instance:IsA("BasePart") then
+		table.insert(parts, instance)
+	end
+	for _, descendant in instance:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			table.insert(parts, descendant)
+		end
+	end
+	return parts
+end
 
 local function firstPart(tag: string): BasePart?
 	for _, instance in CollectionService:GetTagged(tag) do
@@ -66,12 +84,12 @@ local ArenaParts: ArenaParts = {
 	end,
 
 	refresh = function(self: ArenaParts)
-		local markers: { [number]: BasePart } = {}
+		local markers: { [number]: Marker } = {}
 		local count = 0
 		for _, instance in CollectionService:GetTagged(Tags.CornerMarker) do
 			local index = instance:GetAttribute(Tags.Attribute.GateIndex)
-			if instance:IsA("BasePart") and type(index) == "number" then
-				markers[index] = instance
+			if (instance:IsA("Model") or instance:IsA("BasePart")) and type(index) == "number" then
+				markers[index] = { parts = partsOf(instance), position = (instance :: PVInstance):GetPivot().Position }
 				count += 1
 			end
 		end
@@ -81,12 +99,7 @@ local ArenaParts: ArenaParts = {
 			self.parts = nil
 			return
 		end
-		local hoop: { BasePart } = {}
-		for _, descendant in hoopModel:GetDescendants() do
-			if descendant:IsA("BasePart") then
-				table.insert(hoop, descendant)
-			end
-		end
+		local hoop = partsOf(hoopModel)
 		self.parts = { markers = markers, hoop = hoop, hoopUp = hoopModel:GetPivot().UpVector, panel = panel }
 	end,
 

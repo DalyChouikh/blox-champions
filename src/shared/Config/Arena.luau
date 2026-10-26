@@ -1,6 +1,6 @@
 --!strict
 -- The graybox arena (spec §9.1, Arena spec §3): the track loop, its cross-section, the rideable glass walls with their
--- lips, the top that closes it, the goal ring, corner markers, spawns and colors. Lengths are in studs. Arena/Geometry
+-- lips, the top that closes it, the goal ring, the gate panels, spawns and colors. Lengths are in studs. Arena/Geometry
 -- turns these numbers into parts; the cross-field checks here, and the goal ring's fit checked in Arena/Geometry,
 -- reject sizes that could not be built without overlaps or gaps.
 
@@ -53,7 +53,10 @@ export type ArenaConfig = {
 		-- Gap between the ring's outer edge and the outer wall.
 		wallGap: number,
 	},
-	marker: { width: number, height: number },
+	-- The glass panel hanging across the track at each gate (R18): it fills the track's cross-section from the walls'
+	-- top down to a rounded opening (half an ellipse, its feet on the outer wall's top at both glass faces, its apex
+	-- `openingHeight` at the track's middle), in `segments` slices `depth` thick along the track.
+	gatePanel: { openingHeight: number, depth: number, segments: number },
 	teamSpawnSpacing: number,
 	ballSpawnHeight: number,
 	-- Parts that only carry a tag: lap gates (invisible; only their plane counts), team spawn pads (a square in the
@@ -62,7 +65,7 @@ export type ArenaConfig = {
 	spawnPad: { width: number, thickness: number, transparency: number },
 	ballSpawnSize: number,
 	-- glass: the glass walls' and a closed map's roof.
-	colors: { surface: Color3, infield: Color3, goal: Color3, marker: Color3, glass: Color3 },
+	colors: { surface: Color3, infield: Color3, goal: Color3, glass: Color3 },
 }
 
 local defaults: ArenaConfig = {
@@ -91,7 +94,7 @@ local defaults: ArenaConfig = {
 		rimSegments = 16,
 		wallGap = 1,
 	},
-	marker = { width = 2, height = 8 },
+	gatePanel = { openingHeight = 60, depth = 2, segments = 16 },
 	teamSpawnSpacing = 10,
 	ballSpawnHeight = 6,
 	gateThickness = 0.2,
@@ -101,14 +104,13 @@ local defaults: ArenaConfig = {
 		surface = Color3.fromRGB(163, 162, 165),
 		infield = Color3.fromRGB(99, 95, 98),
 		goal = Color3.fromRGB(248, 248, 248),
-		marker = Color3.fromRGB(27, 42, 53),
 		glass = Color3.fromRGB(200, 225, 240),
 	},
 }
 
 local size = Validate.number({ above = 0 })
--- Sizes one part directly (the infield, a gate, a wall slab, a glass slab, a marker, the panel), so it must be a size
--- Roblox builds as given instead of clamping.
+-- Sizes one part directly (the infield, a gate, a wall slab, a glass slab, a gate panel, the goal's panel), so it must
+-- be a size Roblox builds as given instead of clamping.
 local partSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
 local nonNegative = Validate.number({ min = 0 })
 local transparency = Validate.number({ min = 0, max = 1 })
@@ -151,13 +153,18 @@ local fields = Validate.record({
 		-- A ring touching the wall would put a rim face in the wall's plane, where the two flicker.
 		wallGap = size,
 	}),
-	marker = Validate.record({ width = partSize, height = partSize }),
+	-- The opening's height is judged against the walls (rule below); at least three slices round it.
+	gatePanel = Validate.record({
+		openingHeight = size,
+		depth = partSize,
+		segments = Validate.number({ min = 3, integer = true }),
+	}),
 	teamSpawnSpacing = size,
 	ballSpawnHeight = size,
 	gateThickness = partSize,
 	spawnPad = Validate.record({ width = partSize, thickness = partSize, transparency = transparency }),
 	ballSpawnSize = partSize,
-	colors = Validate.record({ surface = color, infield = color, goal = color, marker = color, glass = color }),
+	colors = Validate.record({ surface = color, infield = color, goal = color, glass = color }),
 })
 
 -- Checked in order; the first that fails is reported. Whether the goal ring fits is judged by Arena/Geometry
@@ -198,6 +205,13 @@ local crossFieldRules: { Validate.Rule } = {
 		message = "the lips must leave the top open between them",
 		holds = function(arena: ArenaConfig): boolean
 			return 2 * arena.glass.lipRadius < arena.trackWidth
+		end,
+	},
+	{
+		message = "the gate panel's opening must stand between the outer wall's top and the lips",
+		holds = function(arena: ArenaConfig): boolean
+			local opening = arena.gatePanel.openingHeight
+			return opening > arena.outerWallHeight and opening < arena.glass.top - arena.glass.lipRadius
 		end,
 	},
 	{

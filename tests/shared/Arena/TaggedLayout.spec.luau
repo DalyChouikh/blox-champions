@@ -30,16 +30,31 @@ local function child(root: Instance, name: string): Instance
 	return root:FindFirstChild(name) :: Instance
 end
 
+-- A corner marker as the arena builder makes one: a model of glass panes, pivoted at its opening's apex.
+local function markerModel(parent: Instance, name: string, index: number): Model
+	local model = Instance.new("Model")
+	model.Name = name
+	for pane = 1, 2 do
+		local part = Instance.new("Part")
+		part.Name = `Pane{pane}`
+		part.Parent = model
+	end
+	model.WorldPivot = CFrame.new(100 * index, 60, 0)
+	model:SetAttribute(Tags.Attribute.GateIndex, index)
+	model:AddTag(Tags.CornerMarker)
+	model.Parent = parent
+	return model
+end
+
 -- A complete minimal arena, gates created in reverse so reading must sort them.
 local function arenaRoot(): Folder
 	local root = Instance.new("Folder")
 	root.Name = "TaggedLayoutTest"
 	for index = 4, 1, -1 do
-		tagged(root, "Gate" .. index, Tags.LapGate, CFrame.new(100 * index, 0, 0), Vector3.new(44, 28, 0.2)):SetAttribute(
-			Tags.Attribute.GateIndex,
-			index
-		)
-		tagged(root, "Marker" .. index, Tags.CornerMarker):SetAttribute(Tags.Attribute.GateIndex, index)
+		local gate =
+			tagged(root, "Gate" .. index, Tags.LapGate, CFrame.new(100 * index, 0, 0), Vector3.new(44, 28, 0.2))
+		gate:SetAttribute(Tags.Attribute.GateIndex, index)
+		markerModel(root, "Marker" .. index, index)
 	end
 	local hoop = Instance.new("Model")
 	hoop.Name = "GoalHoop"
@@ -74,9 +89,22 @@ describe("TaggedLayout.read", function()
 		expect(arena.goalPanel.Name).toBe("GoalPanel")
 		expect(#arena.markers).toBe(4)
 		expect(arena.markers[2].Name).toBe("Marker2")
+		expect(arena.markers[2]:GetPivot().Position).toEqual(Vector3.new(200, 60, 0))
 		expect(arena.teamSpawns.Blue[1].Position).toEqual(Vector3.new(0, 0, -53))
 		expect(arena.teamSpawns.Orange[1].Position).toEqual(Vector3.new(0, 0, 53))
 		expect(arena.ballSpawns[1].Position).toEqual(Vector3.new(-140, 6, 0))
+	end)
+
+	-- An art pass may tag a single part instead of a model.
+	it("reads a corner marker that is a model or a part", function()
+		local root = arenaRoot()
+		child(root, "Marker3"):Destroy()
+		tagged(root, "Marker3", Tags.CornerMarker, CFrame.new(300, 20, 0)):SetAttribute(Tags.Attribute.GateIndex, 3)
+		local markers = TaggedLayout.read(root).markers
+		expect(#markers).toBe(4)
+		expect(markers[2]:IsA("Model")).toBe(true)
+		expect(markers[3]:IsA("BasePart")).toBe(true)
+		expect(markers[3]:GetPivot().Position).toEqual(Vector3.new(300, 20, 0))
 	end)
 
 	it("ignores tagged instances outside the root", function()
@@ -132,6 +160,15 @@ describe("TaggedLayout.read", function()
 		expect(function()
 			TaggedLayout.read(root)
 		end).toThrow('TaggedLayout: LapGate "Gate9" must be a part (got Folder)')
+		local markerFolder = arenaRoot()
+		local stray = Instance.new("Folder")
+		stray.Name = "Marker9"
+		stray:SetAttribute(Tags.Attribute.GateIndex, 9)
+		stray:AddTag(Tags.CornerMarker)
+		stray.Parent = markerFolder
+		expect(function()
+			TaggedLayout.read(markerFolder)
+		end).toThrow('TaggedLayout: CornerMarker "Marker9" must be a model or a part (got Folder)')
 		local function withGate2Index(index: any): Folder
 			local unnumbered = arenaRoot()
 			child(unnumbered, "Gate2"):SetAttribute(Tags.Attribute.GateIndex, index)
