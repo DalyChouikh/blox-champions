@@ -1,7 +1,8 @@
 --!strict
 -- The banner across the screen (spec §11.1): the kickoff's 3-2-1, GOAL!, STREAK POINT!, DENIED!, the clock warnings,
 -- LAST CHANCE and OVERTIME, in the colour of the team it is about, or the HUD's text colour. Hidden without a banner.
--- It shrinks to fit a small screen. A plain function of its props.
+-- It centres in the HUD's stage (left of the touch buttons on touch) and shrinks to fit it. A plain function of its
+-- props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,7 +16,7 @@ export type BannerProps = {
 	config: Config.GameConfig,
 	text: HudText.HudText,
 	banner: HudState.Banner?,
-	-- The HUD's area, which the banner fits in.
+	-- The HUD's stage, which the banner fits in.
 	area: React.Binding<Vector2>,
 }
 

@@ -19,8 +19,16 @@ local config = Config.defaults()
 local LOCAL_ID = "1"
 local DT = 1 / 60
 
+-- A screen's two areas: the HUD's (CoreUISafeInsets) and the touch controls' (DeviceSafeInsets), which also spans
+-- Roblox's 58 px top bar. PHONE is the emulated iPhone 17 Pro in landscape (probed in Play); BIG is a big screen,
+-- where the touch buttons grow 1.5 times.
+type Screen = { hud: Rect, controls: Rect }
+local PHONE: Screen = { hud = Rect.new(0, 0, 750, 323), controls = Rect.new(0, -58, 750, 323) }
+local BIG: Screen = { hud = Rect.new(0, 0, 1280, 742), controls = Rect.new(0, -58, 1280, 742) }
+
 local folder: Folder
 local preferred: Enum.PreferredInput
+local screen: Screen
 
 -- Roblox's key names, as GetStringForKeyCode gives them: a letter key its letter, Space a space, a gamepad button its
 -- KeyCode's name, and nothing for Shift, Ctrl, Tab or a mouse button.
@@ -65,6 +73,7 @@ beforeEach(function()
 	folder.Name = "HudTest"
 	folder.Parent = workspace
 	preferred = Enum.PreferredInput.KeyboardAndMouse
+	screen = PHONE
 	Fixtures.startSkating(folder, config, LOCAL_ID)
 	HudStore:init({ Config = config })
 	HudStore:onSnapshot(Fixtures.matchSnapshot())
@@ -82,6 +91,13 @@ beforeEach(function()
 		end,
 		KeyString = keyString,
 		KeyImage = keyImage,
+		InsetArea = function(insets: Enum.ScreenInsets): Rect
+			if insets == Enum.ScreenInsets.CoreUISafeInsets then
+				return screen.hud
+			end
+			expect(insets).toBe(Enum.ScreenInsets.DeviceSafeInsets)
+			return screen.controls
+		end,
 	})
 end)
 
@@ -240,42 +256,100 @@ describe("Hud", function()
 		expect(part("Scoreboard") ~= nil).toBe(true)
 	end)
 
-	it("hides the touch score button behind the end screen, and forgets its toggle", function()
+	it("on touch, keeps the score button through the end screen and opens the full score tab over it", function()
 		preferred = Enum.PreferredInput.Touch
 		Hud:toggleScoreTab()
 		Hud:step(0)
 		expect(part("ScoreTab") ~= nil).toBe(true)
+		-- The match ends: the tab toggled on before closes, the button stays, and the end screen has no full table.
 		endMatch()
 		Hud:step(0)
-		expect(part("ScoreButton")).toBeNil()
-		-- The tab toggled on before the end stays shut when the next match starts.
+		expect(part("ScoreTab")).toBeNil()
+		expect(part("ScoreButton") ~= nil).toBe(true)
+		local endScreen = part("EndScreen") :: Frame
+		expect(endScreen:FindFirstChild("Table")).toBeNil()
+		-- A tap opens the full score tab over it.
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect(part("ScoreTab") ~= nil).toBe(true)
+		expect((part("ScoreTab") :: Frame).ZIndex > endScreen.ZIndex).toBe(true)
+		expect(part("EndScreen") ~= nil).toBe(true)
+		-- The next match starts: the tab closes, so it never pops open then.
 		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
 		Hud:step(0)
-		expect(part("ScoreButton") ~= nil).toBe(true)
 		expect(part("ScoreTab")).toBeNil()
+		expect(part("EndScreen")).toBeNil()
+		expect(part("ScoreButton") ~= nil).toBe(true)
 	end)
 
-	it("fits the score tab, the end screen, the banner and the feed to the HUD's area", function()
+	it("puts the big panels, the banner and the feed on a stage above the rest, left of the touch buttons", function()
 		local function fit(panel: string): number
 			return (part(panel):FindFirstChild("Fit") :: UIScale).Scale
 		end
 		Fixtures.scriptedBinding(InputController.context, "ScoreTab"):Fire(true)
 		Hud:step(0)
-		-- A phone's safe area: each panel's height decides, less a margin at each side.
-		Hud:resize(Vector2.new(750, 323))
+		for _, name in { "Banner", "Feed", "ScoreTab" } do
+			expect(`{name} in {part(name).Parent.Name}`).toBe(`{name} in Stage`)
+		end
+		-- The solid score tab and end screen cover the scoreboard, the hints and the speedometer.
+		local stage = part("Stage") :: Frame
+		for _, other in part("Root"):GetChildren() do
+			if other ~= stage and other:IsA("GuiObject") then
+				expect(`{other.Name} below: {other.ZIndex < stage.ZIndex}`).toBe(`{other.Name} below: true`)
+			end
+		end
+		-- With a keyboard the stage is the whole HUD area: the tab's height decides, less a margin at each side.
+		expect(part("Stage").Size).toEqual(UDim2.fromOffset(750, 323))
 		expect(fit("ScoreTab")).toBeCloseTo(307 / 360, 4)
+		-- On touch it ends where the buttons begin: (504 - 2 margins) / 640 for the tab and the banner.
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		expect(part("Stage").Size).toEqual(UDim2.fromOffset(504, 323))
+		expect(fit("ScoreTab")).toBeCloseTo(488 / 640, 4)
+		expect(fit("Banner")).toBeCloseTo(488 / 640, 4)
+		expect(fit("Feed")).toBe(1)
+		-- The compact end screen is as tall as its parts, so its width decides: (504 - 2 margins) / 720.
 		endMatch()
 		Hud:step(0)
-		expect(fit("EndScreen")).toBeCloseTo(307 / 520, 4)
-		Hud:resize(Vector2.new(1920, 1000))
-		expect(fit("EndScreen")).toBe(1)
-		-- Narrower than the banner and the feed: (400 - 2 margins) / 640 and / 460.
-		Hud:resize(Vector2.new(400, 323))
-		expect(fit("Banner")).toBeCloseTo(384 / 640, 4)
-		expect(fit("Feed")).toBeCloseTo(384 / 460, 4)
+		expect(part("EndScreen").Parent.Name).toBe("Stage")
+		expect(fit("EndScreen")).toBeCloseTo(488 / 720, 4)
 	end)
 
-	it("unmounts both its React roots when destroyed", function()
+	it("hides the reticle while the score tab or the end screen shows", function()
+		local function reticle(): boolean
+			return (Hud.centre:FindFirstChild("Reticle") :: Frame).Visible
+		end
+		local held = Fixtures.scriptedBinding(InputController.context, "ScoreTab")
+		Hud:step(0)
+		expect(reticle()).toBe(true)
+		held:Fire(true)
+		Hud:step(0)
+		expect(reticle()).toBe(false)
+		held:Fire(false)
+		Hud:step(0)
+		expect(reticle()).toBe(true)
+		endMatch()
+		Hud:step(0)
+		expect(reticle()).toBe(false)
+	end)
+
+	it("measures the stage again when the device changes or the screen turns", function()
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		expect(part("Stage").Size).toEqual(UDim2.fromOffset(504, 323))
+		-- A big screen: the buttons grow 1.5 times and reach 369 px in.
+		screen = BIG
+		Hud:resize()
+		expect(part("Stage").Size).toEqual(UDim2.fromOffset(911, 742))
+		preferred = Enum.PreferredInput.KeyboardAndMouse
+		Hud:step(0)
+		expect(part("Stage").Size).toEqual(UDim2.fromOffset(1280, 742))
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		expect(part("Stage").Size).toEqual(UDim2.fromOffset(911, 742))
+	end)
+
+	it("unmounts its React root when destroyed, the reticle with it", function()
 		Hud:step(0)
 		Hud:destroy()
 		expect(Hud.gui:FindFirstChild("Root")).toBeNil()
@@ -284,6 +358,9 @@ describe("Hud", function()
 
 	it("steps in under 0.1 ms", function()
 		Fixtures.spawnSkater(folder, config)
+		-- Untimed: the first render of any React root in a fresh module registry does one-time work (measured: a
+		-- separate root rendered first halves the timed mean). The loop measures the frames after it.
+		Hud:step(DT)
 		local total = 0
 		for step = 1, 600 do
 			-- The ball changes hands every 100 steps.

@@ -1,17 +1,21 @@
 --!strict
--- The HUD on screen (spec §11.1), drawn with React Luau through legacy roots, which render at once. Its panels sit in
+-- The HUD on screen (spec §11.1), drawn with React Luau through a legacy root, which renders at once. Its panels sit in
 -- the ScreenGui "Hud", below Roblox's own top bar; the reticle sits in "HudCentre", which spans the whole screen, so
--- its centre is where the camera aims (drawn once: it never changes). Before each frame is drawn (FrameController),
--- after HudStore has counted the clocks, the Hud renders App again only when something App shows has changed: the HUD
--- state's version, the device, the carrier, whether the local player has a skater, or whether the score tab is open.
--- What changes every frame (the clock, the speed, what each control does now) goes through bindings instead, each set
--- only when its text changes; the texts come from caches and the config, so a quiet frame allocates nothing. Hints name
--- each key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout
--- gives it, else Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the
--- labels. The score tab shows while its key is held; on touch a button toggles it, and the toggle clears once the
--- device is not touch or the match is over (the button hides behind the end screen). The score tab and the end screen
--- shrink to fit the HUD's area on a small screen: its size goes to them through a binding, followed from start on.
+-- its centre is where the camera aims (App draws it there through a portal). Before each frame is drawn
+-- (FrameController), after HudStore has counted the clocks, the Hud renders App again only when something App shows has
+-- changed: the HUD state's version, the device, the carrier, whether the local player has a skater, or whether the
+-- score tab is open. What changes every frame (the clock, the speed, what each control does now) goes through bindings
+-- instead, each set only when its text changes; the texts come from caches and the config, so a quiet frame allocates
+-- nothing. Hints name each key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the player's own
+-- keyboard layout gives it, else Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the
+-- buttons carry the labels. The score tab shows while its key is held; on touch a button toggles it, and the toggle
+-- clears once the device is not touch and whenever the end screen appears or goes, so the tab never pops open unasked.
+-- The banner, the feed, the score tab and the end screen centre and fit in the HUD's stage, a binding: on touch the
+-- part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that GuiService gives),
+-- elsewhere the whole of it. It is measured again when the screen's size changes (from start on) and when the device
+-- does.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -28,8 +32,8 @@ local InputController = require(script.Parent.InputController)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local React = require(ReplicatedStorage.Packages.React)
 local ReactRoblox = require(ReplicatedStorage.Packages.ReactRoblox)
-local Reticle = require(script.Reticle)
 local SkateController = require(script.Parent.SkateController)
+local TouchArea = require(ReplicatedStorage.Shared.Input.TouchArea)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
@@ -46,9 +50,9 @@ export type Hud = {
 	step: (self: Hud, dt: number) -> (),
 	-- What the touch score button does: opens the score tab, or closes it.
 	toggleScoreTab: (self: Hud) -> (),
-	-- The HUD's area changed (the gui's AbsoluteSize): the big panels fit in it.
-	resize: (self: Hud, area: Vector2) -> (),
-	-- Unmounts both React roots (tests).
+	-- The screen's size changed (the gui's AbsoluteSize): the stage is measured again.
+	resize: (self: Hud) -> (),
+	-- Unmounts the React root, the reticle with it (tests).
 	destroy: (self: Hud) -> (),
 	gui: ScreenGui,
 	-- Spans the whole screen: the reticle's.
@@ -67,19 +71,22 @@ export type Hud = {
 	-- UserInputService's key names and glyphs, or fakes.
 	_keyString: (key: Enum.KeyCode) -> string,
 	_keyImage: (key: Enum.KeyCode) -> string,
+	-- GuiService:GetInsetArea, or a fake: a gui's area on the screen for its ScreenInsets.
+	_insetArea: (insets: Enum.ScreenInsets) -> Rect,
 	_root: ReactRoblox.RootType,
-	_centreRoot: ReactRoblox.RootType,
 	_bindings: App.HudBindings,
 	_clock: Shown,
 	_speed: Shown,
 	_labels: { [string]: Shown },
-	-- The HUD's area last set on its binding, and the setter.
-	_area: Vector2,
-	_setArea: (area: Vector2) -> (),
+	-- The stage last set on its binding, and the setter.
+	_stage: Vector2,
+	_setStage: (stage: Vector2) -> (),
 	-- The score button's handler, made once.
 	_onScoreButton: () -> (),
 	-- The score tab toggled on by its touch button.
 	_touchToggled: boolean,
+	-- Whether the match was over at the last step.
+	_over: boolean,
 	-- What App last rendered from; the version is nil before the first render.
 	_version: number?,
 	_device: Enum.PreferredInput?,
@@ -97,6 +104,18 @@ local function show(shown: Shown, text: string)
 	if text ~= shown.value then
 		shown.value = text
 		shown.set(text)
+	end
+end
+
+-- Sets the stage for `device`: on touch the HUD's area left of the touch buttons, elsewhere the whole of it.
+local function measure(self: Hud, device: Enum.PreferredInput)
+	local hud = self._insetArea(Enum.ScreenInsets.CoreUISafeInsets)
+	local stage = if device == Enum.PreferredInput.Touch
+		then TouchArea.stage(self._config.Input.touch, hud, self._insetArea(Enum.ScreenInsets.DeviceSafeInsets))
+		else hud.Max - hud.Min
+	if stage ~= self._stage then
+		self._stage = stage
+		self._setStage(stage)
 	end
 end
 
@@ -150,16 +169,19 @@ local Hud: Hud = {
 	_keyImage = function(_key: Enum.KeyCode): string
 		return ""
 	end,
+	_insetArea = function(_insets: Enum.ScreenInsets): Rect
+		return Rect.new(Vector2.zero, Vector2.zero)
+	end,
 	_root = nil :: any,
-	_centreRoot = nil :: any,
 	_bindings = nil :: any,
 	_clock = nil :: any,
 	_speed = nil :: any,
 	_labels = {},
-	_area = Vector2.zero,
-	_setArea = function(_area: Vector2) end,
+	_stage = Vector2.zero,
+	_setStage = function(_stage: Vector2) end,
 	_onScoreButton = function() end,
 	_touchToggled = false,
+	_over = false,
 	_version = nil,
 	_device = nil,
 	_shownCarrier = nil,
@@ -167,7 +189,7 @@ local Hud: Hud = {
 	_scoreTabOpen = false,
 
 	-- deps.Parent keeps the guis out of the local player's PlayerGui in tests; deps.PreferredInput, deps.LocalId,
-	-- deps.KeyString and deps.KeyImage replace the live game there.
+	-- deps.KeyString, deps.KeyImage and deps.InsetArea replace the live game there.
 	init = function(self: Hud, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -190,6 +212,10 @@ local Hud: Hud = {
 			or function(key: Enum.KeyCode): string
 				return UserInputService:GetImageForKeyCode(key)
 			end
+		self._insetArea = deps.InsetArea
+			or function(insets: Enum.ScreenInsets): Rect
+				return GuiService:GetInsetArea(insets)
+			end
 		self.renders = 0
 		self._version = nil
 		self._device = nil
@@ -197,6 +223,7 @@ local Hud: Hud = {
 		self._hasSkater = false
 		self._scoreTabOpen = false
 		self._touchToggled = false
+		self._over = false
 		self._onScoreButton = function()
 			self:toggleScoreTab()
 		end
@@ -211,11 +238,11 @@ local Hud: Hud = {
 			labelBindings[control] = shown.binding
 		end
 		self._labels = labels
-		local area, setArea = React.createBinding(Vector2.zero)
-		self._area = Vector2.zero
-		self._setArea = setArea
+		local stage, setStage = React.createBinding(Vector2.zero)
+		self._stage = Vector2.zero
+		self._setStage = setStage
 		self._bindings =
-			{ clock = self._clock.binding, speed = self._speed.binding, labels = labelBindings, area = area }
+			{ clock = self._clock.binding, speed = self._speed.binding, labels = labelBindings, stage = stage }
 
 		local parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
 		-- Both are kept across respawns.
@@ -233,19 +260,14 @@ local Hud: Hud = {
 		centre.ScreenInsets = Enum.ScreenInsets.None
 		centre.Parent = parent
 		self.centre = centre
-		self._centreRoot = ReactRoblox.createLegacyRoot(centre)
-		self._centreRoot:render(React.createElement(React.Fragment, nil, {
-			Reticle = React.createElement(Reticle, { config = config }),
-		}))
 	end,
 
-	-- The HUD's area changes when the window is resized or the device turned.
+	-- The screen's size changes when the window is resized or the device turned.
 	start = function(self: Hud)
-		local gui = self.gui
-		gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-			self:resize(gui.AbsoluteSize)
+		self.gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			self:resize()
 		end)
-		self:resize(gui.AbsoluteSize)
+		self:resize()
 	end,
 
 	toggleScoreTab = function(self: Hud)
@@ -254,14 +276,10 @@ local Hud: Hud = {
 
 	destroy = function(self: Hud)
 		self._root:unmount()
-		self._centreRoot:unmount()
 	end,
 
-	resize = function(self: Hud, area: Vector2)
-		if area ~= self._area then
-			self._area = area
-			self._setArea(area)
-		end
+	resize = function(self: Hud)
+		measure(self, self._preferredInput())
 	end,
 
 	step = function(self: Hud, _dt: number)
@@ -270,8 +288,13 @@ local Hud: Hud = {
 		local carrier = self._carrier.carrier
 		local skate = self._skate
 		local hasSkater = skate:hasSkater()
-		if device ~= Enum.PreferredInput.Touch or state.ended ~= nil then
+		if device ~= self._device then
+			measure(self, device)
+		end
+		local over = state.ended ~= nil
+		if device ~= Enum.PreferredInput.Touch or over ~= self._over then
 			self._touchToggled = false
+			self._over = over
 		end
 		local scoreTabOpen = self._input:scoreTabHeld() or self._touchToggled
 		if
@@ -299,6 +322,7 @@ local Hud: Hud = {
 				scoreTabOpen = scoreTabOpen,
 				onScoreButton = self._onScoreButton,
 				bindings = self._bindings,
+				centre = self.centre,
 			}))
 		end
 

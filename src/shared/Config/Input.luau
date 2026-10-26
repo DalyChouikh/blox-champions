@@ -158,22 +158,33 @@ local actionList = Validate.check(
 	"must name at least one action"
 )
 
--- Whether two buttons placed from the same corner (equal scales) sit nearer than a button's size, both across and
--- down: then they would cover each other, whatever their shape.
-local function buttonsOverlap(touch: TouchLayout): boolean
+-- Every touch button's place, one per button: the rules below and the buttons' reach (Input/TouchArea) read them.
+local function buttonPlaces(touch: TouchLayout): { UDim2 }
 	local b = touch.buttons
-	local all: { UDim2 } = { b.jump, b.pump, b.brake, b.attach, b.tackle, b.uppercut, b.pass, b.throw }
+	return { b.jump, b.pump, b.brake, b.attach, b.tackle, b.uppercut, b.pass, b.throw }
+end
+
+-- Whether every button sits at the bottom-right corner (scales 1, 1), as TouchLayout documents: the buttons' reach is
+-- measured from there.
+local function fromCorner(touch: TouchLayout): boolean
+	for _, place in buttonPlaces(touch) do
+		if place.X.Scale ~= 1 or place.Y.Scale ~= 1 then
+			return false
+		end
+	end
+	return true
+end
+
+-- Whether two buttons, both placed from the corner, sit nearer than a button's size both across and down: then they
+-- would cover each other, whatever their shape.
+local function buttonsOverlap(touch: TouchLayout): boolean
+	local all = buttonPlaces(touch)
 	local width, height = touch.buttonSize.X.Offset, touch.buttonSize.Y.Offset
 	for first = 1, #all - 1 do
 		local p = all[first]
 		for second = first + 1, #all do
 			local q = all[second]
-			if
-				p.X.Scale == q.X.Scale
-				and p.Y.Scale == q.Y.Scale
-				and math.abs(p.X.Offset - q.X.Offset) < width
-				and math.abs(p.Y.Offset - q.Y.Offset) < height
-			then
+			if math.abs(p.X.Offset - q.X.Offset) < width and math.abs(p.Y.Offset - q.Y.Offset) < height then
 				return true
 			end
 		end
@@ -231,6 +242,10 @@ local fields = Validate.record({
 				holds = function(touch: TouchLayout): boolean
 					return touch.stickRadius > touch.stickDeadZone
 				end,
+			},
+			{
+				message = "buttons must sit at the bottom-right corner (scales 1, 1)",
+				holds = fromCorner,
 			},
 			{
 				message = "buttons must not overlap",
@@ -297,4 +312,5 @@ end
 return {
 	defaults = defaults,
 	schema = schema,
+	buttonPlaces = buttonPlaces,
 }

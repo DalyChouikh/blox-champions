@@ -82,6 +82,9 @@ describe("ScoreTab", function()
 			table.insert(orders, (frame:FindFirstChild(id, true) :: Frame).LayoutOrder)
 		end
 		expect(orders).toEqual({ 1, 2, 3, 4 })
+		-- Solid, and drawn over the end screen (ZIndex 1), which it opens over on touch.
+		expect(frame.BackgroundTransparency).toBe(config.UI.hud.overlayTransparency)
+		expect(frame.ZIndex).toBe(2)
 	end)
 
 	it("shrinks to fit a screen smaller than itself", function()

@@ -42,6 +42,11 @@ function Style.panel(config: Config.GameConfig, props: Props?): Props
 	)
 end
 
+-- A panel drawn over the game (the score tab, the end screen): Style.panel, but overlayTransparency see-through.
+function Style.overlay(config: Config.GameConfig, props: Props?): Props
+	return Style.panel(config, over({ BackgroundTransparency = config.UI.hud.overlayTransparency }, props))
+end
+
 -- A frame that only holds others.
 function Style.holder(props: Props?): Props
 	return over({ BackgroundTransparency = 1, BorderSizePixel = 0 }, props)
