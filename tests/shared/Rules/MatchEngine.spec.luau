@@ -11,6 +11,15 @@ local Types = require(ReplicatedStorage.Shared.Rules.Types)
 local ZERO = Vector3.zero
 local ON_TARGET_POSITION, ON_TARGET_VELOCITY = Vector3.new(190, 15, 0), Vector3.new(100, 0, 0)
 local SHORT_STREAK = { Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2 } }
+local DEFAULTS = Fixtures.config()
+local LAPS_TO_OPEN_GOAL = DEFAULTS.Match.lapsToOpenGoal
+-- Every streak starts at the goal's gate (spec §4.2), so a lap runs from it round to the gate before it.
+local GOAL_GATE = DEFAULTS.Arena.goalGateIndex
+local GATE_COUNT = Fixtures.GATE_COUNT
+local LAP: { number } = table.create(GATE_COUNT)
+for offset = 0, GATE_COUNT - 1 do
+	LAP[offset + 1] = (GOAL_GATE + offset - 1) % GATE_COUNT + 1
+end
 
 local function newEngine(overrides: { [string]: any }?): MatchEngine.MatchEngine
 	local engine = MatchEngine.new({
@@ -48,7 +57,7 @@ local function crossGates(engine: MatchEngine.MatchEngine, gates: { number })
 end
 
 local function lap(engine: MatchEngine.MatchEngine)
-	crossGates(engine, { 1, 2, 3, 4 })
+	crossGates(engine, LAP)
 end
 
 -- Typed so each expected event is checked against the Event union.
@@ -204,7 +213,7 @@ describe("MatchEngine possession and laps", function()
 		local engine = liveEngine()
 		engine:pickedUp("B1", ZERO, ZERO)
 		expectEvents(engine, { { name = "PossessionChanged", team = "Blue", player = "B1" } })
-		crossGates(engine, { 1, 2 })
+		crossGates(engine, { LAP[1], LAP[2] })
 		engine:drainEvents()
 		engine:pickedUp("O1", ZERO, ZERO)
 		expectEvents(engine, {
@@ -232,26 +241,42 @@ describe("MatchEngine possession and laps", function()
 		local engine = liveEngine()
 		local snapshot = engine:snapshot()
 		expect(snapshot.stats).toEqual(engine:stats())
-		expect(snapshot.gateCount).toBe(4)
-		expect(snapshot.nextGate).toBeNil()
+		expect(snapshot.gateCount).toBe(GATE_COUNT)
+		expect(snapshot.nextGate).toBe(GOAL_GATE)
 		engine:pickedUp("B1", ZERO, ZERO)
-		crossGates(engine, { 1 })
-		expect(engine:snapshot().nextGate).toBe(2)
+		crossGates(engine, { GOAL_GATE })
+		expect(engine:snapshot().nextGate).toBe(LAP[2])
 	end)
 
 	it("counts gates only for a possessing team, forward and in order", function()
 		local engine = liveEngine()
-		engine:ballMoved(Fixtures.throughGate(1))
+		engine:ballMoved(Fixtures.throughGate(GOAL_GATE))
 		expectEvents(engine, {})
 		engine:pickedUp("B1", ZERO, ZERO)
 		engine:drainEvents()
-		crossGates(engine, { 2, 4, 3 })
-		local from, to = Fixtures.throughGate(4)
+		-- The gate after the goal's counts nothing before it; then one out of order, and one crossed backwards.
+		crossGates(engine, { LAP[2], LAP[1], LAP[3], LAP[2] })
+		local from, to = Fixtures.throughGate(LAP[3])
 		engine:ballMoved(to, from)
 		expectEvents(engine, {
-			{ name = "GateCrossed", team = "Blue", gateIndex = 2, progress = 1 },
-			{ name = "GateCrossed", team = "Blue", gateIndex = 3, progress = 2 },
+			{ name = "GateCrossed", team = "Blue", gateIndex = LAP[1], progress = 1 },
+			{ name = "GateCrossed", team = "Blue", gateIndex = LAP[2], progress = 2 },
 		})
+	end)
+
+	it("starts every streak at the goal's gate, after the kickoff and after a steal", function()
+		-- Not the default goal gate, so an engine that ignores goalGateIndex fails.
+		local goalGate = GOAL_GATE % GATE_COUNT + 1
+		local engine = liveEngine({ Arena = { goalGateIndex = goalGate } })
+		expect(engine:snapshot().nextGate).toBe(goalGate)
+		engine:pickedUp("B1", ZERO, ZERO)
+		engine:drainEvents()
+		crossGates(engine, { GOAL_GATE, goalGate })
+		expectEvents(engine, { { name = "GateCrossed", team = "Blue", gateIndex = goalGate, progress = 1 } })
+		engine:pickedUp("O1", ZERO, ZERO)
+		local snapshot = engine:snapshot()
+		expect(snapshot.nextGate).toBe(goalGate)
+		expect(snapshot.lapProgress).toBe(0)
 	end)
 
 	it("completes a lap after four gates in order, crediting the last holder", function()
@@ -274,7 +299,7 @@ describe("MatchEngine goals and points", function()
 		engine:pickedUp("B1", ZERO, ZERO)
 		engine:thrown("B1")
 		engine:pickedUp("B2", ZERO, ZERO)
-		for _ = 1, 3 do
+		for _ = 1, LAPS_TO_OPEN_GOAL - 1 do
 			lap(engine)
 		end
 		engine:drainEvents()
@@ -315,19 +340,23 @@ describe("MatchEngine goals and points", function()
 	it("judges the ring before the gates a segment crosses, so the lap that opens the goal cannot score", function()
 		local engine = liveEngine()
 		engine:pickedUp("B1", ZERO, ZERO)
-		for _ = 1, 3 do
-			crossGates(engine, { 3, 4, 1, 2 })
+		for _ = 1, LAPS_TO_OPEN_GOAL - 1 do
+			lap(engine)
 		end
-		crossGates(engine, { 3, 4, 1 })
+		crossGates(engine, table.move(LAP, 1, GATE_COUNT - 1, 1, {}))
 		engine:drainEvents()
-		engine:ballMoved(Fixtures.throughRing())
+		-- The lap ends at the gate before the goal's, and the ring hangs in the goal gate's plane: one segment from
+		-- before that last gate through the ring completes the lap that opens the goal, and still does not score.
+		local lastGate = LAP[GATE_COUNT]
+		local beforeLast = Fixtures.throughGate(lastGate)
+		local ringFrom, ringTo = Fixtures.throughRing()
+		engine:ballMoved(Vector3.new(beforeLast.X, ringFrom.Y, ringFrom.Z), ringTo)
 		expectEvents(engine, {
-			{ name = "GateCrossed", team = "Blue", gateIndex = 2, progress = 4 },
-			{ name = "LapCompleted", team = "Blue", streak = 4, holder = "B1" },
+			{ name = "GateCrossed", team = "Blue", gateIndex = lastGate, progress = GATE_COUNT },
+			{ name = "LapCompleted", team = "Blue", streak = LAPS_TO_OPEN_GOAL, holder = "B1" },
 			{ name = "GoalOpened", team = "Blue" },
+			{ name = "GateCrossed", team = "Blue", gateIndex = GOAL_GATE, progress = 1 },
 		})
-		crossGates(engine, { 3, 4, 1 })
-		engine:drainEvents()
 		engine:ballMoved(Fixtures.throughRing())
 		expect(names(engine:drainEvents())).toEqual({ "GoalScored", "GoalClosed" })
 	end)

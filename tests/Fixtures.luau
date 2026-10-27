@@ -30,6 +30,9 @@ export type Screen = { hud: Rect, controls: Rect }
 -- Roblox's default workspace.Gravity, pointing down.
 Fixtures.GRAVITY = Vector3.new(0, -196.2, 0)
 
+-- The gates in a lap, one at each corner of the arena (spec §4.2): every fixture's gates and markers.
+Fixtures.GATE_COUNT = 4
+
 -- A point outside the arena: 10 studs past the outer glass's face and 5 up, at the top straight's middle. The ball
 -- there is out, and a skater there is placed back on their spawn.
 function Fixtures.outsideArena(config: Config.GameConfig): Vector3
@@ -98,6 +101,8 @@ end
 
 local GATE_SPACING = 100
 local GATE_SIZE = 40
+-- Every streak starts at the goal's gate (spec §4.2), so it is the next gate from the kickoff on.
+local GOAL_GATE = Config.defaults().Arena.goalGateIndex
 
 function Fixtures.mode(overrides: { [string]: any }?): Config.Mode
 	return { id = "Test", displayName = "Test", itemsEnabled = false, overrides = overrides or {} }
@@ -132,7 +137,8 @@ function Fixtures.roster(count: number): { Types.PlayerStats }
 end
 
 -- What the server sends the HUD: a live match two minutes from the end with players "1" (Blue, Ana) and "2" (Orange,
--- Rex), its fields changed by `overrides`, taken on server frame `frame` (default 0).
+-- Rex), no lap progress yet (the goal's gate next), its fields changed by `overrides`, taken on server frame `frame`
+-- (default 0).
 function Fixtures.matchSnapshot(overrides: { [string]: any }?, frame: number?): Payloads.MatchSnapshot
 	local match: { [string]: any } = {
 		state = "Live",
@@ -143,7 +149,8 @@ function Fixtures.matchSnapshot(overrides: { [string]: any }?, frame: number?): 
 		scores = { Blue = 0, Orange = 0 },
 		streak = 0,
 		lapProgress = 0,
-		gateCount = 4,
+		gateCount = Fixtures.GATE_COUNT,
+		nextGate = GOAL_GATE,
 		stats = {
 			scores = { Blue = 0, Orange = 0 },
 			players = { Fixtures.playerStats("1", "Blue", true), Fixtures.playerStats("2", "Orange", true) },
@@ -169,7 +176,7 @@ end
 
 function Fixtures.gates(): { Crossing.Rectangle }
 	local gates = {}
-	for index = 1, 4 do
+	for index = 1, Fixtures.GATE_COUNT do
 		table.insert(gates, Fixtures.gate(GATE_SPACING * index))
 	end
 	return gates
@@ -282,7 +289,7 @@ function Fixtures.hudArena(folder: Instance): HudArena
 	local panel = part("GoalPanel", Vector3.new(2, 20, -40), folder)
 	panel:AddTag(Tags.GoalPanel)
 	local markers: { Model } = {}
-	for index = 1, 4 do
+	for index = 1, Fixtures.GATE_COUNT do
 		local marker = Instance.new("Model")
 		marker.Name = `Marker{index}`
 		part("Pane1", Vector3.new(index * 100, 1, 0), marker)

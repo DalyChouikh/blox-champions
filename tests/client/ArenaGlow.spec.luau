@@ -18,6 +18,9 @@ local colors = config.UI.teamColors
 local DT = 1 / 60
 -- An invisible part: every gate's panel but the next gate's.
 local HIDDEN = 1
+-- Every streak starts at the goal's gate (the snapshot fixture's next gate), then goes on to the one after it.
+local GOAL_GATE = config.Arena.goalGateIndex
+local AFTER_GOAL_GATE = GOAL_GATE % Fixtures.GATE_COUNT + 1
 
 local folder: Folder
 local arena: Fixtures.HudArena
@@ -100,24 +103,31 @@ describe("ArenaGlow", function()
 		end
 	end)
 
-	-- The owner's choice (2026-10-27): only the next gate's panel shows, and every other one is invisible.
-	it("shows only the next gate's panel, lit for the team with the ball, and none before their first gate", function()
+	-- The owner's choices (2026-10-27): only the next gate's panel shows, every other one is invisible, and every
+	-- streak starts at the goal's gate.
+	it("shows only the next gate's panel, lit for the team with the ball, the goal gate's from the pickup", function()
 		local markers = arena.markers
-		snapshot({ possessingTeam = "Blue" })
+		-- Nobody has the ball: no panel shows, though the goal's gate is next.
+		snapshot()
 		for _, marker in markers do
 			expect(panelShows(marker, nil)).toBe(true)
 		end
-		snapshot({ possessingTeam = "Blue", nextGate = 2 })
-		expect(panelShows(markers[2], colors.Blue)).toBe(true)
-		expect(panelShows(markers[1], nil) and panelShows(markers[3], nil) and panelShows(markers[4], nil)).toBe(true)
-		-- The panel the carrier passed disappears as the next one lights.
-		snapshot({ possessingTeam = "Blue", nextGate = 3 })
-		expect(panelShows(markers[2], nil)).toBe(true)
-		expect(panelShows(markers[3], colors.Blue)).toBe(true)
-		snapshot({ possessingTeam = "Orange", nextGate = 3 })
-		expect(panelShows(markers[3], colors.Orange)).toBe(true)
+		snapshot({ possessingTeam = "Blue" })
+		for gate, marker in markers do
+			expect(panelShows(marker, if gate == GOAL_GATE then colors.Blue else nil)).toBe(true)
+		end
+		-- A kickoff (after a goal at the goal's gate) leaves nobody with the ball and the goal's gate still next.
 		snapshot()
-		expect(panelShows(markers[3], nil)).toBe(true)
+		expect(panelShows(markers[GOAL_GATE], nil)).toBe(true)
+		snapshot({ possessingTeam = "Blue" })
+		-- The panel the carrier passed disappears as the next one lights.
+		snapshot({ possessingTeam = "Blue", nextGate = AFTER_GOAL_GATE })
+		expect(panelShows(markers[GOAL_GATE], nil)).toBe(true)
+		expect(panelShows(markers[AFTER_GOAL_GATE], colors.Blue)).toBe(true)
+		snapshot({ possessingTeam = "Orange", nextGate = AFTER_GOAL_GATE })
+		expect(panelShows(markers[AFTER_GOAL_GATE], colors.Orange)).toBe(true)
+		snapshot()
+		expect(panelShows(markers[AFTER_GOAL_GATE], nil)).toBe(true)
 	end)
 
 	it("hides every gate's panel from the start, and never the goal", function()
@@ -141,16 +151,16 @@ describe("ArenaGlow", function()
 	end)
 
 	it("keeps each part's first look when the arena's parts are found again while they glow", function()
-		snapshot({ possessingTeam = "Blue", goalOpenFor = "Blue" })
-		-- A new record of the same parts, the ring still glowing and every panel hidden.
+		snapshot({ possessingTeam = "Blue", goalOpenFor = "Blue", nextGate = AFTER_GOAL_GATE })
+		-- A new record of the same parts, the ring still glowing and the goal gate's panel hidden.
 		ArenaParts:refresh()
 		ArenaGlow:step(DT)
-		snapshot({ possessingTeam = "Blue", nextGate = 2 })
+		snapshot({ possessingTeam = "Blue" })
 		for _, rim in arena.rim do
 			expect(glows(rim, nil)).toBe(true)
 		end
 		-- The panel shows at the transparency it was first seen with, not the hidden one.
-		expect(panelShows(arena.markers[2], colors.Blue)).toBe(true)
+		expect(panelShows(arena.markers[GOAL_GATE], colors.Blue)).toBe(true)
 	end)
 
 	it("slides the panel out of the ring while the goal is open, and back", function()

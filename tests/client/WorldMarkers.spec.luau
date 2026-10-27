@@ -159,10 +159,12 @@ describe("WorldMarkers", function()
 		BallCarrier:set("2")
 		WorldMarkers:step(DT)
 		expect(arrow.Visible).toBe(false)
+		-- Every streak starts at the goal's gate (the snapshot fixture's next gate): the arrow shows from the pickup.
 		BallCarrier:set(LOCAL_ID)
 		snapshot({ possessingTeam = "Blue" })
 		WorldMarkers:step(DT)
-		expect(arrow.Visible).toBe(false)
+		expect(arrow.Visible).toBe(true)
+		Fixtures.expectNear(gateAimed :: Vector3, arena.markers[config.Arena.goalGateIndex]:GetPivot().Position)
 	end)
 
 	it("hides every ball marker while there is no ball", function()
