@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-25 (design approved in brainstorming); written 2026-10-26; **revised 2026-10-26** (session 21) after the owner's direction change; **amended 2026-10-27** after the owner's playtest
 - **Milestone:** [M1 - Foundation & Core Match](https://github.com/DalyChouikh/blox-champions/milestone/1)
-- **Status:** Revision approved by the owner (2026-10-26). The first version (d558a48, approved 2026-10-26) is built as Task 1 (#186, PR #192); this revision replaces its glass barrier, sizes, gate arches and reach check. The playtest's amendment (2026-10-27) changes the glass's look (R5) and turns the gate panels into walls (R18).
+- **Status:** Revision approved by the owner (2026-10-26). The first version (d558a48, approved 2026-10-26) is built as Task 1 (#186, PR #192); this revision replaces its glass barrier, sizes, gate arches and reach check. The playtest's amendment (2026-10-27) changes the glass's look (R5) and turns the gate panels into walls (R18), only the next gate's showing.
 - **Parent:** `docs/superpowers/specs/2026-10-21-m1-foundation-core-match-design.md`, decision A6 (the overhaul: Arena → Feel → Ball & rules → Presentation)
 - **Reference:** `docs/reference/2026-10-25-reference-games.md` (the videos, the observations, the owner's answers; "Video 3" is the 45-minute ranked video the revision rests on)
 
@@ -79,7 +79,7 @@ Brainstorm 2026-10-25, the approved spec 2026-10-26, and the revision 2026-10-26
 | R14 | The top (2026-10-26) | **Set per map** (`Arena.top.kind`): **Closed**, a glass roof at the walls' top; or **Open**, an invisible ceiling above it. Both stop skaters and the ball, and neither is ridden. Both kinds are built and tested now; **our map is closed**. |
 | R15 | The top of the walls (2026-10-26) | Every wall ends in a **lip** curling inward. The lip is rideable, and turns a fast skater back toward the track; the top is not, and a skater bumps off it like a ceiling. Gravity brings them down: no riding upside down. |
 | R17 | The open map's ceiling (2026-10-26) | **20 studs above the walls' top** (140), stopping **the ball and skaters**. In Video 3's replay at 21:13 the ball rose above Acapulco's overhead rails before falling into the goal, so if RC has a ceiling it sits above the walls. |
-| R18 | The gate panels (2026-10-26, amended 2026-10-27) | **A thin glass wall, floor to roof:** glass fills the gate's whole cross-section, from the track's surface up to the walls' top, and skaters pass through it ("just like in rc, it is a wall not an arch ... it feels more satisfying to pass through a wall"); nothing collides with it. The whole wall glows, still see-through, on the next gate. *(2026-10-26: a panel hanging from the top down to a rounded opening.)* |
+| R18 | The gate panels (2026-10-26, amended 2026-10-27) | **A thin glass wall, floor to roof:** glass fills the gate's whole cross-section, from the track's surface up to the walls' top, and skaters pass through it ("just like in rc, it is a wall not an arch ... it feels more satisfying to pass through a wall"); nothing collides with it. The whole wall glows, still see-through, on the next gate. **Only that wall shows** (the owner, after its play check): every other wall is invisible, so none shows while nobody has the ball or before the team's first gate, and a passed wall disappears as the next one lights. *(2026-10-26: a panel hanging from the top down to a rounded opening.)* |
 
 (R16, the inner side, is folded into R3.)
 
@@ -107,7 +107,7 @@ The M1 spec's §9.1 (layout, dimensions, markers, goal placement), §9.2 (folder
 7. **A3's loop rule stays in `SkateMath`.** On an overhang, a skater stays on only while speed² × curvature reaches gravity's pull off the surface. That is real physics, and it is what the lips need (R15). What the Feel part changes is the walls' rule (`minWallSpeed`). Cost if wrong: one rule.
 8. **The top's height is one rule** (`Profile.topHeight`): `glass.top` when closed, `glass.top + top.ceilingAbove` when open. Gates are that tall, and `Bounds.inArena` ends there. Cost if wrong: none.
 9. **Every ray looks through the top** (RideSurfaces' `params` holds ride surfaces only, as Task 2's work has it). The camera stops in front of glass, as in front of any wall, but sees through the roof. Cost if wrong: a camera that, near the roof, could rise above it.
-10. **The gate wall follows the cross-section as built** (amended 2026-10-27). It runs from the solid section at the gate (the step half blended there) up to the walls' top outline (the lips' chords and 120). Its slices break at every point of either outline, so its edges lie on the surface's and the lips' own chords; equal slices would cut across the step and the foot curve. Breaks closer than Roblox's smallest part (0.001) merge into one. It is `gatePanel.depth` (0.5) thick, behind the gate's plane, and keeps the name "gate panel" in code. Cost if wrong: none. *(2026-10-26: an opening of half an ellipse, `gatePanel.openingHeight` 60, in `gatePanel.segments` 16 slices, 2 deep.)*
+10. **The gate wall follows the cross-section as built** (amended 2026-10-27). It runs from the solid section at the gate (the step half blended there) up to the walls' top outline (the lips' chords and 120). Its slices break at every point of either outline, so its edges lie on the surface's and the lips' own chords; equal slices would cut across the step and the foot curve. Breaks closer than Roblox's smallest part (0.001) merge into one. It is `gatePanel.depth` (0.2) thick, behind the gate's plane, and keeps the name "gate panel" in code. The goal hangs in gate 2's plane, centred on it, so the wall must be thinner than half the goal's thinnest part (§3.3, rule 7): at 0.5 the wall's back face lay in the rim's face plane and the rim flickered (seen 2026-10-27; clean at 0.2). Cost if wrong: none. *(2026-10-26: an opening of half an ellipse, `gatePanel.openingHeight` 60, in `gatePanel.segments` 16 slices, 2 deep.)*
 11. **The goal's arm comes from the outer glass.** A post rises from the rim's top up to `goal.arm.height` (40), then a beam runs out to the outer glass's face. That works on both kinds of top. Cost if wrong: none.
 12. **The beam covers the vertical outer glass**, from the solid wall's top (28) up to where the lip starts (108). Cost if wrong: none.
 13. **A lap at cruise speed takes about 13 s** (777 studs at 60), past the M1 spec's 10–12 s target. The Feel part tunes speeds. Cost if wrong: longer laps until then.
@@ -166,7 +166,7 @@ Every section runs the same way around the track's "O" (inner top, down, across 
 | `stripsPerSection` (the solid profile) | 20 | 20 |
 | `barrier` | `{ top = 85, thickness = 1, transparency = 0.7 }` | removed: `glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.85, material = Enum.Material.SmoothPlastic }` (2026-10-27: was 0.7 with the Glass material) |
 | `top` | — | `{ kind = "Closed", ceilingAbove = 20 }` (`kind` is `"Closed"` or `"Open"`; `ceilingAbove` is used by Open) |
-| `marker` | `{ width, height }` | removed: `gatePanel = { depth = 0.5 }` (2026-10-27: was `{ openingHeight = 60, depth = 2, segments = 16 }`) |
+| `marker` | `{ width, height }` | removed: `gatePanel = { depth = 0.2 }` (2026-10-27: was `{ openingHeight = 60, depth = 2, segments = 16 }`) |
 | `goal.wallGap` | 1 | removed: `goal.across = 0.75` (the ring's centre, as a fraction of `trackWidth` from the inner glass) |
 | `goal.arm` | — | `{ thickness = 1, height = 40 }` (where the arm's beam runs, above the lower floor) |
 | `colors.marker` | (27, 42, 53) | removed (`colors.glass` colours the glass, the roof and the panels) |
@@ -188,8 +188,9 @@ Every section runs the same way around the track's "O" (inner top, down, across 
 4. The glass must rise above both solid tops before its lip starts: `glass.top − glass.lipRadius > outerWallHeight` (and `> innerBankHeight`).
 5. The lips must leave the top open between them: `2 · glass.lipRadius < trackWidth`.
 6. `profileBlendLength` must fit within a straight and a curved end (unchanged).
+7. The gate panel must be thinner than half the goal's thinnest part: `gatePanel.depth < min(goal.rimThickness, goal.panelThickness, goal.arm.thickness) / 2`. The goal's parts are centred on gate 2's plane and the wall hangs behind it, so then no face of that wall lies in a face plane of the goal (2026-10-27).
 
-(2026-10-27: the gate panel's opening and its rule went with R18's amendment.)
+(2026-10-27: the gate panel's opening and its rule went with R18's amendment; rule 7 is new.)
 
 **Checked by `Arena/Geometry` against the arena as built:** the goal ring's fit and its arm (§5.3).
 
@@ -245,7 +246,7 @@ As today, a gate spans the track at the start of each section, facing the travel
   - it is made of slices across the track that break at every point of either outline (§2.3, 10), each a quad in the gate's plane, `gatePanel.depth` thick behind it (a block when the quad is a rectangle, wedges otherwise, as the surface's quads).
 - **Parts:** each panel is a Model `GatePanel<g>` tagged `CornerMarker` with `GateIndex` g, its pivot at the wall's middle (u = `trackWidth`/2, halfway between the surface and the top there), facing the travel direction. Its parts have the glass look, with `CanCollide`, `CanQuery` and `CanTouch` false: nothing hits, sees or touches them, so skaters pass through.
 - **`ArenaParts.markers[g]`** becomes `{ parts: { BasePart }, position: Vector3 }`: every part of the panel, and its pivot's position.
-  - ArenaGlow lights every part of the next gate's panel in the possessing team's colour, and restores each as it reached the client.
+  - ArenaGlow shows only the next gate's panel (R18): every part of it lit in the possessing team's colour, at its own transparency. It hides every other panel (`Transparency` 1) from the moment the arena's parts reach the client, and each panel it leaves.
   - The next-gate arrow (WorldMarkers) points at `position`.
 
 ### 5.3 The hanging goal
@@ -338,7 +339,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 - **RideSurfaces:** `solid` holds the top, `params` does not.
 - **SkateController:** the sweep stops at the top (real parts in Edit, like the seam test), and the ground ray ignores it.
 - **CameraController:** the top between the camera and the skater does not pull the camera in.
-- **ArenaParts, ArenaGlow, WorldMarkers:** the panel markers.
+- **ArenaParts, ArenaGlow, WorldMarkers:** the panel markers; ArenaGlow hides every panel but the lit one, and never the goal.
 - **CarrierBeam:** hidden without a carrier, beside the ball on the outer glass in the team's colour, writes only on change.
 - **MovementGuard and BallService:** in and out by `inArena`.
 - **Integration:** the arena built from the shipped config, every tag present, the ground found on the glass.

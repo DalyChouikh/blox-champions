@@ -137,6 +137,14 @@ revised before any more Arena code. Their words, then what still needs a questio
   surface (bank, floor, step, wall foot) up to the lips and the roof, thin (0.5), the glass's look, nothing hits it;
   the whole wall glows in the team's colour (still see-through) on the next gate; the carrier's arrow points at its
   middle. Not chosen: lighting it as thin vertical light lines (RC's curtain look). Replaces the hanging panel above.
+- **The walls' thickness**, after their play check (screenshots): at 0.5 the goal gate's wall shared the rim's face
+  plane and the rim flickered. The owner: "lets try 0.2 studs thick" (recommended: 0.2, with a settings check keeping
+  the wall thinner than half the goal's thinnest part).
+- **Only the lit wall shows** (the owner, same answer): "the wall marker shouldn't always be visible with the white
+  color when a ball is not picked up or the player pass a marker and the marker becomes white and next one lit, we
+  should only show the lit marker the other ones become invisible". Every gate wall is invisible except the next
+  gate's, lit in the team's colour: none while nobody has the ball or before the first gate, and a passed wall
+  disappears.
 - Asked: "are the physics and camera in future tasks?" - yes, the Feel part (next after the Arena part).
 
 ## Roller Champions

@@ -634,8 +634,9 @@ docs/playtests/2026-10-26-m1-arena.md          the Studio checks and the owner's
 
 During Task 7 Step 3 the owner asked for two changes, and the spec was amended for them on 2026-10-27 (R5's look, R18 a wall, §2.3 #10, §3.2, §3.3, §4.1, §5.2). Each is its own issue and a stacked, test-first fix before Task 7's record, as in Phase 9.
 
-- **Order:** `feat/190-carrier-beam` ← Task 7a ← Task 7b ← `test/191-arena-playtest`. Task 7's docs commit (e7c599b, local only) is replayed onto Task 7b's branch in a scratch worktree, its M1 spec text brought in line with both fixes.
-- **Totals:** Task 6 ended at **697** (one under this plan's 698, by session 22's ruling on Task 3). Task 7a: **698**. Task 7b: **700**. Task 7's record adds none.
+- **Order:** `feat/190-carrier-beam` ← Task 7a ← Task 7b ← Task 7c ← `test/191-arena-playtest`. Task 7's docs commit (e7c599b, local only) is replayed onto Task 7c's branch in a scratch worktree, its M1 spec text brought in line with the fixes.
+- **Totals:** Task 6 ended at **697** (one under this plan's 698, by session 22's ruling on Task 3). Task 7a: **698**. Task 7b: **700**. Task 7c: **701**. Task 7's record adds none.
+- **Amended after Task 7b's play check (2026-10-27, the owner):** the walls are 0.2 thick (at 0.5 the goal gate's wall shared the rim's face plane and the rim flickered), with config rule 7; and only the next gate's wall shows (Task 7c, #202).
 - **The play checks** use the published game's light: the dev place's Lighting effects are set aside for screenshots and restored after (the built game has none).
 
 ### Task 7a: See-through glass (labels `feature`, `arena`)
@@ -675,7 +676,7 @@ During Task 7 Step 3 the owner asked for two changes, and the spec was amended f
 
 **Interfaces:**
 ```lua
--- Config.Arena.gatePanel = { depth = 0.5 }   (openingHeight, segments and rule 6 removed)
+-- Config.Arena.gatePanel = { depth = 0.2 }   (openingHeight, segments and rule 6 removed; rule 7 added)
 Profile.topOutline(arena: ArenaConfig): { Vector2 }  -- the walls' top as built, in u order: the inner lip, the outer lip
 Surface.section(arena: ArenaConfig, distance: number): { Vector2 }  -- the solid section, the step blended at distance
 export type GatePanel = { pieces: { Piece }, pivot: CFrame }  -- pivot replaces apex
@@ -689,7 +690,7 @@ export type GatePanel = { pieces: { Piece }, pivot: CFrame }  -- pivot replaces 
 - **Expected counts at the defaults:** 28 breaks, so 27 slices. Two are rectangles (the lower floor under the roof, u 12–36; the upper floor, u 54–62), so a wall is 2 blocks and 25 × 4 wedges = 102 pieces: 408 parts in all (the panels had 256).
 
 - [ ] **Step 1: Write the failing tests:**
-  - **`Config.spec`:** `gatePanel = { depth = 0.5 }`; the `segments` cases and rule 6's two cases go; the depth part-size case stays.
+  - **`Config.spec`:** `gatePanel = { depth = 0.2 }`; the `segments` cases and rule 6's two cases go; the depth part-size case stays; rule 7's case `gatePanel = { depth = 0.25 }` (half the goal panel's 0.5) → `Arena: the gate panel must be thinner than half the goal's thinnest part, so its faces never meet the goal's`.
   - **`Profile.spec`** `follows the walls' top as built across the track`: `heightAt(topOutline(arena), u)` gives today's values, and the outline runs from (0, 108) to (80, 108).
   - **`Surface.spec`** (+1) **new** `gives the solid section at a distance, with the straights' step blended there`: the full step on a straight, none at a curved end's apex, half at a gate.
   - **`Features.spec`:**
@@ -709,10 +710,30 @@ export type GatePanel = { pieces: { Piece }, pivot: CFrame }  -- pivot replaces 
   - no merge → the merge test; the last break dropped → the shape test (u 80);
   - the pivot at a fixed height → the slices test;
   - `Surface.section` without the blend → the Surface test;
-  - the depth ignored → the shape test.
+  - the depth ignored → the shape test;
+  - rule 7 dropped, or `<=` for `<` → the Config rejection.
 - [ ] **Step 6: Play check (Studio):** with the ball carried by a probe, the next gate's wall glows across the whole track and the arrow points at its middle; a skater passes through untouched; the goal gate's wall beside the ring; the part count; screenshots; the console shows the two ready lines.
 - [ ] **Step 7:** Static checks. Commit `feat(arena): each gate becomes a thin glass wall across the track`.
 
+### Task 7c: Only the next gate's wall shows (labels `feature`, `arena`)
+
+**Issue:** #202 · **Branch:** `feat/202-only-next-wall` · **Stacked on:** Task 7b
+
+**Files:** modify `src/client/ArenaGlow.luau`; test `tests/client/ArenaGlow.spec.luau`.
+
+- **ArenaGlow** (spec §5.2): each part's remembered look gains its `transparency`. Every marker is hidden (`Transparency` 1) from the moment the arena's parts are found. The next gate's marker shows lit: the team's colour, `arenaGlow.material` and each part's own transparency. The marker it leaves hides again. The hoop and the goal panel never hide.
+
+- [ ] **Step 1: Write the failing tests** (`ArenaGlow.spec`; the fixture's panes get the glass's transparency in `beforeEach`):
+  - `shows only the next gate's panel, lit for the team with the ball, and none before their first gate` (replaces the lighting test): hidden before the first gate; nextGate 2 lights marker 2 at its own transparency and keeps the others hidden; nextGate 3 hides marker 2; Orange relights marker 3; no team hides it;
+  - (+1) **new** `hides every gate's panel from the start, and never the goal`;
+  - `keeps each part's first look when the arena's parts are found again while they glow` also refreshes while a panel is hidden, and the panel then shows at its first transparency, not hidden.
+- [ ] **Step 2:** Run `testPathPattern = "ArenaGlow"`. Expected: FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, then the full suite. Expected: **701 tests**.
+- [ ] **Step 5: Mutations:** shown at a fixed transparency; not hidden at the start; a passed panel left showing; the hoop hidden too; the hidden transparency remembered on a refresh.
+- [ ] **Step 6: Play check (Studio):** in play only the lit wall shows, none before the first gate; screenshots; the console shows the two ready lines.
+- [ ] **Step 7:** Static checks. Commit `feat(arena): only the next gate's wall shows, lit for the team`.
+
 ### Task 7, continued
 
-After Task 7b: Task 7's docs commit is replayed and brought in line, then Step 2's republish, the rest of Step 3 (the checklist), and Step 4's record with both findings and their issues (#199, #200).
+After Task 7c: Task 7's docs commit is replayed and brought in line, then Step 2's republish, the rest of Step 3 (the checklist), and Step 4's record with every finding and its issue (#199, #200, #202).
