@@ -1,7 +1,7 @@
 --!strict
--- Lap progress of the possessing team's streak (spec §4.2). The first gate crossed after a reset starts the
--- sequence; after that only the next gate in track order counts, so backward or out-of-order crossings are
--- ignored. Crossing every gate in order is one lap.
+-- Lap progress of the possessing team's streak (spec §4.2). Every streak starts at the start gate (a match's is the
+-- goal's), and only the next gate in track order counts, so backward or out-of-order crossings are ignored. Crossing
+-- every gate in order is one lap.
 
 local Crossing = require(script.Parent.Crossing)
 
@@ -12,8 +12,9 @@ type Fields = {
 	gateCount: number,
 	streak: number,
 	progress: number,
-	-- The gate that counts next; nil until a streak's first gate starts the sequence (any gate counts then).
-	nextGate: number?,
+	-- The gate that counts next: the start gate when a streak starts.
+	nextGate: number,
+	_startGate: number,
 	_gates: { Crossing.Rectangle },
 	-- Reused by every call, so reporting and ordering crossings never allocates on a tick.
 	_crossed: { number },
@@ -23,17 +24,23 @@ type Fields = {
 
 export type LapTracker = typeof(setmetatable({} :: Fields, LapTracker))
 
-function LapTracker.new(gates: { Crossing.Rectangle }): LapTracker
-	if #gates == 0 then
+function LapTracker.new(gates: { Crossing.Rectangle }, startGate: number): LapTracker
+	local gateCount = #gates
+	if gateCount == 0 then
 		error("LapTracker: at least one gate is required", 0)
+	end
+	-- A start gate that is not a gate would leave every crossing out of order: no lap would ever count.
+	if startGate ~= math.floor(startGate) or startGate < 1 or startGate > gateCount then
+		error(`LapTracker: the start gate must be one of the {gateCount} gates (got {startGate})`, 0)
 	end
 	local fractions: { [number]: number } = {}
 	return setmetatable(
 		{
-			gateCount = #gates,
+			gateCount = gateCount,
 			streak = 0,
 			progress = 0,
-			nextGate = nil,
+			nextGate = startGate,
+			_startGate = startGate,
 			_gates = gates,
 			_crossed = {},
 			_fractions = fractions,
@@ -69,8 +76,7 @@ end
 -- Returns the progress after accepting the crossing (1..gateCount, where gateCount completes a lap: the
 -- streak grows by one and the next lap starts at 0), or nil when the crossing is out of order.
 function LapTracker.accept(self: LapTracker, gateIndex: number): number?
-	local nextGate = self.nextGate
-	if nextGate ~= nil and gateIndex ~= nextGate then
+	if gateIndex ~= self.nextGate then
 		return nil
 	end
 	self.nextGate = gateIndex % self.gateCount + 1
@@ -87,7 +93,7 @@ end
 function LapTracker.reset(self: LapTracker)
 	self.streak = 0
 	self.progress = 0
-	self.nextGate = nil
+	self.nextGate = self._startGate
 end
 
 return LapTracker

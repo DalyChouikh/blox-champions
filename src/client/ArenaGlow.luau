@@ -6,8 +6,8 @@
 --   through it); when the goal closes, the hoop looks as before and the panel slides back;
 -- - only the next gate's corner marker (its glass wall) shows (the owner's choice, 2026-10-27): every part of it glows
 --   in the colour of the team with the ball, at the transparency it had when it reached this client. Every other
---   marker is hidden from the start, and none shows before the team's first gate (the snapshot's nextGate is nil
---   then); the marker it leaves looks as before, hidden.
+--   marker is hidden from the start, and none shows while nobody has the ball; every streak starts at the goal's gate
+--   (spec §4.2), so its marker shows from the pickup. The marker it leaves looks as before, hidden.
 -- "As before" is how each part looked when it reached this client. Everything here is this client's own view.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -193,8 +193,7 @@ local ArenaGlow: ArenaGlow = {
 			glowGoal(self, parts, goalTeam)
 		end
 		local team: Team? = if match ~= nil then match.possessingTeam else nil
-		local nextGate = if match ~= nil then match.nextGate else nil
-		local gate = if team ~= nil and nextGate ~= nil then parts.markers[nextGate] else nil
+		local gate = if match ~= nil and team ~= nil then parts.markers[match.nextGate] else nil
 		if fresh or gate ~= self._gate or team ~= self._gateTeam then
 			glowGate(self, gate, team)
 		end

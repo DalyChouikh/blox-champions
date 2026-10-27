@@ -5,8 +5,8 @@
 --   nothing lies within groundProbe studs;
 -- - an arrow at the screen's edge pointing to the ball while it is off the screen (ScreenMarker);
 -- - for the local player while they carry the ball, an arrow to their team's next gate: over its corner marker's pivot
---   (its glass wall's middle), or pinned to the screen's edge. None before their first gate (the owner's choice): the
---   snapshot's nextGate is nil.
+--   (its glass wall's middle), or pinned to the screen's edge. Every streak starts at the goal's gate (spec §4.2), so
+--   it shows from the pickup.
 -- All of them take the colour of the team with the ball, or the HUD's text colour while it is loose, and hide while
 -- there is no ball. The arrows sit in a ScreenGui without insets, so their pixels are the camera's. A property is
 -- written only when it changes; a step allocates only the disc's frame, the ray's result and a shown arrow's place.
@@ -162,7 +162,7 @@ local function placeBall(self: WorldMarkers, ball: BasePart?)
 	end
 end
 
--- `nextGate`: the possessing team's next gate, nil before their first.
+-- `nextGate`: the possessing team's next gate, nil until the HUD has a match.
 local function placeGate(self: WorldMarkers, nextGate: number?)
 	local parts = self._arena.parts
 	local gate = if nextGate ~= nil

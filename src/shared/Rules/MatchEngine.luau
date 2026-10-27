@@ -46,9 +46,9 @@ export type Snapshot = {
 	lastHolder: PlayerId?,
 	streak: number,
 	lapProgress: number,
-	-- The gates in a lap, and the one that counts next for the possessing team (nil until their first gate).
+	-- The gates in a lap, and the one that counts next for the possessing team: the goal's when a streak starts.
 	gateCount: number,
-	nextGate: number?,
+	nextGate: number,
 	goalOpenFor: Team?,
 	-- The score tab: every player who played this match, by team, then score.
 	stats: Types.MatchStats,
@@ -293,7 +293,8 @@ function MatchEngine.new(options: EngineOptions): MatchEngine
 			_pendingBlockUntil = 0,
 			_events = {},
 			_possession = Possession.new(),
-			_laps = LapTracker.new(arena.gates),
+			-- Every streak starts at the goal's gate, so a lap ends just before the goal (spec §4.2).
+			_laps = LapTracker.new(arena.gates, config.Arena.goalGateIndex),
 			_goal = GoalJudge.new(arena.goal, match.lapsToOpenGoal),
 			_clock = MatchClock.new(match.durationSeconds, config.UI.clockWarnings),
 			_assists = AssistTracker.new(config.Scoring.assistWindowSeconds),

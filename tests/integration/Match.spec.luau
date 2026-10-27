@@ -197,16 +197,23 @@ local function catchWith(rig: Model)
 	MatchService:step(FRAME)
 end
 
--- Seats `count` players (1 by default); the first catches the ball and carries it one lap, which opens the goal.
--- Returns that rig, where it is, and every rig.
-local function openGoal(count: number?): (Model, number, { Model })
+-- Carries the ball `rig` holds at `start` on to the goal's gate, where every streak starts, then once round to 3 studs
+-- before that gate: the lap that opens the goal, ready to shoot. At most two laps.
+local function lapFromGoalGate(rig: Model, start: number)
+	local length = Centerline.length(config.Arena)
+	local goalGate = Centerline.gateDistance(config.Arena, config.Arena.goalGateIndex)
+	carry(rig, start, start + (goalGate - start) % length + length - 3)
+end
+
+-- Seats `count` players (1 by default); the first catches the ball and opens the goal with a lap from the goal's gate.
+-- Returns that rig and every rig.
+local function openGoal(count: number?): (Model, { Model })
 	local rigs = seat(count or 1)
 	kickoff()
 	local start = ballDistance()
 	carry(rigs[1], start, start)
-	local finish = start + Centerline.length(config.Arena) + 2
-	carry(rigs[1], start, finish)
-	return rigs[1], finish % Centerline.length(config.Arena), rigs
+	lapFromGoalGate(rigs[1], start)
+	return rigs[1], rigs
 end
 
 -- The ball is moved through the ring's disc front to back in two frames.
@@ -217,12 +224,10 @@ local function throughRing(goal: CFrame)
 	MatchService:step(FRAME)
 end
 
--- Opens the goal with `count` players seated (1 by default), carries the ball back to just before the goal gate
--- (crossing gates backwards counts nothing), throws it and sends it through the ring. Returns the scorer's rig and
--- every rig.
+-- Opens the goal with `count` players seated (1 by default), throws the ball from just before the goal gate and sends
+-- it through the ring. Returns the scorer's rig and every rig.
 local function scoreOnce(count: number?): (Model, { Model })
-	local rig, at, rigs = openGoal(count)
-	carry(rig, at, Centerline.gateDistance(config.Arena, config.Arena.goalGateIndex) - 3)
+	local rig, rigs = openGoal(count)
 	local goal = tagged().layout.goal.frame
 	BallService:throw("1", goal.LookVector * 60)
 	throughRing(goal)
@@ -281,9 +286,8 @@ describe("A match on the generated arena", function()
 
 	it("reports a body touch to the rules after the pickups", function()
 		setup()
-		local rig, at, rigs = openGoal(2)
+		local _, rigs = openGoal(2)
 		expect(TeamService:teamOf("2")).never.toBe(TeamService:teamOf("1"))
-		carry(rig, at, Centerline.gateDistance(config.Arena, config.Arena.goalGateIndex) - 3)
 		local goal = tagged().layout.goal.frame
 		-- A knocked-down defender beside the ring's approach: the ball touches them instead of being caught.
 		local defender = rigs[2]
@@ -479,14 +483,15 @@ describe("A match on the generated arena", function()
 	end)
 
 	it("closes the goal for the next match when a match ends on time with the goal open", function()
-		setup({ lapsToOpenGoal = 1, lapsForStreakPoint = 2, durationSeconds = 25, postMatchSeconds = 1 })
+		-- Time for both goal openings: each carries the ball at most two laps (about 13 s at 2 studs a frame).
+		setup({ lapsToOpenGoal = 1, lapsForStreakPoint = 2, durationSeconds = 40, postMatchSeconds = 1 })
 		local rig = scoreOnce()
 		frames(config.Match.celebrationSeconds + config.Match.kickoffCountdownSeconds + 0.1)
 		catchWith(rig)
-		local start = ballDistance()
-		carry(rig, start, start + Centerline.length(config.Arena) + 2)
+		lapFromGoalGate(rig, ballDistance())
 		expect(#eventsNamed("GoalOpened")).toBe(2)
-		frames(10)
+		-- The clock runs out with the goal open.
+		frames(MatchService.engine:snapshot().secondsLeft + FRAME)
 		expect(table.find(events(), "MatchEnded")).never.toBeNil()
 		frames(config.Match.postMatchSeconds + 0.05)
 		local panel = tagged().goalPanel
