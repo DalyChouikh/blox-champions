@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-25 (design approved in brainstorming); written 2026-10-26; **revised 2026-10-26** (session 21) after the owner's direction change; **amended 2026-10-27** after the owner's playtest
 - **Milestone:** [M1 - Foundation & Core Match](https://github.com/DalyChouikh/blox-champions/milestone/1)
-- **Status:** Revision approved by the owner (2026-10-26). The first version (d558a48, approved 2026-10-26) is built as Task 1 (#186, PR #192); this revision replaces its glass barrier, sizes, gate arches and reach check. The playtest's amendment (2026-10-27) changes the glass's look (R5) and turns the gate panels into walls (R18), only the next gate's showing.
+- **Status:** Revision approved by the owner (2026-10-26). The first version (d558a48, approved 2026-10-26) is built as Task 1 (#186, PR #192); this revision replaces its glass barrier, sizes, gate arches and reach check. The playtest's amendment (2026-10-27) changes the glass's look (R5) and turns the gate panels into walls (R18), only the next gate's showing; its later finding starts every streak at the goal's gate, so the first wall shows on the pickup (R18, §5.1; the M1 spec's §4.2).
 - **Parent:** `docs/superpowers/specs/2026-10-21-m1-foundation-core-match-design.md`, decision A6 (the overhaul: Arena → Feel → Ball & rules → Presentation)
 - **Reference:** `docs/reference/2026-10-25-reference-games.md` (the videos, the observations, the owner's answers; "Video 3" is the 45-minute ranked video the revision rests on)
 
@@ -79,7 +79,7 @@ Brainstorm 2026-10-25, the approved spec 2026-10-26, and the revision 2026-10-26
 | R14 | The top (2026-10-26) | **Set per map** (`Arena.top.kind`): **Closed**, a glass roof at the walls' top; or **Open**, an invisible ceiling above it. Both stop skaters and the ball, and neither is ridden. Both kinds are built and tested now; **our map is closed**. |
 | R15 | The top of the walls (2026-10-26) | Every wall ends in a **lip** curling inward. The lip is rideable, and turns a fast skater back toward the track; the top is not, and a skater bumps off it like a ceiling. Gravity brings them down: no riding upside down. |
 | R17 | The open map's ceiling (2026-10-26) | **20 studs above the walls' top** (140), stopping **the ball and skaters**. In Video 3's replay at 21:13 the ball rose above Acapulco's overhead rails before falling into the goal, so if RC has a ceiling it sits above the walls. |
-| R18 | The gate panels (2026-10-26, amended 2026-10-27) | **A thin glass wall, floor to roof:** glass fills the gate's whole cross-section, from the track's surface up to the walls' top, and skaters pass through it ("just like in rc, it is a wall not an arch ... it feels more satisfying to pass through a wall"); nothing collides with it. The whole wall glows, still see-through, on the next gate. **Only that wall shows** (the owner, after its play check): every other wall is invisible, so none shows while nobody has the ball or before the team's first gate, and a passed wall disappears as the next one lights. *(2026-10-26: a panel hanging from the top down to a rounded opening.)* |
+| R18 | The gate panels (2026-10-26, amended 2026-10-27) | **A thin glass wall, floor to roof:** glass fills the gate's whole cross-section, from the track's surface up to the walls' top, and skaters pass through it ("just like in rc, it is a wall not an arch ... it feels more satisfying to pass through a wall"); nothing collides with it. The whole wall glows, still see-through, on the next gate. **Only that wall shows** (the owner, after its play check): every other wall is invisible, so none shows while nobody has the ball, and a passed wall disappears as the next one lights. **The first lit wall is the goal gate's** (the owner, 2026-10-27, playing PlaceVersion 9): every streak starts there, so it lights the moment a team gets the ball (§5.1). *(Until then: none showed before the team's first gate, any gate.)* *(2026-10-26: a panel hanging from the top down to a rounded opening.)* |
 
 (R16, the inner side, is folded into R3.)
 
@@ -238,6 +238,8 @@ Its two callers stay: **the ball** (`BallService`, out by `Ball.outOfBoundsMargi
 
 As today, a gate spans the track at the start of each section, facing the travel direction. It is now `trackWidth` wide and as tall as the top (`Profile.topHeight`), so no ball in play crosses unseen.
 
+**Every streak starts at the goal's gate** (`goalGateIndex`; the M1 spec's §4.2, amended 2026-10-27). After a kickoff or a change of possession the next gate is the goal's, so a lap runs Gate 2 → 3 → 4 → 1 and ends just before the goal. `LapTracker.new(gates, startGate)` takes it, and `MatchEngine` passes `Arena.goalGateIndex`. The snapshot's `nextGate` is therefore always set, and a gate wall and the carrier's arrow show from the pickup.
+
 ### 5.2 Gate panels (replacing the corner markers)
 
 - **Shape (amended 2026-10-27):** in each gate's plane, a thin glass wall fills the track's whole cross-section (R18):
@@ -333,6 +335,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 - **Bounds:** inside: the floors, the bank, both glass walls, up to the top plus the margin (each kind); outside: past either glass, under the floor, over the top.
 - **Centerline:** `distanceOf` round trip on both straights and both ends, the wrap at gate 1, and `pose` against `frameAt`.
 - **Config:** the new defaults, each new field rule, each cross-field rule (exact messages).
+- **LapTracker and MatchEngine** (2026-10-27): every streak starts at its start gate, after a kickoff and a steal; the engine's start gate is `goalGateIndex` (a non-default one too); a start gate that is not one of the gates is rejected.
 
 **Client and server, in Edit:**
 - **Builder:** folders, tags, `GateIndex`, the glass and top looks (taken from `glass.material` and `glass.transparency`, a non-default look included), touchable glass and top, no shadow on glass or the top, the middle untagged, both kinds of top.

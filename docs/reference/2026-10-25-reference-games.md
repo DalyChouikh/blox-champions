@@ -146,6 +146,21 @@ revised before any more Arena code. Their words, then what still needs a questio
   gate's, lit in the team's colour: none while nobody has the ball or before the first gate, and a passed wall
   disappears.
 - Asked: "are the physics and camera in future tasks?" - yes, the Feel part (next after the Arena part).
+- **The loose ball's 15 s respawn** (the owner, playing PlaceVersion 9: the ball "keeps respawning in a default spot
+  when not picked"; their issue list: "Ball gets spawned randomly again when not being picked after a while at the
+  start"). Asked (recommended): the timer (`Ball.ballIdleResetSeconds`) waits for the **Ball & rules** part. A carried
+  ball does not respawn ("I tried picking it up and standing for a while it didn't respawn").
+- **Lap markers start at the goal's gate** (the owner, same playtest): "when a player picks a ball make sure to show
+  the marker that is on the same level of the goal, no need to wait for player to pass a certain marker to start the
+  lap markers, it should start from the marker that is close to the goal". Asked to pick the order, they gave it in
+  their own words: "it should be the marker next to the goal, then the marker that is on the same level of the goal
+  but on the other straight side, then the other marker on the other straight side, then the marker that is before
+  the goal marker, so that then players just see the goal open and ready to shoot". So every streak starts at the
+  goal's gate: Gate 2 -> 3 -> 4 -> 1, and its wall lights on the pickup. Replaces "the first gate crossed starts the
+  sequence" (any gate, nothing shown before it).
+- **When the goal opens** (asked next, recommended): **after 4 laps, for now**. Only the marker order changes in the
+  Arena part; the goal opening after 1 lap (+1), 2 (+3) and 3 (+5), first to 5 wins, comes with the whole scoring set
+  in the Ball & rules part. Not chosen: opening after 1 lap now.
 
 ## Roller Champions
 

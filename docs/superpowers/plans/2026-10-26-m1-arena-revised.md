@@ -630,13 +630,14 @@ docs/playtests/2026-10-26-m1-arena.md          the Studio checks and the owner's
 
 ---
 
-## Addendum (2026-10-27): the playtest's two findings
+## Addendum (2026-10-27): the playtest's findings
 
-During Task 7 Step 3 the owner asked for two changes, and the spec was amended for them on 2026-10-27 (R5's look, R18 a wall, §2.3 #10, §3.2, §3.3, §4.1, §5.2). Each is its own issue and a stacked, test-first fix before Task 7's record, as in Phase 9.
+During Task 7 Step 3 the owner asked for two changes, and the spec was amended for them on 2026-10-27 (R5's look, R18 a wall, §2.3 #10, §3.2, §3.3, §4.1, §5.2); then for two more (the walls' thickness and only the next one showing; laps starting at the goal's gate, Task 7d). Each is its own issue and a stacked, test-first fix before Task 7's record, as in Phase 9.
 
-- **Order:** `feat/190-carrier-beam` ← Task 7a ← Task 7b ← Task 7c ← `test/191-arena-playtest`. Task 7's docs commit (e7c599b, local only) is replayed onto Task 7c's branch in a scratch worktree, its M1 spec text brought in line with the fixes.
-- **Totals:** Task 6 ended at **697** (one under this plan's 698, by session 22's ruling on Task 3). Task 7a: **698**. Task 7b: **700**. Task 7c: **701**. Task 7's record adds none.
+- **Order:** `feat/190-carrier-beam` ← Task 7a ← Task 7b ← Task 7c ← Task 7d ← `test/191-arena-playtest`. Task 7's docs commit (e7c599b, local only) is replayed onto Task 7c's branch in a scratch worktree, its M1 spec text brought in line with the fixes (session 24: 5f23193), and again onto Task 7d's.
+- **Totals:** Task 6 ended at **697** (one under this plan's 698, by session 22's ruling on Task 3). Task 7a: **698**. Task 7b: **700**. Task 7c: **701**. Task 7d: **703**. Task 7's record adds none.
 - **Amended after Task 7b's play check (2026-10-27, the owner):** the walls are 0.2 thick (at 0.5 the goal gate's wall shared the rim's face plane and the rim flickered), with config rule 7; and only the next gate's wall shows (Task 7c, #202).
+- **Amended during the playtest of PlaceVersion 9 (2026-10-27, the owner):** every streak starts at the goal's gate, so its wall lights on the pickup and a lap ends just before the goal (Task 7d, #205; the M1 spec's §4.2, the Arena spec's R18 and §5.1). The goal still opens after `lapsToOpenGoal` (4) laps until the Ball & rules part (the owner's choice).
 - **The play checks** use the published game's light: the dev place's Lighting effects are set aside for screenshots and restored after (the built game has none).
 
 ### Task 7a: See-through glass (labels `feature`, `arena`)
@@ -734,6 +735,49 @@ export type GatePanel = { pieces: { Piece }, pivot: CFrame }  -- pivot replaces 
 - [ ] **Step 6: Play check (Studio):** in play only the lit wall shows, none before the first gate; screenshots; the console shows the two ready lines.
 - [ ] **Step 7:** Static checks. Commit `feat(arena): only the next gate's wall shows, lit for the team`.
 
+### Task 7d: Every lap starts at the goal's gate (labels `feature`, `rules`)
+
+**Issue:** #205 · **Branch:** `feat/205-laps-start-at-goal` · **Stacked on:** Task 7c
+
+**Files:**
+- Modify: `src/shared/Rules/LapTracker.luau`; `src/shared/Rules/MatchEngine.luau` (the start gate, the snapshot's `nextGate`); the "before their first gate" comments in `src/client/ArenaGlow.luau` and `src/client/WorldMarkers.luau`; `tests/Fixtures.luau` (`matchSnapshot`'s `nextGate` defaults to the goal's gate, as after a kickoff).
+- Test: `tests/shared/Rules/{LapTracker,MatchEngine}.spec.luau`; `tests/integration/Match.spec.luau`; `tests/client/{ArenaGlow,WorldMarkers}.spec.luau`.
+
+**Interfaces:**
+```lua
+LapTracker.new(gates: { Crossing.Rectangle }, startGate: number): LapTracker
+-- nextGate: number - startGate on new and on every reset; accept takes nextGate only (the "any gate first" branch goes)
+-- a start gate that is not a whole number in 1..#gates: "LapTracker: the start gate must be one of the 4 gates (got 5)"
+-- MatchEngine.new: LapTracker.new(arena.gates, config.Arena.goalGateIndex); Snapshot.nextGate: number (was number?)
+```
+
+- [ ] **Step 1: Write the failing tests:**
+  - **`LapTracker.spec`** (start gate 3, not the first gate, so a tracker that starts at gate 1 fails):
+    - `starts every streak at its start gate, then accepts only the next gate in order` (replaces "starts the sequence at the first gate crossed"): gates 1 and 4 count nothing; 3, 4, 1, 2 give progress 1–4 and the lap;
+    - `keeps the sequence across laps`: two laps from the start gate, then the start gate counts and the gate before it does not;
+    - `names its start gate as the next gate from the start, then each next one in turn` (replaces "names the next gate once a streak's first gate is crossed");
+    - `starts again at its start gate on reset, clearing the streak and progress` (replaces "clears the streak, progress and sequence on reset");
+    - (+1) **new** `requires a start gate among its gates`: 0, 5 and 1.5 each → the message above.
+  - **`MatchEngine.spec`:**
+    - the `lap` helper runs from the goal's gate (`goalGateIndex` from the fixture's config), so every lap-based test keeps its meaning; the steal test crosses the lap's first two gates;
+    - `reports the score tab, the gate count and the next gate in its snapshot`: the goal's gate before anyone has the ball, the gate after it once crossed;
+    - `counts gates only for a possessing team, forward and in order`: a crossing of another gate before the goal's counts nothing;
+    - `judges the ring before the gates a segment crosses, so the lap that opens the goal cannot score`: the opening lap now ends at Gate 1, so one segment from before Gate 1 through the ring (the fixture's ring lies on Gate 2's plane) completes it, and the goal does not score in that segment;
+    - (+1) **new** `starts every streak at the goal's gate, after the kickoff and after a steal`, with `Arena = { goalGateIndex = 3 }`: the snapshot names gate 3 after the kickoff; after B1's pickup gate 2 counts nothing and gate 3 gives progress 1; after O1's steal the next gate is 3 again.
+  - **`integration/Match.spec`:** `openGoal` carries the ball on to the goal's gate, then once round to 3 studs before it, so the lap that opens the goal ends ready to shoot; `scoreOnce` and the body-touch test no longer carry the ball back. (`integration/Arena.spec`'s lap starts just past Gate 1 and runs 2 → 3 → 4 → 1: unchanged.)
+  - **`ArenaGlow.spec`:** `shows only the next gate's panel, lit for the team with the ball, the goal gate's from the pickup` (replaces "... and none before their first gate"): no wall while nobody has the ball; the goal gate's wall lit for Blue on the pickup; then as today.
+  - **`WorldMarkers.spec`:** `points the carrier to their team's next gate, and nobody else`: the check of a carrier before their first gate (no arrow) goes with that state; on the pickup the arrow points at the goal gate's wall.
+- [ ] **Step 2:** Run `testPathPattern = "(LapTracker|MatchEngine|Match|ArenaGlow|WorldMarkers)"`. Expected: FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, then the full suite. Expected: **703 tests**.
+- [ ] **Step 5: Mutations:**
+  - the tracker starting at gate 1, or reset leaving `nextGate` where it was → the LapTracker start / reset tests;
+  - `accept` taking any gate while the lap's progress is 0 (the old rule) → the start test;
+  - the start gate's guard dropped, `>` for `>=` at `#gates`, or the whole-number check dropped → the guard test;
+  - MatchEngine passing gate 2 or gate 1 instead of `goalGateIndex` → the new MatchEngine test.
+- [ ] **Step 6: Play check (Studio):** with a probe-handed ball, the goal gate's wall lights at once and the arrow points at it; carried 2 → 3 → 4 → 1, a `LapCompleted` (a Client probe on `RuleEvents`); the console shows the two ready lines.
+- [ ] **Step 7:** Static checks. Commit `feat(rules): every lap starts at the goal's gate`.
+
 ### Task 7, continued
 
-After Task 7c: Task 7's docs commit is replayed and brought in line, then Step 2's republish, the rest of Step 3 (the checklist), and Step 4's record with every finding and its issue (#199, #200, #202).
+After Task 7d: Task 7's docs commit (5f23193) is replayed onto Task 7d's branch, then Step 2's republish, the rest of Step 3 (the checklist), and Step 4's record with every finding and its issue (#199, #200, #202, #205).

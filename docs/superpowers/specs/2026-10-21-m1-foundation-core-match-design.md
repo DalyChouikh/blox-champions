@@ -42,7 +42,7 @@ M1 does include the **registries** (ball skin, skate skin) holding one default e
 
 | # | Question | Decision |
 |---|---|---|
-| Q1 | How laps count | **Team streak.** Laps belong to the possessing team; passes keep the count; resets to 0 only when an opponent gains the ball. |
+| Q1 | How laps count | **Team streak.** Laps belong to the possessing team; passes keep the count; resets to 0 only when an opponent gains the ball. *Every streak starts at the goal's gate (2026-10-27, the owner's playtest of the Arena part; §4.2).* |
 | Q2 | After a point | **Full kickoff reset.** Both streaks → 0, everyone respawns at team spawns, countdown, ball drops at a **random** ball spawn point. |
 | Q3 | Tie at 0:00 | **Golden-goal overtime** (no time limit) **plus Last Chance** (user-defined, §5.3). |
 | Q4 | Extra moves | **Uppercut, Draft, Tiptoe, Air tackle / air dodge** added to the user's list. |
@@ -131,9 +131,9 @@ blox-champions/
 - The arena has **4 lap gates** at the corners where straights meet the curved ends, numbered in track order (§9.1). Each gate is a rectangle spanning the track with a **forward normal** pointing along the track direction.
 - Lap progress tracks **the ball**: each server tick, the segment from the ball's previous position to its current position is tested against every gate rectangle (carried, flying, or loose — so a pass thrown through a gate counts).
 - A crossing counts only if it is **forward** (segment direction · gate normal > 0) **and** the possessing team is not neutral.
-- The first forward crossing after the streak starts sets the sequence. After that, only the **next gate in order** counts; backward or out-of-order crossings are ignored.
+- **Every streak starts at the goal's gate** (`Arena.goalGateIndex`, Gate 2): from the moment the streak starts, it is the next gate, so its marker shows on the pickup. Only the **next gate in order** counts; backward or out-of-order crossings are ignored. A lap runs Gate 2 → 3 → 4 → 1 and ends just before the goal (the owner, 2026-10-27, after playing the Arena part: "it should start from the marker that is close to the goal ... so that then players just see the goal open and ready to shoot"). A carrier who picks the ball up just past Gate 2 rides round to it first. *(Until 2026-10-27: the first forward crossing after the streak started set the sequence, whichever gate it was.)*
 - 4 accepted crossings in order = **1 lap**. Emits `GateCrossed { team, gateIndex, progress }` and `LapCompleted { team, streak, holder }`.
-- The streak resets to 0 on `PossessionChanged` to a different team, and on kickoff reset.
+- The streak resets to 0, and the next gate to the goal's, on `PossessionChanged` to a different team and on kickoff reset.
 
 ### 4.3 Goal (`GoalJudge`)
 
