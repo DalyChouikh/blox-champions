@@ -46,6 +46,42 @@ describe("Centerline", function()
 		Fixtures.expectNear(Centerline.at(arena, 100, 0, 20).Position, Vector3.new(0, 20, -20))
 	end)
 
+	-- The carrier's beam follows the ball with it: the inverse of `at` for any point across the track.
+	it("finds how far along the track a point is, on both straights and around both ends", function()
+		-- 0 and 50 on the top straight, 230 around the left end, 400 on the bottom straight, 560 and 700 around the
+		-- right end.
+		for _, distance in { 0, 50, 230, 400, 560, 700 } do
+			for _, lateral in { 5, 40, 75 } do
+				local point = Centerline.at(arena, distance, lateral, 5).Position
+				expect(Centerline.distanceOf(arena, point)).toBeCloseTo(distance, 3)
+			end
+		end
+		-- Just before gate 1 it is nearly a lap, not nearly 0.
+		local length = Centerline.length(arena)
+		local last = Centerline.at(arena, length - 0.01, 40, 5).Position
+		expect(Centerline.distanceOf(arena, last)).toBeCloseTo(length - 0.01, 3)
+	end)
+
+	-- In plain numbers, so a caller placing a part every frame allocates nothing.
+	it("poses a point and its heading in plain numbers, the same as frameAt", function()
+		for _, distance in { 0, 250, 700 } do
+			local point, yaw = Centerline.pose(arena, distance, 70, 5)
+			Fixtures.expectNear(point, Centerline.at(arena, distance, 70, 5).Position)
+			-- Roblox's Orientation Y: CFrame.Angles(0, yaw, 0) looks along (-sin yaw, 0, -cos yaw).
+			Fixtures.expectNear(
+				Vector3.new(-math.sin(yaw), 0, -math.cos(yaw)),
+				Centerline.frameAt(arena, distance).LookVector
+			)
+		end
+		-- 50 into the left end: turned 50 / endRadius radians from heading -X toward +Z.
+		local _, yaw = Centerline.pose(arena, 250, 40, 0)
+		local angle = 50 / arena.endRadius
+		Fixtures.expectNear(
+			Vector3.new(-math.sin(yaw), 0, -math.cos(yaw)),
+			Vector3.new(-math.cos(angle), 0, math.sin(angle))
+		)
+	end)
+
 	it("puts stations at most segmentLength apart around the whole loop, one on every gate", function()
 		local stations = Centerline.stations(arena)
 		-- 50 on each straight (200 / 4) and 48 around each curved end (188.5 / 4, rounded up).

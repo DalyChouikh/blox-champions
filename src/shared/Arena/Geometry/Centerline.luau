@@ -41,28 +41,55 @@ function Centerline.length(arena: ArenaConfig): number
 	return 2 * arena.straightLength + 2 * math.pi * arena.endRadius
 end
 
-function Centerline.frameAt(arena: ArenaConfig, distance: number): CFrame
+-- A point on the cross-section at `distance` (lateral measured from the inner wall face toward the outer wall, height
+-- from the lower floor), and the heading's yaw in radians: Roblox's Orientation Y, so CFrame.Angles(0, yaw, 0) looks
+-- along the travel direction, (-sin yaw, 0, -cos yaw). Plain numbers and a Vector3 (a native value), so a caller
+-- placing a part every frame allocates nothing.
+function Centerline.pose(arena: ArenaConfig, distance: number, lateral: number, height: number): (Vector3, number)
 	local index, offset = locate(arena, distance)
 	local halfStraight, radius = arena.straightLength / 2, arena.endRadius
-	local position: Vector3, heading: Vector3
+	-- The centerline's point and heading on the first half of the loop.
+	local x: number, z: number, headingX: number, headingZ: number
 	if isStraight(index) then
-		position = Vector3.new(halfStraight - offset, 0, -radius)
-		heading = Vector3.new(-1, 0, 0)
+		x, z, headingX, headingZ = halfStraight - offset, -radius, -1, 0
 	else
 		local angle = offset / radius
-		position = Vector3.new(-halfStraight - radius * math.sin(angle), 0, -radius * math.cos(angle))
-		heading = Vector3.new(-math.cos(angle), 0, math.sin(angle))
+		x, z = -halfStraight - radius * math.sin(angle), -radius * math.cos(angle)
+		headingX, headingZ = -math.cos(angle), math.sin(angle)
 	end
 	-- The second half of the loop is the first half turned 180° about the vertical axis.
 	local turn = if index <= SECTION_COUNT / 2 then 1 else -1
-	position *= turn
-	return CFrame.lookAt(position, position + heading * turn)
+	x, z, headingX, headingZ = x * turn, z * turn, headingX * turn, headingZ * turn
+	-- Across the track, toward the outer wall: the heading turned a quarter clockwise, seen from above.
+	local across = lateral - arena.trackWidth / 2
+	return Vector3.new(x - headingZ * across, height, z + headingX * across), math.atan2(-headingX, -headingZ)
 end
 
--- A point on the cross-section at `distance`: lateral is measured from the inner wall face toward the outer wall,
--- height from the lower floor.
+function Centerline.frameAt(arena: ArenaConfig, distance: number): CFrame
+	return Centerline.at(arena, distance, arena.trackWidth / 2, 0)
+end
+
+-- The pose at `distance` as a frame facing the travel direction, its RightVector toward the outer wall.
 function Centerline.at(arena: ArenaConfig, distance: number, lateral: number, height: number): CFrame
-	return Centerline.frameAt(arena, distance) * CFrame.new(lateral - arena.trackWidth / 2, height, 0)
+	local position, yaw = Centerline.pose(arena, distance, lateral, height)
+	return CFrame.new(position) * CFrame.Angles(0, yaw, 0)
+end
+
+-- How far along the track a point is: the inverse of `at` for any point across the track, found by projecting it onto
+-- the centerline seen from above. Each section gives a distance within its own stretch of [0, length): around a curved
+-- end the point lies past the straights' ends, so its angle from the end's start stays strictly inside a half turn.
+function Centerline.distanceOf(arena: ArenaConfig, position: Vector3): number
+	local halfStraight, radius = arena.straightLength / 2, arena.endRadius
+	local x, z = position.X, position.Z
+	if x > halfStraight then
+		-- The right curved end, the loop's last section.
+		return 2 * arena.straightLength + math.pi * radius + radius * math.atan2(x - halfStraight, z)
+	elseif x < -halfStraight then
+		return arena.straightLength + radius * math.atan2(-(x + halfStraight), -z)
+	elseif z < 0 then
+		return halfStraight - x
+	end
+	return arena.straightLength + math.pi * radius + x + halfStraight
 end
 
 -- Gate g stands at the start of section g.
