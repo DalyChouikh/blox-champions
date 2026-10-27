@@ -870,8 +870,8 @@ describe("Config.forMode", function()
 			{ overrides = { UI = { hud = { spacing = -1 } } }, message = "UI.hud.spacing: must be >= 0" },
 			-- The carrier's beam is one part, which Roblox would clamp to its size limits.
 			{
-				overrides = { UI = { arenaGlow = { beam = { width = 0 } } } },
-				message = "UI.arenaGlow.beam.width: must be > 0 (got 0)",
+				overrides = { UI = { arenaGlow = { beam = { width = 0.0005 } } } },
+				message = "UI.arenaGlow.beam.width: must be >= 0.001 (got 0.0005)",
 			},
 			{
 				overrides = { UI = { arenaGlow = { beam = { thickness = 3000 } } } },

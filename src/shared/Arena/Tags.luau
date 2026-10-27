@@ -20,7 +20,7 @@ local Tags = {
 	-- On the ball's part, so clients find the ball the server built.
 	Ball = "Ball",
 	Attribute = {
-		-- On LapGate and CornerMarker parts: which gate, 1..4 in travel order.
+		-- On LapGate parts and CornerMarkers (a Model or a part): which gate, 1..4 in travel order.
 		GateIndex = "GateIndex",
 		-- On TeamSpawn parts: "Blue" or "Orange".
 		Team = "Team",

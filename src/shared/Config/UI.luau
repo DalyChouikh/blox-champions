@@ -365,7 +365,7 @@ end
 local textSize = Validate.number({ min = 1, max = 100, integer = true })
 local transparency = Validate.number({ min = 0, max = 1 })
 local positive = Validate.number({ above = 0 })
-local beamSize = Validate.number({ above = 0, max = PartSize.MAX })
+local beamSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
 local udim2 = Validate.datatype("UDim2")
 local pixels = Validate.pixels()
 local place = Validate.record({ position = udim2, size = pixels })
@@ -503,7 +503,7 @@ local fields = Validate.record({
 		material = Validate.enumItem(Enum.Material),
 		panelSlide = positive,
 		panelSlideSeconds = Validate.number({ min = 0 }),
-		-- The beam is one part: Roblox would clamp a bigger one.
+		-- The beam is one part: Roblox would silently clamp a size outside its part limits.
 		beam = Validate.record({ width = beamSize, thickness = beamSize }),
 	}),
 })
