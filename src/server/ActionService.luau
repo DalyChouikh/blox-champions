@@ -5,7 +5,9 @@
 -- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns, the
 -- running action (until its recovery) and calls for a pass show as character attributes every client reads. A
 -- knocked-down player whose client asks to get up (GetUp, sent when they move) is up once Actions.getUpAfter has passed
--- since the knockdown, never sooner; one who never asks, after the hit's knockdownSeconds. A throw keeps no more of the
+-- since the knockdown, never sooner; one who never asks, after the hit's knockdownSeconds. An action with a landing
+-- (the Dive) ends on the skater's belly: nothing else starts until, past its active phase, the server's own ray along
+-- their down finds a ride surface, which knocks them down; no one scores that knockdown. A throw keeps no more of the
 -- carrier's speed than skating allows, and no more charge than the ball was held for.
 -- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
 -- sum of the frames it is stepped, so a request between frames counts as the last frame's.
@@ -48,6 +50,8 @@ type Record = {
 	-- When the last knockdown began (the service's clock), and whether they asked to get up since.
 	downSince: number,
 	getUp: boolean,
+	-- The running action with a landing, until their touchdown knocks them down: nothing else starts meanwhile.
+	landing: Config.ActionName?,
 	-- The action the character's Action attribute shows.
 	shown: Config.ActionName?,
 }
@@ -87,6 +91,8 @@ export type ActionService = {
 	_calls: { [PlayerId]: number },
 	_candidates: { Reach.Candidate },
 	_context: ActionRunner.Context,
+	-- The arena's ride surfaces, the only things a diver's touchdown ray hits.
+	_rideParams: RaycastParams,
 	_knockdowns: { Knockdown },
 	-- Every Knockdown record ever made, reused frame after frame.
 	_knockdownPool: { Knockdown },
@@ -125,6 +131,7 @@ local function recordOf(self: ActionService, player: PlayerId): Record
 			knockdownLeft = 0,
 			downSince = 0,
 			getUp = false,
+			landing = nil,
 			shown = nil,
 		}
 		self._records[player] = record
@@ -194,13 +201,15 @@ local function addKnockdown(self: ActionService, attacker: PlayerId, victim: Pla
 	list[index] = knockdown
 end
 
--- Down for `seconds`: their action stops without a refund, and a carried ball drops with their momentum. A request to
--- get up made before it no longer counts.
-local function knockDown(self: ActionService, attacker: PlayerId, victim: PlayerId, seconds: number)
+-- Down for `seconds`: their action (a dive's landing with it) stops without a refund, and a carried ball drops with
+-- their momentum. A request to get up made before it no longer counts. Only a knockdown someone dealt is listed for the
+-- rules; a diver's own touchdown has no `attacker`.
+local function knockDown(self: ActionService, attacker: PlayerId?, victim: PlayerId, seconds: number)
 	local record = recordOf(self, victim)
 	record.knockdownLeft = seconds
 	record.downSince = self._now
 	record.getUp = false
+	record.landing = nil
 	local running: Config.ActionName? = record.runner.action
 	if running ~= nil then
 		record.runner:cancel(running, false)
@@ -211,7 +220,22 @@ local function knockDown(self: ActionService, attacker: PlayerId, victim: Player
 	if holder ~= nil and self._ball.state.carrier == victim then
 		self._ball:drop(holder.root.AssemblyLinearVelocity)
 	end
-	addKnockdown(self, attacker, victim)
+	if attacker ~= nil then
+		addKnockdown(self, attacker, victim)
+	end
+end
+
+-- Whether a skater whose action has a landing has touched down: past that action's active phase, a ride surface lies
+-- within Movement.groundProbeLength along their down, as the skating's own ground ray looks.
+local function touchedDown(self: ActionService, player: PlayerId, record: Record, landing: Config.ActionName): boolean
+	local runner = record.runner
+	local holder = self._holderOf[player]
+	if holder == nil or (runner.action == landing and runner.phase ~= "Recovery") then
+		return false
+	end
+	local root = holder.root
+	local down = -root.CFrame.UpVector * self._config.Movement.groundProbeLength
+	return workspace:Raycast(root.Position, down, self._rideParams) ~= nil
 end
 
 -- A strike whose active phase this frame reached, and that has not landed yet, aims at the nearest opponent it
@@ -268,7 +292,7 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Pass: Effect, 
 
 local ActionService: ActionService = {
 	name = "ActionService",
-	dependencies = { "Config", "NetService", "BallService", "TeamService", "CharacterService" },
+	dependencies = { "Config", "NetService", "BallService", "TeamService", "CharacterService", "ArenaService" },
 	_config = nil :: any,
 	_net = nil :: any,
 	_ball = nil :: any,
@@ -282,7 +306,8 @@ local ActionService: ActionService = {
 	_holderOf = {},
 	_calls = {},
 	_candidates = {},
-	_context = { hasBall = false, airborne = false, knockedDown = false },
+	_context = { hasBall = false, knockedDown = false },
+	_rideParams = nil :: any,
 	_knockdowns = {},
 	_knockdownPool = {},
 
@@ -301,8 +326,12 @@ local ActionService: ActionService = {
 		self._holderOf = {}
 		self._calls = {}
 		self._candidates = {}
-		-- The server never judges `airborne`: it cannot see the client's ground ray.
-		self._context = { hasBall = false, airborne = false, knockedDown = false }
+		-- No `airborne`: the server's view of a jump lags the client's, so it lets an action needing either start.
+		self._context = { hasBall = false, knockedDown = false }
+		local rideParams = RaycastParams.new()
+		rideParams.FilterType = Enum.RaycastFilterType.Include
+		rideParams.FilterDescendantsInstances = deps.ArenaService.arena.rideSurfaces
+		self._rideParams = rideParams
 		self._knockdowns = {}
 		self._knockdownPool = {}
 		self._net:listen(
@@ -329,8 +358,8 @@ local ActionService: ActionService = {
 		end)
 	end,
 
-	-- Refused when the player has no seated, living character, is frozen, or their runner says no, with
-	-- Network.actionTimingTolerance of slack on its timing, for lag.
+	-- Refused when the player has no seated, living character, is frozen, or their runner says no (a diver who has
+	-- not landed counts as down), with Network.actionTimingTolerance of slack on its timing, for lag.
 	request = function(self: ActionService, player: PlayerId, payload: any)
 		local name: Config.ActionName = payload.action
 		refreshHolders(self)
@@ -342,13 +371,16 @@ local ActionService: ActionService = {
 		local record = recordOf(self, player)
 		local context = self._context
 		context.hasBall = self._ball.state.carrier == player
-		context.knockedDown = knockedDown(self, player)
+		context.knockedDown = knockedDown(self, player) or record.landing ~= nil
 		if record.runner:start(name, context, self._config.Network.actionTimingTolerance) ~= "Started" then
 			reject(self, player, name)
 			return
 		end
 		record.struck = false
 		local action = self._config.Actions[name]
+		if action.landing ~= nil then
+			record.landing = name
+		end
 		effects[action.effect](self, player, holder, payload, action)
 		show(self, player, record)
 	end,
@@ -385,6 +417,11 @@ local ActionService: ActionService = {
 					setAttribute(self, player, Attributes.KnockedDown, nil)
 				end
 			end
+			-- One ray per diver, none for anyone else.
+			local landing: Config.ActionName? = record.landing
+			if landing ~= nil and touchedDown(self, player, record, landing) then
+				knockDown(self, nil, player, (actions[landing].landing :: Config.Landing).knockdownSeconds)
+			end
 			show(self, player, record)
 		end
 		for _, player in self._order do
@@ -410,6 +447,7 @@ local ActionService: ActionService = {
 			record.struck = false
 			record.hit = nil
 			record.knockdownLeft = 0
+			record.landing = nil
 			record.shown = nil
 		end
 		for _, holder in self._holderList do

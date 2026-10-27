@@ -251,6 +251,44 @@ describe("SkateController", function()
 		expect(getUps).toBe(2)
 	end)
 
+	-- A dive ends on the belly (#221): the diver does nothing more, and slides from the moment they touch down.
+	it("locks a diver's input as a knockdown does, until the server's knockdown ends the dive", function()
+		local skater = SkateController.skater :: any
+		SkateController.diving = true
+		-- In the air the jump strikes no Air Pose.
+		flying(Vector3.new(0, 20, 0), Vector3.new(0, 0, -30))
+		Fixtures.scriptedBinding(InputController.context, "Jump"):Fire(true)
+		task.wait() -- the press arrives with the deferred events
+		SkateController:step(1 / 60)
+		expect(skater.airPosing).toBe(false)
+		-- On the ground, no steering, and the knockdown's slide: 60 − (4 + 0.02 × 60) × 0.1 − knockdownDecel 75 × 0.1.
+		rig:PivotTo(CFrame.new(0, movement.hoverHeight, 0))
+		skater.mode = "Grounded"
+		skater.velocity = Vector3.new(0, 0, -60)
+		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(1, 0))
+		SkateController:step(0.1)
+		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -51.98))
+		expect(SkateController.diving).toBe(true)
+		-- Nor does a teammate right ahead take them in tow.
+		local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
+		table.insert(others, { player = "2", team = "Blue", root = Fixtures.root(leader) })
+		Fixtures.scriptedBinding(InputController.context, "Attach"):Fire(true)
+		SkateController:step(1 / 60)
+		expect(skater.mode).never.toBe("Attached")
+		-- The server's knockdown takes over; a kickoff freeze or a new character ends a dive too.
+		rig:SetAttribute(Attributes.KnockedDown, true)
+		SkateController:step(1 / 60)
+		expect(SkateController.diving).toBe(false)
+		rig:SetAttribute(Attributes.KnockedDown, nil)
+		SkateController.diving = true
+		Fixtures.root(rig).Anchored = true
+		SkateController:step(1 / 60)
+		expect(SkateController.diving).toBe(false)
+		SkateController.diving = true
+		SkateController:bind(skaterAt("Respawned", Vector3.new(50, 0, 0)))
+		expect(SkateController.diving).toBe(false)
+	end)
+
 	it("knows when a teammate is close enough to attach behind", function()
 		local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
 		table.insert(others, { player = "2", team = "Blue", root = Fixtures.root(leader) })

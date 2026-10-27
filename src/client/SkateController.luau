@@ -7,8 +7,9 @@
 --   the server built.
 -- It holds the skater still during the kickoff freeze and until the arena has reached this client. A knocked-down
 -- skater (the server's KnockedDown attribute) lets go of any attach and only slides, and asks the server to get up
--- (GetUp) once per knockdown, as soon as the stick moves: the server decides when. While Roblox's menu holds the keys
--- the skater lets go of any attach too, with no release boost. Actions push the skater through `push`.
+-- (GetUp) once per knockdown, as soon as the stick moves: the server decides when. A diver (`diving`) is held the same
+-- way until that knockdown. While Roblox's menu holds the keys the skater lets go of any attach too, with no release
+-- boost. Actions push the skater through `push`.
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
 -- humanoid's state machine off here, on the owning client only: the server keeps it on so deaths still fire Died.
 
@@ -62,6 +63,10 @@ export type SkateController = {
 	-- the floor to come (#177).
 	knockedDown: boolean,
 	frozen: boolean,
+	-- Set by ActionController when a dive (an action with a landing) starts: the skater does nothing more until the
+	-- server's knockdown at their touchdown, which ends it, as do a freeze and a new character. Meanwhile the input
+	-- locks as a knockdown's does, so the belly slide starts the moment they touch down.
+	diving: boolean,
 	-- Set each step: attached, or right behind a teammate with no cooldown, so holding Attach would attach.
 	attachable: boolean,
 	-- An action's push, written to the skater body at once; `launch` leaves the ground.
@@ -226,7 +231,7 @@ local function moveSkater(self: SkateController, root: BasePart, skater: SkateMa
 	local movement = self._config.Movement
 	local keys = self._keys
 	local attach = self._attach
-	if self.knockedDown or self._inputController.paused then
+	if self._input.knockedDown or self._inputController.paused then
 		if attach.leader ~= nil then
 			attach:reset()
 			skater:release(Vector3.zero)
@@ -323,11 +328,12 @@ local function askToGetUp(self: SkateController)
 end
 
 -- The kickoff freeze (the server anchors every root while it places them), and the wait for the arena: the skater
--- starts from rest, upright and facing where the server put them, with no attach held over and no jump pressed during
--- the countdown. Pump and brake are still shared, so other players see what this one holds.
+-- starts from rest, upright and facing where the server put them, with no attach held over, no dive and no jump pressed
+-- during the countdown. Pump and brake are still shared, so other players see what this one holds.
 local function freeze(self: SkateController, root: BasePart, skater: SkateMath.Skater)
 	self._inputController:read(self._keys)
 	skater:stop()
+	self.diving = false
 	local up = worldUp(self)
 	skater.up = up
 	local facing = Vectors.alongSurface(root.CFrame.LookVector, up)
@@ -349,6 +355,7 @@ local SkateController: SkateController = {
 	move = Vector3.zero,
 	knockedDown = false,
 	frozen = false,
+	diving = false,
 	attachable = false,
 	_config = nil :: any,
 	_inputController = nil :: any,
@@ -450,6 +457,7 @@ local SkateController: SkateController = {
 		self.move = Vector3.zero
 		self.knockedDown = false
 		self.frozen = false
+		self.diving = false
 		self.attachable = false
 	end,
 
@@ -486,6 +494,7 @@ local SkateController: SkateController = {
 		self._inputController:read(self._keys)
 		self.pumping = false
 		self.braking = false
+		self.diving = false
 		self._airPosing = false
 		self._statePending = false
 	end,
@@ -505,6 +514,9 @@ local SkateController: SkateController = {
 		local root = self.root :: BasePart
 		local character = self._character :: Model
 		self.knockedDown = character:GetAttribute(Attributes.KnockedDown) == true
+		if self.knockedDown then
+			self.diving = false
+		end
 		self.frozen = root.Anchored or not self._surfaces.ready
 		if self.frozen then
 			freeze(self, root, skater)
@@ -518,7 +530,7 @@ local SkateController: SkateController = {
 		input.pump = keys.pump
 		input.brake = keys.brake
 		input.jump = keys.jump
-		input.knockedDown = self.knockedDown
+		input.knockedDown = self.knockedDown or self.diving
 		self.move = input.move
 		castGround(self, root, skater, dt)
 		gatherOthers(self)

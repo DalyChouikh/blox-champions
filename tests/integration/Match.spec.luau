@@ -93,6 +93,7 @@ local function setup(match: { [string]: any }?)
 		BallService = BallService,
 		TeamService = TeamService,
 		CharacterService = CharacterService,
+		ArenaService = ArenaService,
 	})
 	MatchService:init({
 		Config = config,

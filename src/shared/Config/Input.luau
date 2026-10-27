@@ -59,7 +59,7 @@ export type InputConfig = {
 	pump: { Enum.KeyCode },
 	brake: { Enum.KeyCode },
 	attach: { Enum.KeyCode },
-	-- Tackle, a Dive during a tackle, or a Dodge with the ball.
+	-- A Tackle on the ground, a Dive in the air, or a Dodge with the ball.
 	tackle: { Enum.KeyCode },
 	uppercut: { Enum.KeyCode },
 	-- A Pass with the ball, a Call Pass without.
@@ -73,7 +73,8 @@ export type InputConfig = {
 	touchBallFocusMode: FocusMode,
 	-- Held to show the score tab.
 	scoreTab: { Enum.KeyCode },
-	-- The actions each action key may start, in order: the first whose requires.ball fits is the one.
+	-- The actions each action key may start, in order: the first whose requires fit (the ball, the ground or the air)
+	-- is the one.
 	actions: {
 		tackle: { Actions.ActionName },
 		uppercut: { Actions.ActionName },
@@ -109,7 +110,7 @@ local defaults: InputConfig = {
 	touchBallFocusMode = "Toggle",
 	scoreTab = { Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect },
 	actions = {
-		tackle = { "Tackle", "Dodge" },
+		tackle = { "Tackle", "Dive", "Dodge" },
 		uppercut = { "Uppercut" },
 		pass = { "Pass", "CallPass" },
 		throw = { "ChargeThrow" },

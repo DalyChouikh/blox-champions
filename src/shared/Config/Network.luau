@@ -25,7 +25,7 @@ export type NetworkConfig = {
 	-- Extra reach for strikes judged on the server, which sees each player slightly behind their own screen.
 	hitLagToleranceStuds: number,
 	-- How far network jitter may move an action's timing on the server: it may arrive this early before its cooldown
-	-- or the running action ends, or this close to its follow-up window.
+	-- or the running action ends.
 	actionTimingTolerance: number,
 	-- How many requests to get up a client may send (a burst of this many, refilled per second): an honest client
 	-- sends one per knockdown, and a knockdown lasts at least Actions.getUpAfter (0.5 s).

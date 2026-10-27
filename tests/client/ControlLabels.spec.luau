@@ -67,10 +67,14 @@ describe("ControlLabels", function()
 		expect(now("pass")).toBe(labels.Pass)
 		expect(now("throw")).toBe(labels.ChargeThrow)
 
-		-- In the air the jump button strikes the Air Pose, once until landing (#218).
+		-- In the air the jump button strikes the Air Pose, once until landing (#218), and the tackle button dives
+		-- without the ball (#221).
 		local skater = SkateController.skater :: any
 		skater.mode = "Airborne"
 		expect(now("jump")).toBe(labels.AirPose)
+		expect(now("tackle")).toBe(labels.Dodge)
+		BallCarrier:set(nil)
+		expect(now("tackle")).toBe(labels.Dive)
 		skater.airPoseReady = false
 		expect(now("jump")).toBeNil()
 

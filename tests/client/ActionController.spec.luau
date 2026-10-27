@@ -53,6 +53,14 @@ local function skater(): any
 	return SkateController.skater
 end
 
+-- Puts the skater high above the floor, flying at `velocity`, facing -Z.
+local function flying(velocity: Vector3)
+	rig:PivotTo(CFrame.new(0, 60, 0))
+	skater().mode = "Airborne"
+	skater().velocity = velocity
+	skater().forward = -Vector3.zAxis
+end
+
 -- The controllers over a floor, on a skater facing -Z. `surfaces` become ride surfaces too, before the rays read them.
 local function setup(surfaces: { BasePart }?)
 	local floor = Instance.new("Part")
@@ -143,24 +151,80 @@ describe("ActionController", function()
 		expect(ActionController:pose()).toBe("None")
 	end)
 
-	it("dives when tackle is pressed again during the tackle", function()
+	-- Roller Champions' tackle key dives in the air (#221).
+	it("dives in the air: lunges at the dive's full push and asks the server", function()
 		setup()
+		flying(Vector3.new(0, 0, -30))
+		press("Tackle")
+		ActionController:step(DT)
+		expect(requests).toEqual({ { action = "Dive" } })
+		-- 30 + lungeSpeed 60: the push of an action that starts only in the air is never airMultiplier'd.
+		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -90))
+		expect(ActionController:pose()).toBe("Lunge")
+	end)
+
+	it("never dives past the ceiling", function()
+		setup()
+		flying(Vector3.new(0, 0, -80))
+		press("Tackle")
+		ActionController:step(DT)
+		-- 80 + 60 = 140, held at hardCap.
+		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -movement.hardCap))
+	end)
+
+	it("dodges in the air airMultiplier as hard as on the ground", function()
+		setup()
+		BallCarrier:set(LOCAL_ID)
+		bindingOf("Move"):Fire(Vector2.new(1, 0))
+		frame()
+		flying(Vector3.zero)
+		press("Tackle")
+		ActionController:step(DT)
+		expect(requests).toEqual({ { action = "Dodge" } })
+		-- sideSpeed 45 × airMultiplier 0.8 = 36, to the right.
+		Fixtures.expectNear(skater().velocity, CAMERA.CFrame.RightVector * 36)
+	end)
+
+	-- A dive ends on the skater's belly: the server knocks them down at their first touch of the ground (#221).
+	it("does nothing more while diving, until the knockdown that ends the dive is over", function()
+		setup()
+		flying(Vector3.new(0, 0, -30))
 		press("Tackle")
 		frame()
-		-- Past the tackle's 0.05 s windup.
-		for _ = 1, 4 do
+		expect(SkateController.diving).toBe(true)
+		press("Uppercut")
+		frame()
+		expect(requests).toEqual({ { action = "Dive" } })
+		-- Nor once the dive's phases are over, while they still fly.
+		local phases = config.Actions.Dive.phases
+		for _ = 1, math.ceil((phases.windup + phases.active + phases.recovery) / DT) do
 			frame()
 		end
+		press("Uppercut")
+		frame()
+		expect(requests).toEqual({ { action = "Dive" } })
+		-- The server's knockdown arrives: the dive is over and stops, as the server stops it, and the knockdown holds
+		-- the skater.
+		rig:SetAttribute(Attributes.KnockedDown, true)
+		frame()
+		expect(SkateController.diving).toBe(false)
+		press("Uppercut")
+		frame()
+		expect(#requests).toBe(1)
+		rig:SetAttribute(Attributes.KnockedDown, nil)
+		frame()
+		press("Uppercut")
+		frame()
+		expect(requests).toEqual({ { action = "Dive" }, { action = "Uppercut" } })
+	end)
+
+	it("frees a diver the server refused", function()
+		setup()
+		flying(Vector3.new(0, 0, -30))
 		press("Tackle")
 		frame()
-		expect(requests).toEqual({ { action = "Tackle" }, { action = "Dive" } })
-		-- Into the dive's recovery, after its 0.35 s active phase: nothing more starts.
-		for _ = 1, 25 do
-			frame()
-		end
-		press("Tackle")
-		frame()
-		expect(#requests).toBe(2)
+		ActionController:rejected({ action = "Dive" })
+		expect(SkateController.diving).toBe(false)
 	end)
 
 	it("charges a throw for as long as it is held", function()
@@ -362,14 +426,11 @@ describe("ActionController", function()
 		BallCarrier:set(LOCAL_ID)
 		expect(names()).toEqual({ tackle = "Dodge", uppercut = "none", pass = "Pass", throw = "ChargeThrow" })
 
-		-- Into the tackle's active phase, past its 0.05 s windup: the tackle key would dive.
+		-- In the air the tackle key dives; with the ball it still dodges.
+		skater().mode = "Airborne"
+		expect(names()).toEqual({ tackle = "Dodge", uppercut = "none", pass = "Pass", throw = "ChargeThrow" })
 		BallCarrier:set(nil)
-		press("Tackle")
-		for _ = 1, 5 do
-			frame()
-		end
-		expect(ActionController.runner.phase).toBe("Active")
-		expect(ActionController:keyAction("tackle")).toBe("Dive")
+		expect(names()).toEqual({ tackle = "Dive", uppercut = "Uppercut", pass = "CallPass", throw = "none" })
 	end)
 
 	it("steps in under 0.1 ms", function()
