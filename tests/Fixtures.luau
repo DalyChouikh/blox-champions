@@ -61,6 +61,39 @@ function Fixtures.expectNear2(actual: Vector2, expected: Vector2, tolerance: num
 	JestGlobals.expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-3)
 end
 
+-- Jest's toBeCloseTo as a plain check: `value` within half of 10^-digits of `expected`.
+function Fixtures.closeTo(value: number, expected: number, digits: number): boolean
+	return math.abs(value - expected) < 10 ^ -digits / 2
+end
+
+-- How many failed checks Fixtures.checks names; the rest are only counted.
+local CHECKS_NAMED = 10
+
+-- Many checks gathered into one expect, for tests over thousands of pieces: Jest's expect is slow, and one call per
+-- corner took a test to about 4 s, near Jest's 5 s limit for a test, which timed out CI's cloud run (#208).
+-- - `check(ok, what, piece?)` notes a failed check; `what` is a constant, so a passing check builds no string;
+-- - `expectNone()`, once at the end, fails naming the first few and counting the rest.
+function Fixtures.checks(): ((ok: boolean, what: string, piece: number?) -> (), () -> ())
+	local failed: { string } = {}
+	local count = 0
+	local function check(ok: boolean, what: string, piece: number?)
+		if ok then
+			return
+		end
+		count += 1
+		if #failed < CHECKS_NAMED then
+			table.insert(failed, if piece ~= nil then `{what} (piece {piece})` else what)
+		end
+	end
+	local function expectNone()
+		if count > #failed then
+			table.insert(failed, `and {count - #failed} more`)
+		end
+		JestGlobals.expect(failed).toEqual({})
+	end
+	return check, expectNone
+end
+
 -- Every root Fixtures.mount made since the last Fixtures.unmountAll.
 local roots: { any } = {}
 

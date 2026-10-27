@@ -64,25 +64,29 @@ describe("Features.glass", function()
 		-- (the outer glass's, the widest). A lip's strips are chords across too, their middles nearest its center.
 		local sag = (arena.endRadius + arena.trackWidth / 2) * (1 - math.cos(math.pi / (2 * steps)))
 		local nearest = glass.lipRadius * math.cos(math.pi / (4 * glass.lipStrips)) - sag
+		local closeTo = Fixtures.closeTo
+		local check, expectNone = Fixtures.checks()
 		local inner, outer, lips = 0, 0, 0
-		for _, piece in Features.glass(arena) do
+		for index, piece in Features.glass(arena) do
 			if piece.shape == "Block" and math.abs(piece.cframe.RightVector.Y) > 0.999 then
 				-- The vertical glass. A block's X runs up its face, Y out of the face toward the track, Z along it.
 				local center = piece.cframe.Position
-				expect(center.Y + piece.size.X / 2).toBeCloseTo(lipStart, 3)
-				expect(piece.size.Y).toBeCloseTo(thickness, 4)
+				local bottom = center.Y - piece.size.X / 2
+				check(closeTo(center.Y + piece.size.X / 2, lipStart, 3), "a wall's glass up to the lip", index)
+				check(closeTo(piece.size.Y, thickness, 4), "a wall's glass surfaceThickness thick", index)
 				local face = lateral(center + piece.cframe.UpVector * thickness / 2)
 				local back = lateral(center - piece.cframe.UpVector * thickness / 2)
 				if face < arena.trackWidth / 2 then
 					inner += 1
-					expect(face <= 1e-3 and face > -sag - 1e-3).toBe(true)
-					expect(back - face).toBeCloseTo(-thickness, 2)
-					expect(center.Y - piece.size.X / 2).toBeCloseTo(arena.innerBankHeight, 3)
+					check(face <= 1e-3 and face > -sag - 1e-3, "the inner glass's face at the track's edge", index)
+					check(closeTo(back - face, -thickness, 2), "the inner glass's slab behind its face", index)
+					check(closeTo(bottom, arena.innerBankHeight, 3), "the inner glass from the bank's top", index)
 				else
 					outer += 1
-					expect(face >= arena.trackWidth - sag - 1e-3 and face <= arena.trackWidth + 1e-3).toBe(true)
-					expect(back - face).toBeCloseTo(thickness, 2)
-					expect(center.Y - piece.size.X / 2).toBeCloseTo(arena.outerWallHeight, 3)
+					local onEdge = face >= arena.trackWidth - sag - 1e-3 and face <= arena.trackWidth + 1e-3
+					check(onEdge, "the outer glass's face at the track's edge", index)
+					check(closeTo(back - face, thickness, 2), "the outer glass's slab behind its face", index)
+					check(closeTo(bottom, arena.outerWallHeight, 3), "the outer glass from the wall's top", index)
 				end
 			else
 				-- A lip: its face on the chords of a quarter circle curling inward over the track, its slab outside.
@@ -93,11 +97,13 @@ describe("Features.glass", function()
 						then Vector2.new(glass.lipRadius, lipStart)
 						else Vector2.new(arena.trackWidth - glass.lipRadius, lipStart)
 					local distance = (Vector2.new(u, corner.Y) - lipCenter).Magnitude
-					expect(distance > nearest - 1e-3 and distance < glass.lipRadius + thickness + 1e-3).toBe(true)
-					expect(corner.Y > lipStart - 1e-3).toBe(true)
+					local onCircle = distance > nearest - 1e-3 and distance < glass.lipRadius + thickness + 1e-3
+					check(onCircle, "a lip's corner on its quarter circle", index)
+					check(corner.Y > lipStart - 1e-3, "a lip's corner above where the lip starts", index)
 				end
 			end
 		end
+		expectNone()
 		expect(inner > 0 and inner == outer).toBe(true)
 		expect(lips > 0).toBe(true)
 	end)
@@ -156,22 +162,25 @@ describe("Features.top", function()
 		function()
 			local wallTop = arena.glass.top
 			local from, to = arena.glass.lipRadius, arena.trackWidth - arena.glass.lipRadius
+			local closeTo = Fixtures.closeTo
+			local check, expectNone = Fixtures.checks()
 			local blocks, wedges = 0, 0
-			for _, piece in Features.top(arena) do
+			for index, piece in Features.top(arena) do
 				if piece.shape == "Block" then
 					blocks += 1
 					-- The slab above its face, outside the track.
-					expect(piece.cframe.UpVector.Y).toBeCloseTo(-1, 4)
+					check(closeTo(piece.cframe.UpVector.Y, -1, 4), "a roof block's slab above its face", index)
 				else
 					wedges += 1
 					for _, corner in Fixtures.wedgeFace(piece, Vector3.yAxis) do
-						expect(corner.Y).toBeCloseTo(wallTop + arena.surfaceThickness, 3)
+						local onSlab = closeTo(corner.Y, wallTop + arena.surfaceThickness, 3)
+						check(onSlab, "a roof wedge's slab above its face", index)
 					end
 				end
 				for _, corner in faceCorners(piece) do
-					expect(corner.Y).toBeCloseTo(wallTop, 3)
+					check(closeTo(corner.Y, wallTop, 3), "the roof's face at the walls' top", index)
 					local u = lateral(corner)
-					expect(u > from - 0.05 and u < to + 0.05).toBe(true)
+					check(u > from - 0.05 and u < to + 0.05, "the roof between the lips' ends", index)
 				end
 			end
 			-- One block along each straight, and four wedges for each station step around each curved end.
@@ -184,12 +193,13 @@ describe("Features.top", function()
 			local middle = arena.trackWidth / 2
 			local open = Features.top(openArena)
 			expect(#open).toBe(2 + 2 * steps * 4 + 2 * (2 + 2 * steps))
-			for _, piece in open do
+			for index, piece in open do
 				if piece.shape == "Block" and piece.cframe.UpVector.Y > -0.99 then
 					-- A strip's slab hangs outside the track: its face points back across it.
 					local center = piece.cframe.Position
 					local offMiddle = math.abs(lateral(center) - middle)
-					expect(math.abs(lateral(center + piece.cframe.UpVector) - middle) < offMiddle).toBe(true)
+					local outside = math.abs(lateral(center + piece.cframe.UpVector) - middle) < offMiddle
+					check(outside, "an open map's strip with its slab outside the track", index)
 				end
 				for _, corner in faceCorners(piece) do
 					local u = lateral(corner)
@@ -197,9 +207,10 @@ describe("Features.top", function()
 						and corner.Y > wallTop - 1e-3
 						and corner.Y < ceiling + 1e-3
 					local onCeiling = math.abs(corner.Y - ceiling) < 1e-3 and u > from - 0.05 and u < to + 0.05
-					expect(onStrip or onCeiling).toBe(true)
+					check(onStrip or onCeiling, "an open map's top on its strips or its ceiling", index)
 				end
 			end
+			expectNone()
 		end
 	)
 end)
@@ -354,20 +365,23 @@ describe("Features.gatePanels", function()
 		-- The corners on the gate's plane, as (u, y), and how far any corner lies behind it.
 		local face: { Vector2 } = {}
 		local deepest, area = 0, 0
-		for _, piece in Features.gatePanels(arena)[1].pieces do
+		local check, expectNone = Fixtures.checks()
+		for index, piece in Features.gatePanels(arena)[1].pieces do
 			area += faceArea(piece)
 			for _, corner in corners(piece) do
 				-- In the gate's frame: x across the track from its middle, z along it.
 				local at = gate:PointToObjectSpace(corner)
 				local u = at.X + half
-				expect(math.abs(at.Z) <= depth + 1e-3).toBe(true)
+				check(math.abs(at.Z) <= depth + 1e-3, "a wall's corner within gatePanel.depth of the gate", index)
 				deepest = math.max(deepest, math.abs(at.Z))
-				expect(at.Y > height(bottom, u) - 1e-3 and at.Y < height(top, u) + 1e-3).toBe(true)
+				local between = at.Y > height(bottom, u) - 1e-3 and at.Y < height(top, u) + 1e-3
+				check(between, "a wall's corner between the surface and the walls' top", index)
 				if math.abs(at.Z) < 1e-3 then
 					table.insert(face, Vector2.new(u, at.Y))
 				end
 			end
 		end
+		expectNone()
 		local function hasCorner(u: number, y: number): boolean
 			for _, corner in face do
 				if (corner - Vector2.new(u, y)).Magnitude < 1e-3 then
