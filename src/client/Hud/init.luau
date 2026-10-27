@@ -360,7 +360,7 @@ local Hud: Hud = {
 		show(self._clock, self._text:clock(state:clockSeconds()))
 		local skater = skate.skater
 		if hasSkater and skater ~= nil then
-			show(self._speed, self._text:speed(skater.velocity.Magnitude))
+			show(self._speed, self._text:speed(skater:shownSpeed()))
 		end
 		local config, actions = self._config, self._actions
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do

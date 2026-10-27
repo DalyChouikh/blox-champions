@@ -372,6 +372,27 @@ describe("SkateMath pushes and knockdowns", function()
 		expect(s:block(wall)).toBe(false)
 		Fixtures.expectNear(s.velocity, Vector3.new(-50, 10, 0))
 	end)
+
+	-- Roller Champions' speedometer (#233): a standing jump read 0 (the owner's Video 5) and an Air Pose held the
+	-- reading (Video 4: 21 -> 21, 38 -> 38).
+	it("shows the speed along the surface on the ground and on walls, and across the ground in the air", function()
+		-- On the floor: the 2 studs/s along the normal is the hover's pull, not speed. |(30, 0, -40)| = 50.
+		local s = skater(Vector3.new(30, 2, -40))
+		expect(s:shownSpeed()).toBeCloseTo(50, 4)
+		-- On a wall facing +X, riding up and along it: |(0, 30, -40)| = 50.
+		s.up = Vector3.xAxis
+		s.velocity = Vector3.new(3, 30, -40)
+		expect(s:shownSpeed()).toBeCloseTo(50, 4)
+		-- Behind a teammate: on the ground too.
+		s.mode = "Attached"
+		expect(s:shownSpeed()).toBeCloseTo(50, 4)
+		-- A standing jump reads 0, and a fall adds nothing to the speed across the ground.
+		s.mode = "Airborne"
+		s.velocity = Vector3.new(0, movement.jumpImpulse, 0)
+		expect(s:shownSpeed()).toBe(0)
+		s.velocity = Vector3.new(30, -80, -40)
+		expect(s:shownSpeed()).toBeCloseTo(50, 4)
+	end)
 end)
 
 -- Loop physics (A3). A roof is an arc around the origin with the skater inside the tube, so its normal at angle phi

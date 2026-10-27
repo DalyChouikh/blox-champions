@@ -1,8 +1,8 @@
 --!strict
--- The speedometer (spec §7.2, §11.1), in the lower right: the skater's speed in km/h, a binding, so it follows the
--- skater each frame without a render. On touch it sits small in the top-left corner, as the touch buttons and the
--- score button fill the right side (a phone has no room left there). Hidden without a skater. A plain function of its
--- props.
+-- The speedometer (spec §7.2, §11.1), in the lower right: the skater's speed in km/h as SkateMath.shownSpeed reads it
+-- (along the surface, or across the ground in the air), a binding, so it follows the skater each frame without a
+-- render. On touch it sits small in the top-left corner, as the touch buttons and the score button fill the right side
+-- (a phone has no room left there). Hidden without a skater. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
