@@ -16,6 +16,9 @@ local rotateToward = Vectors.rotateToward
 local HISTORY = 32
 -- A ground normal turning less than this in a step (radians) has not turned: float noise on a flat surface.
 local TURN_EPSILON = 1e-6
+-- A face leaning past straight up by less than this (the sine of the lean) is a vertical wall, not an overhang: the
+-- arena's built glass reads up to 6.5e-5 past vertical (measured, #234). The lips' first strip leans 22.5°.
+local OVERHANG_EPSILON = 1e-3
 -- What a knocked-down skater's input becomes: no stick, pump, brake, jump or draft. They only slide.
 local LOCKED: Types.SkateInput = table.freeze({
 	move = Vector3.zero,
@@ -46,6 +49,8 @@ type Fields = {
 	_wallCos: number,
 	-- Gravity's pull along a surface no steeper than pumpFlatSlopeDeg: pumping there counts as on the flat.
 	_flatPull: number,
+	-- Gravity's pull off a face leaning OVERHANG_EPSILON past vertical: up to it the face holds like a wall.
+	_overhangPull: number,
 	-- The ground normal the last grounded step rode on, nil in the air: each step's turn is measured from it (A3).
 	_lastNormal: Vector3?,
 	-- The last grounded steps, newest at `_historyHead`: how far each went and how much the ground turned under it,
@@ -71,6 +76,7 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_worldUp = -gravity.Unit,
 		_wallCos = math.cos(math.rad(movement.wallAngle)),
 		_flatPull = gravity.Magnitude * math.sin(math.rad(movement.pumpFlatSlopeDeg)),
+		_overhangPull = gravity.Magnitude * OVERHANG_EPSILON,
 		_lastNormal = nil,
 		_steps = table.create(HISTORY, 0),
 		_turns = table.create(HISTORY, 0),
@@ -222,9 +228,8 @@ local function measure(self: Skater, normal: Vector3, dt: number): (number, numb
 	if last == nil or speed <= EPSILON then
 		return speed * dt, 0
 	end
-	-- atan2 of the cross and dot products is exactly zero for a normal that has not turned; acos of a dot product of
-	-- single-precision vectors reads a few ten-thousandths of a radian there, enough to look like a turn.
-	local angle = math.atan2(last:Cross(normal).Magnitude, last:Dot(normal))
+	-- Exactly zero for a normal that has not turned, where an arccosine reads enough to look like a turn.
+	local angle = Vectors.angleBetween(last, normal)
 	return speed * dt, if (normal - last):Dot(along) > 0 then -angle else angle
 end
 
@@ -264,10 +269,11 @@ local function curvature(self: Skater, travel: number, turn: number): number
 end
 
 -- Past straight up the surface overhangs, and gravity pulls the skater off it: they stay on only while speed² ×
--- curvature reaches that pull. A flat ceiling has no curvature, so it never holds (spec §7.2, A3).
+-- curvature reaches that pull. A flat ceiling has no curvature, so it never holds (spec §7.2, A3). A face only float
+-- noise past vertical is a wall.
 local function loopBreaks(self: Skater, normal: Vector3, travel: number, turn: number): boolean
 	local pull = self._gravity:Dot(normal)
-	if pull <= 0 then
+	if pull <= self._overhangPull then
 		return false
 	end
 	local speed = alongSurface(self.velocity, normal).Magnitude

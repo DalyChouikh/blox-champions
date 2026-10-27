@@ -43,8 +43,7 @@ function NormalFilter.update(self: NormalFilter, raw: Vector3, dt: number): Vect
 		end
 	else
 		self._pending = nil
-		local angle = math.acos(math.clamp(cos, -1, 1))
-		local turn = angle * (1 - math.exp(-self._smoothing * dt))
+		local turn = Vectors.angleBetween(filtered, normal) * (1 - math.exp(-self._smoothing * dt))
 		-- A small turn is never between opposite normals, so the fallback axis is never used.
 		self.normal = Vectors.rotateToward(filtered, normal, turn, Vector3.xAxis)
 	end

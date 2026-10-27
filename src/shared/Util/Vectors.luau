@@ -26,10 +26,16 @@ function Vectors.rotateAbout(vector: Vector3, axis: Vector3, angle: number): Vec
 	return vector * cos + axis:Cross(vector) * sin + axis * (axis:Dot(vector) * (1 - cos))
 end
 
+-- The angle between two vectors in radians, exact even when it is tiny. The arccosine of a dot product is not: for
+-- float32 unit vectors a hair under unit length it read a 1.3e-4 rad gap as 4.88e-4 (#234).
+function Vectors.angleBetween(a: Vector3, b: Vector3): number
+	return math.atan2(a:Cross(b).Magnitude, a:Dot(b))
+end
+
 -- `from` turned toward `to` (both unit vectors) by at most `maxAngle` radians, about `fallbackAxis` when they are
 -- exactly opposite.
 function Vectors.rotateToward(from: Vector3, to: Vector3, maxAngle: number, fallbackAxis: Vector3): Vector3
-	local angle = math.acos(math.clamp(from:Dot(to), -1, 1))
+	local angle = Vectors.angleBetween(from, to)
 	if angle <= maxAngle then
 		return to
 	end

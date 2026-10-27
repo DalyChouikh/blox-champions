@@ -478,4 +478,12 @@ describe("SkateMath riding the roof by loop physics", function()
 		s:step(input(), ground(Vector3.new(0, 0, 1)), DT)
 		expect(s.mode).toBe("Grounded")
 	end)
+
+	-- Built faces lean a hair: rays at the arena's glass read normals up to 6.5e-5 past straight up (measured, #234).
+	-- That is float noise, not an overhang: a flat face has no curve, so the loop rule would drop every skater on it.
+	it("keeps a skater riding up a wall that leans past vertical only by float noise", function()
+		local s = skater(Vector3.new(0, 40, 0))
+		s:step(input(), ground(Vector3.new(0, -6.5e-5, 1).Unit), DT)
+		expect(s.mode).toBe("Grounded")
+	end)
 end)
