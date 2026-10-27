@@ -161,6 +161,17 @@ revised before any more Arena code. Their words, then what still needs a questio
 - **When the goal opens** (asked next, recommended): **after 4 laps, for now**. Only the marker order changes in the
   Arena part; the goal opening after 1 lap (+1), 2 (+3) and 3 (+5), first to 5 wins, comes with the whole scoring set
   in the Ball & rules part. Not chosen: opening after 1 lap now.
+- **The middle glass** (playing PlaceVersion 11): "did you make the middle glass not skateable like the outer glass?
+  it shouldn't be the case if yes". It is built like the outer glass and rideable (measured: a sharp turn into it rode
+  its face to about 21 studs); from a shallow angle a skater mostly stays on its tight 8-stud bank. Asked
+  (recommended): getting onto it from a shallow angle is the **Feel** part's.
+- **The playtest of PlaceVersion 11:** "Everything works" (the 8-point checklist).
+- **A gate counts either way** (after the end-of-phase review found that a carrier picking the ball up just past
+  gate 2 could turn back to it): "the player can record passing the gate either ways, from the back or the front,
+  but the order of the gates is the same, doesn't change based on his way of clearing a marker". So a crossing counts
+  from the gate's front or its back; only the order (2 -> 3 -> 4 -> 1) matters.
+- **The goal scores either way too** (answering the amendment's approval question): "also the goal should be able to
+  get scored by either way, front or back". A save's block follows (a thrown ball headed through the ring either way).
 
 ## Roller Champions
 

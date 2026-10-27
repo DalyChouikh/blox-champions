@@ -634,8 +634,9 @@ docs/playtests/2026-10-26-m1-arena.md          the Studio checks and the owner's
 
 During Task 7 Step 3 the owner asked for two changes, and the spec was amended for them on 2026-10-27 (R5's look, R18 a wall, §2.3 #10, §3.2, §3.3, §4.1, §5.2); then for two more (the walls' thickness and only the next one showing; laps starting at the goal's gate, Task 7d). Each is its own issue and a stacked, test-first fix before Task 7's record, as in Phase 9.
 
-- **Order:** `feat/190-carrier-beam` ← Task 7a ← Task 7b ← Task 7c ← Task 7d ← `test/191-arena-playtest`. Task 7's docs commit (e7c599b, local only) is replayed onto Task 7c's branch in a scratch worktree, its M1 spec text brought in line with the fixes (session 24: 5f23193), and again onto Task 7d's.
-- **Totals:** Task 6 ended at **697** (one under this plan's 698, by session 22's ruling on Task 3). Task 7a: **698**. Task 7b: **700**. Task 7c: **701**. Task 7d: **703**. Task 7's record adds none.
+- **Order:** `feat/190-carrier-beam` ← Task 7a ← Task 7b ← Task 7c ← Task 7d ← #208's fix ← Task 7e ← `test/191-arena-playtest`. Task 7's docs commit (e7c599b, local only) is replayed onto Task 7c's branch in a scratch worktree, its M1 spec text brought in line with the fixes (session 24: 5f23193), and again onto each later fix.
+- **Totals:** Task 6 ended at **697** (one under this plan's 698, by session 22's ruling on Task 3). Task 7a: **698**. Task 7b: **700**. Task 7c: **701**. Task 7d: **703**. #208's fix: **703**. Task 7e: **705**. Task 7's record adds none.
+- **A CI finding (2026-10-27, #208, PR #209, `test/208-fast-glass-test`):** Features.spec's glass test took 3.9 s, near Jest's 5 s limit for a test, and timed out CI's cloud run twice; its checks (and the top and gate-wall tests') are gathered into one expect each (`Fixtures.checks`), 16 ms now.
 - **Amended after Task 7b's play check (2026-10-27, the owner):** the walls are 0.2 thick (at 0.5 the goal gate's wall shared the rim's face plane and the rim flickered), with config rule 7; and only the next gate's wall shows (Task 7c, #202).
 - **Amended during the playtest of PlaceVersion 9 (2026-10-27, the owner):** every streak starts at the goal's gate, so its wall lights on the pickup and a lap ends just before the goal (Task 7d, #205; the M1 spec's §4.2, the Arena spec's R18 and §5.1). The goal still opens after `lapsToOpenGoal` (4) laps until the Ball & rules part (the owner's choice).
 - **The play checks** use the published game's light: the dev place's Lighting effects are set aside for screenshots and restored after (the built game has none).
@@ -778,6 +779,49 @@ LapTracker.new(gates: { Crossing.Rectangle }, startGate: number): LapTracker
 - [ ] **Step 6: Play check (Studio):** with a probe-handed ball, the goal gate's wall lights at once and the arrow points at it; carried 2 → 3 → 4 → 1, a `LapCompleted` (a Client probe on `RuleEvents`); the console shows the two ready lines.
 - [ ] **Step 7:** Static checks. Commit `feat(rules): every lap starts at the goal's gate`.
 
+### Task 7e: Gates and the goal count either way (labels `feature`, `rules`)
+
+**Issue:** #210 · **Branch:** `feat/210-either-way` · **Stacked on:** #208's fix (`test/208-fast-glass-test`)
+
+The end-of-phase review found that a carrier who picks the ball up just past the goal's gate (the left end's ball spawn, half of all kickoffs) could reach it only by riding round, while the arrow pointed back at it. The owner (2026-10-27): "the player can record passing the gate either ways, from the back or the front, but the order of the gates is the same", and "also the goal should be able to get scored by either way, front or back" (the M1 spec's §4.2, §4.3, §6.3; the Arena spec's §5.1).
+
+**Files:**
+- Modify: `src/shared/Rules/Crossing.luau`, `src/shared/Ball/Trajectory.luau`, `src/shared/Rules/SaveDetector.luau`; the "forward"/"front-to-back" comments in `src/shared/Rules/{LapTracker,GoalJudge}.luau`.
+- Test: `tests/shared/Rules/{Crossing,LapTracker,GoalJudge,SaveDetector,MatchEngine}.spec.luau`, `tests/shared/Ball/Trajectory.spec.luau`.
+
+**Interfaces:**
+```lua
+-- One crossing rule for both shapes, either way: the segment starts strictly off the plane and ends on it or past it
+-- (so a ball stopping on the plane counts once, not again when it moves on).
+Crossing.throughRectangle(rectangle, from, to): number?   -- a lap gate
+Crossing.throughDisc(disc, from, to): number?             -- the goal ring
+-- Replaces forwardCrossingTime: both times in (0, maxTime] at which the path meets the frame's plane, ascending
+-- (nil when absent); allocation-free.
+Trajectory.crossingTimes(position, velocity, gravity, frame, maxTime): (number?, number?)
+-- SaveDetector: a block when either crossing lands inside the ring.
+```
+
+- [ ] **Step 1: Write the failing tests:**
+  - **`Crossing.spec`:**
+    - `counts a crossing either way inside the rectangle, and ignores segments that stay on one side` (replaces "ignores backward crossings and segments that stay on one side");
+    - `counts a ball that stops exactly on the plane once, not again when it moves on` gains the backward case;
+    - `uses the frame's position and facing` becomes `uses the frame's position and plane`: a segment through the plane at the frame counts either way; one beside it, or along the plane, does not;
+    - the disc: a back-to-front crossing inside the radius counts too, outside it does not.
+  - **`Trajectory.spec`** (`crossingTimes`): both crossings of an arc, in order; a ball already on the plane gives only the later one; crossings in the past or after maxTime are left out; a falling ball meets a plane below it.
+  - **`SaveDetector.spec`:** a thrown ball headed back-to-front through the ring is a block; (+1) **new** `calls a block on the later of an arc's two crossings when only it passes through the ring` (a tilted disc: our upright ring meets an arc once).
+  - **`GoalJudge.spec`:** `scores when the ball passes through the ring either way while open`.
+  - **`LapTracker.spec`:** `lists the gates a segment crosses either way, in the order the segment meets them`: a backward sweep lists 4, 3, 2, 1.
+  - **`MatchEngine.spec`:**
+    - `scores a ball passing back-to-front through the open ring` (replaces "never scores ...");
+    - `counts gates only for a possessing team, in order, crossed either way`: the next gate crossed backward counts;
+    - (+1) **new** `lets a carrier just past the goal's gate turn back through it: the lap starts there`: the goal's gate crossed backward gives progress 1, crossing it forward again counts nothing, the next gate gives 2.
+- [ ] **Step 2:** Run `testPathPattern = "(Crossing|Trajectory|SaveDetector|GoalJudge|LapTracker|MatchEngine)"`. Expected: FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, then the full suite. Expected: **705 tests**.
+- [ ] **Step 5: Mutations:** forward only (the backward branch dropped) → the Crossing, GoalJudge, LapTracker and MatchEngine tests; a backward segment stopping on the plane not counted (`<` for `<=`), or counted again when it moves on (`>=` for `>`) → the stop test; `crossingTimes` returning only the first time, or only forward ones → the Trajectory tests; SaveDetector checking only the first time → the tilted-ring test.
+- [ ] **Step 6: Play check (Studio):** a probe-handed ball on the left end just past gate 2, the skater steered back through gate 2: `GateCrossed` gate 2 progress 1, and gate 3's wall lights; after the goal opens, a real pass from behind the ring through it: `GoalScored`; the console shows the two ready lines.
+- [ ] **Step 7:** Static checks. Commit `feat(rules): gates and the goal count whichever way the ball crosses them`.
+
 ### Task 7, continued
 
-After Task 7d: Task 7's docs commit (5f23193) is replayed onto Task 7d's branch, then Step 2's republish, the rest of Step 3 (the checklist), and Step 4's record with every finding and its issue (#199, #200, #202, #205).
+After Task 7d: Task 7's docs commit (5f23193) is replayed onto Task 7d's branch, then Step 2's republish, the rest of Step 3 (the checklist), and Step 4's record with every finding and its issue (#199, #200, #202, #205). After the end-of-phase review: the record is replayed onto #208's fix and Task 7e, and gains #208 and #210; the review's other findings go in the one review-fixes PR.

@@ -238,7 +238,7 @@ Its two callers stay: **the ball** (`BallService`, out by `Ball.outOfBoundsMargi
 
 As today, a gate spans the track at the start of each section, facing the travel direction. It is now `trackWidth` wide and as tall as the top (`Profile.topHeight`), so no ball in play crosses unseen.
 
-**Every streak starts at the goal's gate** (`goalGateIndex`; the M1 spec's §4.2, amended 2026-10-27). After a kickoff or a change of possession the next gate is the goal's, so a lap runs Gate 2 → 3 → 4 → 1 and ends just before the goal. `LapTracker.new(gates, startGate)` takes it, and `MatchEngine` passes `Arena.goalGateIndex`. The snapshot's `nextGate` is therefore always set, and a gate wall and the carrier's arrow show from the pickup.
+**Every streak starts at the goal's gate** (`goalGateIndex`; the M1 spec's §4.2, amended 2026-10-27). After a kickoff or a change of possession the next gate is the goal's, so a lap runs Gate 2 → 3 → 4 → 1 and ends just before the goal. `LapTracker.new(gates, startGate)` takes it, and `MatchEngine` passes `Arena.goalGateIndex`. The snapshot's `nextGate` is therefore always set, and a gate wall and the carrier's arrow show from the pickup. **A gate counts whichever way the ball crosses it** (front or back; only the order matters: the owner, 2026-10-27), so a carrier who picks the ball up just past the goal's gate may turn back through it (`Crossing.throughRectangle`). **The goal ring scores either way too** (the owner, 2026-10-27; `Crossing.throughDisc`), and a save's block looks at both of a thrown ball's crossings of the ring's plane (`Trajectory.crossingTimes`).
 
 ### 5.2 Gate panels (replacing the corner markers)
 
@@ -335,7 +335,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 - **Bounds:** inside: the floors, the bank, both glass walls, up to the top plus the margin (each kind); outside: past either glass, under the floor, over the top.
 - **Centerline:** `distanceOf` round trip on both straights and both ends, the wrap at gate 1, and `pose` against `frameAt`.
 - **Config:** the new defaults, each new field rule, each cross-field rule (exact messages).
-- **LapTracker and MatchEngine** (2026-10-27): every streak starts at its start gate, after a kickoff and a steal; the engine's start gate is `goalGateIndex` (a non-default one too); a start gate that is not one of the gates is rejected.
+- **LapTracker and MatchEngine** (2026-10-27): every streak starts at its start gate, after a kickoff and a steal; the engine's start gate is `goalGateIndex` (a non-default one too); a start gate that is not one of the gates is rejected; a gate crossed either way counts, in order, and a ball stopping on its plane counts once; the goal ring scores either way; a save's block looks at both of an arc's crossings of the ring's plane.
 
 **Client and server, in Edit:**
 - **Builder:** folders, tags, `GateIndex`, the glass and top looks (taken from `glass.material` and `glass.transparency`, a non-default look included), touchable glass and top, no shadow on glass or the top, the middle untagged, both kinds of top.

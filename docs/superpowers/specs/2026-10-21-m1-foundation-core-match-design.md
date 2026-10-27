@@ -130,8 +130,8 @@ blox-champions/
 
 - The arena has **4 lap gates** at the corners where straights meet the curved ends, numbered in track order (§9.1). Each gate is a rectangle spanning the track with a **forward normal** pointing along the track direction.
 - Lap progress tracks **the ball**: each server tick, the segment from the ball's previous position to its current position is tested against every gate rectangle (carried, flying, or loose — so a pass thrown through a gate counts).
-- A crossing counts only if it is **forward** (segment direction · gate normal > 0) **and** the possessing team is not neutral.
-- **Every streak starts at the goal's gate** (`Arena.goalGateIndex`, Gate 2): from the moment the streak starts, it is the next gate, so its marker shows on the pickup. Only the **next gate in order** counts; backward or out-of-order crossings are ignored. A lap runs Gate 2 → 3 → 4 → 1 and ends just before the goal (the owner, 2026-10-27, after playing the Arena part: "it should start from the marker that is close to the goal ... so that then players just see the goal open and ready to shoot"). A carrier who picks the ball up just past Gate 2 rides round to it first. *(Until 2026-10-27: the first forward crossing after the streak started set the sequence, whichever gate it was.)*
+- A crossing counts **either way**, from the gate's front or its back, while the possessing team is not neutral (the owner, 2026-10-27: "the player can record passing the gate either ways, from the back or the front, but the order of the gates is the same"). The segment must start off the gate's plane and end on it or past it, so a ball that stops exactly on the plane counts once. *(Until 2026-10-27: only forward crossings, segment direction · gate normal > 0, counted.)*
+- **Every streak starts at the goal's gate** (`Arena.goalGateIndex`, Gate 2): from the moment the streak starts, it is the next gate, so its marker shows on the pickup. Only the **next gate in order** counts; out-of-order crossings are ignored, whichever way they go. A lap runs Gate 2 → 3 → 4 → 1 and ends just before the goal (the owner, 2026-10-27, after playing the Arena part: "it should start from the marker that is close to the goal ... so that then players just see the goal open and ready to shoot"). A carrier who picks the ball up just past Gate 2 may turn back through it: that is their first marker. *(Until 2026-10-27: the first forward crossing after the streak started set the sequence, whichever gate it was.)*
 - 4 accepted crossings in order = **1 lap**. Emits `GateCrossed { team, gateIndex, progress }` and `LapCompleted { team, streak, holder }`.
 - The streak resets to 0, and the next gate to the goal's, on `PossessionChanged` to a different team and on kickoff reset.
 
@@ -139,7 +139,7 @@ blox-champions/
 
 - One **goal ring** (upright, raised) at the configured gate (§9.1). Closed: a **panel** covers it and the ball bounces off.
 - The goal **opens for the possessing team** when its streak ≥ `Match.lapsToOpenGoal` (4). Emits `GoalOpened { team }`. It closes on possession change to the other team or on any point (`GoalClosed`).
-- A **goal** is scored when the ball's tick segment passes through the ring's disc **front-to-back** (moving with the track direction) while the goal is open for the possessing team. Back-to-front never scores.
+- A **goal** is scored when the ball's tick segment passes through the ring's disc **either way**, front or back, while the goal is open for the possessing team (the owner, 2026-10-27: "also the goal should be able to get scored by either way, front or back"), by the same crossing rule as a lap gate (§4.2). *(Until 2026-10-27: only front-to-back, with the track direction, scored.)*
 - The goal is credited to the possessing team; the **scorer** is the possessing-team player who last held the ball. A defender's deflection that still goes in counts.
 - Emits `GoalScored { team, scorer, assister? }`.
 
@@ -214,7 +214,7 @@ The last **different** teammate who held the ball before the scorer, if the hand
 
 A save is either:
 
-- **(a) Block:** a defender touches (catch, tackle-hit, uppercut, body contact) a **thrown** ball whose predicted ballistic trajectory (`Ball/Trajectory`, gravity only, no bounces) would pass front-to-back through the **open** goal ring within `Scoring.saveLookaheadSeconds` = 1.5; or
+- **(a) Block:** a defender touches (catch, tackle-hit, uppercut, body contact) a **thrown** ball whose predicted ballistic trajectory (`Ball/Trajectory`, gravity only, no bounces) would pass through the **open** goal ring, either way, within `Scoring.saveLookaheadSeconds` = 1.5 (either of an arc's two crossings of the ring's plane; until 2026-10-27, front-to-back only); or
 - **(b) Steal-save:** a defender's team gains possession from the team whose goal is currently open.
 
 One action that satisfies both counts as **one** save. Emits `SaveMade { player, kind }`.
