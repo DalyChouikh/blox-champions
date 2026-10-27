@@ -1,6 +1,6 @@
 --!strict
 -- The goal ring (spec §4.3): opens for the possessing team once its streak reaches the lap target, and
--- scores when the ball passes through the ring front-to-back (along the track direction) while open.
+-- scores when the ball passes through the ring, either way (Crossing), while open.
 
 local Crossing = require(script.Parent.Crossing)
 local Team = require(script.Parent.Team)

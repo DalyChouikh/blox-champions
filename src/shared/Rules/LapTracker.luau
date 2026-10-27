@@ -1,7 +1,7 @@
 --!strict
 -- Lap progress of the possessing team's streak (spec §4.2). Every streak starts at the start gate (a match's is the
--- goal's), and only the next gate in track order counts, so backward or out-of-order crossings are ignored. Crossing
--- every gate in order is one lap.
+-- goal's), and only the next gate in track order counts, crossed either way (Crossing), so out-of-order crossings are
+-- ignored. Crossing every gate in order is one lap.
 
 local Crossing = require(script.Parent.Crossing)
 
@@ -52,7 +52,7 @@ function LapTracker.new(gates: { Crossing.Rectangle }, startGate: number): LapTr
 	)
 end
 
--- Gates the segment crosses forward, in the order the segment meets them, or nil when none. The list is
+-- Gates the segment crosses either way, in the order the segment meets them, or nil when none. The list is
 -- reused by the next call, so read it before calling again.
 function LapTracker.crossedGates(self: LapTracker, from: Vector3, to: Vector3): { number }?
 	local crossed = self._crossed

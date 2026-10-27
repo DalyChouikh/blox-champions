@@ -248,20 +248,36 @@ describe("MatchEngine possession and laps", function()
 		expect(engine:snapshot().nextGate).toBe(LAP[2])
 	end)
 
-	it("counts gates only for a possessing team, forward and in order", function()
+	it("counts gates only for a possessing team, in order, crossed either way", function()
 		local engine = liveEngine()
 		engine:ballMoved(Fixtures.throughGate(GOAL_GATE))
 		expectEvents(engine, {})
 		engine:pickedUp("B1", ZERO, ZERO)
 		engine:drainEvents()
-		-- The gate after the goal's counts nothing before it; then one out of order, and one crossed backwards.
+		-- The gate after the goal's counts nothing before it; then one out of order; then the next one crossed
+		-- backwards counts (the owner, 2026-10-27: a gate counts from its back as from its front).
 		crossGates(engine, { LAP[2], LAP[1], LAP[3], LAP[2] })
 		local from, to = Fixtures.throughGate(LAP[3])
 		engine:ballMoved(to, from)
 		expectEvents(engine, {
 			{ name = "GateCrossed", team = "Blue", gateIndex = LAP[1], progress = 1 },
 			{ name = "GateCrossed", team = "Blue", gateIndex = LAP[2], progress = 2 },
+			{ name = "GateCrossed", team = "Blue", gateIndex = LAP[3], progress = 3 },
 		})
+	end)
+
+	it("lets a carrier just past the goal's gate turn back through it: the lap starts there", function()
+		local engine = liveEngine()
+		engine:pickedUp("B1", ZERO, ZERO)
+		engine:drainEvents()
+		-- Back through the goal's gate: its first marker.
+		local from, to = Fixtures.throughGate(GOAL_GATE)
+		engine:ballMoved(to, from)
+		expectEvents(engine, { { name = "GateCrossed", team = "Blue", gateIndex = GOAL_GATE, progress = 1 } })
+		-- Forward through it again counts nothing (it is no longer the next gate); the next gate follows.
+		engine:ballMoved(from, to)
+		crossGates(engine, { LAP[2] })
+		expectEvents(engine, { { name = "GateCrossed", team = "Blue", gateIndex = LAP[2], progress = 2 } })
 	end)
 
 	it("starts every streak at the goal's gate, after the kickoff and after a steal", function()
@@ -327,14 +343,15 @@ describe("MatchEngine goals and points", function()
 		expect(engine:drainEvents()[1]).toEqual({ name = "GoalScored", team = "Blue", scorer = "B1" })
 	end)
 
-	it("never scores a ball passing back-to-front through the ring", function()
+	-- The owner, 2026-10-27: the goal scores from behind as from the front.
+	it("scores a ball passing back-to-front through the open ring", function()
 		local engine = liveEngine(SHORT_STREAK)
 		engine:pickedUp("B1", ZERO, ZERO)
 		lap(engine)
 		engine:drainEvents()
 		local from, to = Fixtures.throughRing()
 		engine:ballMoved(to, from)
-		expectEvents(engine, {})
+		expect(engine:drainEvents()[1]).toEqual({ name = "GoalScored", team = "Blue", scorer = "B1" })
 	end)
 
 	it("judges the ring before the gates a segment crosses, so the lap that opens the goal cannot score", function()
