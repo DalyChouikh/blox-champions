@@ -286,25 +286,28 @@ describe("ActionController", function()
 		expect(requests[2]).toEqual({ action = "CallPass" })
 	end)
 
-	it("leaps off a wall with an uppercut, and only near one", function()
-		-- A wall facing the skater, 4 studs ahead.
-		local wall: BasePart = Instance.new("Part")
-		wall.Anchored = true
-		wall.Size = Vector3.new(20, 10, 1)
-		wall.CFrame = CFrame.new(0, 5, -4.5)
-		setup({ wall })
+	-- Roller Champions' uppercut launches on flat floor, away from any wall (#219): 110 studs/s up, about 31 studs.
+	it("leaps up with an uppercut anywhere, on open floor as beside a wall", function()
+		setup()
 		frame()
 		press("Uppercut")
 		frame()
 		expect(skater().mode).toBe("Airborne")
 		expect(skater().velocity.Y).toBeCloseTo(110, 3)
 
-		wall:Destroy()
+		-- A wall facing the skater, 4 studs ahead, changes nothing.
+		local wall: BasePart = Instance.new("Part")
+		wall.Anchored = true
+		wall.Size = Vector3.new(20, 10, 1)
+		wall.CFrame = CFrame.new(0, 5, -4.5)
+		wall.Parent = folder
+		wall:AddTag(Tags.RideSurface)
 		skater():stop()
 		ActionController.runner:reset()
 		press("Uppercut")
 		frame()
-		expect(skater().mode).toBe("Grounded")
+		expect(skater().mode).toBe("Airborne")
+		expect(skater().velocity.Y).toBeCloseTo(110, 3)
 		expect(requests).toEqual({ { action = "Uppercut" }, { action = "Uppercut" } })
 	end)
 

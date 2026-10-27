@@ -289,7 +289,7 @@ Tackle = {
 | Tackle | no ball | Lunge; hit opponent in cone → knockdown 1.5 s; a hit ball carrier drops the ball, which keeps their momentum. |
 | Dive | pressing Tackle during Tackle's active phase | Range 11, active 0.35 s, recovery 0.9 s. |
 | Dodge | ball | Side-step at `sideSpeed = 45` in the move direction; tackle-immune for 0.3 s; cooldown 1.5 s. |
-| Uppercut | no ball | Knocks down an opponent in front/above (range 6, cone 60°). If a wall is within 5 studs ahead → vertical leap (`wallLeapImpulse = 110`). Cooldown 1.2 s. |
+| Uppercut | no ball | Knocks down an opponent in front/above (range 6, cone 60°). Leaps the skater straight up anywhere (`leapImpulse = 110`: about 31 studs from the ground, `airMultiplier` as strong in the air), never past `hardCap`. *The owner (#219): Roller Champions' uppercut launches on open floor; was a leap only within 5 studs of a wall.* Cooldown 1.2 s. |
 | Air tackle / Air dodge | airborne | Same as Tackle / Dodge with `airMultiplier = 0.8` on lunge/side speed. |
 | Charge Throw | ball | Hold to charge up to `chargeMaxSeconds = 1.0`; release throws along camera aim at `lerp(minThrowSpeed = 60, maxThrowSpeed = 160, charge)` + `inheritCarrierVelocity = 0.5` × carrier velocity. |
 | Pass | ball | Magnetic pass at `passSpeed = 90` to a teammate who called within `callPassWindow = 3` s (most recent caller first), else the best-scored teammate inside `passTargeting.coneDeg = 70` and `passTargeting.maxRange = 120`, where score = `angleWeight (0.6)` × (1 − angle/cone) + `distanceWeight (0.4)` × (1 − distance/maxRange). With no valid target, the ball is passed straight along the aim at `passSpeed`. Homing acceleration `passHomingAccel = 60`; interceptable. |

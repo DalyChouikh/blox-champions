@@ -26,8 +26,8 @@ export type Hit = { range: number, coneDeg: number, aimUpDeg: number, knockdownS
 export type Motion = {
 	lungeSpeed: number?,
 	sideSpeed: number?,
-	wallLeapDistance: number?,
-	wallLeapImpulse: number?,
+	-- Straight up, anywhere: the Uppercut's leap (#219).
+	leapImpulse: number?,
 }
 export type ThrowSettings = {
 	-- Holding this long charges the throw fully.
@@ -132,7 +132,8 @@ local defaults: ActionsConfig = {
 		pose = "None",
 		motion = { sideSpeed = 45 },
 	},
-	-- Aimed up, so its cone covers "in front and above"; near a wall it leaps.
+	-- Aimed up, so its cone covers "in front and above"; it leaps the skater up anywhere, 110² / (2 × 196.2) = 31 studs
+	-- from the ground (the owner, #219: RC's uppercut launches on open floor).
 	Uppercut = {
 		phases = { windup = 0.05, active = 0.2, recovery = 0.4 },
 		cooldown = 1.2,
@@ -140,7 +141,7 @@ local defaults: ActionsConfig = {
 		effect = "Knockdown",
 		pose = "None",
 		hit = { range = 6, coneDeg = 60, aimUpDeg = 30, knockdownSeconds = 1.5 },
-		motion = { wallLeapDistance = 5, wallLeapImpulse = 110 },
+		motion = { leapImpulse = 110 },
 	},
 	ChargeThrow = {
 		phases = INSTANT,
@@ -250,7 +251,7 @@ local schema = Validate.record({
 	Dodge = action(defaults.Dodge, { motion = Validate.record({ sideSpeed = positive }) }),
 	Uppercut = action(defaults.Uppercut, {
 		hit = hit,
-		motion = Validate.record({ wallLeapDistance = positive, wallLeapImpulse = positive }),
+		motion = Validate.record({ leapImpulse = positive }),
 	}),
 	ChargeThrow = action(defaults.ChargeThrow, { throw = throw }),
 	Pass = action(defaults.Pass, { pass = pass }),

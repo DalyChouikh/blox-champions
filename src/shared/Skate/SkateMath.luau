@@ -112,6 +112,11 @@ local function pumpPush(self: Skater, downhillPull: number): number
 	return 0
 end
 
+-- Steeper than wallAngle: a wall, where gravity pulls along the surface at wallGravityScale.
+local function isWall(self: Skater, normal: Vector3): boolean
+	return normal:Dot(self._worldUp) < self._wallCos
+end
+
 local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
 	local movement = self._movement
 	local normal = ground.normal
@@ -133,7 +138,7 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 
 	-- On a wall gravity pulls along it at wallGravityScale of its strength (#216); in the air it stays full.
 	local gravityAlong = alongSurface(self._gravity, normal)
-	if self:isSteep(normal) then
+	if isWall(self, normal) then
 		gravityAlong *= movement.wallGravityScale
 	end
 	local acceleration = gravityAlong + heading * input.draftAccel
@@ -285,11 +290,6 @@ end
 local function forget(self: Skater)
 	self._lastNormal = nil
 	self._historyCount = 0
-end
-
--- Steeper than wallAngle: a wall, where gravity pulls along the surface at wallGravityScale.
-function SkateMath.isSteep(self: Skater, normal: Vector3): boolean
-	return normal:Dot(self._worldUp) < self._wallCos
 end
 
 -- On the ground again: the Air Pose ends and is ready for the next time in the air.

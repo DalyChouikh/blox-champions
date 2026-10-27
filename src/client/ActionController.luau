@@ -119,7 +119,7 @@ local function chosen(
 end
 
 -- The push an action gives as it starts: a lunge along the facing, a dodge along the stick (to the right without one),
--- a leap straight up off a wall just ahead. In the air it is airMultiplier as strong.
+-- a leap straight up. In the air it is airMultiplier as strong.
 local function push(self: ActionController, skater: SkateMath.Skater, action: Config.ActionConfig)
 	local motion = action.motion
 	if motion == nil then
@@ -137,9 +137,8 @@ local function push(self: ActionController, skater: SkateMath.Skater, action: Co
 			change += side.Unit * motion.sideSpeed
 		end
 	end
-	local impulse, reach = motion.wallLeapImpulse, motion.wallLeapDistance
-	if impulse ~= nil and reach ~= nil and self._skate:wallAhead(reach) then
-		change += Vector3.yAxis * impulse
+	if motion.leapImpulse ~= nil then
+		change += Vector3.yAxis * motion.leapImpulse
 		launch = true
 	end
 	if change.Magnitude <= Vectors.EPSILON then
