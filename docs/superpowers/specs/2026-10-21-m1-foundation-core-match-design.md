@@ -51,14 +51,15 @@ M1 does include the **registries** (ball skin, skate skin) holding one default e
 | Q7 | Devices | **PC + mobile + gamepad** from M1. |
 | Q8 | Character | **Own Roblox avatar + skates**, one fixed collider for everyone. |
 | Q9 | Arena art | **Graybox now**, art later. |
-| Q10 | Goal placement | **Upright raised ring at a corner gate (Gate 2) on the outer wall**, on the carrier's right shoulder; track runs **counter-clockwise**. |
+| Q10 | Goal placement | **Upright raised ring at a corner gate (Gate 2) on the outer wall**, on the carrier's right shoulder; track runs **counter-clockwise**. *The placement is superseded by the Arena spec's R7 (2026-10-26): the ring hangs over the track at Gate 2 from an arm (§9.1). The gate and the direction stay.* |
 | Q11 | Ground shape | Straights: walls both sides, **lower floor by the infield, one smooth wavy step up to a higher floor by the outer wall** (pump down it for speed). Curved ends: **normal floor curving up into the walls (U/J)**. |
 | A1 | Movement approach | **Custom skate controller** on physics constraints (not Humanoid, not ControllerManager). |
-| A2 | Enclosed arena (2026-10-22) | **The track is a closed tube**: a roof spans the track (half-circle, radius `trackWidth / 2`, top at 50 studs), and both walls rise to **28 studs** (`infieldWallHeight` 20 → 28). The skater's pump on a bank can no longer carry them out of the arena. |
-| A3 | Riding the roof (2026-10-22) | **Walls by speed, roof by loop physics.** Walls keep `minWallSpeed`. Past straight up, a skater stays on only while `speed² × curvature ≥ gravity's pull off the surface`. A flat ceiling never holds, at any speed. |
+| A2 | Enclosed arena (2026-10-22) | **The track is a closed tube**: a roof spans the track (half-circle, radius `trackWidth / 2`, top at 50 studs), and both walls rise to **28 studs** (`infieldWallHeight` 20 → 28). The skater's pump on a bank can no longer carry them out of the arena. *Superseded by A7 (2026-10-26).* |
+| A3 | Riding the roof (2026-10-22) | **Walls by speed, roof by loop physics.** Walls keep `minWallSpeed`. Past straight up, a skater stays on only while `speed² × curvature ≥ gravity's pull off the surface`. A flat ceiling never holds, at any speed. *The loop rule stays: it is the real-physics rule for the glass's lips (A7; Arena spec 2.3, 7). The walls' rule (`minWallSpeed`) is the Feel part's.* |
 | A4 | Future art and maps (2026-10-22) | **Glass walls** in the art pass (ground stays opaque). **More maps, picked at random each game**, later: the arena stays data-driven. |
 | A5 | Packages (2026-10-23) | **Roblox's own maintained packages:** React Luau (`roblox/react`, `roblox/react-roblox` 17.3.13) for the HUD and Jest Roblox (`roblox/jest`, `roblox/jest-globals` 3.20.1) for tests. They replace the `jsdotlua` copies, which had not changed since December 2024. |
-| A6 | The M1 overhaul (2026-10-25) | **Match Roller Champions 1:1 in play, with Illegal Soccer's polish**, after the owner studied both games (videos in §15): their feel, rules and layout ideas, never their art, logos, names or music. Phase 9's Config tuning pass is replaced. After Phase 9, M1 continues in four parts, in this order, each with its own spec, plan and test-first tasks: **Arena** (RC's size and shape, an open top with glass barriers, gate arches and a beam beside the carrier) → **Feel** (camera, real physics on walls, jumps, landings, double jump, no action spam) → **Ball & rules** (passes through the air, shooting, 1/3/5 points for 1/2/3 laps, kickoff, leavers, team switching, networking) → **Presentation** (a lighter HUD and phone buttons, goal replay and celebration, cutscenes). Sound, music, art, animations, the stadium and crowd, more maps and the tutorial move to a later milestone; fans to M6; the practice park to M3. |
+| A6 | The M1 overhaul (2026-10-25) | **Match Roller Champions 1:1 in play, with Illegal Soccer's polish**, after the owner studied both games (videos in §15): their feel, rules and layout ideas, never their art, logos, names or music. Phase 9's Config tuning pass is replaced. After Phase 9, M1 continues in four parts, in this order, each with its own spec, plan and test-first tasks: **Arena** (RC's size and shape, an open top with glass barriers, gate arches and a beam beside the carrier) → **Feel** (camera, real physics on walls, jumps, landings, double jump, no action spam) → **Ball & rules** (passes through the air, shooting, 1/3/5 points for 1/2/3 laps, kickoff, leavers, team switching, networking) → **Presentation** (a lighter HUD and phone buttons, goal replay and celebration, cutscenes). Sound, music, art, animations, the stadium and crowd, more maps and the tutorial move to a later milestone; fans to M6; the practice park to M3. *The Arena part's shape is A7's and the Arena spec's R18 (rideable glass with lips, gate walls), not its first version's.* |
+| A7 | The arena's enclosure (2026-10-26; replaces A2 and A3's roof) | **Rideable glass walls with lips, closed by a per-map top** (Arena spec, `docs/superpowers/specs/2026-10-25-m1-arena-design.md`, §2.2). The opaque floor, the inner bank and the outer wall rise into rideable glass up to `glass.top`, each wall curling inward into a lip. Above them, `Arena.top` closes the arena: a glass roof (Closed, our map) or an invisible ceiling 20 studs higher (Open). The top stops skaters and the ball and is never ridden. |
 
 ---
 
@@ -247,7 +248,7 @@ Highest score on the **winning team**. Tie-breakers in order: more goals, more s
 | Body | One collider shape for every player; root hovers above the ground hit; ground sensing ray length. | `colliderSize = Vector3.new(2, 2, 2)` (sphere), `hoverHeight = 2.5`, `groundProbeLength = 6` |
 | Momentum | Gravity's component along the surface accelerates downhill / decelerates uphill. Rolling friction and air drag always apply. Soft cap: acceleration scales down linearly from `softCap` to `hardCap`. Hard cap clamps. | `gravity = workspace.Gravity`, `rollingFriction = 4`, `airDrag = 0.02`, `cruiseSpeed = 60`, `softCap = 90`, `hardCap = 140` (studs/s) |
 | Steering | Turn rate shrinks with speed (wider turns when fast). | `turnRateLow = 4.0`, `turnRateHigh = 1.5` (rad/s) |
-| Wall riding | Stays attached to a surface while speed ≥ `minWallSpeed`; below it on a surface steeper than `maxStickAngle`, the skater detaches and falls. Past straight up (overhangs: the roof's rounded edges and top), the skater also needs loop physics: `speed² × curvature ≥ gravity's pull off the surface`, so a flat ceiling never holds (A3). The curvature is measured over the last `curvatureWindow` studs of the skater's path, so the roof's flat strips read as the arc they make (Phase 5 review). | `minWallSpeed = 35`, `maxStickAngle = 60`°, `curvatureWindow = 10` (studs) |
+| Wall riding | Stays attached to a surface while speed ≥ `minWallSpeed`; below it on a surface steeper than `maxStickAngle`, the skater detaches and falls. Past straight up (overhangs: the glass's lips, A7), the skater also needs loop physics: `speed² × curvature ≥ gravity's pull off the surface`, so a flat ceiling never holds (A3). The curvature is measured over the last `curvatureWindow` studs of the skater's path, so a lip's flat strips read as the arc they make (Phase 5 review). The top is never ridden (A7). | `minWallSpeed = 35`, `maxStickAngle = 60`°, `curvatureWindow = 10` (studs) |
 | Pump (hold) | Multiplies the downhill gravity component; small push on flat ground; no gain uphill. Crouch pose. | `pumpSlopeMultiplier = 1.6`, `pumpFlatAccel = 8` |
 | Brake (hold) | Strong deceleration to a stop. | `brakeDecel = 120` |
 | Tiptoe (brake + steer) | Precise low-speed movement capped at `tiptoeSpeed`. | `tiptoeSpeed = 12` |
@@ -327,37 +328,55 @@ Third-person chase camera with mouse lock. `Camera.distance = 12`, `Camera.heigh
 
 ### 9.1 Layout (`Config/Arena`)
 
+The arena follows the M1 overhaul's Arena spec (`docs/superpowers/specs/2026-10-25-m1-arena-design.md`, decisions R1–R18 and A7). Its §3 holds the full cross-section and every size; this section summarises them.
+
 ```
-                Gate 2 + GOAL RING (raised, outer wall)        Gate 1
+                Gate 2 + GOAL RING (hanging, ¾ across)         Gate 1
                    ▼  ◄────────── top straight (stepped) ─────────  │
             ╭──────┼──────────────────────────────────────────────┼──────╮
            ╱       │   [Blue spawn]                                │       ╲
    curved │  ▼     │      ╭────────────────────────────────╮      │     ▲  │ curved
-   end    │ (ball  │      │          INFIELD (walled)      │      │ (ball│  end
-   (U/J)  │ spawn) │      ╰────────────────────────────────╯      │ spawn)  (U/J)
+   end    │ (ball  │      │  MIDDLE (closed off, 40 wide)  │      │ (ball│  end
+          │ spawn) │      ╰────────────────────────────────╯      │ spawn)
            ╲       │   [Orange spawn]                              │       ╱
             ╰──────┼──────────────────────────────────────────────┼──────╯
                 Gate 3  ───────── bottom straight (stepped) ─────►  Gate 4
                          track direction: COUNTER-CLOCKWISE
+          at every gate a thin glass wall stands across the track; only the next one shows
 ```
 
 - `trackDirection = "CounterClockwise"` (outer wall on the skater's right).
 - Gates numbered in track order: Gate 1 top-right, Gate 2 top-left, Gate 3 bottom-left, Gate 4 bottom-right.
-- `goalGateIndex = 2`: the upright goal ring is raised on the outer wall at Gate 2, front facing oncoming skaters (on the carrier's right shoulder). When open, its panel slides away and the ring glows in the possessing team's color.
-- **Corner markers:** one flat, non-colliding panel per gate on the outer wall's inner face, top flush with the wall top (the roof spans above them). The next gate for the possessing team glows in that team's color; the ball carrier also sees an on-screen arrow to it.
+- **The goal (R7):** `goalGateIndex = 2`. The upright ring hangs over the track in Gate 2's plane:
+  - its centre is `goal.across` (0.75) of the way from the inner glass to the outer glass, `goal.heightAboveFloor` (18) up, and its front faces oncoming skaters;
+  - it hangs from a decorative arm: a post from the rim's top up to `goal.arm.height` (40), then a beam out to the outer glass;
+  - when open, its panel slides away and the ring glows in the possessing team's color.
+- **Gate panels (R6, R18, amended after the playtest):** they replace the flat corner markers.
+  - At every gate a thin glass wall (`gatePanel.depth` 0.2) fills the track's whole cross-section, from the surface up to the walls' top, and skaters pass through it.
+  - Nothing hits, sees or touches a wall. Only the next gate's wall shows, glowing in the possessing team's color; every other wall is invisible. Every streak starts at the goal's gate (§4.2), so its wall shows from the pickup. The ball carrier sees an on-screen arrow to its middle.
+- **The carrier's beam (R6):** a glowing strip on the outer glass travels beside the carried ball, in the possessing team's color (`client/CarrierBeam`).
 - **Team spawns** on opposite straights, mirrored across the arena's long axis (Blue on the top straight, Orange on the bottom). **Ball spawns** on the long axis, equidistant from both team spawns (one in each curved end). Both teams score in the same goal, so fairness comes from the mirrored spawns and the random ball spawn, not from distance to the goal.
-- **Cross-sections:**
-  - **The tube (A2):** the track is a closed "O" cross-section around the infield, with the infield outside it. Both walls rise to 28 studs, and a half-circle roof spans the track from the outer wall top to the inner wall top (centre at the midpoint of the two tops, radius = half the distance between them, top at 50 studs). The roof is graybox now and glass in the art pass; the ground stays opaque.
-  - **Straights:** tall walls on both sides (infield wall and outer wall), floor curving up into each wall; **lower floor next to the infield**, one **smooth wavy step** up to a **higher floor next to the outer wall** (skating down the step is a pump spot).
-  - **Curved ends:** normal floor curving up into the walls (U/J), no step.
+- **Cross-sections** (Arena spec §3.1):
+  - **The enclosure (A7):** the floor, the inner bank (8 high) and the outer wall (28 high) are opaque. They rise into **rideable glass** up to `glass.top` (120), clear plastic at 85% see-through (R5's look: Roblox's Glass material hides every see-through part behind it), and each wall ends in a **lip** curling inward (a quarter circle of `glass.lipRadius`, 12). A **per-map top** closes the arena: a glass roof at 120 (`top.kind = "Closed"`, our map) or an invisible ceiling 20 higher (`"Open"`). The top stops skaters and the ball and is not ridden.
+  - **Straights:** a **lower floor** next to the inner bank, one **smooth step** up to an **upper floor** next to the outer wall's foot curve (skating down the step is a pump spot).
+  - **Curved ends:** the floor curves up into the walls, with no step.
   - Between straight and end, the profile **blends smoothly** over `profileBlendLength`.
-- Initial dimensions (studs): `straightLength = 160`, `endRadius = 60` (centerline), `trackWidth = 44`, `outerWallHeight = 28`, `infieldWallHeight = 28` (A2), `wallCurveRadius = 10`, `stepHeight = 4`, `stepWidth = 10`, `goal = { ringRadius = 7, heightAboveFloor = 18, panelThickness = 0.5 }`, `profileBlendLength = 20`, `segmentLength = 4`, `stripsPerSection = 40` (measured, A2). The roof has no config value of its own: it is a half circle between the two wall tops, so its radius is half their distance (`trackWidth / 2` = 22 while the walls are level, A2). Centerline loop length ≈ 2·160 + 2π·60 ≈ 697 studs → ≈ 11.6 s per lap at `cruiseSpeed = 60` (target 10–12 s).
+  - **The middle** (40 wide) is closed off behind the inner glass: a floor slab that is not a ride surface.
+- **Dimensions (studs):**
+  - the loop: `straightLength = 200`, `endRadius = 60` (centerline), `trackWidth = 80`, so the arena is 200 across;
+  - the solid profile: `outerWallHeight = 28`, `innerBankHeight = 8`, `wallCurveRadius = 18`, `stepHeight = 4`, `stepWidth = 18`, `upperFloorWidth = 8`, `profileBlendLength = 20`, `segmentLength = 4`, `stripsPerSection = 20`;
+  - the enclosure: `glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.85, material = SmoothPlastic }`, `top = { kind = "Closed", ceilingAbove = 20 }`;
+  - the features: `gatePanel = { depth = 0.2 }`, `goal = { ringRadius = 7, heightAboveFloor = 18, across = 0.75, arm = { thickness = 1, height = 40 } }`.
+- **The lap:** the centerline loop is 2·200 + 2π·60 ≈ 777 studs. A skater holding the stick laps in 12.7–12.8 s (measured 2026-10-26), past the 10–12 s target until the Feel part tunes speeds (Arena spec 2.3, 13).
 
 ### 9.2 Arena generation
 
-- `Arena/Geometry` (pure): builds the centerline loop, the roof (its own list, `roof`, so the Builder can give it its own folder), evaluates the cross-section profile at each station (end profile, straight profile, blended), and outputs strip quads/triangles. Unit-tested (closure of the loop, continuity between strips, profile heights at known stations, gate and goal placement).
-- `server/ArenaService`: turns geometry into **anchored parts** (strips of thin parts and wedges) at server start, then places gates, markers, goal ring + panel, and spawns, tagging them.
-- The roof is built into its own `Roof` folder tagged `RideSurface` (A2, so the lighting and the skate rays can treat it apart). Gameplay code finds arena features **only by CollectionService tag**: `LapGate` (attribute `GateIndex`), `GoalHoop`, `GoalPanel`, `TeamSpawn` (attribute `Team`), `BallSpawn`, `CornerMarker` (attribute `GateIndex`). Any future art model with the same tags drops in.
+- `Arena/Geometry` (pure) builds the centerline loop and sweeps each cross-section around it (`Profile`: the solid section, the two glass sections with their lips, the top of each kind). It returns the pieces of every part: `surface`, `glass`, `top`, `infield` (the middle's floor), `gates`, `goal` (rim, panel and arm), `gatePanels`, `teamSpawns` and `ballSpawns`. Unit-tested: closure of the loop, continuity between strips, profile heights at known stations, gate, wall and goal placement.
+- `server/ArenaService` turns the geometry into **anchored parts** (strips of thin parts and wedges) at server start, through `server/Arena/Builder`, which groups them in folders (Arena spec §6.2):
+  - `Surface` and `Glass`, tagged `RideSurface`: the floors, banks, walls and the rideable glass, which skaters ride and every ray finds;
+  - `Top`, tagged `Barrier`: the roof or the open map's ceiling, which only the skaters' collider sweep finds (`RideSurfaces.solid`), so skaters and the ball bounce off it but nobody rides it;
+  - `Infield` (no tag), `Gates`, `Goal` (the hoop, its panel and the arm), `GatePanels` and `Spawns`.
+- Gameplay code finds arena features **only by CollectionService tag**: `LapGate` (attribute `GateIndex`), `GoalHoop`, `GoalPanel`, `TeamSpawn` (attribute `Team`), `BallSpawn`, `CornerMarker` (attribute `GateIndex`; a gate wall's Model, or any single part), `RideSurface`, `Barrier`. Any future art model with the same tags drops in.
 - EditableMesh is **not** used in M1: per Roblox docs it fails in published games unless "Enable Mesh / Image APIs" is turned on, it is capped at 60,000 vertices / 20,000 triangles per mesh, and its docs show only `Hull` collision. Revisit in the art pass.
 
 ### 9.3 Ball (`Ball/BallState`, `server/BallService`)
@@ -366,7 +385,7 @@ Third-person chase camera with mouse lock. `Camera.distance = 12`, `Camera.heigh
 - **Carried:** attached to the carrier's hand; only the server assigns the carrier.
 - **Loose / Flying:** a server-owned physics part (`SetNetworkOwner(nil)`), physical properties from `Config/Ball` (`radius = 1.5`, `elasticity = 0.5`, `friction = 0.3`). Magnetic passes add homing acceleration toward the receiver.
 - **Pickup / catch:** a player who is not knocked down, within `pickupRadius = 5` (+ `Network.pickupLagToleranceStuds = 2`), gets the ball. The thrower cannot re-catch for `rethrowPickupDelay = 0.4` s.
-- **Recovery:** if the ball leaves the arena bounds or stays untouched for `ballIdleResetSeconds = 15`, it respawns at a random `BallSpawn`. Possession is unchanged.
+- **Recovery:** if the ball is not inside the arena's box by more than `Ball.outOfBoundsMargin = 2` (`Bounds.inArena`: between the two glass faces, no lower than the floor and no higher than the top; Arena spec §4.4), or stays untouched for `ballIdleResetSeconds = 15`, it respawns at a random `BallSpawn`. Possession is unchanged. The top holds the ball, so only a fault puts it outside.
 - Each server tick, the ball's previous→current segment is fed to `LapTracker` and `GoalJudge` (§4.2–4.3), so fast throws cannot tunnel through a gate or the ring.
 
 ### 9.4 Ball indicator and skins
@@ -394,7 +413,7 @@ Third-person chase camera with mouse lock. `Camera.distance = 12`, `Camera.heigh
 
 ### 10.3 Movement guard (`server/MovementGuard`)
 
-Samples each character every `Network.guardSampleSeconds = 0.25`. If the upward move in a sample exceeds `Movement.hardCap × Network.speedTolerance (1.2)` for `Network.guardStrikes = 3` consecutive samples, or one move exceeds `Network.guardTeleportFactor = 2` times that allowance, falling excluded, the character is returned to its last valid position and the event is logged. A character whose root is outside the arena's tube (past a wall, under the floor or over the roof) by more than `Network.guardOutsideMargin = 2` is placed back on its team spawn, and the event is logged (owner, 2026-10-24, #181). The speed rule is judged first, so a jump out of the arena is a return, not a placement. A carrier placed on their spawn first drops the ball, still, where they were last inside the arena (owner, 2026-10-25), so leaving the arena never takes the ball home. The guard runs in MatchService's frame before the ball, and no move of a carrier by the server counts as the ball crossing a gate or the ring. Thresholds are config.
+Samples each character every `Network.guardSampleSeconds = 0.25`. If the upward move in a sample exceeds `Movement.hardCap × Network.speedTolerance (1.2)` for `Network.guardStrikes = 3` consecutive samples, or one move exceeds `Network.guardTeleportFactor = 2` times that allowance, falling excluded, the character is returned to its last valid position and the event is logged. A character whose root is not inside the arena's box (`Bounds.inArena`: past either glass face, under the floor or over the top; Arena spec §4.4) by more than `Network.guardOutsideMargin = 2` is placed back on its team spawn, and the event is logged (owner, 2026-10-24, #181). The top holds every skater, so only a fault puts one outside. The speed rule is judged first, so a jump out of the arena is a return, not a placement. A carrier placed on their spawn first drops the ball, still, where they were last inside the arena (owner, 2026-10-25), so leaving the arena never takes the ball home. The guard runs in MatchService's frame before the ball, and no move of a carrier by the server counts as the ball crossing a gate or the ring. Thresholds are config.
 
 ---
 
