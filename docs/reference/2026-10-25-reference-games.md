@@ -120,6 +120,24 @@ revised before any more Arena code. Their words, then what still needs a questio
 - **The revised Arena spec approved** (2026-10-26, main 979ce49), with its 14 smaller decisions (2.3): among them the
   widths x4/3 (foot curve 18, step 18, upper floor 8), lips r 12, the reach check removed (the top holds everyone), A3's
   loop rule kept for the lips, the top touchable, the goal's arm from the outer glass. Next: a new plan file.
+- **The revised plan approved** (2026-10-26, `docs/superpowers/plans/2026-10-26-m1-arena-revised.md`): Tasks 2-7
+  stacked on PR #192 (top, rideable glass + sizes, gate panels, hanging goal, beam, playtest), Native, 680 -> 698.
+
+## The owner's answers, 2026-10-27 (the Arena playtest, after the republish)
+
+- **The glass must be see-through**, "specially the middle glass so players can see through the other side". Roblox's
+  Glass material hides every non-opaque part behind it (Roblox's DevForum announcement of 2017-12-06: "Non-opaque
+  objects are currently not visible through glass"): in Studio the far glass and the gate panels vanished behind it
+  at 0.7 and 0.9, and showed with SmoothPlastic at 0.8-0.9. Asked with the two screenshots (recommended): **clear
+  plastic, SmoothPlastic at 85% see-through**, for the walls, lips, roof and gate markers; it looks the same on phones;
+  the Glass sheen waits for the art pass.
+- **The gate markers: a thin glass WALL across the whole track, not an arch over an opening** ("just like in rc, it is a
+  wall not an arch ... it feels more satisfying to pass through a wall"); skaters still pass through it. Asked with
+  ASCII previews (recommended): **floor to roof, all lit** - it fills the gate's whole cross-section from the track's
+  surface (bank, floor, step, wall foot) up to the lips and the roof, thin (0.5), the glass's look, nothing hits it;
+  the whole wall glows in the team's colour (still see-through) on the next gate; the carrier's arrow points at its
+  middle. Not chosen: lighting it as thin vertical light lines (RC's curtain look). Replaces the hanging panel above.
+- Asked: "are the physics and camera in future tasks?" - yes, the Feel part (next after the Arena part).
 
 ## Roller Champions
 

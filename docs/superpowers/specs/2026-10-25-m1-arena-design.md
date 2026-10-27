@@ -1,8 +1,8 @@
 # M1 Overhaul, Part 1: The Arena — Design Spec
 
-- **Date:** 2026-10-25 (design approved in brainstorming); written 2026-10-26; **revised 2026-10-26** (session 21) after the owner's direction change
+- **Date:** 2026-10-25 (design approved in brainstorming); written 2026-10-26; **revised 2026-10-26** (session 21) after the owner's direction change; **amended 2026-10-27** after the owner's playtest
 - **Milestone:** [M1 - Foundation & Core Match](https://github.com/DalyChouikh/blox-champions/milestone/1)
-- **Status:** Revision approved by the owner (2026-10-26). The first version (d558a48, approved 2026-10-26) is built as Task 1 (#186, PR #192); this revision replaces its glass barrier, sizes, gate arches and reach check.
+- **Status:** Revision approved by the owner (2026-10-26). The first version (d558a48, approved 2026-10-26) is built as Task 1 (#186, PR #192); this revision replaces its glass barrier, sizes, gate arches and reach check. The playtest's amendment (2026-10-27) changes the glass's look (R5) and turns the gate panels into walls (R18).
 - **Parent:** `docs/superpowers/specs/2026-10-21-m1-foundation-core-match-design.md`, decision A6 (the overhaul: Arena → Feel → Ball & rules → Presentation)
 - **Reference:** `docs/reference/2026-10-25-reference-games.md` (the videos, the observations, the owner's answers; "Video 3" is the 45-minute ranked video the revision rests on)
 
@@ -15,7 +15,7 @@
 The generated arena takes Roller Champions' shape (reference: "Video 3"):
 - a wide track inside **tall rideable glass walls**, which curl inward at the top (the **lips**);
 - a **top set per map**: a glass roof (**closed**, like Mexico) or an invisible ceiling (**open**, like Acapulco); our map is closed;
-- a glass **panel** hanging across the track at each lap gate, glowing for the possessing team's next gate;
+- a thin glass **wall** across the track at each lap gate, glowing for the possessing team's next gate;
 - a light **beam** on the outer glass travelling beside the ball carrier;
 - the **goal ring** hanging over the track from an arm.
 
@@ -67,8 +67,8 @@ Brainstorm 2026-10-25, the approved spec 2026-10-26, and the revision 2026-10-26
 | R2 | Size and shape | Straights 200; the arena's outside 200 across; **the track 80 wide (R12)**. The floor, the banks and the solid walls are opaque, like RC; the glass above them is clear. *(First version: track 60, curved ends 70.)* |
 | R3 | The inner side | A low curved bank (about **8** studs, a pump spot) that rises into **rideable glass up to the top**, with its own lip, on the straights and the ends. The middle behind it (40 wide) is closed off, not rideable, and seen through the glass. *(First version: a glass barrier on the bank.)* |
 | R4 | The outer side | The curved solid wall (**28**) rises into **rideable glass up to 120 (R11)**, which curls inward at the top. *(First version: a glass barrier to 85.)* |
-| R5 | Glass | **A ride surface** with a glass look ("the player should be able to skate on them, not just fall"). *(First version: a barrier, not a ride surface.)* |
-| R6 | Gate markers | **A glass panel hanging across the track at each gate (R18)**, glowing in the possessing team's colour on the next gate; and a **beam** on the outer glass beside the carrier. They replace today's flat corner panels. *(First version: a thin arch.)* |
+| R5 | Glass | **A ride surface** with a glass look ("the player should be able to skate on them, not just fall"). **The look (2026-10-27): clear plastic, SmoothPlastic at 85% see-through**, so players see through the glass to the other side ("specially the middle glass"): Roblox's Glass material hides every non-opaque part behind it. *(First version: a barrier, not a ride surface. Until 2026-10-27: the Glass material at 70%.)* |
+| R6 | Gate markers | **A thin glass wall across the track at each gate (R18)**, glowing in the possessing team's colour on the next gate; and a **beam** on the outer glass beside the carrier. They replace today's flat corner panels. *(First version: a thin arch.)* |
 | R7 | The goal | The ring **hangs over the track** at gate 2, about **¾ of the way across** toward the outer wall, facing oncoming skaters, on a decorative arm. The rim and the panel work as today. |
 | R8 | The straights' step and the spawns | The step stays, scaled to the wider track; spawns as today, scaled. |
 | R9 | Outside | "Outside" is past either glass face, under the floor, or over the top. The top holds skaters and the ball (R14), so only a fault puts anything outside. *(First version: no ceiling for skaters.)* |
@@ -79,7 +79,7 @@ Brainstorm 2026-10-25, the approved spec 2026-10-26, and the revision 2026-10-26
 | R14 | The top (2026-10-26) | **Set per map** (`Arena.top.kind`): **Closed**, a glass roof at the walls' top; or **Open**, an invisible ceiling above it. Both stop skaters and the ball, and neither is ridden. Both kinds are built and tested now; **our map is closed**. |
 | R15 | The top of the walls (2026-10-26) | Every wall ends in a **lip** curling inward. The lip is rideable, and turns a fast skater back toward the track; the top is not, and a skater bumps off it like a ceiling. Gravity brings them down: no riding upside down. |
 | R17 | The open map's ceiling (2026-10-26) | **20 studs above the walls' top** (140), stopping **the ball and skaters**. In Video 3's replay at 21:13 the ball rose above Acapulco's overhead rails before falling into the goal, so if RC has a ceiling it sits above the walls. |
-| R18 | The gate panels (2026-10-26) | **RC's hanging panel:** glass fills the track's cross-section from the top down to a rounded opening that skaters pass through; nothing collides with it. |
+| R18 | The gate panels (2026-10-26, amended 2026-10-27) | **A thin glass wall, floor to roof:** glass fills the gate's whole cross-section, from the track's surface up to the walls' top, and skaters pass through it ("just like in rc, it is a wall not an arch ... it feels more satisfying to pass through a wall"); nothing collides with it. The whole wall glows, still see-through, on the next gate. *(2026-10-26: a panel hanging from the top down to a rounded opening.)* |
 
 (R16, the inner side, is folded into R3.)
 
@@ -107,7 +107,7 @@ The M1 spec's §9.1 (layout, dimensions, markers, goal placement), §9.2 (folder
 7. **A3's loop rule stays in `SkateMath`.** On an overhang, a skater stays on only while speed² × curvature reaches gravity's pull off the surface. That is real physics, and it is what the lips need (R15). What the Feel part changes is the walls' rule (`minWallSpeed`). Cost if wrong: one rule.
 8. **The top's height is one rule** (`Profile.topHeight`): `glass.top` when closed, `glass.top + top.ceilingAbove` when open. Gates are that tall, and `Bounds.inArena` ends there. Cost if wrong: none.
 9. **Every ray looks through the top** (RideSurfaces' `params` holds ride surfaces only, as Task 2's work has it). The camera stops in front of glass, as in front of any wall, but sees through the roof. Cost if wrong: a camera that, near the roof, could rise above it.
-10. **The gate panel's opening is half an ellipse.** Its feet stand at the solid wall's top height (28) on both glass faces, its apex is `gatePanel.openingHeight` (60) at the track's middle, and the panel fills from it up to the walls' top outline (the lips and 120). It is made of `gatePanel.segments` (16) slices, `gatePanel.depth` (2) along the track. Cost if wrong: a few numbers.
+10. **The gate wall follows the cross-section as built** (amended 2026-10-27). It runs from the solid section at the gate (the step half blended there) up to the walls' top outline (the lips' chords and 120). Its slices break at every point of either outline, so its edges lie on the surface's and the lips' own chords; equal slices would cut across the step and the foot curve. Breaks closer than Roblox's smallest part (0.001) merge into one. It is `gatePanel.depth` (0.5) thick, behind the gate's plane, and keeps the name "gate panel" in code. Cost if wrong: none. *(2026-10-26: an opening of half an ellipse, `gatePanel.openingHeight` 60, in `gatePanel.segments` 16 slices, 2 deep.)*
 11. **The goal's arm comes from the outer glass.** A post rises from the rim's top up to `goal.arm.height` (40), then a beam runs out to the outer glass's face. That works on both kinds of top. Cost if wrong: none.
 12. **The beam covers the vertical outer glass**, from the solid wall's top (28) up to where the lip starts (108). Cost if wrong: none.
 13. **A lap at cruise speed takes about 13 s** (777 studs at 60), past the M1 spec's 10–12 s target. The Feel part tunes speeds. Cost if wrong: longer laps until then.
@@ -164,9 +164,9 @@ Every section runs the same way around the track's "O" (inner top, down, across 
 | `wallCurveRadius` | 14 | 18 |
 | `stepHeight` / `stepWidth` / `upperFloorWidth` | 4 / 14 / 6 | 4 / 18 / 8 |
 | `stripsPerSection` (the solid profile) | 20 | 20 |
-| `barrier` | `{ top = 85, thickness = 1, transparency = 0.7 }` | removed: `glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.7 }` |
+| `barrier` | `{ top = 85, thickness = 1, transparency = 0.7 }` | removed: `glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.85, material = Enum.Material.SmoothPlastic }` (2026-10-27: was 0.7 with the Glass material) |
 | `top` | — | `{ kind = "Closed", ceilingAbove = 20 }` (`kind` is `"Closed"` or `"Open"`; `ceilingAbove` is used by Open) |
-| `marker` | `{ width, height }` | removed: `gatePanel = { openingHeight = 60, depth = 2, segments = 16 }` |
+| `marker` | `{ width, height }` | removed: `gatePanel = { depth = 0.5 }` (2026-10-27: was `{ openingHeight = 60, depth = 2, segments = 16 }`) |
 | `goal.wallGap` | 1 | removed: `goal.across = 0.75` (the ring's centre, as a fraction of `trackWidth` from the inner glass) |
 | `goal.arm` | — | `{ thickness = 1, height = 40 }` (where the arm's beam runs, above the lower floor) |
 | `colors.marker` | (27, 42, 53) | removed (`colors.glass` colours the glass, the roof and the panels) |
@@ -177,8 +177,8 @@ Every section runs the same way around the track's "O" (inner top, down, across 
 
 **Field rules** for the new keys:
 - sizes are above zero, and part sizes are within Roblox's part limits;
-- `top.kind` is `"Closed"` or `"Open"`;
-- `glass.lipStrips` and `gatePanel.segments` are whole numbers of at least 1 and 3;
+- `top.kind` is `"Closed"` or `"Open"`; `glass.material` is a `Material`;
+- `glass.lipStrips` is a whole number of at least 1;
 - `goal.across` lies between 0 and 1; every transparency lies between 0 and 1.
 
 **Cross-field rules**, in order:
@@ -187,8 +187,9 @@ Every section runs the same way around the track's "O" (inner top, down, across 
 3. The outer wall must rise above its foot curve and the step (unchanged).
 4. The glass must rise above both solid tops before its lip starts: `glass.top − glass.lipRadius > outerWallHeight` (and `> innerBankHeight`).
 5. The lips must leave the top open between them: `2 · glass.lipRadius < trackWidth`.
-6. The gate panel's opening must stand between the solid tops and the lips: `outerWallHeight < gatePanel.openingHeight < glass.top − glass.lipRadius`.
-7. `profileBlendLength` must fit within a straight and a curved end (unchanged).
+6. `profileBlendLength` must fit within a straight and a curved end (unchanged).
+
+(2026-10-27: the gate panel's opening and its rule went with R18's amendment.)
 
 **Checked by `Arena/Geometry` against the arena as built:** the goal ring's fit and its arm (§5.3).
 
@@ -200,7 +201,7 @@ Every section runs the same way around the track's "O" (inner top, down, across 
 
 - **Folder `Glass`**, tagged `RideSurface` like `Surface`: the two glass sections of §3.1 (each wall's vertical glass and its lip), swept around the loop.
 - **Glass parts:**
-  - Material Glass, `colors.glass`, `glass.transparency`, `CastShadow` false (120 studs of it would shade the track);
+  - `glass.material` (SmoothPlastic), `colors.glass`, `glass.transparency` (0.85), `CastShadow` false (120 studs of it would shade the track). Not the Glass material: it hides every non-opaque part behind it (Roblox's DevForum announcement of 2017-12-06, "Non-opaque objects are currently not visible through glass"; measured 2026-10-27: the far glass and the gate panels vanished behind it at 0.7 and 0.9, and showed with SmoothPlastic at 0.8–0.9). The Builder's one `lookLikeGlass` gives this look to the glass, a closed map's roof and the gate panels;
   - `CanCollide`, `CanQuery` and `CanTouch` true, as the floor.
 - So skaters ride it (their ground and wall rays find it), the collider sweep slides along it, the camera stops in front of it as before any wall, and the ball bounces off it and ends its flight there.
 - The Builder's `Barriers` folder and `Features.barriers` (Task 1) are gone.
@@ -238,11 +239,11 @@ As today, a gate spans the track at the start of each section, facing the travel
 
 ### 5.2 Gate panels (replacing the corner markers)
 
-- **Shape:** in each gate's plane, glass fills the track's cross-section from the top down to a rounded opening:
-  - the opening's edge is half an ellipse whose feet are at `outerWallHeight` (28) on both glass faces and whose apex is `gatePanel.openingHeight` (60) at the track's middle;
-  - the panel's top follows the walls' top outline: the inner lip, 120 between the lips' ends, the outer lip;
-  - it is made of `gatePanel.segments` slices across the track, each a quad in the gate's plane, `gatePanel.depth` thick along the track (a block when the quad is a rectangle, wedges otherwise, as the surface's quads).
-- **Parts:** each panel is a Model `GatePanel<g>` tagged `CornerMarker` with `GateIndex` g, its pivot at the opening's apex. Its parts have the glass look, with `CanCollide`, `CanQuery` and `CanTouch` false: nothing hits, sees or touches them.
+- **Shape (amended 2026-10-27):** in each gate's plane, a thin glass wall fills the track's whole cross-section (R18):
+  - its bottom follows the solid section at the gate (`Surface.section`): the inner bank from the inner glass's face, the floors, the step half blended there, the foot curve up to the outer glass's face;
+  - its top follows the walls' top outline (`Profile.topOutline`): the inner lip, 120 between the lips' ends, the outer lip;
+  - it is made of slices across the track that break at every point of either outline (§2.3, 10), each a quad in the gate's plane, `gatePanel.depth` thick behind it (a block when the quad is a rectangle, wedges otherwise, as the surface's quads).
+- **Parts:** each panel is a Model `GatePanel<g>` tagged `CornerMarker` with `GateIndex` g, its pivot at the wall's middle (u = `trackWidth`/2, halfway between the surface and the top there), facing the travel direction. Its parts have the glass look, with `CanCollide`, `CanQuery` and `CanTouch` false: nothing hits, sees or touches them, so skaters pass through.
 - **`ArenaParts.markers[g]`** becomes `{ parts: { BasePart }, position: Vector3 }`: every part of the panel, and its pivot's position.
   - ArenaGlow lights every part of the next gate's panel in the possessing team's colour, and restores each as it reached the client.
   - The next-gate arrow (WorldMarkers) points at `position`.
@@ -288,8 +289,8 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 
 | Module | Change |
 |---|---|
-| `Geometry/Profile` | The solid section as today with the new sizes; new `innerGlass`, `outerGlass` and `top` sections (§3.1) and `topHeight`. |
-| `Geometry/Surface` | Unchanged: `build` sweeps the solid section; `rings` and `sweep` sweep the others. |
+| `Geometry/Profile` | The solid section as today with the new sizes; new `innerGlass`, `outerGlass` and `top` sections (§3.1), `topHeight`, and `topOutline` (the walls' top across the track, as points; `heightAt` reads a height on it). |
+| `Geometry/Surface` | `build` sweeps the solid section; `rings` and `sweep` sweep the others. `section(arena, distance)` names the solid section at a distance (the step blended there), which the sweep, the goal's fit check and the gate walls share. |
 | `Geometry/Features` | `glass` and `top` (swept sections) replace `barriers`; `gatePanels` replaces `markers`; `gates` as tall as the top; the new `goal` with its arm and fit check; the middle behind the inner glass slab. |
 | `Geometry/Reach` | Removed (§2.3, 6). |
 | `Geometry/init` | `build(config)` returns `surface`, `glass`, `top`, `infield`, `gates`, `goal` (with `arm`), `gatePanels`, `teamSpawns`, `ballSpawns`. Gravity is no longer needed. |
@@ -319,12 +320,13 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 ## 7. Testing
 
 **Unit (pure):**
-- **Profile:** the solid section's points and strip counts with the new sizes; the glass sections (the lip's ends, its centre, `lipStrips`); the top section of each kind; `topHeight` of each kind.
+- **Profile:** the solid section's points and strip counts with the new sizes; the glass sections (the lip's ends, its centre, `lipStrips`); the top section of each kind; `topHeight` of each kind; the walls' top outline.
+- **Surface:** `section` at a distance, the step blended there.
 - **Features:**
   - glass: vertical up to the lip, the lip's end, one block per side along a straight for the vertical glass, slabs behind the faces;
   - top: closed at `glass.top` between the lips' ends; open with its strips and ceiling at `glass.top + ceilingAbove`;
   - gates: as tall as the top, of each kind;
-  - gate panels: the opening's feet and apex, the top outline, the slice count, `GateIndex` order;
+  - gate panels: the wall from the surface to the top outline, a break at every point of both outlines, close breaks merged, the pivot at the wall's middle, `GateIndex` order;
   - the goal: lateral 60, facing oncoming skaters, each fit failure; the arm from the rim to the outer glass;
   - spawns and the middle.
 - **Bounds:** inside: the floors, the bank, both glass walls, up to the top plus the margin (each kind); outside: past either glass, under the floor, over the top.
@@ -332,7 +334,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 - **Config:** the new defaults, each new field rule, each cross-field rule (exact messages).
 
 **Client and server, in Edit:**
-- **Builder:** folders, tags, `GateIndex`, the glass and top looks, touchable glass and top, no shadow on glass or the top, the middle untagged, both kinds of top.
+- **Builder:** folders, tags, `GateIndex`, the glass and top looks (taken from `glass.material` and `glass.transparency`, a non-default look included), touchable glass and top, no shadow on glass or the top, the middle untagged, both kinds of top.
 - **RideSurfaces:** `solid` holds the top, `params` does not.
 - **SkateController:** the sweep stops at the top (real parts in Edit, like the seam test), and the ground ray ignores it.
 - **CameraController:** the top between the camera and the skater does not pull the camera in.

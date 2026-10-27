@@ -627,3 +627,92 @@ docs/playtests/2026-10-26-m1-arena.md          the Studio checks and the owner's
 
   Then ask before deleting the ledger folder.
 - **Next:** the Feel part starts with its own brainstorm. Read `docs/reference/2026-10-25-reference-games.md` first.
+
+---
+
+## Addendum (2026-10-27): the playtest's two findings
+
+During Task 7 Step 3 the owner asked for two changes, and the spec was amended for them on 2026-10-27 (R5's look, R18 a wall, §2.3 #10, §3.2, §3.3, §4.1, §5.2). Each is its own issue and a stacked, test-first fix before Task 7's record, as in Phase 9.
+
+- **Order:** `feat/190-carrier-beam` ← Task 7a ← Task 7b ← `test/191-arena-playtest`. Task 7's docs commit (e7c599b, local only) is replayed onto Task 7b's branch in a scratch worktree, its M1 spec text brought in line with both fixes.
+- **Totals:** Task 6 ended at **697** (one under this plan's 698, by session 22's ruling on Task 3). Task 7a: **698**. Task 7b: **700**. Task 7's record adds none.
+- **The play checks** use the published game's light: the dev place's Lighting effects are set aside for screenshots and restored after (the built game has none).
+
+### Task 7a: See-through glass (labels `feature`, `arena`)
+
+**Issue:** #199 · **Branch:** `feat/199-see-through-glass` · **Stacked on:** Task 6
+
+**Files:** modify `src/shared/Config/Arena.luau`, `src/server/Arena/Builder.luau`; test `tests/shared/Config/Config.spec.luau`, `tests/server/Arena/Builder.spec.luau`.
+
+**Interfaces:**
+```lua
+-- Config.Arena.glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.85,
+--   material = Enum.Material.SmoothPlastic }   (material: Validate.enumItem(Enum.Material))
+-- Builder's lookLikeGlass(part, arena): Material = glass.material, Transparency = glass.transparency, CastShadow false
+```
+
+- [ ] **Step 1: Write the failing tests:**
+  - **`Config.spec`:** `match the spec's arena layout` expects the new `glass`; the rejection cases gain `glass = { material = "Glass" }` → `Arena.glass.material: must be a Material (got "Glass")`.
+  - **`Builder.spec`:** one local `looksLikeGlass(part, arena)` serves the glass, roof and panel tests, comparing `glass.material` and `glass.transparency`; (+1) **new** `takes the glass's look from config: the walls, a closed map's roof and the gate panels`, built with `glass = { material = Enum.Material.Glass, transparency = 0.5 }`.
+- [ ] **Step 2:** Run `testPathPattern = "(Config|Builder)"`. Expected: FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, then the full suite. Expected: **698 tests**.
+- [ ] **Step 5: Mutations:**
+  - `lookLikeGlass` leaving the material (the part keeps `newPart`'s SmoothPlastic) → the new config test;
+  - the transparency fixed at 0.85 → the new config test;
+  - the material's field rule dropped → the Config rejection;
+  - the roof or the panels not given the look → the top test, the panel test.
+- [ ] **Step 6: Play check (Studio):** the playtest's comparison view across the middle shows the far glass and the far gate panel through the near glass; screenshots; the console shows the two ready lines.
+- [ ] **Step 7:** Static checks. Commit `feat(arena): clear glass that shows the far side of the track`.
+
+### Task 7b: Glass walls at the gates (labels `feature`, `arena`)
+
+**Issue:** #200 · **Branch:** `feat/200-gate-walls` · **Stacked on:** Task 7a
+
+**Files:**
+- Modify: `src/shared/Config/Arena.luau`; `src/shared/Arena/Geometry/{Profile,Surface,Features,Types}.luau`; `src/server/Arena/Builder.luau`; the "opening's apex" wording in `src/client/ArenaParts.luau`, `tests/Fixtures.luau`, `tests/shared/Arena/TaggedLayout.spec.luau`, `tests/client/WorldMarkers.spec.luau`.
+- Test: `tests/shared/Config/Config.spec.luau`; `tests/shared/Arena/Geometry/{Profile,Surface,Features}.spec.luau`; `tests/server/Arena/Builder.spec.luau`.
+
+**Interfaces:**
+```lua
+-- Config.Arena.gatePanel = { depth = 0.5 }   (openingHeight, segments and rule 6 removed)
+Profile.topOutline(arena: ArenaConfig): { Vector2 }  -- the walls' top as built, in u order: the inner lip, the outer lip
+Surface.section(arena: ArenaConfig, distance: number): { Vector2 }  -- the solid section, the step blended at distance
+export type GatePanel = { pieces: { Piece }, pivot: CFrame }  -- pivot replaces apex
+```
+
+- **The wall** (spec §5.2): its bottom is `Surface.section(arena, gateDistance)`, its top `Profile.topOutline(arena)`.
+  - Its breaks are every point's u of both outlines, in order; one within `PartSize.MIN` of the break before it is dropped, and the last is always `trackWidth`.
+  - Between two breaks, a quad from `Profile.heightAt(bottom, u)` up to `Profile.heightAt(top, u)` goes to `Surface.quadPieces` with `gatePanel.depth`.
+  - Its pivot: `Centerline.at(gateDistance, w/2, (bottom(w/2) + top(w/2)) / 2)`.
+  - `Surface.build` and `Features`' goal fit check use `Surface.section` too.
+- **Expected counts at the defaults:** 28 breaks, so 27 slices. Two are rectangles (the lower floor under the roof, u 12–36; the upper floor, u 54–62), so a wall is 2 blocks and 25 × 4 wedges = 102 pieces: 408 parts in all (the panels had 256).
+
+- [ ] **Step 1: Write the failing tests:**
+  - **`Config.spec`:** `gatePanel = { depth = 0.5 }`; the `segments` cases and rule 6's two cases go; the depth part-size case stays.
+  - **`Profile.spec`** `follows the walls' top as built across the track`: `heightAt(topOutline(arena), u)` gives today's values, and the outline runs from (0, 108) to (80, 108).
+  - **`Surface.spec`** (+1) **new** `gives the solid section at a distance, with the straights' step blended there`: the full step on a straight, none at a curved end's apex, half at a gate.
+  - **`Features.spec`:**
+    - `fills each gate with glass from the track's surface up to the walls' top` (replaces the opening test). For gate 1, in the gate's frame:
+      - every corner lies within `gatePanel.depth` of the gate's plane, and between the section and the outline;
+      - every point of both outlines is a corner of the wall's face;
+      - the lowest corners are 8 at u 0, 22 at u 80 and 0 on the lower floor; the highest are 120 inside the lips and 108 at both faces.
+    - `builds each wall from a slice between every two breaks, in gate order` (replaces the segments test): 102 pieces per wall; each pivot at the wall's middle, facing the travel direction.
+    - (+1) **new** `merges breaks closer than Roblox's smallest part`: with `glass.lipRadius = wallCurveRadius − PartSize.MIN / 2`, the outer lip's end lands half a smallest part past the foot curve's start; every piece is a size Roblox builds.
+  - **`Builder.spec`:** each panel holds `#geometry.gatePanels[g].pieces` parts, pivoted at `pivot`; the invalid-piece case uses the new record.
+- [ ] **Step 2:** Run `testPathPattern = "(Arena|Config)"`. Expected: FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, then the full suite. Expected: **700 tests**.
+- [ ] **Step 5: Mutations:**
+  - equal slices instead of breaks → the shape test (the outlines' points);
+  - the bottom flat at 0 → the shape test; the top at `glass.top` everywhere → the shape test (108 at the faces);
+  - no merge → the merge test; the last break dropped → the shape test (u 80);
+  - the pivot at a fixed height → the slices test;
+  - `Surface.section` without the blend → the Surface test;
+  - the depth ignored → the shape test.
+- [ ] **Step 6: Play check (Studio):** with the ball carried by a probe, the next gate's wall glows across the whole track and the arrow points at its middle; a skater passes through untouched; the goal gate's wall beside the ring; the part count; screenshots; the console shows the two ready lines.
+- [ ] **Step 7:** Static checks. Commit `feat(arena): each gate becomes a thin glass wall across the track`.
+
+### Task 7, continued
+
+After Task 7b: Task 7's docs commit is replayed and brought in line, then Step 2's republish, the rest of Step 3 (the checklist), and Step 4's record with both findings and their issues (#199, #200).
