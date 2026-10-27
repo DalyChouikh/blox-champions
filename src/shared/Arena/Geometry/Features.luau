@@ -1,11 +1,13 @@
 --!strict
 -- Everything in the arena besides the solid riding surface (spec §9.1, Arena spec §5): the rideable glass walls with
 -- their lips, the top that closes the arena (a roof, or an open map's ceiling), the lap gates, the goal ring hanging
--- from its arm with its panel, the glass panels hanging at the gates, the team and ball spawns, and the infield floor.
+-- from its arm with its panel, the glass walls across the track at the gates, the team and ball spawns, and the infield
+-- floor.
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
 local Crossing = require(script.Parent.Parent.Parent.Rules.Crossing)
+local PartSize = require(script.Parent.Parent.Parent.Util.PartSize)
 local Profile = require(script.Parent.Profile)
 local Surface = require(script.Parent.Surface)
 local Team = require(script.Parent.Parent.Parent.Rules.Team)
@@ -113,7 +115,7 @@ local function checkFit(arena: ArenaConfig, corners: { Vector2 }, lateral: numbe
 	if lateral - reach(corners, -Vector2.xAxis) < 0 or lateral + reach(corners, Vector2.xAxis) > arena.trackWidth then
 		fail("the goal ring must stay inside the glass")
 	end
-	local surface = Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, gateDistance))
+	local surface = Surface.section(arena, gateDistance)
 	for _, corner in corners do
 		-- The riding surface under the corner, or nil at a wall.
 		local floor = Profile.heightAt(surface, lateral + corner.X)
@@ -189,44 +191,61 @@ function Features.goal(arena: ArenaConfig): Types.Goal
 	}
 end
 
--- The rounded opening's edge at a lateral position (R18): half an ellipse whose feet stand on the outer wall's top at
--- both glass faces, its apex gatePanel.openingHeight at the track's middle.
-local function openingEdge(arena: ArenaConfig, lateral: number): number
-	local half = arena.trackWidth / 2
-	local across = (lateral - half) / half
-	local rise = arena.gatePanel.openingHeight - arena.outerWallHeight
-	return arena.outerWallHeight + rise * math.sqrt(math.max(0, 1 - across * across))
+-- Where a gate panel's slices break (Arena spec §2.3, 10): at every point of its bottom and top outlines, in u order,
+-- so its edges lie on their chords. A break closer than Roblox's smallest part to the one before it would leave a
+-- slice too thin to build, so it merges into that one (an edge then skips a bend narrower than that); the last break
+-- is always the outer glass's face.
+local function breaks(bottom: { Vector2 }, top: { Vector2 }): { number }
+	local laterals: { number } = {}
+	for _, outline in { bottom, top } do
+		for _, point in outline do
+			table.insert(laterals, point.X)
+		end
+	end
+	table.sort(laterals)
+	local last = laterals[#laterals]
+	local kept = { laterals[1] }
+	for _, lateral in laterals do
+		if lateral - kept[#kept] >= PartSize.MIN and last - lateral >= PartSize.MIN then
+			table.insert(kept, lateral)
+		end
+	end
+	table.insert(kept, last)
+	return kept
 end
 
--- Each gate's glass panel (R18, Arena spec §5.2), in gate order: in the gate's plane, glass fills the track's
--- cross-section from the walls' top as built (Profile.topOutline) down to the rounded opening skaters pass through.
--- It is gatePanel.segments slices across the track, each a quad gatePanel.depth thick behind the plane (a block when
--- it is a rectangle, wedges otherwise, as the surface's quads). Its pivot is the opening's apex, facing the travel
--- direction.
+-- Each gate's glass panel (R18, Arena spec §5.2), in gate order: a thin wall in the gate's plane that fills the track's
+-- whole cross-section, from the surface at the gate (Surface.section) up to the walls' top as built
+-- (Profile.topOutline). Between every two breaks a slice is a quad gatePanel.depth thick behind the plane (a block
+-- when it is a rectangle, wedges otherwise, as the surface's quads). Its pivot is the wall's middle, halfway between
+-- the surface and the top at the track's middle, facing the travel direction.
 function Features.gatePanels(arena: ArenaConfig): { Types.GatePanel }
-	local panel, width = arena.gatePanel, arena.trackWidth
+	local depth, top = arena.gatePanel.depth, Profile.topOutline(arena)
+	local middle = arena.trackWidth / 2
 	local panels: { Types.GatePanel } = {}
 	for gate = 1, Centerline.gateCount do
 		local distance = Centerline.gateDistance(arena, gate)
-		local function point(lateral: number, height: number): Vector3
-			return Centerline.at(arena, distance, lateral, height).Position
+		local bottom = Surface.section(arena, distance)
+		-- Both outlines run from one glass face to the other, so each has a height at every break.
+		local function height(outline: { Vector2 }, lateral: number): number
+			return Profile.heightAt(outline, lateral) :: number
 		end
+		local function point(outline: { Vector2 }, lateral: number): Vector3
+			return Centerline.at(arena, distance, lateral, height(outline, lateral)).Position
+		end
+		local cuts = breaks(bottom, top)
 		local pieces: { Piece } = {}
-		for slice = 0, panel.segments - 1 do
-			local from, to = width * slice / panel.segments, width * (slice + 1) / panel.segments
-			-- Across the slice toward the outer glass, and up from the opening to the walls' top.
-			local quad = Surface.quadPieces(
-				point(from, openingEdge(arena, from)),
-				point(to, openingEdge(arena, to)),
-				point(from, Profile.topOutline(arena, from)),
-				point(to, Profile.topOutline(arena, to)),
-				panel.depth
-			)
+		for index = 1, #cuts - 1 do
+			local from, to = cuts[index], cuts[index + 1]
+			-- Across the slice toward the outer glass, and up from the surface to the walls' top.
+			local quad =
+				Surface.quadPieces(point(bottom, from), point(bottom, to), point(top, from), point(top, to), depth)
 			for _, piece in quad do
 				table.insert(pieces, piece)
 			end
 		end
-		table.insert(panels, { pieces = pieces, apex = Centerline.at(arena, distance, width / 2, panel.openingHeight) })
+		local pivot = Centerline.at(arena, distance, middle, (height(bottom, middle) + height(top, middle)) / 2)
+		table.insert(panels, { pieces = pieces, pivot = pivot })
 	end
 	return panels
 end

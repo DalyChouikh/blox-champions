@@ -157,8 +157,8 @@ local function addTop(pieces: { Piece }, arena: ArenaConfig, parent: Instance)
 	end
 end
 
--- The gate panels (R18): glass hanging across the track that nothing hits, sees or touches, so skaters pass through
--- it. Each is a model carrying CornerMarker and its GateIndex, pivoted at its opening's apex, so ArenaGlow lights it
+-- The gate panels (R18): thin glass walls across the track that nothing hits, sees or touches, so skaters pass through
+-- them. Each is a model carrying CornerMarker and its GateIndex, pivoted at the wall's middle, so ArenaGlow lights it
 -- and the carrier's arrow points at it.
 local function addGatePanels(panels: { Types.GatePanel }, arena: ArenaConfig, parent: Instance)
 	for gate, panel in panels do
@@ -167,7 +167,7 @@ local function addGatePanels(panels: { Types.GatePanel }, arena: ArenaConfig, pa
 		for index, piece in panel.pieces do
 			lookLikeGlass(ghost(addSolid(piece, `Pane{index}`, arena.colors.glass, model)), arena)
 		end
-		model.WorldPivot = panel.apex
+		model.WorldPivot = panel.pivot
 		model:SetAttribute(Tags.Attribute.GateIndex, gate)
 		model:AddTag(Tags.CornerMarker)
 		model.Parent = parent

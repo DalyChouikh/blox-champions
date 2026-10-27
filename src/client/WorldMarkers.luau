@@ -5,7 +5,7 @@
 --   nothing lies within groundProbe studs;
 -- - an arrow at the screen's edge pointing to the ball while it is off the screen (ScreenMarker);
 -- - for the local player while they carry the ball, an arrow to their team's next gate: over its corner marker's pivot
---   (its glass panel's opening), or pinned to the screen's edge. None before their first gate (the owner's choice): the
+--   (its glass wall's middle), or pinned to the screen's edge. None before their first gate (the owner's choice): the
 --   snapshot's nextGate is nil.
 -- All of them take the colour of the team with the ball, or the HUD's text colour while it is loose, and hide while
 -- there is no ball. The arrows sit in a ScreenGui without insets, so their pixels are the camera's. A property is

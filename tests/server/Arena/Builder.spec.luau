@@ -47,10 +47,10 @@ describe("Builder.build", function()
 		expect(#folder(arena, "Top"):GetChildren()).toBe(#geometry.top)
 		expect(#folder(arena, "Infield"):GetChildren()).toBe(#geometry.infield)
 		expect(#folder(arena, "Gates"):GetChildren()).toBe(4)
-		local panels = folder(arena, "GatePanels"):GetChildren()
-		expect(#panels).toBe(4)
-		for _, panel in panels do
-			expect(#panel:GetChildren()).toBe(config.Arena.gatePanel.segments * 4)
+		local panels = folder(arena, "GatePanels")
+		expect(#panels:GetChildren()).toBe(4)
+		for gate, panel in geometry.gatePanels do
+			expect(#(panels:FindFirstChild(`GatePanel{gate}`) :: Model):GetChildren()).toBe(#panel.pieces)
 		end
 		expect(arena:FindFirstChild("Markers")).toBeNil()
 		expect(#folder(arena, "Spawns"):GetChildren()).toBe(8)
@@ -114,7 +114,7 @@ describe("Builder.build", function()
 		end
 	end)
 
-	-- Skaters pass through the panels (R18), and ArenaGlow and the carrier's arrow find them by their tag.
+	-- Skaters pass through the gate walls (R18), and ArenaGlow and the carrier's arrow find them by their tag.
 	it(
 		"makes each gate's panel a model carrying CornerMarker and its GateIndex, of glass nothing hits, sees or "
 			.. "touches",
@@ -126,7 +126,7 @@ describe("Builder.build", function()
 				expect(panel:IsA("Model")).toBe(true)
 				expect(panel:HasTag(Tags.CornerMarker)).toBe(true)
 				expect(panel:GetAttribute(Tags.Attribute.GateIndex)).toBe(gate)
-				Fixtures.expectNear(panel:GetPivot().Position, geometry.gatePanels[gate].apex.Position)
+				Fixtures.expectNear(panel:GetPivot().Position, geometry.gatePanels[gate].pivot.Position)
 				for _, child in panel:GetChildren() do
 					local pane = child :: BasePart
 					if
@@ -262,7 +262,7 @@ describe("Builder.build", function()
 		thinPanel.gatePanels = table.clone(geometry.gatePanels)
 		thinPanel.gatePanels[3] = {
 			pieces = { { shape = "Block", cframe = CFrame.identity, size = Vector3.new(1, 1, 0) } },
-			apex = CFrame.identity,
+			pivot = CFrame.identity,
 		}
 		expect(function()
 			Builder.build(thinPanel, config, parent)

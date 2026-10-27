@@ -8,7 +8,9 @@ local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Features = require(ReplicatedStorage.Shared.Arena.Geometry.Features)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local PartSize = require(ReplicatedStorage.Shared.Util.PartSize)
 local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
+local Surface = require(ReplicatedStorage.Shared.Arena.Geometry.Surface)
 local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 
 local arena = Config.defaults().Arena
@@ -318,58 +320,118 @@ describe("Features.goal fit", function()
 end)
 
 describe("Features.gatePanels", function()
-	-- RC's hanging panel (R18): glass across the track from the walls' top down to half an ellipse, its feet on the
-	-- outer wall's top (28) at both glass faces and its apex openingHeight (60) at the track's middle.
-	it("fills each gate with glass from the walls' top down to a rounded opening", function()
-		local panel = arena.gatePanel
+	-- The area a piece's face covers in its plane: a block's rectangle, or a wedge's right triangle.
+	local function faceArea(piece: Types.Piece): number
+		return if piece.shape == "Block" then piece.size.X * piece.size.Z else piece.size.Y * piece.size.Z / 2
+	end
+
+	-- The area between two outlines that both run across the track: the shoelace formula round the bottom one, then
+	-- the top one run back.
+	local function areaBetween(bottom: { Vector2 }, top: { Vector2 }): number
+		local ring = table.clone(bottom)
+		for index = #top, 1, -1 do
+			table.insert(ring, top[index])
+		end
+		local twice = 0
+		for index, point in ring do
+			local nextPoint = ring[index % #ring + 1]
+			twice += point.X * nextPoint.Y - nextPoint.X * point.Y
+		end
+		return math.abs(twice) / 2
+	end
+
+	-- The wall (R18, amended 2026-10-27): glass across the whole track, from the surface at the gate (the step half
+	-- blended there) up to the walls' top as built, breaking at every bend of either outline.
+	it("fills each gate with glass from the track's surface up to the walls' top", function()
+		local depth = arena.gatePanel.depth
 		local half = arena.trackWidth / 2
-		local gate = Centerline.frameAt(arena, Centerline.gateDistance(arena, 1))
-		local lowest: { [number]: number } = {}
-		local highest: { [number]: number } = {}
-		local highestInside = -math.huge
-		local deepest = 0
+		local distance = Centerline.gateDistance(arena, 1)
+		local gate = Centerline.frameAt(arena, distance)
+		local bottom, top = Surface.section(arena, distance), Profile.topOutline(arena)
+		local function height(outline: { Vector2 }, u: number): number
+			return Profile.heightAt(outline, math.clamp(u, 0, arena.trackWidth)) :: number
+		end
+		-- The corners on the gate's plane, as (u, y), and how far any corner lies behind it.
+		local face: { Vector2 } = {}
+		local deepest, area = 0, 0
 		for _, piece in Features.gatePanels(arena)[1].pieces do
+			area += faceArea(piece)
 			for _, corner in corners(piece) do
 				-- In the gate's frame: x across the track from its middle, z along it.
 				local at = gate:PointToObjectSpace(corner)
-				expect(math.abs(at.Z) <= panel.depth + 1e-3).toBe(true)
+				local u = at.X + half
+				expect(math.abs(at.Z) <= depth + 1e-3).toBe(true)
 				deepest = math.max(deepest, math.abs(at.Z))
-				local opening = arena.outerWallHeight
-					+ (panel.openingHeight - arena.outerWallHeight) * math.sqrt(math.max(0, 1 - (at.X / half) ^ 2))
-				expect(at.Y > opening - 1e-3 and at.Y < Profile.topOutline(arena, at.X + half) + 1e-3).toBe(true)
-				local x = math.round(at.X)
-				if math.abs(at.X - x) < 1e-3 then
-					lowest[x] = math.min(lowest[x] or math.huge, at.Y)
-					highest[x] = math.max(highest[x] or -math.huge, at.Y)
-				end
-				if math.abs(at.X) <= half - arena.glass.lipRadius + 1e-3 then
-					highestInside = math.max(highestInside, at.Y)
+				expect(at.Y > height(bottom, u) - 1e-3 and at.Y < height(top, u) + 1e-3).toBe(true)
+				if math.abs(at.Z) < 1e-3 then
+					table.insert(face, Vector2.new(u, at.Y))
 				end
 			end
 		end
-		expect(lowest[-40]).toBeCloseTo(28, 3)
-		expect(lowest[40]).toBeCloseTo(28, 3)
-		expect(lowest[0]).toBeCloseTo(60, 3)
-		expect(highestInside).toBeCloseTo(120, 3)
-		expect(highest[-40]).toBeCloseTo(108, 3)
-		expect(highest[40]).toBeCloseTo(108, 3)
+		local function hasCorner(u: number, y: number): boolean
+			for _, corner in face do
+				if (corner - Vector2.new(u, y)).Magnitude < 1e-3 then
+					return true
+				end
+			end
+			return false
+		end
+		-- A break at every point of either outline: the wall has a corner there on both of them.
+		for _, outline in { bottom, top } do
+			for _, point in outline do
+				local u = point.X
+				expect(hasCorner(u, height(bottom, u)) and hasCorner(u, height(top, u))).toBe(true)
+			end
+		end
+		-- It meets the bank's top and the lower floor, the lips and the roof.
+		expect(hasCorner(0, arena.innerBankHeight)).toBe(true)
+		expect(hasCorner(arena.innerBankHeight, 0)).toBe(true)
+		expect(hasCorner(0, Profile.lipStart(arena)) and hasCorner(arena.trackWidth, Profile.lipStart(arena))).toBe(
+			true
+		)
+		expect(hasCorner(arena.glass.lipRadius, arena.glass.top)).toBe(true)
+		-- No gap and no overlap: the slices' faces cover the area between the outlines.
+		expect(area).toBeCloseTo(areaBetween(bottom, top), 1)
 		-- gatePanel.depth thick along the track.
-		expect(deepest).toBeCloseTo(panel.depth, 3)
+		expect(deepest).toBeCloseTo(depth, 3)
 	end)
 
-	it("builds each panel from gatePanel.segments slices, in gate order", function()
+	it("builds each wall from a slice between every two breaks, in gate order", function()
 		local panels = Features.gatePanels(arena)
 		expect(#panels).toBe(Centerline.gateCount)
+		local half = arena.trackWidth / 2
 		for gate, panel in panels do
-			-- No slice is a rectangle (the opening curves under every one), so each is four wedges.
-			expect(#panel.pieces).toBe(arena.gatePanel.segments * 4)
-			local apex = Centerline.at(arena, Centerline.gateDistance(arena, gate), 40, 60)
-			Fixtures.expectNear(panel.apex.Position, apex.Position)
-			Fixtures.expectNear(panel.apex.LookVector, apex.LookVector)
+			-- 28 breaks, so 27 slices. Two are rectangles, one block each: the lower floor under the roof (u 12 to 36)
+			-- and the upper floor (u 54 to 62). The other 25 are four wedges each.
+			local blocks = 0
+			for _, piece in panel.pieces do
+				if piece.shape == "Block" then
+					blocks += 1
+				end
+			end
+			expect(blocks).toBe(2)
+			expect(#panel.pieces).toBe(2 + 25 * 4)
+			-- Its pivot is the wall's middle, halfway between the surface and the roof, facing the travel direction.
+			local distance = Centerline.gateDistance(arena, gate)
+			local floor = Profile.heightAt(Surface.section(arena, distance), half) :: number
+			local middle = Centerline.at(arena, distance, half, (floor + arena.glass.top) / 2)
+			Fixtures.expectNear(panel.pivot.Position, middle.Position)
+			Fixtures.expectNear(panel.pivot.LookVector, middle.LookVector)
 		end
-		-- Another even count: no slice is centred on the track's middle, so none is a rectangle there either.
-		local six = Fixtures.config({ Arena = { gatePanel = { segments = 6 } } }).Arena
-		expect(#Features.gatePanels(six)[1].pieces).toBe(6 * 4)
+	end)
+
+	-- With the inner lip's end half a smallest part before the step's start (u 36), the two outlines bend 0.0005
+	-- apart over the flat lower floor and under the flat roof: a slice between the bends would be a block thinner than
+	-- Roblox builds.
+	it("merges breaks closer than Roblox's smallest part", function()
+		local stepStart = arena.trackWidth - arena.wallCurveRadius - arena.upperFloorWidth - arena.stepWidth
+		local close = Fixtures.config({ Arena = { glass = { lipRadius = stepStart - PartSize.MIN / 2 } } }).Arena
+		for _, panel in Features.gatePanels(close) do
+			for _, piece in panel.pieces do
+				local size = piece.size
+				expect(math.min(size.X, size.Y, size.Z) >= PartSize.MIN).toBe(true)
+			end
+		end
 	end)
 end)
 

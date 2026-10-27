@@ -121,10 +121,17 @@ function Surface.sweep(rings: { { Vector3 } }, thickness: number): { Piece }
 	return pieces
 end
 
+-- The solid cross-section at a distance along the loop, with the straights' step blended to its height there
+-- (Centerline.stepBlend). The sweep places it at every station; the goal's fit check and the gate panels read it at
+-- a gate.
+function Surface.section(arena: ArenaConfig, distance: number): { Vector2 }
+	return Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, distance))
+end
+
 -- The riding surface: the floors, the inner bank and the outer wall, from the bank's top to the outer wall's top.
 function Surface.build(arena: ArenaConfig): { Piece }
 	local rings = Surface.rings(arena, function(distance: number): { Vector2 }
-		return Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, distance))
+		return Surface.section(arena, distance)
 	end)
 	return Surface.sweep(rings, arena.surfaceThickness)
 end

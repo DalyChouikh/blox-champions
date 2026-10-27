@@ -95,13 +95,20 @@ describe("Profile", function()
 
 	-- A gate panel ends at this outline, so it meets the lips as built (their chords) and never pokes through them.
 	it("follows the walls' top as built across the track: the lips' chords, and glass.top between them", function()
+		local outline = Profile.topOutline(arena)
+		-- From the inner glass's face to the outer one, always toward the outer glass: a height at every u between.
+		near(outline[1], Vector2.new(0, 108))
+		near(outline[#outline], Vector2.new(80, 108))
+		for index = 2, #outline do
+			expect(outline[index].X > outline[index - 1].X).toBe(true)
+		end
 		local cases = { { 0, 108 }, { 80, 108 }, { 12, 120 }, { 40, 120 }, { 68, 120 }, { 76.485, 116.485 } }
 		for _, case in cases do
-			expect(Profile.topOutline(arena, case[1])).toBeCloseTo(case[2], 3)
+			expect(Profile.heightAt(outline, case[1])).toBeCloseTo(case[2], 3)
 		end
 		-- On the chord from (3.515, 116.485) to (7.408, 119.087), not on the lip's circle.
 		local t = (6 - 3.515) / (7.408 - 3.515)
-		expect(Profile.topOutline(arena, 6)).toBeCloseTo(116.485 + t * (119.087 - 116.485), 2)
+		expect(Profile.heightAt(outline, 6)).toBeCloseTo(116.485 + t * (119.087 - 116.485), 2)
 	end)
 
 	-- The top closes the track's "O": it runs on from the outer lip's end back to the inner one's (Arena spec §3.1,

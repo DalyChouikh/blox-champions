@@ -262,7 +262,7 @@ export type HudArena = { hoop: Model, rim: { BasePart }, panel: BasePart, marker
 
 -- The arena parts the HUD lights and points at, tagged as the arena builder tags them: a goal hoop of two rim parts,
 -- its panel, and four corner markers 100 studs apart along x, by gate index, each a model of two panes pivoted between
--- them (as a gate panel is at its opening's apex). Anchored, in `folder`.
+-- them (as a gate panel is at its wall's middle). Anchored, in `folder`.
 function Fixtures.hudArena(folder: Instance): HudArena
 	local function part(name: string, position: Vector3, parent: Instance): Part
 		local made = Instance.new("Part")

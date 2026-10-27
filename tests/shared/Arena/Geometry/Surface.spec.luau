@@ -4,8 +4,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
+local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local Surface = require(ReplicatedStorage.Shared.Arena.Geometry.Surface)
 local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 
@@ -40,6 +42,25 @@ describe("Surface.quadPieces", function()
 		for _, piece in pieces do
 			expect(piece.shape).toBe("Wedge")
 		end
+	end)
+end)
+
+describe("Surface.section", function()
+	-- The sweep places it at every station; the goal's fit check and the gate panels read it at a gate.
+	it("gives the solid section at a distance, with the straights' step blended there", function()
+		local arena = Config.defaults().Arena
+		local function expectSection(distance: number, stepHeight: number)
+			local expected = Profile.points(arena, stepHeight)
+			local section = Surface.section(arena, distance)
+			expect(#section).toBe(#expected)
+			for index, point in expected do
+				expect((section[index] - point).Magnitude).toBeLessThan(1e-4)
+			end
+		end
+		-- The full step along a straight, none at a curved end's apex, and half at a gate (a corner).
+		expectSection(arena.straightLength / 2, arena.stepHeight)
+		expectSection(arena.straightLength + math.pi * arena.endRadius / 2, 0)
+		expectSection(Centerline.gateDistance(arena, 2), arena.stepHeight / 2)
 	end)
 end)
 
