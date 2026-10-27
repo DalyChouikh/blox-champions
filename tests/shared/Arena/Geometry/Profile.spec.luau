@@ -14,13 +14,16 @@ local function near(actual: Vector2, expected: Vector2, tolerance: number?)
 	expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-4)
 end
 
--- The defaults' cross-section on a straight (Arena spec §3.1): the bank (0, 8) → (8, 0), the lower floor to 36, the
+-- The defaults' cross-section on a straight (Arena spec §3.1): the bank (0, 16) → (16, 0), the lower floor to 36, the
 -- step to (54, 4), the upper floor to 62, the foot curve to (80, 22) and the outer wall to (80, 28).
 describe("Profile", function()
 	it(
 		"gives each floor and the wall one strip and shares the rest across the bank, the step and the foot curve",
 		function()
-			expect(Profile.stripCounts(arena)).toEqual({ 4, 1, 5, 1, 8, 1 })
+			-- 14 spare strips by length: the bank 25.13 (π/2 × 16), the step 18.54, the foot 28.27 (π/2 × 18) of
+			-- 71.94 give 4.89, 3.61 and 5.50: 4, 3 and 5, and the two left over to the largest remainders, the
+			-- bank's and the step's.
+			expect(Profile.stripCounts(arena)).toEqual({ 6, 1, 5, 1, 6, 1 })
 		end
 	)
 
@@ -32,22 +35,24 @@ describe("Profile", function()
 
 	it("runs from the inner bank's top down, across the floors and the step, and up the outer wall", function()
 		local p = Profile.points(arena, 4)
-		near(p[1], Vector2.new(0, 8))
-		near(p[5], Vector2.new(8, 0))
-		near(p[6], Vector2.new(36, 0))
-		near(p[11], Vector2.new(54, 4))
-		near(p[12], Vector2.new(62, 4))
+		near(p[1], Vector2.new(0, 16))
+		near(p[7], Vector2.new(16, 0))
+		near(p[8], Vector2.new(36, 0))
+		near(p[13], Vector2.new(54, 4))
+		near(p[14], Vector2.new(62, 4))
 		near(p[20], Vector2.new(80, 22))
 		near(p[21], Vector2.new(80, 28))
-		expect(Profile.lowerFloorCenter(arena)).toBe(22)
+		expect(Profile.lowerFloorCenter(arena)).toBe(26) -- (16 + 36) / 2
 	end)
 
+	-- The bank's circle is centred level with its top and straight over its foot, so it leaves the glass vertically and
+	-- meets the lower floor flat: one smooth curve from the floor up the glass.
 	it("rounds the inner bank with innerBankHeight and the outer wall's foot with wallCurveRadius", function()
 		local p = Profile.points(arena, 4)
-		for index = 1, 5 do
-			expect((p[index] - Vector2.new(8, 8)).Magnitude).toBeCloseTo(8, 3)
+		for index = 1, 7 do
+			expect((p[index] - Vector2.new(16, 16)).Magnitude).toBeCloseTo(16, 3)
 		end
-		for index = 12, 20 do
+		for index = 14, 20 do
 			expect((p[index] - Vector2.new(62, 22)).Magnitude).toBeCloseTo(18, 3)
 		end
 	end)
@@ -55,14 +60,14 @@ describe("Profile", function()
 	it("shapes the step as one smooth rise from the lower to the upper floor", function()
 		local p = Profile.points(arena, 4)
 		-- Five strips: points at t = 0.4 and 0.8 of the way across, on 2 · (1 − cos(π t)).
-		expect(p[8].Y).toBeCloseTo(2 - 2 * math.cos(0.4 * math.pi), 3)
-		expect(p[10].Y).toBeCloseTo(2 - 2 * math.cos(0.8 * math.pi), 3)
+		expect(p[10].Y).toBeCloseTo(2 - 2 * math.cos(0.4 * math.pi), 3)
+		expect(p[12].Y).toBeCloseTo(2 - 2 * math.cos(0.8 * math.pi), 3)
 	end)
 
 	it("keeps the same points with no step, so straights and curves blend point by point", function()
 		local flat = Profile.points(arena, 0)
 		expect(#flat).toBe(21)
-		for index = 5, 12 do
+		for index = 7, 14 do
 			expect(flat[index].Y).toBeCloseTo(0, 4)
 		end
 		near(flat[20], Vector2.new(80, 18))
@@ -89,7 +94,7 @@ describe("Profile", function()
 		expect(#inner).toBe(#expected)
 		for index, point in expected do
 			local mirrored = Vector2.new(arena.trackWidth - point.X, point.Y)
-			near(inner[#expected + 1 - index], if index == 1 then Vector2.new(0, 8) else mirrored, 1e-3)
+			near(inner[#expected + 1 - index], if index == 1 then Vector2.new(0, 16) else mirrored, 1e-3)
 		end
 	end)
 

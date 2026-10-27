@@ -25,7 +25,7 @@ The owner's rule: **players and the ball never get out of the arena.** The top h
 
 1. The arena is built from `Config.Arena` alone:
    - the track 80 wide, the arena's outside 200 across (the curved ends' centerline radius 60), the straights 200 (a lap of about 777 studs);
-   - on the inner side a curved bank 8 high, on the outer side a curved solid wall 28 high;
+   - on the inner side a curved bank 16 high (8 until the Feel part's #217), on the outer side a curved solid wall 28 high;
    - **rideable glass** above both, up to **120**, each wall ending in a lip that curls inward;
    - the top of `Arena.top.kind`: a glass roof at 120 (Closed, the default) or an invisible ceiling at 140 (Open).
 2. Glass is a ride surface: skaters ride it and their rays find it; the ball bounces off it, and its flight ends there as on any surface.
@@ -65,7 +65,7 @@ Brainstorm 2026-10-25, the approved spec 2026-10-26, and the revision 2026-10-26
 |---|---|---|
 | R1 | How to change the arena | **Reshape the generated arena (approach A).** Keep the pure `Arena/Geometry` → `Builder` pipeline, everything config-driven. The art pass later swaps in models carrying the same tags. |
 | R2 | Size and shape | Straights 200; the arena's outside 200 across; **the track 80 wide (R12)**. The floor, the banks and the solid walls are opaque, like RC; the glass above them is clear. *(First version: track 60, curved ends 70.)* |
-| R3 | The inner side | A low curved bank (about **8** studs, a pump spot) that rises into **rideable glass up to the top**, with its own lip, on the straights and the ends. The middle behind it (40 wide) is closed off, not rideable, and seen through the glass. *(First version: a glass barrier on the bank.)* |
+| R3 | The inner side | A curved bank (**16** studs since the Feel part, #217: the owner, 2026-10-27, from Roller Champions' Pixel City; first about 8, a pump spot) that rises into **rideable glass up to the top**, with its own lip, on the straights and the ends. The middle behind it (40 wide) is closed off, not rideable, and seen through the glass. *(First version: a glass barrier on the bank.)* |
 | R4 | The outer side | The curved solid wall (**28**) rises into **rideable glass up to 120 (R11)**, which curls inward at the top. *(First version: a glass barrier to 85.)* |
 | R5 | Glass | **A ride surface** with a glass look ("the player should be able to skate on them, not just fall"). **The look (2026-10-27): clear plastic, SmoothPlastic at 85% see-through**, so players see through the glass to the other side ("specially the middle glass"): Roblox's Glass material hides every non-opaque part behind it. *(First version: a barrier, not a ride surface. Until 2026-10-27: the Glass material at 70%.)* |
 | R6 | Gate markers | **A thin glass wall across the track at each gate (R18)**, glowing in the possessing team's colour on the next gate; and a **beam** on the outer glass beside the carrier. They replace today's flat corner panels. *(First version: a thin arch.)* |
@@ -97,6 +97,8 @@ The M1 spec's §9.1 (layout, dimensions, markers, goal placement), §9.2 (folder
    - the outer wall's foot curve 14 → 18, the step 14 → 18 wide, the upper floor 6 → 8;
    - the step stays 4 high, the bank 8, the solid outer wall 28;
    - the lower floor becomes 28 wide (was 18).
+
+   *Amended by the Feel part (#217, 2026-10-27): the bank is 16, so the lower floor is 20 wide.*
 
    Cost if wrong: tuning values.
 2. **The lips are quarter circles of radius 12, in 4 strips each.** So the glass is vertical up to 108, and the top spans the 56 studs between the two lips' ends. Cost if wrong: two numbers.
@@ -130,18 +132,18 @@ The M1 spec's §9.1 (layout, dimensions, markers, goal placement), §9.2 (folder
            |                                                    |
  28        |                                                    |  outer wall's top (solid below)
  22        |                                                   /   foot curve (r 18)
-  8        ╮ inner bank (r 8)                         ___----
+ 16        ╮ inner bank (r 16)                        ___----
   4         ╲                       ____----------- upper floor
-  0          ╲_____________________/  step (18 wide, 4 high)
-           u 0   8               36     54    62            80
+  0          ╲__________/  step (18 wide, 4 high)
+           u 0       16          36     54    62            80
 ```
 
 | Piece | From → to (u, y) on a straight | Folder |
 |---|---|---|
 | Inner lip: a quarter circle, centre (12, 108) | (12, 120) → (0, 108) | Glass |
-| Inner glass | (0, 108) → (0, 8) | Glass |
-| Inner bank: a quarter circle, centre (8, 8) | (0, 8) → (8, 0) | Surface |
-| Lower floor | (8, 0) → (36, 0) | Surface |
+| Inner glass | (0, 108) → (0, 16) | Glass |
+| Inner bank: a quarter circle, centre (16, 16): vertical where the glass stands on it, flat where it meets the floor (#217; was r 8) | (0, 16) → (16, 0) | Surface |
+| Lower floor | (16, 0) → (36, 0) | Surface |
 | Step: a cosine rise | (36, 0) → (54, 4) | Surface |
 | Upper floor | (54, 4) → (62, 4) | Surface |
 | Outer foot curve: centre (62, 22) | (62, 4) → (80, 22) | Surface |
@@ -160,7 +162,7 @@ Every section runs the same way around the track's "O" (inner top, down, across 
 | `straightLength` | 200 | 200 |
 | `endRadius` | 70 | 60 |
 | `trackWidth` | 60 | 80 |
-| `outerWallHeight` / `innerBankHeight` | 28 / 8 | 28 / 8 |
+| `outerWallHeight` / `innerBankHeight` | 28 / 8 | 28 / 8 (16 since #217) |
 | `wallCurveRadius` | 14 | 18 |
 | `stepHeight` / `stepWidth` / `upperFloorWidth` | 4 / 14 / 6 | 4 / 18 / 8 |
 | `stripsPerSection` (the solid profile) | 20 | 20 |
@@ -278,7 +280,7 @@ As today, a gate spans the track at the start of each section, facing the travel
 
 ### 5.5 Spawns and the middle
 
-- **Team spawns:** on the lower floor's middle lane (u 22), as today.
+- **Team spawns:** on the lower floor's middle lane (u 22; u 26 since #217's 16-stud bank), as today.
 - **Ball spawns:** on the track's middle at each curved end's apex, as today.
 - **The middle:** a floor slab `surfaceThickness` thick, its top at the lower floor's height, out to the inner glass slab's back: a block between the straights and a fan of prisms under each curved end, as today. It is not a ride surface.
 

@@ -415,7 +415,7 @@ describe("Features.gatePanels", function()
 		expect(#panels).toBe(Centerline.gateCount)
 		local half = arena.trackWidth / 2
 		for gate, panel in panels do
-			-- 28 breaks, so 27 slices. Two are rectangles, one block each: the lower floor under the roof (u 12 to 36)
+			-- 28 breaks, so 27 slices. Two are rectangles, one block each: the lower floor under the roof (u 16 to 36)
 			-- and the upper floor (u 54 to 62). The other 25 are four wedges each.
 			local blocks = 0
 			for _, piece in panel.pieces do
@@ -454,9 +454,10 @@ describe("Features spawns and infield", function()
 		local spawns = Features.teamSpawns(arena, 3)
 		expect(#spawns.Blue).toBe(3)
 		expect(#spawns.Orange).toBe(3)
-		Fixtures.expectNear(spawns.Blue[1].Position, Vector3.new(10, 0, -42))
-		Fixtures.expectNear(spawns.Blue[2].Position, Vector3.new(0, 0, -42))
-		Fixtures.expectNear(spawns.Blue[3].Position, Vector3.new(-10, 0, -42))
+		-- The lower floor's middle, u (16 + 36) / 2 = 26 from the inner glass's face at 20: 46 off the long axis.
+		Fixtures.expectNear(spawns.Blue[1].Position, Vector3.new(10, 0, -46))
+		Fixtures.expectNear(spawns.Blue[2].Position, Vector3.new(0, 0, -46))
+		Fixtures.expectNear(spawns.Blue[3].Position, Vector3.new(-10, 0, -46))
 		Fixtures.expectNear(spawns.Blue[1].LookVector, Vector3.new(-1, 0, 0))
 		for index, blue in spawns.Blue do
 			local orange = spawns.Orange[#spawns.Orange + 1 - index]

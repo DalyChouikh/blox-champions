@@ -224,6 +224,19 @@ about two thirds of a lap, swinging from wall to wall.
 - **An Air Pose breaks a fall** (same answer, recommended): it stops the fall and hops the skater about 4.5 studs up, so
   the height counts from its hop: a skater falling 60 studs off the glass who strikes an Air Pose just above the
   floor lands safely. Not chosen: the whole fall counts from the highest point since leaving the ground.
+- **Screenshots for the middle curve and the camera** (2026-10-27, on a private review page: the owner's Pixel City
+  frames at 4:04.6, 1:12.9 and 0:04.5, beside Studio shots of our arena; for the camera, the owner's frames at 0:23.5
+  and 5:41.5 and the ranked games at 21:01.5 and 27:51, beside a skater on our outer glass 45 studs up with the camera
+  tilted 0°, 15°, 30°, 45°, 60° and the full 90°). The owner chose every recommendation:
+  - **The middle curve: 16 studs**, as shown (#217): a quarter curve 16 studs high and wide into the middle glass; the
+    low floor narrows from 28 to 20; the track stays 80 wide.
+  - **The camera tilts at most 30°** (#223): the top of what the owner's own games showed (about 15–30° by eye), close
+    to the ranked player's ride at 21:01; the ranked ride at 27:51 rolled about 60–90°.
+  - **The speedometer reads like Roller Champions'**: the speed along the surface on the ground and the walls, the
+    horizontal speed in the air. Roller Champions read 0 during a standing jump (Video 5) and held steady through an
+    Air Pose (Video 4); ours showed the full 3D speed (85 km/h right after a jump at 71).
+  - **How high skilled combos reach** (measured 70–80 studs; the lips start at 108): judged at the Feel playtest; if
+    too low, measured options then (a stronger whip or uppercut, lighter wall gravity).
 
 ## Roller Champions
 
