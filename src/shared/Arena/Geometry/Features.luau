@@ -1,7 +1,7 @@
 --!strict
 -- Everything in the arena besides the solid riding surface (spec §9.1, Arena spec §5): the rideable glass walls with
 -- their lips, the top that closes the arena (a roof, or an open map's ceiling), the lap gates, the raised goal ring and
--- its panel, the corner markers, the team and ball spawns, and the infield floor.
+-- its panel, the glass panels hanging at the gates, the team and ball spawns, and the infield floor.
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
@@ -100,17 +100,6 @@ local function reach(corners: { Vector2 }, direction: Vector2): number
 	return farthest
 end
 
--- The height of the cross-section's riding surface at a lateral position between the walls, or nil at a wall.
-local function surfaceHeight(points: { Vector2 }, lateral: number): number?
-	for index = 1, #points - 1 do
-		local from, to = points[index], points[index + 1]
-		if from.X < to.X and from.X <= lateral and lateral <= to.X then
-			return from.Y + (to.Y - from.Y) * (lateral - from.X) / (to.X - from.X)
-		end
-	end
-	return nil
-end
-
 -- The ring must fit inside the track's cross-section at the goal gate, judged by its real outline against the
 -- surface as built (the step half blended there, the wall's foot curve as strips).
 local function checkFit(arena: ArenaConfig, corners: { Vector2 }, lateral: number, gateDistance: number)
@@ -126,7 +115,8 @@ local function checkFit(arena: ArenaConfig, corners: { Vector2 }, lateral: numbe
 	end
 	local surface = Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, gateDistance))
 	for _, corner in corners do
-		local floor = surfaceHeight(surface, lateral + corner.X)
+		-- The riding surface under the corner, or nil at a wall.
+		local floor = Profile.heightAt(surface, lateral + corner.X)
 		if floor == nil or height + corner.Y <= floor then
 			fail("the goal ring must clear the track's surface at the goal gate")
 		end
@@ -170,23 +160,46 @@ function Features.goal(arena: ArenaConfig): Types.Goal
 	}
 end
 
--- A flat panel on the outer wall's inner face at each gate, its top flush with the wall top, under the glass. Its
--- thickness is the surface's, and it stays out of the skaters' way.
-function Features.markers(arena: ArenaConfig): { Piece }
-	local markers: { Piece } = {}
+-- The rounded opening's edge at a lateral position (R18): half an ellipse whose feet stand on the outer wall's top at
+-- both glass faces, its apex gatePanel.openingHeight at the track's middle.
+local function openingEdge(arena: ArenaConfig, lateral: number): number
+	local half = arena.trackWidth / 2
+	local across = (lateral - half) / half
+	local rise = arena.gatePanel.openingHeight - arena.outerWallHeight
+	return arena.outerWallHeight + rise * math.sqrt(math.max(0, 1 - across * across))
+end
+
+-- Each gate's glass panel (R18, Arena spec §5.2), in gate order: in the gate's plane, glass fills the track's
+-- cross-section from the walls' top as built (Profile.topOutline) down to the rounded opening skaters pass through.
+-- It is gatePanel.segments slices across the track, each a quad gatePanel.depth thick behind the plane (a block when
+-- it is a rectangle, wedges otherwise, as the surface's quads). Its pivot is the opening's apex, facing the travel
+-- direction.
+function Features.gatePanels(arena: ArenaConfig): { Types.GatePanel }
+	local panel, width = arena.gatePanel, arena.trackWidth
+	local panels: { Types.GatePanel } = {}
 	for gate = 1, Centerline.gateCount do
-		table.insert(markers, {
-			shape = "Block",
-			cframe = Centerline.at(
-				arena,
-				Centerline.gateDistance(arena, gate),
-				arena.trackWidth - arena.surfaceThickness / 2,
-				arena.outerWallHeight - arena.marker.height / 2
-			),
-			size = Vector3.new(arena.surfaceThickness, arena.marker.height, arena.marker.width),
-		})
+		local distance = Centerline.gateDistance(arena, gate)
+		local function point(lateral: number, height: number): Vector3
+			return Centerline.at(arena, distance, lateral, height).Position
+		end
+		local pieces: { Piece } = {}
+		for slice = 0, panel.segments - 1 do
+			local from, to = width * slice / panel.segments, width * (slice + 1) / panel.segments
+			-- Across the slice toward the outer glass, and up from the opening to the walls' top.
+			local quad = Surface.quadPieces(
+				point(from, openingEdge(arena, from)),
+				point(to, openingEdge(arena, to)),
+				point(from, Profile.topOutline(arena, from)),
+				point(to, Profile.topOutline(arena, to)),
+				panel.depth
+			)
+			for _, piece in quad do
+				table.insert(pieces, piece)
+			end
+		end
+		table.insert(panels, { pieces = pieces, apex = Centerline.at(arena, distance, width / 2, panel.openingHeight) })
 	end
-	return markers
+	return panels
 end
 
 -- teamSize floor-level frames per team, teamSpawnSpacing apart on the lower floor, facing the travel direction.

@@ -21,7 +21,8 @@ export type ArenaGeometry = {
 	infield: { Piece },
 	gates: { Crossing.Rectangle },
 	goal: Types.Goal,
-	markers: { Piece },
+	-- The glass panels hanging at the gates, by gate index.
+	gatePanels: { Types.GatePanel },
 	teamSpawns: Types.TeamSpawns,
 	ballSpawns: { CFrame },
 }
@@ -37,7 +38,7 @@ function Geometry.build(config: Config.GameConfig): ArenaGeometry
 		infield = Features.infield(arena),
 		gates = Features.gates(arena),
 		goal = Features.goal(arena),
-		markers = Features.markers(arena),
+		gatePanels = Features.gatePanels(arena),
 		teamSpawns = Features.teamSpawns(arena, config.Match.teamSize),
 		ballSpawns = Features.ballSpawns(arena),
 	}

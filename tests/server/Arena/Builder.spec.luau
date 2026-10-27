@@ -40,7 +40,12 @@ describe("Builder.build", function()
 		expect(#folder(arena, "Top"):GetChildren()).toBe(#geometry.top)
 		expect(#folder(arena, "Infield"):GetChildren()).toBe(#geometry.infield)
 		expect(#folder(arena, "Gates"):GetChildren()).toBe(4)
-		expect(#folder(arena, "Markers"):GetChildren()).toBe(4)
+		local panels = folder(arena, "GatePanels"):GetChildren()
+		expect(#panels).toBe(4)
+		for _, panel in panels do
+			expect(#panel:GetChildren()).toBe(config.Arena.gatePanel.segments * 4)
+		end
+		expect(arena:FindFirstChild("Markers")).toBeNil()
 		expect(#folder(arena, "Spawns"):GetChildren()).toBe(8)
 		local hoop = folder(arena, "Goal"):FindFirstChild("GoalHoop") :: Model
 		expect(#hoop:GetChildren()).toBe(16)
@@ -85,13 +90,38 @@ describe("Builder.build", function()
 				error(`{glass.Name} does not look or act like glass`)
 			end
 		end
-		-- The corner markers are panels that never block a skater (A2).
-		local markers = folder(arena, "Markers"):GetChildren()
-		expect(#markers).toBe(Centerline.gateCount)
-		for _, marker in markers do
-			expect((marker :: BasePart).CanCollide).toBe(false)
-		end
 	end)
+
+	-- Skaters pass through the panels (R18), and ArenaGlow and the carrier's arrow find them by their tag.
+	it(
+		"makes each gate's panel a model carrying CornerMarker and its GateIndex, of glass nothing hits, sees or "
+			.. "touches",
+		function()
+			local geometry = Geometry.build(config)
+			local arena = Builder.build(geometry, config, parent)
+			for gate = 1, Centerline.gateCount do
+				local panel = folder(arena, "GatePanels"):FindFirstChild(`GatePanel{gate}`) :: Model
+				expect(panel:IsA("Model")).toBe(true)
+				expect(panel:HasTag(Tags.CornerMarker)).toBe(true)
+				expect(panel:GetAttribute(Tags.Attribute.GateIndex)).toBe(gate)
+				Fixtures.expectNear(panel:GetPivot().Position, geometry.gatePanels[gate].apex.Position)
+				for _, child in panel:GetChildren() do
+					local pane = child :: BasePart
+					if
+						not (
+							pane.Anchored
+							and pane.Material == Enum.Material.Glass
+							and pane.Color == config.Arena.colors.glass
+							and math.abs(pane.Transparency - config.Arena.glass.transparency) < 1e-4
+							and not (pane.CanCollide or pane.CanQuery or pane.CanTouch or pane.CastShadow)
+						)
+					then
+						error(`{panel.Name}.{pane.Name} is not glass that nothing hits, sees or touches`)
+					end
+				end
+			end
+		end
+	)
 
 	-- The top (A7): skaters and the ball bounce off it, and its touch ends a flight (a pass's lift included), so no
 	-- ball glides along it; no ray looking for ground or a view sees it.
@@ -191,6 +221,15 @@ describe("Builder.build", function()
 		expect(function()
 			Builder.build(flatTop, config, parent)
 		end).toThrow("ArenaBuilder: top piece 1 is invalid (size 1, 0, 1)")
+		local thinPanel = table.clone(geometry)
+		thinPanel.gatePanels = table.clone(geometry.gatePanels)
+		thinPanel.gatePanels[3] = {
+			pieces = { { shape = "Block", cframe = CFrame.identity, size = Vector3.new(1, 1, 0) } },
+			apex = CFrame.identity,
+		}
+		expect(function()
+			Builder.build(thinPanel, config, parent)
+		end).toThrow("ArenaBuilder: gate panel 3 piece 1 is invalid (size 1, 1, 0)")
 		expect(#parent:GetChildren()).toBe(0)
 	end)
 end)

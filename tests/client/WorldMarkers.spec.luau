@@ -31,6 +31,9 @@ local hit: { Position: Vector3, Normal: Vector3 }?
 -- The ball's screen, and every other point's (the gates').
 local ballScreen: Screen
 local gateScreen: Screen
+-- The last point other than the ball's that was put on the screen: where the gate arrow aims.
+local gateAimed: Vector3?
+local arena: Fixtures.HudArena
 
 local function snapshot(overrides: { [string]: any }?)
 	HudStore:onSnapshot(Fixtures.matchSnapshot(overrides))
@@ -53,7 +56,8 @@ beforeEach(function()
 	hit = { Position = Vector3.new(0, 0, 0), Normal = Vector3.yAxis }
 	ballScreen = { point = Vector3.new(300, 200, 10), onScreen = true }
 	gateScreen = { point = Vector3.new(600, 100, 20), onScreen = true }
-	Fixtures.hudArena(folder)
+	gateAimed = nil
+	arena = Fixtures.hudArena(folder)
 	ArenaParts:init({})
 	ArenaParts:refresh()
 	RideSurfaces:init({})
@@ -76,8 +80,11 @@ beforeEach(function()
 		LocalId = LOCAL_ID,
 		Project = function(position: Vector3): (Vector3, boolean)
 			local current = ball
-			local screen = if current ~= nil and position == current.Position then ballScreen else gateScreen
-			return screen.point, screen.onScreen
+			if current ~= nil and position == current.Position then
+				return ballScreen.point, ballScreen.onScreen
+			end
+			gateAimed = position
+			return gateScreen.point, gateScreen.onScreen
 		end,
 		ViewportSize = function(): Vector2
 			return VIEWPORT
@@ -147,6 +154,8 @@ describe("WorldMarkers", function()
 		WorldMarkers:step(DT)
 		expect(arrow.Visible).toBe(true)
 		expect(arrow.Position == UDim2.fromOffset(600, 100)).toBe(true)
+		-- At the gate panel's pivot: its opening's apex.
+		Fixtures.expectNear(gateAimed :: Vector3, arena.markers[3]:GetPivot().Position)
 		BallCarrier:set("2")
 		WorldMarkers:step(DT)
 		expect(arrow.Visible).toBe(false)

@@ -258,10 +258,11 @@ function Fixtures.root(rig: Model): BasePart
 	return rig:FindFirstChild(SkaterRig.root) :: BasePart
 end
 
-export type HudArena = { hoop: Model, rim: { BasePart }, panel: BasePart, markers: { BasePart } }
+export type HudArena = { hoop: Model, rim: { BasePart }, panel: BasePart, markers: { Model } }
 
 -- The arena parts the HUD lights and points at, tagged as the arena builder tags them: a goal hoop of two rim parts,
--- its panel, and four corner markers 100 studs apart along x, by gate index. Anchored, in `folder`.
+-- its panel, and four corner markers 100 studs apart along x, by gate index, each a model of two panes pivoted between
+-- them (as a gate panel is at its opening's apex). Anchored, in `folder`.
 function Fixtures.hudArena(folder: Instance): HudArena
 	local function part(name: string, position: Vector3, parent: Instance): Part
 		local made = Instance.new("Part")
@@ -280,11 +281,16 @@ function Fixtures.hudArena(folder: Instance): HudArena
 	hoop:AddTag(Tags.GoalHoop)
 	local panel = part("GoalPanel", Vector3.new(2, 20, -40), folder)
 	panel:AddTag(Tags.GoalPanel)
-	local markers: { BasePart } = {}
+	local markers: { Model } = {}
 	for index = 1, 4 do
-		local marker = part(`Marker{index}`, Vector3.new(index * 100, 1, 0), folder)
+		local marker = Instance.new("Model")
+		marker.Name = `Marker{index}`
+		part("Pane1", Vector3.new(index * 100, 1, 0), marker)
+		part("Pane2", Vector3.new(index * 100, 9, 0), marker)
+		marker.WorldPivot = CFrame.new(index * 100, 5, 0)
 		marker:SetAttribute(Tags.Attribute.GateIndex, index)
 		marker:AddTag(Tags.CornerMarker)
+		marker.Parent = folder
 		markers[index] = marker
 	end
 	return { hoop = hoop, rim = rim, panel = panel, markers = markers }

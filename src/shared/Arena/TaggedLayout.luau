@@ -18,8 +18,8 @@ type Team = Team.Team
 export type TaggedArena = {
 	layout: MatchEngine.ArenaLayout,
 	goalPanel: BasePart,
-	-- Indexed by GateIndex.
-	markers: { BasePart },
+	-- Indexed by GateIndex: each a model (the builder's gate panel) or a single part.
+	markers: { PVInstance },
 	-- Each team's spawn parts' frames, sorted by part name.
 	teamSpawns: Types.TeamSpawns,
 	-- Sorted by part name.
@@ -58,39 +58,55 @@ local function asPart(instance: Instance, tag: string): BasePart
 	return instance :: BasePart
 end
 
+local function asModelOrPart(instance: Instance, tag: string): PVInstance
+	if not (instance:IsA("Model") or instance:IsA("BasePart")) then
+		fail(`{tag} "{instance.Name}" must be a model or a part (got {instance.ClassName})`)
+	end
+	return instance :: PVInstance
+end
+
+-- Instances tagged `tag`, sorted by name, so the first malformed one is always the one named.
+local function sortedTagged(root: Instance, tag: string): { Instance }
+	local found = taggedUnder(root, tag)
+	table.sort(found, function(a: Instance, b: Instance): boolean
+		return a.Name < b.Name
+	end)
+	return found
+end
+
 -- Parts tagged `tag`, sorted by name.
 local function partsTagged(root: Instance, tag: string): { BasePart }
 	local parts: { BasePart } = {}
-	for _, instance in taggedUnder(root, tag) do
+	for _, instance in sortedTagged(root, tag) do
 		table.insert(parts, asPart(instance, tag))
 	end
-	table.sort(parts, function(a: BasePart, b: BasePart): boolean
-		return a.Name < b.Name
-	end)
 	return parts
 end
 
--- Parts tagged `tag` sorted by their GateIndex attribute, and those indices in the same order.
-local function byGateIndex(root: Instance, tag: string): ({ BasePart }, { number })
-	local parts = partsTagged(root, tag)
-	local indexOf: { [BasePart]: number } = {}
-	for _, part in parts do
-		local index = part:GetAttribute(Tags.Attribute.GateIndex)
+-- Instances tagged `tag`, each passed through `cast`, sorted by their GateIndex attribute, and those indices in the
+-- same order.
+local function byGateIndex<T>(root: Instance, tag: string, cast: (Instance, string) -> T): ({ T }, { number })
+	local entries: { { item: T, index: number } } = {}
+	for _, instance in sortedTagged(root, tag) do
+		local item = cast(instance, tag)
+		local index = instance:GetAttribute(Tags.Attribute.GateIndex)
 		-- `% 1 == 0` is false for NaN and the infinities too.
 		if type(index) == "number" and index % 1 == 0 then
-			indexOf[part] = index
+			table.insert(entries, { item = item, index = index })
 		else
-			fail(`{tag} "{part.Name}" needs a whole-number {Tags.Attribute.GateIndex} attribute`)
+			fail(`{tag} "{instance.Name}" needs a whole-number {Tags.Attribute.GateIndex} attribute`)
 		end
 	end
-	table.sort(parts, function(a: BasePart, b: BasePart): boolean
-		return indexOf[a] < indexOf[b]
+	table.sort(entries, function(a: { item: T, index: number }, b: { item: T, index: number }): boolean
+		return a.index < b.index
 	end)
+	local items: { T } = {}
 	local indices: { number } = {}
-	for position, part in parts do
-		indices[position] = indexOf[part]
+	for position, entry in entries do
+		items[position] = entry.item
+		indices[position] = entry.index
 	end
-	return parts, indices
+	return items, indices
 end
 
 -- True when the sorted indices are exactly 1..n.
@@ -104,7 +120,7 @@ local function isSequence(indices: { number }): boolean
 end
 
 local function readGates(root: Instance): { Crossing.Rectangle }
-	local parts, indices = byGateIndex(root, Tags.LapGate)
+	local parts, indices = byGateIndex(root, Tags.LapGate, asPart)
 	if #parts == 0 then
 		fail(`no {Tags.LapGate} found`)
 	end
@@ -128,8 +144,8 @@ local function readGoal(root: Instance): Crossing.Disc
 	return fail(`{Tags.GoalHoop} needs a positive {Tags.Attribute.OpeningRadius} attribute`)
 end
 
-local function readMarkers(root: Instance, gateCount: number): { BasePart }
-	local markers, indices = byGateIndex(root, Tags.CornerMarker)
+local function readMarkers(root: Instance, gateCount: number): { PVInstance }
+	local markers, indices = byGateIndex(root, Tags.CornerMarker, asModelOrPart)
 	if #indices ~= gateCount or not isSequence(indices) then
 		local got = table.concat(indices, ", ")
 		fail(`{Tags.CornerMarker} {Tags.Attribute.GateIndex} values must match the gates (got {got})`)

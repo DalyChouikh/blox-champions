@@ -8,6 +8,7 @@ local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Features = require(ReplicatedStorage.Shared.Arena.Geometry.Features)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 
 local arena = Config.defaults().Arena
@@ -269,15 +270,63 @@ describe("Features.goal fit", function()
 	end)
 end)
 
-describe("Features markers, spawns and infield", function()
-	it("hangs a flat panel on the outer wall's inner face at each gate, its top flush with the wall top", function()
-		local markers = Features.markers(arena)
-		expect(#markers).toBe(4)
-		-- Lateral 79.5 (one surface thickness in from the wall at 80), top at 28 less half the 8-stud panel.
-		Fixtures.expectNear(markers[2].cframe.Position, Vector3.new(-100, 24, -99.5))
-		Fixtures.expectNear(markers[2].size, Vector3.new(1, 8, 2))
+describe("Features.gatePanels", function()
+	-- RC's hanging panel (R18): glass across the track from the walls' top down to half an ellipse, its feet on the
+	-- outer wall's top (28) at both glass faces and its apex openingHeight (60) at the track's middle.
+	it("fills each gate with glass from the walls' top down to a rounded opening", function()
+		local panel = arena.gatePanel
+		local half = arena.trackWidth / 2
+		local gate = Centerline.frameAt(arena, Centerline.gateDistance(arena, 1))
+		local lowest: { [number]: number } = {}
+		local highest: { [number]: number } = {}
+		local highestInside = -math.huge
+		local deepest = 0
+		for _, piece in Features.gatePanels(arena)[1].pieces do
+			for _, corner in corners(piece) do
+				-- In the gate's frame: x across the track from its middle, z along it.
+				local at = gate:PointToObjectSpace(corner)
+				expect(math.abs(at.Z) <= panel.depth + 1e-3).toBe(true)
+				deepest = math.max(deepest, math.abs(at.Z))
+				local opening = arena.outerWallHeight
+					+ (panel.openingHeight - arena.outerWallHeight) * math.sqrt(math.max(0, 1 - (at.X / half) ^ 2))
+				expect(at.Y > opening - 1e-3 and at.Y < Profile.topOutline(arena, at.X + half) + 1e-3).toBe(true)
+				local x = math.round(at.X)
+				if math.abs(at.X - x) < 1e-3 then
+					lowest[x] = math.min(lowest[x] or math.huge, at.Y)
+					highest[x] = math.max(highest[x] or -math.huge, at.Y)
+				end
+				if math.abs(at.X) <= half - arena.glass.lipRadius + 1e-3 then
+					highestInside = math.max(highestInside, at.Y)
+				end
+			end
+		end
+		expect(lowest[-40]).toBeCloseTo(28, 3)
+		expect(lowest[40]).toBeCloseTo(28, 3)
+		expect(lowest[0]).toBeCloseTo(60, 3)
+		expect(highestInside).toBeCloseTo(120, 3)
+		expect(highest[-40]).toBeCloseTo(108, 3)
+		expect(highest[40]).toBeCloseTo(108, 3)
+		-- gatePanel.depth thick along the track.
+		expect(deepest).toBeCloseTo(panel.depth, 3)
 	end)
 
+	it("builds each panel from gatePanel.segments slices, in gate order", function()
+		local panels = Features.gatePanels(arena)
+		expect(#panels).toBe(Centerline.gateCount)
+		for gate, panel in panels do
+			-- No slice is a rectangle (the opening curves under every one), so each is four wedges.
+			expect(#panel.pieces).toBe(arena.gatePanel.segments * 4)
+			local apex = Centerline.at(arena, Centerline.gateDistance(arena, gate), 40, 60)
+			Fixtures.expectNear(panel.apex.Position, apex.Position)
+			Fixtures.expectNear(panel.apex.LookVector, apex.LookVector)
+		end
+		-- Another even count: no slice is centred on the track's middle, so none is a rectangle there either.
+		local six = Fixtures.config({ Arena = { gatePanel = { segments = 6 } } }).Arena
+		expect(#Features.gatePanels(six)[1].pieces).toBe(6 * 4)
+	end)
+end)
+
+describe("Features spawns and infield", function()
 	it("lines each team up on the lower floor of its straight, mirrored across the long axis", function()
 		local spawns = Features.teamSpawns(arena, 3)
 		expect(#spawns.Blue).toBe(3)

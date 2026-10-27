@@ -42,8 +42,10 @@ local function validate(geometry: Geometry.ArenaGeometry)
 		{ name = "infield", pieces = geometry.infield },
 		{ name = "goal rim", pieces = geometry.goal.rim },
 		{ name = "goal panel", pieces = { geometry.goal.panel } },
-		{ name = "marker", pieces = geometry.markers },
 	}
+	for index, panel in geometry.gatePanels do
+		table.insert(groups, { name = `gate panel {index}`, pieces = panel.pieces })
+	end
 	for _, group in groups do
 		for index, piece in group.pieces do
 			local problem = problemWith(piece)
@@ -84,12 +86,17 @@ local function addSolid(piece: Piece, name: string, color: Color3, parent: Insta
 	return part
 end
 
--- Carries a tag for gameplay code but takes no part in collisions, touches or raycasts.
-local function addGhost(name: string, cframe: CFrame, size: Vector3, transparency: number, parent: Instance): BasePart
-	local part = newPart("Block", name, cframe, size)
+-- Takes no part in collisions, touches or raycasts.
+local function ghost(part: BasePart): BasePart
 	part.CanCollide = false
 	part.CanQuery = false
 	part.CanTouch = false
+	return part
+end
+
+-- Carries a tag for gameplay code but takes no part in collisions, touches or raycasts.
+local function addGhost(name: string, cframe: CFrame, size: Vector3, transparency: number, parent: Instance): BasePart
+	local part = ghost(newPart("Block", name, cframe, size))
 	part.Transparency = transparency
 	part.Parent = parent
 	return part
@@ -146,6 +153,23 @@ local function addTop(pieces: { Piece }, arena: ArenaConfig, parent: Instance)
 		else
 			lookLikeGlass(part, arena)
 		end
+	end
+end
+
+-- The gate panels (R18): glass hanging across the track that nothing hits, sees or touches, so skaters pass through
+-- it. Each is a model carrying CornerMarker and its GateIndex, pivoted at its opening's apex, so ArenaGlow lights it
+-- and the carrier's arrow points at it.
+local function addGatePanels(panels: { Types.GatePanel }, arena: ArenaConfig, parent: Instance)
+	for gate, panel in panels do
+		local model = Instance.new("Model")
+		model.Name = `GatePanel{gate}`
+		for index, piece in panel.pieces do
+			lookLikeGlass(ghost(addSolid(piece, `Pane{index}`, arena.colors.glass, model)), arena)
+		end
+		model.WorldPivot = panel.apex
+		model:SetAttribute(Tags.Attribute.GateIndex, gate)
+		model:AddTag(Tags.CornerMarker)
+		model.Parent = parent
 	end
 end
 
@@ -207,14 +231,7 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 
 	buildGoal(geometry.goal, arena, newFolder("Goal", model))
 
-	local markers = newFolder("Markers", model)
-	for index, piece in geometry.markers do
-		local marker = addSolid(piece, `Marker{index}`, colors.marker, markers)
-		-- A flat panel on the wall: it shows the way and never blocks a skater (A2).
-		marker.CanCollide = false
-		marker:SetAttribute(Tags.Attribute.GateIndex, index)
-		marker:AddTag(Tags.CornerMarker)
-	end
+	addGatePanels(geometry.gatePanels, arena, newFolder("GatePanels", model))
 
 	buildSpawns(geometry, config, newFolder("Spawns", model))
 
