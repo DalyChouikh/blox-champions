@@ -29,6 +29,13 @@ local function folder(arena: Instance, name: string): Folder
 	return arena:FindFirstChild(name) :: Folder
 end
 
+-- The look every glass part takes (R5): the glass's material and transparency, in its colour.
+local function looksLikeGlass(part: BasePart, arena: Config.ArenaConfig): boolean
+	return part.Material == arena.glass.material
+		and part.Color == arena.colors.glass
+		and math.abs(part.Transparency - arena.glass.transparency) < 1e-4
+end
+
 describe("Builder.build", function()
 	it("builds one part per piece, grouped by what it is", function()
 		local geometry = Geometry.build(config)
@@ -96,9 +103,7 @@ describe("Builder.build", function()
 			if
 				not (
 					glass.Anchored
-					and glass.Material == Enum.Material.Glass
-					and glass.Color == config.Arena.colors.glass
-					and math.abs(glass.Transparency - config.Arena.glass.transparency) < 1e-4
+					and looksLikeGlass(glass, config.Arena)
 					and glass.CanCollide
 					and glass.CanQuery
 					and glass.CanTouch
@@ -127,9 +132,7 @@ describe("Builder.build", function()
 					if
 						not (
 							pane.Anchored
-							and pane.Material == Enum.Material.Glass
-							and pane.Color == config.Arena.colors.glass
-							and math.abs(pane.Transparency - config.Arena.glass.transparency) < 1e-4
+							and looksLikeGlass(pane, config.Arena)
 							and not (pane.CanCollide or pane.CanQuery or pane.CanTouch or pane.CastShadow)
 						)
 					then
@@ -155,14 +158,31 @@ describe("Builder.build", function()
 			end
 		end
 		expectTop(Builder.build(Geometry.build(config), config, parent), function(part: BasePart): boolean
-			return part.Material == Enum.Material.Glass
-				and part.Color == config.Arena.colors.glass
-				and math.abs(part.Transparency - config.Arena.glass.transparency) < 1e-4
+			return looksLikeGlass(part, config.Arena)
 		end)
 		local open = Fixtures.config({ Arena = { top = { kind = "Open" } } })
 		expectTop(Builder.build(Geometry.build(open), open, parent), function(part: BasePart): boolean
 			return part.Transparency == 1
 		end)
+	end)
+
+	-- The look is the map's (R5): the default is clear plastic, since Roblox's Glass material hides every non-opaque
+	-- part behind it, and any other look reaches every glass part.
+	it("takes the glass's look from config: the walls, a closed map's roof and the gate panels", function()
+		local custom = Fixtures.config({ Arena = { glass = { material = Enum.Material.Glass, transparency = 0.5 } } })
+		local arena = Builder.build(Geometry.build(custom), custom, parent)
+		local checked = 0
+		for _, name in { "Glass", "Top", "GatePanels" } do
+			for _, child in folder(arena, name):GetDescendants() do
+				if child:IsA("BasePart") then
+					checked += 1
+					if not looksLikeGlass(child, custom.Arena) then
+						error(`{child.Name} in {name} does not take the configured glass look`)
+					end
+				end
+			end
+		end
+		expect(checked > 0).toBe(true)
 	end)
 
 	-- A roof that cast shadows kept the whole track in its shade (seen in a playtest); 120 studs of glass would too.

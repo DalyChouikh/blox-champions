@@ -34,8 +34,10 @@ export type ArenaConfig = {
 	surfaceThickness: number,
 	-- The rideable glass (R5) rising from the inner bank's and the outer wall's tops up to `top` above the lower floor,
 	-- each wall curling inward at the top into a lip (R15): a quarter circle of `lipRadius` in `lipStrips` strips. Its
-	-- slabs are surfaceThickness thick behind its faces, outside the track; it never darkens the track.
-	glass: { top: number, lipRadius: number, lipStrips: number, transparency: number },
+	-- slabs are surfaceThickness thick behind its faces, outside the track; it never darkens the track. It looks like
+	-- `material` at `transparency`, as do a closed map's roof and the gate panels: clear plastic, because Roblox's
+	-- Glass material hides every non-opaque part behind it (the far glass, the gate panels, the carrier's beam).
+	glass: { top: number, lipRadius: number, lipStrips: number, transparency: number, material: Enum.Material },
 	-- The top that closes the arena, set per map (R14): a closed map's roof spans the walls' top between the lips'
 	-- ends; an open map's ceiling stands `ceilingAbove` higher, joined to the lips by strips. Either stops skaters and
 	-- the ball, and neither is ridden.
@@ -85,7 +87,7 @@ local defaults: ArenaConfig = {
 	segmentLength = 4,
 	stripsPerSection = 20,
 	surfaceThickness = 1,
-	glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.7 },
+	glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.85, material = Enum.Material.SmoothPlastic },
 	top = { kind = "Closed", ceilingAbove = 20 },
 	goalGateIndex = 2,
 	goal = {
@@ -143,6 +145,7 @@ local fields = Validate.record({
 		lipRadius = size,
 		lipStrips = Validate.number({ min = 1, integer = true }),
 		transparency = transparency,
+		material = Validate.enumItem(Enum.Material),
 	}),
 	-- The ceiling's height above the walls sizes the strips up to it.
 	top = Validate.record({ kind = Validate.string({ oneOf = { "Closed", "Open" } }), ceilingAbove = partSize }),
