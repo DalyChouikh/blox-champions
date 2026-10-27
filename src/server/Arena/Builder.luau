@@ -125,9 +125,9 @@ local function addTaggedSolids(pieces: { Piece }, name: string, tag: string, col
 end
 
 -- Glass is see-through and casts no shadow, or 120 studs of it would keep the track in its shade (a roof that did was
--- seen in a playtest).
+-- seen in a playtest). Its material is the map's (Config.Arena.glass).
 local function lookLikeGlass(part: BasePart, arena: ArenaConfig)
-	part.Material = Enum.Material.Glass
+	part.Material = arena.glass.material
 	part.Transparency = arena.glass.transparency
 	part.CastShadow = false
 end

@@ -437,7 +437,13 @@ describe("Config defaults", function()
 		expect(a.segmentLength).toBe(4)
 		expect(a.stripsPerSection).toBe(20)
 		expect(a.surfaceThickness).toBe(1)
-		expect(a.glass).toEqual({ top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.7 })
+		expect(a.glass).toEqual({
+			top = 120,
+			lipRadius = 12,
+			lipStrips = 4,
+			transparency = 0.85,
+			material = Enum.Material.SmoothPlastic,
+		})
 		expect(a.top).toEqual({ kind = "Closed", ceilingAbove = 20 })
 		expect(a.goalGateIndex).toBe(2)
 		expect(a.goal).toEqual({
@@ -648,6 +654,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { top = { kind = "Lid" } },
 				message = 'Arena.top.kind: must be one of Closed, Open (got "Lid")',
+			},
+			{
+				overrides = { glass = { material = "Glass" } },
+				message = 'Arena.glass.material: must be a Material (got "Glass")',
 			},
 		}
 		for _, case in cases do
