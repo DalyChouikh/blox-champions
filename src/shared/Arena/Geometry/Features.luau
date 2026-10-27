@@ -1,7 +1,7 @@
 --!strict
--- Everything in the arena besides the riding surface (spec §9.1, Arena spec §5): the glass on the two tops, the top
--- that closes the arena (a roof, or an open map's ceiling), the lap gates, the raised goal ring and its panel, the
--- corner markers, the team and ball spawns, and the infield floor.
+-- Everything in the arena besides the solid riding surface (spec §9.1, Arena spec §5): the rideable glass walls with
+-- their lips, the top that closes the arena (a roof, or an open map's ceiling), the lap gates, the raised goal ring and
+-- its panel, the corner markers, the team and ball spawns, and the infield floor.
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
@@ -39,16 +39,13 @@ local function sweepFixed(arena: ArenaConfig, section: { Vector2 }, thickness: n
 	return Surface.sweep(rings, thickness)
 end
 
--- The glass (A7): two vertical strips swept around the loop, the inner one standing on the bank's top and the outer
--- one on the outer wall's top, both up to barrier.top. Each runs the way the profile does (down the inner glass, up
--- the outer one), so its slab hangs barrier.thickness behind its face, outside the track. Every strip between two
--- stations is a flat rectangle: one block per station step around the ends, one per side along each straight.
-function Features.barriers(arena: ArenaConfig): { Piece }
-	local top, width, thickness = arena.barrier.top, arena.trackWidth, arena.barrier.thickness
-	local inner = { Vector2.new(0, top), Vector2.new(0, arena.innerBankHeight) }
-	local outer = { Vector2.new(width, arena.outerWallHeight), Vector2.new(width, top) }
-	local pieces = sweepFixed(arena, inner, thickness)
-	for _, piece in sweepFixed(arena, outer, thickness) do
+-- The rideable glass (R5, R15): the inner and the outer glass sections, each rising from a solid top and curling into
+-- its lip, swept around the loop with their slabs surfaceThickness behind their faces, outside the track. A vertical
+-- face between two stations is a flat rectangle (one block per station step around the ends, one per side along each
+-- straight); a lip's strips run whole along the straights and are wedges around the ends.
+function Features.glass(arena: ArenaConfig): { Piece }
+	local pieces = sweepFixed(arena, Profile.innerGlass(arena), arena.surfaceThickness)
+	for _, piece in sweepFixed(arena, Profile.outerGlass(arena), arena.surfaceThickness) do
 		table.insert(pieces, piece)
 	end
 	return pieces
@@ -219,12 +216,12 @@ function Features.ballSpawns(arena: ArenaConfig): { CFrame }
 end
 
 -- The infield floor behind the inner glass (Arena spec §5.5): a slab surfaceThickness thick, its top at the lower
--- floor's height, meeting the back of the glass's slab (barrier.thickness behind its face) instead of overlapping it:
+-- floor's height, meeting the back of the glass's slab (surfaceThickness behind its face) instead of overlapping it:
 -- a block between the straights, and under each curved end a fan of prisms from the end's center to the glass's back
 -- at every station, because the glass there is flat strips, not a circle. It is no ride surface: no skater reaches it.
 function Features.infield(arena: ArenaConfig): { Piece }
-	local behindGlass = -arena.barrier.thickness
 	local thickness = arena.surfaceThickness
+	local behindGlass = -thickness
 	local pieces: { Piece } = {
 		{
 			shape = "Block",
@@ -232,7 +229,7 @@ function Features.infield(arena: ArenaConfig): { Piece }
 			size = Vector3.new(
 				arena.straightLength,
 				thickness,
-				2 * (arena.endRadius - arena.trackWidth / 2 - arena.barrier.thickness)
+				2 * (arena.endRadius - arena.trackWidth / 2 + behindGlass)
 			),
 		},
 	}

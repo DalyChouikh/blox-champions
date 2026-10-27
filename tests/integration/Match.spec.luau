@@ -586,7 +586,7 @@ describe("A match on the generated arena", function()
 		-- A free ball moving along the outside of the track (over the upper floor): the catch scan and the bounds check
 		-- every frame.
 		for step = 1, 300 do
-			BallService.part.CFrame = Centerline.at(config.Arena, from + step, MIDDLE + 13, 8)
+			BallService.part.CFrame = Centerline.at(config.Arena, from + step, MIDDLE + 18, 8)
 			local started = os.clock()
 			MatchService:step(FRAME)
 			total += os.clock() - started

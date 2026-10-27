@@ -1,8 +1,8 @@
 --!strict
 -- The riding surface: the cross-section swept around the centerline. At every station the profile (with the step
 -- blended to that station's height) is placed across the track; each strip between two neighboring stations is a
--- quad, built as one block when it is a flat rectangle and as two wedge-pair triangles otherwise. The glass on the
--- tops is swept the same way (Features.barriers).
+-- quad, built as one block when it is a flat rectangle and as two wedge-pair triangles otherwise. The glass and the
+-- top are swept the same way (Features).
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
