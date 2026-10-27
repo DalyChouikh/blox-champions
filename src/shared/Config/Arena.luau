@@ -69,7 +69,7 @@ export type ArenaConfig = {
 	gateThickness: number,
 	spawnPad: { width: number, thickness: number, transparency: number },
 	ballSpawnSize: number,
-	-- glass: the glass walls' and a closed map's roof.
+	-- glass: the glass walls', a closed map's roof and the gate walls.
 	colors: { surface: Color3, infield: Color3, goal: Color3, glass: Color3 },
 }
 

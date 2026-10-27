@@ -21,7 +21,7 @@ export type ArenaGeometry = {
 	infield: { Piece },
 	gates: { Crossing.Rectangle },
 	goal: Types.Goal,
-	-- The glass panels hanging at the gates, by gate index.
+	-- The thin glass walls across the track at the gates, by gate index.
 	gatePanels: { Types.GatePanel },
 	teamSpawns: Types.TeamSpawns,
 	ballSpawns: { CFrame },

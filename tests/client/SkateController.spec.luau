@@ -496,13 +496,15 @@ describe("SkateController", function()
 	end)
 end)
 
--- The controller over an arc of roof (A3): its ray returns the arc's normal, and the test drives the skater along it.
-describe("SkateController over the roof", function()
+-- The controller over an overhang's arc (A3, the rule the glass's lips use): its ray returns the arc's normal, and
+-- the test drives the skater along it.
+describe("SkateController over an overhang", function()
 	local RADIUS = 22
 	local DT = 1 / 60
 
-	-- Whether the skater stays on from level up to the top of the arc at `speed`. With `strips`, the roof is that many
-	-- flat strips over the half circle, as the arena builds it, so the ray's normal turns only at strip edges.
+	-- Whether the skater stays on from a wall up to the top of the arc at `speed`. With `strips`, the arc is that many
+	-- flat strips over a half circle, as the arena builds its lips of flat strips, so the ray's normal turns only at
+	-- strip edges.
 	local function holdsOverTheTop(speed: number, strips: number?): boolean
 		local phi = 0
 		setup({
@@ -530,12 +532,12 @@ describe("SkateController over the roof", function()
 		return true
 	end
 
-	it("holds a skater over the top of the roof at 70 studs/s and drops one at 60, as the loop rule says", function()
+	it("holds a skater over the top of the arc at 70 studs/s and drops one at 60, as the loop rule says", function()
 		expect(holdsOverTheTop(70)).toBe(true)
 		expect(holdsOverTheTop(60)).toBe(false)
 	end)
 
-	it("does the same over the arena's roof of 21 flat strips, through its own normal filter", function()
+	it("does the same over an arc of 21 flat strips, through its own normal filter", function()
 		expect(holdsOverTheTop(70, 21)).toBe(true)
 		expect(holdsOverTheTop(60, 21)).toBe(false)
 	end)

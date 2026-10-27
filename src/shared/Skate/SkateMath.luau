@@ -206,7 +206,7 @@ local function measure(self: Skater, normal: Vector3, dt: number): (number, numb
 end
 
 -- How sharply the surface bends around the skater, 1/radius, from the turns of the last curvatureWindow studs of
--- path. Across the arena roof's flat strips the ground turns only at each strip's edge, so the curve is the turning
+-- path. Across a lip's flat strips the ground turns only at each strip's edge, so the curve is the turning
 -- between the oldest and the newest turn in the window over the road between them: one strip's angle per strip's
 -- width, the arc they make. On a smooth curve every step turns, and this is the turn per stud. With fewer than two
 -- turns in the window it is the turning over the window's road. Zero until a grounded step has measured a turn.

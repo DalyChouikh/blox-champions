@@ -162,7 +162,7 @@ describe("Builder.build", function()
 		end)
 		local open = Fixtures.config({ Arena = { top = { kind = "Open" } } })
 		expectTop(Builder.build(Geometry.build(open), open, parent), function(part: BasePart): boolean
-			return part.Transparency == 1
+			return part.Transparency == 1 and not part.CastShadow
 		end)
 	end)
 

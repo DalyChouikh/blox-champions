@@ -1,7 +1,7 @@
 --!strict
 -- The chase camera's state (spec §8.4), stepped each frame: which way is up, the heading on the plane that up defines,
 -- the pitch above or below it, and the field of view. Up rolls toward the surface the skater rides, so on a wall the
--- view tilts and over the roof it loops (owner, 2026-10-23); the heading rides along with the roll. The look input
+-- view tilts and over an overhang it loops (owner, 2026-10-23); the heading rides along with the roll. The look input
 -- turns and tips it. Ball Focus turns it toward the ball; otherwise, on a device that allows it, it swings back behind
 -- the skater's travel once the look input has rested. Every response closes 1 − e^(−rate × dt) of its gap. Vector3
 -- math only: a step allocates nothing.

@@ -117,9 +117,10 @@ local function checkFit(arena: ArenaConfig, corners: { Vector2 }, lateral: numbe
 	end
 	local surface = Surface.section(arena, gateDistance)
 	for _, corner in corners do
-		-- The riding surface under the corner, or nil at a wall.
-		local floor = Profile.heightAt(surface, lateral + corner.X)
-		if floor == nil or arena.goal.heightAboveFloor + corner.Y <= floor then
+		-- The riding surface under the corner: past the glass check every corner lies between the glass faces, where
+		-- the section has a height.
+		local floor = Profile.heightAt(surface, lateral + corner.X) :: number
+		if arena.goal.heightAboveFloor + corner.Y <= floor then
 			fail("the goal ring must clear the track's surface at the goal gate")
 		end
 	end

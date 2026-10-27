@@ -34,8 +34,8 @@ export type MovementConfig = {
 	-- On a surface steeper than maxStickAngle, a skater slower than minWallSpeed falls off.
 	minWallSpeed: number,
 	maxStickAngle: number,
-	-- How far back along the skater's path the curve of an overhang is measured (A3): a few of the roof's flat strips,
-	-- so a roof of strips reads as the arc it makes, yet short enough to follow a curve from where it starts.
+	-- How far back along the skater's path the curve of an overhang is measured (A3): a few of a lip's flat strips,
+	-- so a curve of strips reads as the arc it makes, yet short enough to follow a curve from where it starts.
 	curvatureWindow: number,
 	pumpSlopeMultiplier: number,
 	pumpFlatAccel: number,
