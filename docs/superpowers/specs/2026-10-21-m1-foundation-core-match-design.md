@@ -321,6 +321,8 @@ The gamepad layout mirrors Roller Champions' console layout (Ball Focus / Charge
 
 Third-person chase camera with mouse lock. `Camera.distance = 12`, `Camera.height = 4`, FOV from `fovBase = 70` to `fovMax = 90` scaled by speed toward `hardCap`. Ball Focus rotates the camera to keep the ball in frame while staying behind the player. Spectators get a camera that follows the ball.
 
+**Tilt (#223).** The camera's up rolls toward the surface the skater rides at `rollResponse`, but leans at most `Camera.maxTiltDeg = 30`° from world up. On the glass the floor never stands up on screen, and over a lip the view never turns past sideways or loops. Under a surface facing straight down it keeps the lean it has, and it rolls back level when the surface flattens. *The owner picked 30° from Studio screenshots at 0–90°. Roller Champions, judged by eye: about 15–30° in the owner's own games, 60–90° in ranked players' glass rides. Before this, the camera rolled all the way with the surface and looped over overhangs.* The validator keeps the limit under 90°, so two ups the camera may take are never opposite and a roll always has an axis. The stick still follows the screen: `SkateController` lays the camera's right and look on the skater's surface, so on the glass, pushing toward the wall climbs it at full strength under a leaning camera too.
+
 ### 8.5 Roblox defaults that conflict with our bindings
 
 - Roblox's Shift Lock option uses Shift, which we bind to Pump → `StarterPlayer.EnableMouseLockOption = false` (our camera handles mouse lock).

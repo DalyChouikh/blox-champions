@@ -328,15 +328,20 @@ describe("SkateController", function()
 		expect(math.abs(velocity.Z)).toBeLessThan(0.2 * movement.attachBoostSpeed)
 	end)
 
-	it("steers along the screen on a wall, as the rolled camera shows it", function()
-		-- A camera rolled onto a wall whose up is -X, looking along -Z: its right is +Y, up the wall.
-		setup({ Camera = { CFrame = CFrame.lookAlong(Vector3.zero, -Vector3.zAxis, -Vector3.xAxis) } })
-		SkateController:bind(rig)
-		local skater = SkateController.skater :: any
-		skater.up = -Vector3.xAxis
-		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(1, 0))
-		SkateController:step(1 / 60)
-		Fixtures.expectNear(SkateController.move, Vector3.new(0, 1, 0))
+	it("steers along the screen on a wall, as the camera shows it rolled or only leaning", function()
+		-- Both cameras look along -Z beside a wall whose up is -X. Rolled onto it, the camera's right is +Y, up the
+		-- wall. Leaning only Camera.maxTiltDeg (30°) toward it (#223), its right is (cos 30°, sin 30°, 0), mostly into
+		-- the wall: laid on the wall it still points straight up, at full strength.
+		local leaning = Vector3.new(-math.sin(math.rad(30)), math.cos(math.rad(30)), 0)
+		for _, up in { -Vector3.xAxis, leaning } do
+			setup({ Camera = { CFrame = CFrame.lookAlong(Vector3.zero, -Vector3.zAxis, up) } })
+			SkateController:bind(rig)
+			local skater = SkateController.skater :: any
+			skater.up = -Vector3.xAxis
+			Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(1, 0))
+			SkateController:step(1 / 60)
+			Fixtures.expectNear(SkateController.move, Vector3.new(0, 1, 0))
+		end
 	end)
 
 	it("lets go of an attach without its boost when Roblox's menu opens", function()
