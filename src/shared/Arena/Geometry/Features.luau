@@ -1,7 +1,7 @@
 --!strict
 -- Everything in the arena besides the solid riding surface (spec §9.1, Arena spec §5): the rideable glass walls with
--- their lips, the top that closes the arena (a roof, or an open map's ceiling), the lap gates, the raised goal ring and
--- its panel, the glass panels hanging at the gates, the team and ball spawns, and the infield floor.
+-- their lips, the top that closes the arena (a roof, or an open map's ceiling), the lap gates, the goal ring hanging
+-- from its arm with its panel, the glass panels hanging at the gates, the team and ball spawns, and the infield floor.
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
@@ -100,37 +100,65 @@ local function reach(corners: { Vector2 }, direction: Vector2): number
 	return farthest
 end
 
--- The ring must fit inside the track's cross-section at the goal gate, judged by its real outline against the
--- surface as built (the step half blended there, the wall's foot curve as strips).
+-- The height of the rim's top: segment 0 faces straight up, so the outline is flat there, where the arm's post stands.
+local function rimTop(arena: ArenaConfig): number
+	local goal = arena.goal
+	return goal.heightAboveFloor + goal.ringRadius + goal.rimThickness
+end
+
+-- The ring must hang inside the track's cross-section at the goal gate, judged by its real outline (its corners)
+-- against the glass faces and the surface as built (the step half blended there, the wall's foot curve as strips),
+-- and under its arm, whose beam must stay under the lips.
 local function checkFit(arena: ArenaConfig, corners: { Vector2 }, lateral: number, gateDistance: number)
-	local height = arena.goal.heightAboveFloor
-	if lateral - reach(corners, -Vector2.xAxis) < 0 then
-		fail("the goal ring must fit across the track")
-	end
-	if
-		height - reach(corners, -Vector2.yAxis) < arena.stepHeight
-		or height + reach(corners, Vector2.yAxis) > arena.outerWallHeight
-	then
-		fail("the goal ring must sit between the upper floor and the outer wall top")
+	if lateral - reach(corners, -Vector2.xAxis) < 0 or lateral + reach(corners, Vector2.xAxis) > arena.trackWidth then
+		fail("the goal ring must stay inside the glass")
 	end
 	local surface = Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, gateDistance))
 	for _, corner in corners do
 		-- The riding surface under the corner, or nil at a wall.
 		local floor = Profile.heightAt(surface, lateral + corner.X)
-		if floor == nil or height + corner.Y <= floor then
+		if floor == nil or arena.goal.heightAboveFloor + corner.Y <= floor then
 			fail("the goal ring must clear the track's surface at the goal gate")
 		end
 	end
+	local armHeight = arena.goal.arm.height
+	if rimTop(arena) >= armHeight then
+		fail("the goal ring must hang under its arm")
+	end
+	if armHeight >= arena.glass.top - arena.glass.lipRadius then
+		fail("the goal's arm must stay under the lips")
+	end
 end
 
--- The ring stands on the goal gate's plane with its outline wallGap from the outer wall face, so it sits on the
--- carrier's right shoulder and its front faces oncoming skaters.
+-- The arm the ring hangs from (Arena spec §5.3), in the goal gate's plane: a post from the rim's top up to arm.height,
+-- then a beam at that height from over the ring's centre out to the outer glass's face. It is decoration that the art
+-- pass replaces.
+local function arm(arena: ArenaConfig, gateDistance: number, lateral: number): { Piece }
+	local thickness, height = arena.goal.arm.thickness, arena.goal.arm.height
+	local base = rimTop(arena)
+	local beamLength = arena.trackWidth - lateral
+	return {
+		{
+			shape = "Block",
+			cframe = Centerline.at(arena, gateDistance, lateral, (base + height) / 2),
+			size = Vector3.new(thickness, height - base, thickness),
+		},
+		{
+			shape = "Block",
+			cframe = Centerline.at(arena, gateDistance, lateral + beamLength / 2, height),
+			size = Vector3.new(beamLength, thickness, thickness),
+		},
+	}
+end
+
+-- The ring hangs over the track in the goal gate's plane (R7), its centre goal.across of the way from the inner glass's
+-- face to the outer one, its front facing oncoming skaters.
 function Features.goal(arena: ArenaConfig): Types.Goal
 	local goal = arena.goal
 	local outerRadius = goal.ringRadius + goal.rimThickness
 	local corners = rimCorners(arena)
 	local gateDistance = Centerline.gateDistance(arena, arena.goalGateIndex)
-	local lateral = arena.trackWidth - goal.wallGap - reach(corners, Vector2.xAxis)
+	local lateral = goal.across * arena.trackWidth
 	checkFit(arena, corners, lateral, gateDistance)
 	local frame = Centerline.at(arena, gateDistance, lateral, goal.heightAboveFloor)
 
@@ -157,6 +185,7 @@ function Features.goal(arena: ArenaConfig): Types.Goal
 			cframe = frame * CFrame.Angles(0, math.pi / 2, 0),
 			size = Vector3.new(goal.panelThickness, 2 * goal.ringRadius, 2 * goal.ringRadius),
 		},
+		arm = arm(arena, gateDistance, lateral),
 	}
 end
 
