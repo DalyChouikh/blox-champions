@@ -3,6 +3,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local GeometryTypes = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
@@ -28,6 +29,13 @@ export type Screen = { hud: Rect, controls: Rect }
 
 -- Roblox's default workspace.Gravity, pointing down.
 Fixtures.GRAVITY = Vector3.new(0, -196.2, 0)
+
+-- A point outside the arena: 10 studs past the outer glass's face and 5 up, at the top straight's middle. The ball
+-- there is out, and a skater there is placed back on their spawn.
+function Fixtures.outsideArena(config: Config.GameConfig): Vector3
+	local arena = config.Arena
+	return Centerline.at(arena, arena.straightLength / 2, arena.trackWidth + 10, 5).Position
+end
 
 -- The emulated iPhone 17 Pro in landscape (probed in Play), and a big screen, whose touch area is 1280 x 800 (the
 -- touch buttons grow 1.5 times there).

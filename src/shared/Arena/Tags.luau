@@ -11,8 +11,12 @@ local Tags = {
 	TeamSpawn = "TeamSpawn",
 	BallSpawn = "BallSpawn",
 	CornerMarker = "CornerMarker",
-	-- On the folders of surfaces skaters ride (the track, its roof, the infield top): the only things their rays hit.
+	-- On the folder of surfaces skaters ride (the floors, the inner bank and the outer wall): the only things their
+	-- rays hit.
 	RideSurface = "RideSurface",
+	-- On the folder of glass on the arena's tops (A7): skaters and the ball bounce off it, and only a skater's collider
+	-- sweep sees it; every ray looks through it.
+	Barrier = "Barrier",
 	-- On the ball's part, so clients find the ball the server built.
 	Ball = "Ball",
 	Attribute = {

@@ -17,8 +17,8 @@ export type NetworkConfig = {
 	guardStrikes: number,
 	-- A move this many times the allowed distance in one sample returns the skater at once.
 	guardTeleportFactor: number,
-	-- How far outside the arena's tube (past a wall, under the floor, over the roof) a skater's root may be before the
-	-- guard puts them back on their team's spawn.
+	-- How far outside the arena (past either glass or under the floor: Bounds.inArena) a skater's root may be before
+	-- the guard puts them back on their team's spawn.
 	guardOutsideMargin: number,
 	-- How many action requests a client may send (a burst of this many, refilled per second).
 	maxActionsPerSecond: number,

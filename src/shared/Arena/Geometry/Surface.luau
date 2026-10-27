@@ -1,7 +1,8 @@
 --!strict
 -- The riding surface: the cross-section swept around the centerline. At every station the profile (with the step
 -- blended to that station's height) is placed across the track; each strip between two neighboring stations is a
--- quad, built as one block when it is a flat rectangle and as two wedge-pair triangles otherwise.
+-- quad, built as one block when it is a flat rectangle and as two wedge-pair triangles otherwise. The glass on the
+-- tops is swept the same way (Features.barriers).
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
@@ -62,12 +63,28 @@ function Surface.quadPieces(p00: Vector3, p10: Vector3, p01: Vector3, p11: Vecto
 	return pieces
 end
 
--- The strips between profile points first..last, around the whole loop. Neighboring rectangles that continue each
+-- The cross-section `section(distance)` gives (points (u, y), as Profile's) placed across the track at every station
+-- around the loop: one ring of world points per station.
+function Surface.rings(arena: ArenaConfig, section: (distance: number) -> { Vector2 }): { { Vector3 } }
+	local rings: { { Vector3 } } = {}
+	for _, distance in Centerline.stations(arena) do
+		local ring: { Vector3 } = {}
+		for _, point in section(distance) do
+			table.insert(ring, Centerline.at(arena, distance, point.X, point.Y).Position)
+		end
+		table.insert(rings, ring)
+	end
+	return rings
+end
+
+-- The strips between every two neighboring points of the rings, around the whole loop, each slab `thickness` behind
+-- the side a strip faces: the side to the left of the ring's direction, seen along the travel direction (into the
+-- track for a profile run from the inner top across to the outer top). Neighboring rectangles that continue each
 -- other in a straight line (a strip whose cross-section does not change along a straight) merge into one long block:
 -- fewer parts, and no seams across the strip for a rolling ball to bump on.
-local function sweep(rings: { { Vector3 } }, thickness: number, first: number, last: number): { Piece }
+function Surface.sweep(rings: { { Vector3 } }, thickness: number): { Piece }
 	local pieces: { Piece } = {}
-	for point = first, last do
+	for point = 1, #rings[1] - 1 do
 		-- The open run of rectangles: its first quad's near edge, and its far edge so far.
 		local runStart: { Vector3 }? = nil
 		local runEnd: { Vector3 }? = nil
@@ -104,24 +121,12 @@ local function sweep(rings: { { Vector3 } }, thickness: number, first: number, l
 	return pieces
 end
 
--- The riding surface in two lists (A2): the walls and floors, and the roof, which gets its own folder in the Builder.
--- The profile's roof is its last strips, from the outer wall's top to the inner wall's top.
-function Surface.build(arena: ArenaConfig): { surface: { Piece }, roof: { Piece } }
-	local rings: { { Vector3 } } = {}
-	for _, distance in Centerline.stations(arena) do
-		local ring: { Vector3 } = {}
-		for _, point in Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, distance)) do
-			table.insert(ring, Centerline.at(arena, distance, point.X, point.Y).Position)
-		end
-		table.insert(rings, ring)
-	end
-
-	local thickness = arena.surfaceThickness
-	local roofEdge = Profile.roofEdge(arena)
-	return {
-		surface = sweep(rings, thickness, 1, roofEdge - 1),
-		roof = sweep(rings, thickness, roofEdge, #rings[1] - 1),
-	}
+-- The riding surface: the floors, the inner bank and the outer wall, from the bank's top to the outer wall's top.
+function Surface.build(arena: ArenaConfig): { Piece }
+	local rings = Surface.rings(arena, function(distance: number): { Vector2 }
+		return Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, distance))
+	end)
+	return Surface.sweep(rings, arena.surfaceThickness)
 end
 
 return Surface

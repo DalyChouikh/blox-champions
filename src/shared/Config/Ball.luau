@@ -16,7 +16,8 @@ export type BallConfig = {
 	rethrowPickupDelay: number,
 	-- A ball nobody has held for this long respawns at a ball spawn.
 	ballIdleResetSeconds: number,
-	-- How far past the outer wall, below the floor or onto the infield the ball's center may go before it is out.
+	-- How far past either glass, below the floor or over the glass top (Bounds.inArena) the ball's center may go before
+	-- it is out.
 	outOfBoundsMargin: number,
 	-- Where a carried ball sits in its carrier's root frame: at their right side, clear of the floor and the legs.
 	carryOffset: Vector3,

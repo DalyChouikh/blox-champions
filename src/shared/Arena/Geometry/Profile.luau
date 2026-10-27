@@ -1,18 +1,18 @@
 --!strict
--- The track's cross-section (spec §9.1) as points (u, y): u is the lateral distance from the inner wall face toward
--- the outer wall, y the height above the lower floor. Eight pieces, from the inner wall top down and across:
--- the inner wall, its foot curve, the lower floor, the step, the upper floor, the outer wall's foot curve, the
--- outer wall and the roof, an arc back over to the inner wall top (A2: the tube closes). Every cross-section has the
--- same point layout and only the step's height changes, so the straights' stepped profile blends point by point into
--- the curved ends' flat one.
+-- The track's cross-section (Arena spec §3.1) as points (u, y): u is the lateral distance from the inner glass's face
+-- toward the outer glass, y the height above the lower floor. Six pieces, from the inner bank's top down and across:
+-- the inner bank (a quarter circle, vertical where the glass stands on it), the lower floor, the step, the upper
+-- floor, the outer wall's foot curve and the outer wall, up to its top. The top is open: glass stands on the two tops
+-- (Features.barriers). Every cross-section has the same point layout and only the step's height changes, so the
+-- straights' stepped profile blends point by point into the curved ends' flat one.
 
 local Config = require(script.Parent.Parent.Parent.Config)
 
 type ArenaConfig = Config.ArenaConfig
 type Piece = (t: number) -> Vector2
 
--- The wall feet, the step and the roof share the strips left after one per straight piece, by length.
-local CURVED_PIECES = { 2, 4, 6, 8 }
+-- The bank, the step and the outer wall's foot share the strips left after one per piece, by length.
+local CURVED_PIECES = { 1, 3, 5 }
 local LENGTH_SEGMENTS = 64
 
 local Profile = {}
@@ -30,43 +30,23 @@ local function arc(center: Vector2, radius: number, fromAngle: number, toAngle: 
 	end
 end
 
--- The roof's circle, in the profile's (u, y): its centre (u, y) is the midpoint of the two wall tops and its radius
--- half their distance, so the arc is a half circle when the walls are level (the owner's enclosed arena). Plain
--- numbers, because Bounds.inTube reads it on each check over the wall tops and a Vector2 is a heap object.
-function Profile.roofCircle(arena: ArenaConfig): (number, number, number)
-	local width, rise = arena.trackWidth, arena.outerWallHeight - arena.infieldWallHeight
-	return width / 2, arena.infieldWallHeight + rise / 2, math.sqrt(width * width + rise * rise) / 2
-end
-
-local function roofArc(arena: ArenaConfig): Piece
-	local centerU, centerY, radius = Profile.roofCircle(arena)
-	local from = math.atan2(arena.outerWallHeight - centerY, arena.trackWidth - centerU)
-	local to = math.atan2(arena.infieldWallHeight - centerY, -centerU)
-	if to < from then
-		to += 2 * math.pi
-	end
-	return arc(Vector2.new(centerU, centerY), radius, from, to)
-end
-
 local function stepStart(arena: ArenaConfig): number
 	return arena.trackWidth - arena.wallCurveRadius - arena.upperFloorWidth - arena.stepWidth
 end
 
 local function pieces(arena: ArenaConfig, stepHeight: number): { Piece }
-	local width, radius = arena.trackWidth, arena.wallCurveRadius
+	local width, radius, bank = arena.trackWidth, arena.wallCurveRadius, arena.innerBankHeight
 	local stepFrom = stepStart(arena)
 	local stepTo = stepFrom + arena.stepWidth
 	return {
-		line(Vector2.new(0, arena.infieldWallHeight), Vector2.new(0, radius)),
-		arc(Vector2.new(radius, radius), radius, math.pi, 1.5 * math.pi),
-		line(Vector2.new(radius, 0), Vector2.new(stepFrom, 0)),
+		arc(Vector2.new(bank, bank), bank, math.pi, 1.5 * math.pi),
+		line(Vector2.new(bank, 0), Vector2.new(stepFrom, 0)),
 		function(t: number): Vector2
 			return Vector2.new(stepFrom + t * arena.stepWidth, stepHeight * (1 - math.cos(math.pi * t)) / 2)
 		end,
 		line(Vector2.new(stepTo, stepHeight), Vector2.new(width - radius, stepHeight)),
 		arc(Vector2.new(width - radius, stepHeight + radius), radius, 1.5 * math.pi, 2 * math.pi),
 		line(Vector2.new(width, stepHeight + radius), Vector2.new(width, arena.outerWallHeight)),
-		roofArc(arena),
 	}
 end
 
@@ -136,25 +116,9 @@ function Profile.points(arena: ArenaConfig, stepHeight: number): { Vector2 }
 	return points
 end
 
--- The highest point of the roof: the apex of its circle. The lap gates are as tall as it.
-function Profile.roofTop(arena: ArenaConfig): number
-	local _, centerY, radius = Profile.roofCircle(arena)
-	return centerY + radius
-end
-
--- The point where the roof starts, at the outer wall's top: the roof's strips run from here to the last point.
-function Profile.roofEdge(arena: ArenaConfig): number
-	local counts = Profile.stripCounts(arena)
-	local before = 1
-	for index = 1, #counts - 1 do
-		before += counts[index]
-	end
-	return before
-end
-
 -- The middle of the lower floor: the lane the team spawns line up on.
 function Profile.lowerFloorCenter(arena: ArenaConfig): number
-	return (arena.wallCurveRadius + stepStart(arena)) / 2
+	return (arena.innerBankHeight + stepStart(arena)) / 2
 end
 
 return Profile

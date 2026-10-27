@@ -419,19 +419,20 @@ describe("Config defaults", function()
 
 	it("match the spec's arena layout", function()
 		local a = Config.defaults().Arena
-		expect(a.straightLength).toBe(160)
-		expect(a.endRadius).toBe(60)
-		expect(a.trackWidth).toBe(44)
+		expect(a.straightLength).toBe(200)
+		expect(a.endRadius).toBe(70)
+		expect(a.trackWidth).toBe(60)
 		expect(a.outerWallHeight).toBe(28)
-		expect(a.infieldWallHeight).toBe(28)
-		expect(a.wallCurveRadius).toBe(10)
+		expect(a.innerBankHeight).toBe(8)
+		expect(a.wallCurveRadius).toBe(14)
 		expect(a.stepHeight).toBe(4)
-		expect(a.stepWidth).toBe(10)
-		expect(a.upperFloorWidth).toBe(4)
+		expect(a.stepWidth).toBe(14)
+		expect(a.upperFloorWidth).toBe(6)
 		expect(a.profileBlendLength).toBe(20)
 		expect(a.segmentLength).toBe(4)
-		expect(a.stripsPerSection).toBe(40)
+		expect(a.stripsPerSection).toBe(20)
 		expect(a.surfaceThickness).toBe(1)
+		expect(a.barrier).toEqual({ top = 85, thickness = 1, transparency = 0.7 })
 		expect(a.goalGateIndex).toBe(2)
 		expect(a.goal).toEqual({
 			ringRadius = 7,
@@ -462,6 +463,7 @@ describe("Config defaults", function()
 			infield = Color3.fromRGB(99, 95, 98),
 			goal = Color3.fromRGB(248, 248, 248),
 			marker = Color3.fromRGB(27, 42, 53),
+			glass = Color3.fromRGB(200, 225, 240),
 		})
 	end)
 
@@ -559,23 +561,39 @@ describe("Config.forMode", function()
 	it("rejects arena sizes that cannot be built", function()
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			{
-				overrides = { trackWidth = 30 },
-				message = "Arena: trackWidth must fit both wall curves, the step, the upper floor and a lower floor",
+				overrides = { trackWidth = 40 },
+				message = "Arena: trackWidth must fit the inner bank, the outer wall's foot curve, the step, the upper "
+					.. "floor and a lower floor",
 			},
 			{
-				overrides = { endRadius = 22 },
-				message = "Arena: endRadius must leave room for the infield behind the inner wall",
+				overrides = { endRadius = 30 },
+				message = "Arena: endRadius must leave room for the infield behind the inner glass",
 			},
 			{
-				overrides = { infieldWallHeight = 10 },
-				message = "Arena: each wall must rise above the curve at its foot",
+				-- 1.2 studs behind the inner glass's face: room for a surface slab (1), not for this glass (1.5).
+				overrides = { endRadius = 31.2, barrier = { thickness = 1.5 } },
+				message = "Arena: endRadius must leave room for the infield behind the inner glass",
 			},
 			{
-				overrides = { profileBlendLength = 200 },
+				overrides = { wallCurveRadius = 25 },
+				message = "Arena: the outer wall must rise above its foot curve and the step",
+			},
+			{
+				overrides = { barrier = { top = 20 } },
+				message = "Arena: the glass must rise above the inner bank's and the outer wall's tops",
+			},
+			{
+				-- Over the outer wall (28), under a bank of 30 on a track wide enough for it.
+				overrides = { innerBankHeight = 30, trackWidth = 80, barrier = { top = 29 } },
+				message = "Arena: the glass must rise above the inner bank's and the outer wall's tops",
+			},
+			{
+				-- Longer than a straight (200), so the blends at its two ends would overlap.
+				overrides = { profileBlendLength = 250 },
 				message = "Arena: profileBlendLength must fit within a straight and a curved end",
 			},
 			{ overrides = { goal = { wallGap = 0 } }, message = "Arena.goal.wallGap: must be > 0 (got 0)" },
-			{ overrides = { stripsPerSection = 6 }, message = "Arena.stripsPerSection: must be >= 7 (got 6)" },
+			{ overrides = { stripsPerSection = 5 }, message = "Arena.stripsPerSection: must be >= 6 (got 5)" },
 			{ overrides = { goalGateIndex = 5 }, message = "Arena.goalGateIndex: must be <= 4 (got 5)" },
 		}
 		for _, case in cases do
@@ -598,6 +616,10 @@ describe("Config.forMode", function()
 				message = "Arena.goal.panelThickness: must be >= 0.001 (got 0.0005)",
 			},
 			{ overrides = { marker = { height = 2500 } }, message = "Arena.marker.height: must be <= 2048 (got 2500)" },
+			{
+				overrides = { barrier = { thickness = 0.0005 } },
+				message = "Arena.barrier.thickness: must be >= 0.001 (got 0.0005)",
+			},
 		}
 		for _, case in cases do
 			expect(function()
@@ -812,11 +834,13 @@ describe("Config.forMode", function()
 	end)
 
 	it("rejects team spawns that would not fit on a straight", function()
+		-- Six spawns span five spacings: exactly a straight's length fits, any more does not.
+		local fits = Config.defaults().Arena.straightLength / 5
 		expect(function()
-			Fixtures.config({ Match = { teamSize = 6 }, Arena = { teamSpawnSpacing = 40 } })
+			Fixtures.config({ Match = { teamSize = 6 }, Arena = { teamSpawnSpacing = fits + 1 } })
 		end).toThrow("Arena: Match.teamSize spawns teamSpawnSpacing apart must fit on a straight")
 		expect(function()
-			Fixtures.config({ Match = { teamSize = 6 }, Arena = { teamSpawnSpacing = 32 } })
+			Fixtures.config({ Match = { teamSize = 6 }, Arena = { teamSpawnSpacing = fits } })
 		end).never.toThrow()
 	end)
 

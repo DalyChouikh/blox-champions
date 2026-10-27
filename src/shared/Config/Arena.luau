@@ -1,7 +1,8 @@
 --!strict
--- The graybox arena (spec §9.1): the track loop, its cross-section, the goal ring, corner markers, spawns and
--- colors. Lengths are in studs. Arena/Geometry turns these numbers into parts; the cross-field checks here and the
--- goal ring's fit check in Arena/Geometry reject sizes that could not be built without overlaps or gaps.
+-- The graybox arena (spec §9.1, Arena spec §3): the track loop, its cross-section, the glass on its tops, the goal
+-- ring, corner markers, spawns and colors. Lengths are in studs. Arena/Geometry turns these numbers into parts; the
+-- cross-field checks here, and the goal ring's fit and the skaters' reach checked in Arena/Geometry, reject sizes that
+-- could not be built without overlaps or gaps, or that a skater could leave.
 
 local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
@@ -12,8 +13,9 @@ export type ArenaConfig = {
 	endRadius: number,
 	trackWidth: number,
 	outerWallHeight: number,
-	infieldWallHeight: number,
-	-- Radius of the floor's curve up into each wall.
+	-- The inner bank: a quarter circle this high and this wide, from its top down to the lower floor.
+	innerBankHeight: number,
+	-- Radius of the floor's curve up into the outer wall.
 	wallCurveRadius: number,
 	stepHeight: number,
 	stepWidth: number,
@@ -23,10 +25,14 @@ export type ArenaConfig = {
 	profileBlendLength: number,
 	-- Longest distance between two cross-sections of the swept surface.
 	segmentLength: number,
-	-- Strips across one cross-section, from the inner wall top to the outer wall top.
+	-- Strips across one cross-section, from the inner bank's top to the outer wall's top.
 	stripsPerSection: number,
 	-- Every surface part is a slab this thick behind the riding surface.
 	surfaceThickness: number,
+	-- The glass standing on the inner bank's and the outer wall's tops (A7): up to `top` above the lower floor, a slab
+	-- `thickness` thick behind its face, outside the track. Skaters and the ball bounce off it; it never darkens the
+	-- track.
+	barrier: { top: number, thickness: number, transparency: number },
 	goalGateIndex: number,
 	goal: {
 		-- The opening's radius, which is also the scoring disc's.
@@ -48,23 +54,25 @@ export type ArenaConfig = {
 	gateThickness: number,
 	spawnPad: { width: number, thickness: number, transparency: number },
 	ballSpawnSize: number,
-	colors: { surface: Color3, infield: Color3, goal: Color3, marker: Color3 },
+	-- glass: the barriers'.
+	colors: { surface: Color3, infield: Color3, goal: Color3, marker: Color3, glass: Color3 },
 }
 
 local defaults: ArenaConfig = {
-	straightLength = 160,
-	endRadius = 60,
-	trackWidth = 44,
+	straightLength = 200,
+	endRadius = 70,
+	trackWidth = 60,
 	outerWallHeight = 28,
-	infieldWallHeight = 28,
-	wallCurveRadius = 10,
+	innerBankHeight = 8,
+	wallCurveRadius = 14,
 	stepHeight = 4,
-	stepWidth = 10,
-	upperFloorWidth = 4,
+	stepWidth = 14,
+	upperFloorWidth = 6,
 	profileBlendLength = 20,
 	segmentLength = 4,
-	stripsPerSection = 40,
+	stripsPerSection = 20,
 	surfaceThickness = 1,
+	barrier = { top = 85, thickness = 1, transparency = 0.7 },
 	goalGateIndex = 2,
 	goal = {
 		ringRadius = 7,
@@ -86,12 +94,13 @@ local defaults: ArenaConfig = {
 		infield = Color3.fromRGB(99, 95, 98),
 		goal = Color3.fromRGB(248, 248, 248),
 		marker = Color3.fromRGB(27, 42, 53),
+		glass = Color3.fromRGB(200, 225, 240),
 	},
 }
 
 local size = Validate.number({ above = 0 })
--- Sizes one part directly (the infield, a gate, a wall slab, a marker, the panel), so it must be a size Roblox
--- builds as given instead of clamping.
+-- Sizes one part directly (the infield, a gate, a wall slab, a glass slab, a marker, the panel), so it must be a size
+-- Roblox builds as given instead of clamping.
 local partSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
 local nonNegative = Validate.number({ min = 0 })
 local transparency = Validate.number({ min = 0, max = 1 })
@@ -103,16 +112,18 @@ local fields = Validate.record({
 	endRadius = Validate.number({ above = 0, max = PartSize.MAX / 2 }),
 	trackWidth = partSize,
 	outerWallHeight = partSize,
-	infieldWallHeight = partSize,
+	innerBankHeight = size,
 	wallCurveRadius = size,
 	stepHeight = nonNegative,
 	stepWidth = size,
 	upperFloorWidth = size,
 	profileBlendLength = size,
 	segmentLength = size,
-	-- One strip for each wall and each flat floor, and at least one for each wall curve and the step.
-	stripsPerSection = Validate.number({ min = 7, integer = true }),
+	-- At least one strip for each of the profile's six pieces.
+	stripsPerSection = Validate.number({ min = 6, integer = true }),
 	surfaceThickness = partSize,
+	-- The glass's height sizes each of its slabs.
+	barrier = Validate.record({ top = partSize, thickness = partSize, transparency = transparency }),
 	-- The loop has four sections (two straights, two curved ends), and a lap gate starts each one.
 	goalGateIndex = Validate.number({ min = 1, max = 4, integer = true }),
 	goal = Validate.record({
@@ -131,29 +142,41 @@ local fields = Validate.record({
 	gateThickness = partSize,
 	spawnPad = Validate.record({ width = partSize, thickness = partSize, transparency = transparency }),
 	ballSpawnSize = partSize,
-	colors = Validate.record({ surface = color, infield = color, goal = color, marker = color }),
+	colors = Validate.record({ surface = color, infield = color, goal = color, marker = color, glass = color }),
 })
 
 -- Checked in order; the first that fails is reported. Whether the goal ring fits is judged by Arena/Geometry
--- against the surface as built (Features.goal), which config cannot require.
+-- against the surface as built (Features.goal), which config cannot require; so is whether a skater could clear the
+-- glass, which depends on the world's gravity (Reach).
 local crossFieldRules: { Validate.Rule } = {
 	{
-		message = "trackWidth must fit both wall curves, the step, the upper floor and a lower floor",
+		message = "trackWidth must fit the inner bank, the outer wall's foot curve, the step, the upper floor and a "
+			.. "lower floor",
 		holds = function(arena: ArenaConfig): boolean
-			return arena.trackWidth - 2 * arena.wallCurveRadius - arena.stepWidth - arena.upperFloorWidth > 0
+			return arena.trackWidth
+					- arena.innerBankHeight
+					- arena.wallCurveRadius
+					- arena.stepWidth
+					- arena.upperFloorWidth
+				> 0
 		end,
 	},
 	{
-		message = "endRadius must leave room for the infield behind the inner wall",
+		message = "endRadius must leave room for the infield behind the inner glass",
 		holds = function(arena: ArenaConfig): boolean
-			return arena.endRadius - arena.trackWidth / 2 - arena.surfaceThickness > 0
+			return arena.endRadius - arena.trackWidth / 2 - arena.barrier.thickness > 0
 		end,
 	},
 	{
-		message = "each wall must rise above the curve at its foot",
+		message = "the outer wall must rise above its foot curve and the step",
 		holds = function(arena: ArenaConfig): boolean
-			return arena.infieldWallHeight > arena.wallCurveRadius
-				and arena.outerWallHeight > arena.wallCurveRadius + arena.stepHeight
+			return arena.outerWallHeight > arena.wallCurveRadius + arena.stepHeight
+		end,
+	},
+	{
+		message = "the glass must rise above the inner bank's and the outer wall's tops",
+		holds = function(arena: ArenaConfig): boolean
+			return arena.barrier.top > arena.outerWallHeight and arena.barrier.top > arena.innerBankHeight
 		end,
 	},
 	{
