@@ -4,9 +4,10 @@
 -- - while the goal is open for a team, the hoop's parts take that team's colour and Config.UI.arenaGlow.material, and
 --   the goal panel slides panelSlide studs up out of the ring over panelSlideSeconds (the server only lets the ball
 --   through it); when the goal closes, the hoop looks as before and the panel slides back;
--- - every part of the next gate's corner marker (its glass panel) glows in the colour of the team with the ball, none
---   before their first gate (the owner's choice, as the snapshot's nextGate is nil then); the marker it leaves looks
---   as before.
+-- - only the next gate's corner marker (its glass wall) shows (the owner's choice, 2026-10-27): every part of it glows
+--   in the colour of the team with the ball, at the transparency it had when it reached this client. Every other
+--   marker is hidden from the start, and none shows before the team's first gate (the snapshot's nextGate is nil
+--   then); the marker it leaves looks as before, hidden.
 -- "As before" is how each part looked when it reached this client. Everything here is this client's own view.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,7 +20,10 @@ local Team = require(ReplicatedStorage.Shared.Rules.Team)
 
 type Team = Team.Team
 -- How a part looked when it reached this client.
-type Look = { color: Color3, material: Enum.Material, frame: CFrame }
+type Look = { color: Color3, material: Enum.Material, transparency: number, frame: CFrame }
+
+-- An invisible part: every corner marker but the next gate's.
+local HIDDEN = 1
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
 export type ArenaGlow = {
@@ -53,7 +57,12 @@ local function remember(self: ArenaGlow, parts: ArenaParts.Parts)
 	local looks = self._looks
 	local function keep(part: BasePart)
 		if looks[part] == nil then
-			looks[part] = { color = part.Color, material = part.Material, frame = part.CFrame }
+			looks[part] = {
+				color = part.Color,
+				material = part.Material,
+				transparency = part.Transparency,
+				frame = part.CFrame,
+			}
 		end
 	end
 	for _, part in parts.hoop do
@@ -102,18 +111,31 @@ local function glowGoal(self: ArenaGlow, parts: ArenaParts.Parts, team: Team?)
 	end
 end
 
+-- A marker that is not the next gate's looks as before, hidden.
+local function hide(self: ArenaGlow, marker: ArenaParts.Marker)
+	for _, part in marker.parts do
+		restore(self, part)
+		part.Transparency = HIDDEN
+	end
+end
+
+-- The next gate's marker glows for `team`, each part at the transparency it reached this client with (remembered,
+-- since every marker is hidden from the start).
+local function show(self: ArenaGlow, marker: ArenaParts.Marker, team: Team)
+	for _, part in marker.parts do
+		light(self, part, team)
+		part.Transparency = self._looks[part].transparency
+	end
+end
+
 local function glowGate(self: ArenaGlow, gate: ArenaParts.Marker?, team: Team?)
 	local previous = self._gate
 	if previous ~= nil and previous ~= gate then
-		for _, part in previous.parts do
-			restore(self, part)
-		end
+		hide(self, previous)
 	end
 	self._gate, self._gateTeam = gate, team
 	if gate ~= nil and team ~= nil then
-		for _, part in gate.parts do
-			light(self, part, team)
-		end
+		show(self, gate, team)
 	end
 end
 
@@ -160,6 +182,9 @@ local ArenaGlow: ArenaGlow = {
 		if fresh then
 			self._parts = parts
 			remember(self, parts)
+			for _, marker in parts.markers do
+				hide(self, marker)
+			end
 		end
 		self._version = state.version
 		local match = state.match
