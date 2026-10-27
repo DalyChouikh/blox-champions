@@ -9,6 +9,8 @@ local React = require(ReplicatedStorage.Packages.React)
 
 -- Keyed by property name, or by a React event (React.Event.Activated).
 export type Props = { [any]: any }
+-- One key as the HUD shows it: the name the player's own keyboard gives it, or Roblox's glyph on a gamepad.
+export type KeyView = { text: string?, image: string? }
 
 local Style = {}
 
@@ -96,6 +98,52 @@ function Style.fit(
 			return Fit.scale(shown, laidOut, margin)
 		end),
 	})
+end
+
+-- A key `height` pixels tall at `order` in its row: Roblox's glyph, or its name on a key cap that a long name ("Shift")
+-- widens, keeping `spacing` at each side. Returns what its row calls it ("Glyph" or "Key") and the key.
+function Style.key(
+	config: Config.GameConfig,
+	view: KeyView,
+	height: number,
+	order: number
+): (string, React.ReactElement)
+	local size = UDim2.fromOffset(height, height)
+	if view.image ~= nil then
+		return "Glyph",
+			React.createElement("ImageLabel", Style.holder({ LayoutOrder = order, Size = size, Image = view.image }))
+	end
+	local spacing = UDim.new(0, config.UI.hud.spacing)
+	return "Key",
+		React.createElement(
+			"TextLabel",
+			Style.text(
+				config,
+				Style.panel(config, {
+					LayoutOrder = order,
+					Size = size,
+					AutomaticSize = Enum.AutomaticSize.X,
+					Text = view.text or "",
+				})
+			),
+			{
+				Corner = Style.corner(config),
+				Padding = React.createElement("UIPadding", { PaddingLeft = spacing, PaddingRight = spacing }),
+			}
+		)
+end
+
+-- A key's label: as tall as its row, as wide as its text (a string or a binding), at `order` in the row.
+function Style.label(config: Config.GameConfig, text: string | React.Binding<string>, order: number): React.ReactElement
+	return React.createElement(
+		"TextLabel",
+		Style.text(config, {
+			LayoutOrder = order,
+			AutomaticSize = Enum.AutomaticSize.X,
+			Size = UDim2.fromScale(0, 1),
+			Text = text,
+		})
+	)
 end
 
 -- Keeps a panel's parts `spacing` inside its edge.

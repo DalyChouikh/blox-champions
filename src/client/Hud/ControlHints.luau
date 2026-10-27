@@ -11,9 +11,7 @@ local ControlLabels = require(script.Parent.Parent.ControlLabels)
 local React = require(ReplicatedStorage.Packages.React)
 local Style = require(script.Parent.Style)
 
--- One hint's key: its name, or its glyph.
-export type KeyView = { text: string?, image: string? }
-export type HintKeys = { [Config.TouchControl]: KeyView }
+export type HintKeys = { [Config.TouchControl]: Style.KeyView }
 -- What each control does now; "" while it would do nothing.
 export type HintLabels = { [Config.TouchControl]: React.Binding<string> }
 
@@ -25,41 +23,6 @@ export type ControlHintsProps = {
 
 local function shown(label: string): boolean
 	return label ~= ""
-end
-
--- A key: Roblox's glyph, or its name on a key cap, as tall as the row.
-local function key(config: Config.GameConfig, view: KeyView, height: number): { [string]: React.Node }
-	local size = UDim2.fromOffset(height, height)
-	if view.image ~= nil then
-		return {
-			Glyph = React.createElement(
-				"ImageLabel",
-				Style.holder({ LayoutOrder = 1, Size = size, Image = view.image })
-			),
-		}
-	end
-	return {
-		Key = React.createElement(
-			"TextLabel",
-			Style.text(
-				config,
-				Style.panel(config, {
-					LayoutOrder = 1,
-					Size = size,
-					AutomaticSize = Enum.AutomaticSize.X,
-					Text = view.text or "",
-				})
-			),
-			{
-				Corner = Style.corner(config),
-				-- A long name ("Shift") widens its cap, keeping `spacing` at each side.
-				Padding = React.createElement("UIPadding", {
-					PaddingLeft = UDim.new(0, config.UI.hud.spacing),
-					PaddingRight = UDim.new(0, config.UI.hud.spacing),
-				}),
-			}
-		),
-	}
 end
 
 local function ControlHints(props: ControlHintsProps): React.ReactElement
@@ -75,19 +38,14 @@ local function ControlHints(props: ControlHintsProps): React.ReactElement
 	}
 	for order, control: Config.TouchControl in ControlLabels.CONTROLS do
 		local label = props.labels[control]
-		local children = key(config, props.keys[control], height)
-		children.Layout = Style.list(config, Enum.FillDirection.Horizontal, {
-			HorizontalAlignment = Enum.HorizontalAlignment.Right,
-		})
-		children.Label = React.createElement(
-			"TextLabel",
-			Style.text(config, {
-				LayoutOrder = 2,
-				AutomaticSize = Enum.AutomaticSize.X,
-				Size = UDim2.fromScale(0, 1),
-				Text = label,
-			})
-		)
+		local keyName, key = Style.key(config, props.keys[control], height, 1)
+		local children: { [string]: React.Node } = {
+			Layout = Style.list(config, Enum.FillDirection.Horizontal, {
+				HorizontalAlignment = Enum.HorizontalAlignment.Right,
+			}),
+			[keyName] = key,
+			Label = Style.label(config, label, 2),
+		}
 		rows[control] = React.createElement(
 			"Frame",
 			Style.holder({ LayoutOrder = order, Size = UDim2.new(1, 0, 0, height), Visible = label:map(shown) }),

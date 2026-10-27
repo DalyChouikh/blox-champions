@@ -370,6 +370,7 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 			return {}
 		end,
 		SendSkateState = function() end,
+		SendGetUp = function() end,
 		Gravity = Fixtures.GRAVITY,
 		Team = function(): string?
 			return "Blue"

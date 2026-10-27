@@ -295,6 +295,7 @@ Tackle = {
 | Pass | ball | Magnetic pass at `passSpeed = 90` to a teammate who called within `callPassWindow = 3` s (most recent caller first), else the best-scored teammate inside `passTargeting.coneDeg = 70` and `passTargeting.maxRange = 120`, where score = `angleWeight (0.6)` × (1 − angle/cone) + `distanceWeight (0.4)` × (1 − distance/maxRange). With no valid target, the ball is passed straight along the aim at `passSpeed`. Homing acceleration `passHomingAccel = 60`; interceptable. |
 | Call Pass | no ball | Shows a hand icon over you for `callPassWindow`; cooldown 1 s. |
 | Ball Focus | — | Camera keeps the ball in view. Mode `Input.ballFocusMode = "Hold"` (`"Toggle"` available). A player-facing setting arrives with saved settings in M6. |
+| Get Up | knocked down | Any movement input (keys, stick or touch stick) asks the server to get the skater up: once per knockdown, through the `GetUp` remote. The server gets them up `getUpAfter = 0.5` s after the knockdown at the soonest (at once if the request comes later); without a request they are up after the hit's `knockdownSeconds` (1.5 s). A "Get Up" prompt shows the movement keys meanwhile (§11.1). *The owner (#220): Roller Champions' prompt shows the movement keys, and its skaters were up in under 1.8 s (Video 5 at 0:18).* |
 
 ### 8.3 Controls (`Config/Input` — single source for bindings and on-screen hints)
 
@@ -409,6 +410,9 @@ The arena follows the M1 overhaul's Arena spec (`docs/superpowers/specs/2026-10-
 | Remote | Direction | Payload | Notes |
 |---|---|---|---|
 | `ActionRequest` | client → server | `{ action: string, aim: Vector3?, charge: number? }` | Schema-validated; rate-limited per player (`Network.maxActionsPerSecond = 15`). |
+| `ActionRejected` | server → client | `{ action: string }` | The server refused the action; the client cancels it (§13). |
+| `SkateState` | client → server | `{ pump: boolean, brake: boolean, airPose: boolean }` | Sent when one changes; schema-validated; rate-limited per player (`Network.maxSkateStatesPerSecond = 20`); other clients pose from the attributes the server sets. |
+| `GetUp` | client → server | `{}` | A knocked-down player moved (§8.2), once per knockdown; schema-validated; rate-limited per player (`Network.maxGetUpsPerSecond = 2`: one per knockdown, each at least `getUpAfter` long). |
 | `MatchSnapshot` | server → client | full match state | Sent on join and on resync. |
 | `RuleEvents` | server → client | ordered batch of §4.7 events | Drives HUD and feed. |
 | `BallCarrier` | server → client | `{ carrier: Player? }` | Ball physics replicates natively when loose. |
@@ -431,6 +435,7 @@ React Luau (Roblox's `roblox/react` 17.3.13 + `roblox/react-roblox` 17.3.13, A5)
 - **World UI:** ball indicator (§9.4), next-gate arrow for the carrier, call-pass hand over teammates, team-colored name tags.
 - **Control hints (right):** generated from `Config/Input`, filtered by context (with/without ball, airborne, near teammate) and by the current input device's glyphs.
 - **Speedometer (bottom right).**
+- **Get Up prompt (bottom center, above the feed):** while the local skater is knocked down, the movement keys as the device shows them (the keyboard's first composite, up, left, down, right, named by the player's own layout, e.g. Z Q S D on AZERTY; the gamepad's stick glyph; "Move" on touch) and "Get Up" (§8.2).
 - **Mobile controls:** laid out from `Config/Input`; context buttons appear only when usable.
 - **Score tab** (§6.4) and **end screen** (winner banner, MVP card, team totals).
 

@@ -27,6 +27,9 @@ export type NetworkConfig = {
 	-- How far network jitter may move an action's timing on the server: it may arrive this early before its cooldown
 	-- or the running action ends, or this close to its follow-up window.
 	actionTimingTolerance: number,
+	-- How many requests to get up a client may send (a burst of this many, refilled per second): an honest client
+	-- sends one per knockdown, and a knockdown lasts at least Actions.getUpAfter (0.5 s).
+	maxGetUpsPerSecond: number,
 }
 
 local defaults: NetworkConfig = {
@@ -40,6 +43,7 @@ local defaults: NetworkConfig = {
 	maxActionsPerSecond = 15,
 	hitLagToleranceStuds = 3,
 	actionTimingTolerance = 0.1,
+	maxGetUpsPerSecond = 2,
 }
 
 local schema = Validate.record({
@@ -53,6 +57,7 @@ local schema = Validate.record({
 	maxActionsPerSecond = Validate.number({ above = 0 }),
 	hitLagToleranceStuds = Validate.number({ min = 0 }),
 	actionTimingTolerance = Validate.number({ min = 0 }),
+	maxGetUpsPerSecond = Validate.number({ above = 0 }),
 })
 
 return {

@@ -7,6 +7,7 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local Client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 local ActionController = require(Client.ActionController)
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallCarrier = require(Client.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
@@ -25,24 +26,27 @@ local folder: Folder
 local preferred: Enum.PreferredInput
 local screen: Fixtures.Screen
 
--- Roblox's key names, as GetStringForKeyCode gives them: a letter key its letter, Space a space, a gamepad button its
--- KeyCode's name, and nothing for Shift, Ctrl, Tab or a mouse button.
+-- A gamepad's button or stick: Roblox names each by its KeyCode and gives it a glyph (probed).
+local function gamepadKey(name: string): boolean
+	return string.sub(name, 1, 6) == "Button" or string.sub(name, 1, 10) == "Thumbstick"
+end
+
+-- Roblox's key names, as GetStringForKeyCode gives them: a letter key its letter, Space a space, a gamepad's button or
+-- stick its KeyCode's name, and nothing for Shift, Ctrl, Tab or a mouse button.
 local function keyString(key: Enum.KeyCode): string
 	local name = key.Name
 	if key == Enum.KeyCode.Space then
 		return " "
-	elseif #name == 1 or string.sub(name, 1, 6) == "Button" then
+	elseif #name == 1 or gamepadKey(name) then
 		return name
 	end
 	return ""
 end
 
--- Roblox's glyphs, as GetImageForKeyCode gives them: one for each gamepad button, none for other keys.
+-- Roblox's glyphs, as GetImageForKeyCode gives them: one for each gamepad button and stick, none for other keys.
 local function keyImage(key: Enum.KeyCode): string
 	local name = key.Name
-	return if string.sub(name, 1, 6) == "Button"
-		then `rbxasset://textures/ui/Controls/DefaultController/{name}@2x.png`
-		else ""
+	return if gamepadKey(name) then `rbxasset://textures/ui/Controls/DefaultController/{name}@2x.png` else ""
 end
 
 -- The HUD's part called `name`, wherever it sits; nil while it is not drawn.
@@ -191,6 +195,38 @@ describe("Hud", function()
 		rig:Destroy()
 		Hud:step(0)
 		expect(part("ControlHints")).toBeNil()
+	end)
+
+	-- Roller Champions' Get Up (#220): moving gets a knocked-down skater up sooner.
+	it("shows a Get Up prompt with the device's movement keys only while the skater is knocked down", function()
+		local rig = Fixtures.spawnSkater(folder, config)
+		local function knockedDown(down: boolean)
+			rig:SetAttribute(Attributes.KnockedDown, if down then true else nil)
+			SkateController:step(DT)
+			Hud:step(0)
+		end
+		Hud:step(0)
+		expect(part("GetUp")).toBeNil()
+		knockedDown(true)
+		local prompt = part("GetUp")
+		expect(prompt.Label.Text).toBe(config.UI.controlLabels.GetUp)
+		-- The default WASD composite, up, left, down, right, as the player's keyboard names them.
+		local keys = { prompt.Key1.Text, prompt.Key2.Text, prompt.Key3.Text, prompt.Key4.Text }
+		expect(keys).toEqual({ "W", "A", "S", "D" })
+		preferred = Enum.PreferredInput.Gamepad
+		Hud:step(0)
+		expect(part("GetUp").Glyph1.Image).toBe(keyImage(Enum.KeyCode.Thumbstick1))
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		expect(part("GetUp").Key1.Text).toBe(config.UI.text.touchMove)
+
+		knockedDown(false)
+		expect(part("GetUp")).toBeNil()
+		knockedDown(true)
+		expect(part("GetUp") ~= nil).toBe(true)
+		rig:Destroy()
+		Hud:step(0)
+		expect(part("GetUp")).toBeNil()
 	end)
 
 	it("shows the skater's speed in km/h, and none without a character", function()

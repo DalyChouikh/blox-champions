@@ -3,8 +3,10 @@
 -- own ActionRunner and applied here, or refused with ActionRejected. Throws and passes go through BallService. Strikes
 -- are judged each frame against the server's positions and knock down the nearest opponent they reach; every strike
 -- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns, the
--- running action (until its recovery) and calls for a pass show as character attributes every client reads. A throw
--- keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held for.
+-- running action (until its recovery) and calls for a pass show as character attributes every client reads. A
+-- knocked-down player whose client asks to get up (GetUp, sent when they move) is up once Actions.getUpAfter has passed
+-- since the knockdown, never sooner; one who never asks, after the hit's knockdownSeconds. A throw keeps no more of the
+-- carrier's speed than skating allows, and no more charge than the ball was held for.
 -- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
 -- sum of the frames it is stepped, so a request between frames counts as the last frame's.
 
@@ -43,6 +45,9 @@ type Record = {
 	hitSeconds: number,
 	-- Seconds left knocked down; 0 when on their feet.
 	knockdownLeft: number,
+	-- When the last knockdown began (the service's clock), and whether they asked to get up since.
+	downSince: number,
+	getUp: boolean,
 	-- The action the character's Action attribute shows.
 	shown: Config.ActionName?,
 }
@@ -55,6 +60,8 @@ export type ActionService = {
 	start: ((self: ActionService) -> ())?,
 	-- What a validated ActionRequest runs (tests call it directly).
 	request: (self: ActionService, player: PlayerId, payload: any) -> (),
+	-- What a validated GetUp runs: a knocked-down player gets up once they may.
+	getUp: (self: ActionService, player: PlayerId) -> (),
 	-- One frame: phases, strikes, knockdowns and calls. Returns this frame's knockdowns in a list it reuses.
 	step: (self: ActionService, dt: number) -> { Knockdown },
 	-- The kickoff: no action, knockdown or call left, on the server or on any character.
@@ -116,6 +123,8 @@ local function recordOf(self: ActionService, player: PlayerId): Record
 			hit = nil,
 			hitSeconds = 0,
 			knockdownLeft = 0,
+			downSince = 0,
+			getUp = false,
 			shown = nil,
 		}
 		self._records[player] = record
@@ -185,10 +194,13 @@ local function addKnockdown(self: ActionService, attacker: PlayerId, victim: Pla
 	list[index] = knockdown
 end
 
--- Down for `seconds`: their action stops without a refund, and a carried ball drops with their momentum.
+-- Down for `seconds`: their action stops without a refund, and a carried ball drops with their momentum. A request to
+-- get up made before it no longer counts.
 local function knockDown(self: ActionService, attacker: PlayerId, victim: PlayerId, seconds: number)
 	local record = recordOf(self, victim)
 	record.knockdownLeft = seconds
+	record.downSince = self._now
+	record.getUp = false
 	local running: Config.ActionName? = record.runner.action
 	if running ~= nil then
 		record.runner:cancel(running, false)
@@ -301,6 +313,14 @@ local ActionService: ActionService = {
 				self:request(player, payload)
 			end
 		)
+		self._net:listen(
+			Remotes.names.GetUp,
+			Schemas.GetUp,
+			config.Network.maxGetUpsPerSecond,
+			function(player: PlayerId)
+				self:getUp(player)
+			end
+		)
 		self._characters.characterRemoved:Connect(function(player: PlayerId)
 			self:forget(player)
 		end)
@@ -333,11 +353,20 @@ local ActionService: ActionService = {
 		show(self, player, record)
 	end,
 
+	-- Counted at the next step: the next knockdown forgets a request made on their feet.
+	getUp = function(self: ActionService, player: PlayerId)
+		local record = self._records[player]
+		if record ~= nil then
+			record.getUp = true
+		end
+	end,
+
 	step = function(self: ActionService, dt: number): { Knockdown }
 		self._now += dt
 		table.clear(self._knockdowns)
 		refreshHolders(self)
-		local window = self._config.Actions.callPassWindow
+		local actions = self._config.Actions
+		local window = actions.callPassWindow
 		local carrier = self._ball.state.carrier
 		for player, at in self._calls do
 			if self._now - at > window or player == carrier then
@@ -350,7 +379,8 @@ local ActionService: ActionService = {
 			record.runner:step(dt)
 			if record.knockdownLeft > 0 then
 				record.knockdownLeft -= dt
-				if record.knockdownLeft <= 0 then
+				local mayGetUp = record.getUp and self._now - record.downSince >= actions.getUpAfter
+				if record.knockdownLeft <= 0 or mayGetUp then
 					record.knockdownLeft = 0
 					setAttribute(self, player, Attributes.KnockedDown, nil)
 				end

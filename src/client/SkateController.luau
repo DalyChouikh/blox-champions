@@ -6,7 +6,8 @@
 -- - steps SkateMath, slides the skater along any ride surface in its way, and writes the result into the skater body
 --   the server built.
 -- It holds the skater still during the kickoff freeze and until the arena has reached this client. A knocked-down
--- skater (the server's KnockedDown attribute) lets go of any attach and only slides; while Roblox's menu holds the keys
+-- skater (the server's KnockedDown attribute) lets go of any attach and only slides, and asks the server to get up
+-- (GetUp) once per knockdown, as soon as the stick moves: the server decides when. While Roblox's menu holds the keys
 -- the skater lets go of any attach too, with no release boost. Actions push the skater through `push`.
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
 -- humanoid's state machine off here, on the owning client only: the server keeps it on so deaths still fire Died.
@@ -77,6 +78,9 @@ export type SkateController = {
 	_statePending: boolean,
 	-- The Air Pose as the server last heard it.
 	_airPosing: boolean,
+	_sendGetUp: () -> (),
+	-- This knockdown's GetUp went out.
+	_askedToGetUp: boolean,
 	_team: () -> string?,
 	_gravity: Vector3,
 	-- workspace:Raycast; a fake in tests, which can then hand the controller a seam's side face.
@@ -308,6 +312,16 @@ local function shareState(self: SkateController)
 	end
 end
 
+-- A stick held through the knockdown asks at once: the server gets the skater up no sooner than Actions.getUpAfter.
+local function askToGetUp(self: SkateController)
+	if not self.knockedDown then
+		self._askedToGetUp = false
+	elseif not self._askedToGetUp and self._keys.move.Magnitude > 0 then
+		self._askedToGetUp = true
+		self._sendGetUp()
+	end
+end
+
 -- The kickoff freeze (the server anchors every root while it places them), and the wait for the arena: the skater
 -- starts from rest, upright and facing where the server put them, with no attach held over and no jump pressed during
 -- the countdown. Pump and brake are still shared, so other players see what this one holds.
@@ -347,6 +361,8 @@ local SkateController: SkateController = {
 	_clock = os.clock,
 	_statePending = false,
 	_airPosing = false,
+	_sendGetUp = function() end,
+	_askedToGetUp = false,
 	_team = function(): string?
 		return nil
 	end,
@@ -378,8 +394,8 @@ local SkateController: SkateController = {
 	_views = {},
 	_playerList = nil,
 
-	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.Clock, deps.Gravity, deps.Team, deps.Raycast and
-	-- deps.Spherecast replace the live game in tests.
+	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.SendGetUp, deps.Clock, deps.Gravity, deps.Team, deps.Raycast
+	-- and deps.Spherecast replace the live game in tests.
 	init = function(self: SkateController, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -397,6 +413,11 @@ local SkateController: SkateController = {
 		self._clock = deps.Clock or os.clock
 		self._statePending = false
 		self._airPosing = false
+		self._sendGetUp = deps.SendGetUp
+			or function()
+				Remotes.get(ReplicatedStorage, Remotes.names.GetUp):FireServer({})
+			end
+		self._askedToGetUp = false
 		self._team = deps.Team
 			or function(): string?
 				return (Players.LocalPlayer :: Player):GetAttribute(Attributes.Team) :: string?
@@ -507,6 +528,7 @@ local SkateController: SkateController = {
 		collide(self, root, skater, dt)
 		apply(self, skater)
 		shareState(self)
+		askToGetUp(self)
 	end,
 
 	push = function(self: SkateController, change: Vector3, launch: boolean)

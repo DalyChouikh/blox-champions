@@ -45,4 +45,12 @@ describe("Schemas", function()
 			expect(#Schemas.ActionRequest(payload, "ActionRequest") > 0).toBe(true)
 		end
 	end)
+
+	it("accepts a request to get up with nothing in it, and nothing else", function()
+		expect(Schemas.GetUp({}, "GetUp")).toEqual({})
+		local malformed: { any } = { { now = true }, "x", true }
+		for _, payload in malformed do
+			expect(#Schemas.GetUp(payload, "GetUp") > 0).toBe(true)
+		end
+	end)
 end)
