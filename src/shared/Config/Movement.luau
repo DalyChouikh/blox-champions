@@ -38,9 +38,11 @@ export type MovementConfig = {
 	airTurnRate: number,
 	-- How fast a skater in the air turns back upright.
 	airUprightRate: number,
-	-- On a surface steeper than maxStickAngle, a skater slower than minWallSpeed falls off.
-	minWallSpeed: number,
-	maxStickAngle: number,
+	-- A surface steeper than wallAngle (degrees from flat) is a wall: gravity pulls along it at wallGravityScale of its
+	-- full strength (the owner, #216: about a third, from RC's glass rides). A wall holds a skater at any speed; past
+	-- straight up the loop rule decides (A3).
+	wallAngle: number,
+	wallGravityScale: number,
 	-- How far back along the skater's path the curve of an overhang is measured (A3): a few of a lip's flat strips,
 	-- so a curve of strips reads as the arc it makes, yet short enough to follow a curve from where it starts.
 	curvatureWindow: number,
@@ -89,8 +91,8 @@ local defaults: MovementConfig = {
 	turnRateHigh = 1.5,
 	airTurnRate = 1,
 	airUprightRate = 6,
-	minWallSpeed = 35,
-	maxStickAngle = 60,
+	wallAngle = 30,
+	wallGravityScale = 1 / 3,
 	curvatureWindow = 10,
 	pumpSlopeMultiplier = 1.6,
 	pumpFlatAccel = 8,
@@ -134,8 +136,8 @@ local fields = Validate.record({
 	turnRateHigh = nonNegative,
 	airTurnRate = nonNegative,
 	airUprightRate = positive,
-	minWallSpeed = nonNegative,
-	maxStickAngle = angle,
+	wallAngle = angle,
+	wallGravityScale = Validate.number({ above = 0, max = 1 }),
 	curvatureWindow = positive,
 	pumpSlopeMultiplier = Validate.number({ min = 1 }),
 	pumpFlatAccel = nonNegative,

@@ -13,9 +13,10 @@ local Types = require(ReplicatedStorage.Shared.Skate.Types)
 -- how to check one by hand.
 local movement = Config.defaults().Movement
 local FLAT = Vector3.yAxis
--- A 30° surface falling toward -Z, and the way down it.
-local SLOPE = Vector3.new(0, math.cos(math.rad(30)), -math.sin(math.rad(30)))
-local DOWNHILL = Vector3.new(0, -0.5, -math.cos(math.rad(30)))
+-- A 20° surface falling toward -Z, and the way down it: well under wallAngle, so gravity pulls along it in full.
+local SLOPE_ANGLE = math.rad(20)
+local SLOPE = Vector3.new(0, math.cos(SLOPE_ANGLE), -math.sin(SLOPE_ANGLE))
+local DOWNHILL = Vector3.new(0, -math.sin(SLOPE_ANGLE), -math.cos(SLOPE_ANGLE))
 
 local function input(overrides: { [string]: any }?): Types.SkateInput
 	local record: Types.SkateInput =
@@ -87,16 +88,16 @@ describe("SkateMath on the ground", function()
 	it("speeds up downhill by gravity's pull along the surface", function()
 		local s = skater(DOWNHILL * 10)
 		s:step(input(), ground(SLOPE), 0.1)
-		-- + 196.2 × sin 30° × 0.1, then friction, drag and coastDecel (nothing is pressed)
-		Fixtures.expectNear(s.velocity, DOWNHILL * 18.6204)
+		-- + 196.2 × sin 20° × 0.1, then friction, drag and coastDecel (nothing is pressed)
+		Fixtures.expectNear(s.velocity, DOWNHILL * 15.5270)
 	end)
 
 	it("scales speeding up down between softCap and hardCap", function()
 		local s = skater(DOWNHILL * 115)
 		s:step(input(), ground(SLOPE), 0.01)
-		-- 98.1 × (121 − 115)/(121 − 90) = 18.99 studs/s², then friction, drag and coastDecel, then the bleed:
-		-- 90 + 25.052 × e^−0.05
-		expect(s.velocity.Magnitude).toBeCloseTo(113.8300, 3)
+		-- 67.10 × (121 − 115)/(121 − 90) = 12.99 studs/s², then friction, drag and coastDecel, then the bleed:
+		-- 90 + 24.992 × e^−0.05
+		expect(s.velocity.Magnitude).toBeCloseTo(113.7730, 3)
 	end)
 
 	-- Roller Champions (#214): a skater whipped to 144 km/h was back near 110 within about a second.
@@ -149,13 +150,13 @@ describe("SkateMath on the ground", function()
 	it("pumps: more pull downhill, a small push on the flat, nothing uphill", function()
 		local downhill = skater(DOWNHILL * 10)
 		downhill:step(input({ pump = true }), ground(SLOPE), 0.1)
-		expect(downhill.velocity.Magnitude).toBeCloseTo(25.2446, 3) -- 10 + 98.1 × 1.6 × 0.1, then friction and drag
+		expect(downhill.velocity.Magnitude).toBeCloseTo(20.2952, 3) -- 10 + 67.10 × 1.6 × 0.1, then friction and drag
 		local flat = skater(Vector3.new(0, 0, -30))
 		flat:step(input({ pump = true }), ground(), 0.1)
 		Fixtures.expectNear(flat.velocity, Vector3.new(0, 0, -30.3384)) -- + pumpFlatAccel 8
 		local uphill = skater(DOWNHILL * -30)
 		uphill:step(input({ pump = true }), ground(SLOPE), 0.1)
-		Fixtures.expectNear(uphill.velocity, -DOWNHILL * 19.7496) -- no push: 30 − 9.81, then friction and drag
+		Fixtures.expectNear(uphill.velocity, -DOWNHILL * 22.8430) -- no push: 30 − 6.71, then friction and drag
 	end)
 
 	it("adds the draft's pull along the way it travels", function()
@@ -248,16 +249,25 @@ describe("SkateMath off the ground and on walls", function()
 		Fixtures.expectNear(wall.velocity, Vector3.new(59.98, -3.2689, -49.9833))
 	end)
 
-	it("rides a steep surface only while fast enough", function()
-		local function modeOn(degrees: number, speed: number): string
-			local s = skater(Vector3.new(0, 0, -speed))
-			local normal = Vector3.new(math.sin(math.rad(degrees)), math.cos(math.rad(degrees)), 0)
-			s:step(input(), ground(normal), 0.1)
-			return s.mode
-		end
-		expect(modeOn(70, 30)).toBe("Airborne")
-		expect(modeOn(70, 40)).toBe("Grounded")
-		expect(modeOn(50, 10)).toBe("Grounded")
+	-- Real physics on the glass (#216): no speed is needed to stay on a wall, and gravity pulls along it at
+	-- wallGravityScale (the owner: about a third, from a ranked player's ride up the glass).
+	it("stays on a wall at any speed, pulled along it by a third of gravity", function()
+		local wall = Vector3.xAxis -- vertical, facing +X
+		local climbing = skater(Vector3.new(0, 10, 0))
+		climbing:step(input(), ground(wall), 0.1)
+		expect(climbing.mode).toBe("Grounded")
+		-- 10 − 196.2 / 3 × 0.1 = 3.46, then 3.46 − (4 + 7.5 + 0.0692) × 0.1
+		Fixtures.expectNear(climbing.velocity, Vector3.new(0, 2.3031, 0))
+		local still = skater(Vector3.zero)
+		still:step(input(), ground(wall), 0.1)
+		expect(still.mode).toBe("Grounded")
+		-- It slides back down: 6.54, then 6.54 − (4 + 7.5 + 0.1308) × 0.1
+		Fixtures.expectNear(still.velocity, Vector3.new(0, -5.3769, 0))
+		-- A 45° bank is steeper than wallAngle, so a wall too: 65.4 × sin 45° × 0.1 = 4.6245, then friction, drag and
+		-- coastDecel
+		local bank = skater(Vector3.zero)
+		bank:step(input(), ground(Vector3.new(0, math.cos(math.rad(45)), -math.sin(math.rad(45)))), 0.1)
+		expect(bank.velocity.Magnitude).toBeCloseTo(3.4652, 3)
 	end)
 
 	it("steers a little in the air", function()
@@ -426,11 +436,13 @@ describe("SkateMath riding the roof by loop physics", function()
 		expect(frames * speed * DT).toBeLessThan(movement.curvatureWindow + speed * DT + 1e-6)
 	end)
 
-	it("drops a skater too slow for the wall rule on a tight overhang that their curve would still hold", function()
-		-- A quarter-pipe of radius 2 from the floor to 5° past straight up: its curve holds anyone above 6 studs/s.
+	it("holds a slow skater on a tight overhang while its curve does, with no wall speed needed (#216)", function()
+		-- A quarter-pipe of radius 2 from the floor to 5° past straight up: speed² / 2 must reach 196.2 × sin 5°,
+		-- 17.1, so it holds anyone above 5.85 studs/s.
 		local floor, overhang = -math.pi / 2, math.rad(5)
-		expect(staysOn(40, 2, floor, overhang)).toBe(true)
-		expect(staysOn(30, 2, floor, overhang)).toBe(false)
+		expect(staysOn(30, 2, floor, overhang)).toBe(true)
+		expect(staysOn(7, 2, floor, overhang)).toBe(true)
+		expect(staysOn(5, 2, floor, overhang)).toBe(false)
 	end)
 
 	it("keeps a skater riding a vertical wall at 40 studs/s, where gravity does not pull off", function()

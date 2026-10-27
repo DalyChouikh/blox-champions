@@ -482,7 +482,7 @@ describe("SkateController", function()
 		SkateController:bind(rig)
 		local turnCos = math.cos(math.rad(movement.normalFilter.maxTurnDeg))
 		for _ = 1, #normals do
-			-- Faster than minWallSpeed, so a steep normal would be ridden rather than fallen from.
+			-- Riding at cruise: a steep normal is ridden, not fallen from, so only the filter keeps the skater's up.
 			local riding = SkateController.skater :: any
 			riding.velocity = Vector3.new(60, 0, 0)
 			SkateController:step(1 / 60)
