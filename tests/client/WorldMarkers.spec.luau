@@ -154,7 +154,7 @@ describe("WorldMarkers", function()
 		WorldMarkers:step(DT)
 		expect(arrow.Visible).toBe(true)
 		expect(arrow.Position == UDim2.fromOffset(600, 100)).toBe(true)
-		-- At the gate panel's pivot: its opening's apex.
+		-- At the gate panel's pivot: its wall's middle.
 		Fixtures.expectNear(gateAimed :: Vector3, arena.markers[3]:GetPivot().Position)
 		BallCarrier:set("2")
 		WorldMarkers:step(DT)

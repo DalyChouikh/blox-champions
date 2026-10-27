@@ -14,7 +14,8 @@ export type TeamSpawns = { Blue: { CFrame }, Orange: { CFrame } }
 -- beam it hangs from, decoration only.
 export type Goal = { frame: CFrame, openingRadius: number, rim: { Piece }, panel: Piece, arm: { Piece } }
 
--- A gate's glass panel: its slices, and its pivot at the opening's apex, facing the travel direction.
-export type GatePanel = { pieces: { Piece }, apex: CFrame }
+-- A gate's glass panel, a thin wall across the track: its slices, and its pivot at the wall's middle, facing the
+-- travel direction.
+export type GatePanel = { pieces: { Piece }, pivot: CFrame }
 
 return table.freeze({})

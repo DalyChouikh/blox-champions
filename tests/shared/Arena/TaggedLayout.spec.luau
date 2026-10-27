@@ -30,7 +30,7 @@ local function child(root: Instance, name: string): Instance
 	return root:FindFirstChild(name) :: Instance
 end
 
--- A corner marker as the arena builder makes one: a model of glass panes, pivoted at its opening's apex.
+-- A corner marker as the arena builder makes one: a model of glass panes, pivoted at its wall's middle.
 local function markerModel(parent: Instance, name: string, index: number): Model
 	local model = Instance.new("Model")
 	model.Name = name

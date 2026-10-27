@@ -11,7 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
 -- A corner marker: every part of it (a model's parts, or the marker itself when it is a part), and its pivot's
--- position, where the carrier's arrow points (a gate panel's opening's apex).
+-- position, where the carrier's arrow points (a gate panel's middle).
 export type Marker = { parts: { BasePart }, position: Vector3 }
 
 export type Parts = {

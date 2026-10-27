@@ -58,10 +58,10 @@ export type ArenaConfig = {
 		-- lower floor, then a beam at that height out to the outer glass's face, both `thickness` square.
 		arm: { thickness: number, height: number },
 	},
-	-- The glass panel hanging across the track at each gate (R18): it fills the track's cross-section from the walls'
-	-- top down to a rounded opening (half an ellipse, its feet on the outer wall's top at both glass faces, its apex
-	-- `openingHeight` at the track's middle), in `segments` slices `depth` thick along the track.
-	gatePanel: { openingHeight: number, depth: number, segments: number },
+	-- The glass panel at each gate (R18): a thin wall across the track, filling its whole cross-section from the
+	-- surface up to the walls' top, `depth` thick along the track (thinner than the goal's parts: a rule below).
+	-- Skaters pass through it.
+	gatePanel: { depth: number },
 	teamSpawnSpacing: number,
 	ballSpawnHeight: number,
 	-- Parts that only carry a tag: lap gates (invisible; only their plane counts), team spawn pads (a square in the
@@ -100,7 +100,7 @@ local defaults: ArenaConfig = {
 		across = 0.75,
 		arm = { thickness = 1, height = 40 },
 	},
-	gatePanel = { openingHeight = 60, depth = 2, segments = 16 },
+	gatePanel = { depth = 0.2 },
 	teamSpawnSpacing = 10,
 	ballSpawnHeight = 6,
 	gateThickness = 0.2,
@@ -162,12 +162,7 @@ local fields = Validate.record({
 		-- Its height is judged against the ring and the lips by Arena/Geometry.
 		arm = Validate.record({ thickness = partSize, height = size }),
 	}),
-	-- The opening's height is judged against the walls (rule below); at least three slices round it.
-	gatePanel = Validate.record({
-		openingHeight = size,
-		depth = partSize,
-		segments = Validate.number({ min = 3, integer = true }),
-	}),
+	gatePanel = Validate.record({ depth = partSize }),
 	teamSpawnSpacing = size,
 	ballSpawnHeight = size,
 	gateThickness = partSize,
@@ -175,11 +170,6 @@ local fields = Validate.record({
 	ballSpawnSize = partSize,
 	colors = Validate.record({ surface = color, infield = color, goal = color, glass = color }),
 })
-
--- Where the glass's lip starts curling inward: Arena/Geometry's Profile.lipStart, which config cannot require.
-local function lipStart(arena: ArenaConfig): number
-	return arena.glass.top - arena.glass.lipRadius
-end
 
 -- Checked in order; the first that fails is reported. Whether the goal ring and its arm fit is judged by Arena/Geometry
 -- against the arena as built (Features.goal), which config cannot require.
@@ -211,7 +201,8 @@ local crossFieldRules: { Validate.Rule } = {
 	{
 		message = "the glass must rise above the inner bank's and the outer wall's tops before its lip",
 		holds = function(arena: ArenaConfig): boolean
-			local start = lipStart(arena)
+			-- Where the lip starts curling inward: Arena/Geometry's Profile.lipStart, which config cannot require.
+			local start = arena.glass.top - arena.glass.lipRadius
 			return start > arena.outerWallHeight and start > arena.innerBankHeight
 		end,
 	},
@@ -222,18 +213,21 @@ local crossFieldRules: { Validate.Rule } = {
 		end,
 	},
 	{
-		message = "the gate panel's opening must stand between the outer wall's top and the lips",
-		holds = function(arena: ArenaConfig): boolean
-			local opening = arena.gatePanel.openingHeight
-			return opening > arena.outerWallHeight and opening < lipStart(arena)
-		end,
-	},
-	{
 		-- The blend is centered on each corner, so the two blends of one straight or one curved end must not overlap.
 		message = "profileBlendLength must fit within a straight and a curved end",
 		holds = function(arena: ArenaConfig): boolean
 			return arena.profileBlendLength <= arena.straightLength
 				and arena.profileBlendLength <= math.pi * arena.endRadius
+		end,
+	},
+	{
+		-- The goal's parts are centred on the goal gate's plane, and that gate's wall hangs behind it, so a wall as
+		-- thick as half a goal part would put their faces in one plane, where they flicker (seen at 0.5 on the rim).
+		message = "the gate panel must be thinner than half the goal's thinnest part, so its faces never meet the "
+			.. "goal's",
+		holds = function(arena: ArenaConfig): boolean
+			local goal = arena.goal
+			return arena.gatePanel.depth < math.min(goal.rimThickness, goal.panelThickness, goal.arm.thickness) / 2
 		end,
 	},
 }

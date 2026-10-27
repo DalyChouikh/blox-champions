@@ -457,7 +457,7 @@ describe("Config defaults", function()
 			arm = { thickness = 1, height = 40 },
 		})
 		expect((a.goal :: any).wallGap).toBeNil()
-		expect(a.gatePanel).toEqual({ openingHeight = 60, depth = 2, segments = 16 })
+		expect(a.gatePanel).toEqual({ depth = 0.2 })
 		expect((a :: any).marker).toBeNil()
 		expect(a.teamSpawnSpacing).toBe(10)
 		expect(a.ballSpawnHeight).toBe(6)
@@ -573,6 +573,8 @@ describe("Config.forMode", function()
 	end)
 
 	it("rejects arena sizes that cannot be built", function()
+		local WALL_THICKNESS = "Arena: the gate panel must be thinner than half the goal's thinnest part, so its faces "
+			.. "never meet the goal's"
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			{
 				overrides = { trackWidth = 52 },
@@ -619,10 +621,6 @@ describe("Config.forMode", function()
 			{ overrides = { stripsPerSection = 5 }, message = "Arena.stripsPerSection: must be >= 6 (got 5)" },
 			{ overrides = { goalGateIndex = 5 }, message = "Arena.goalGateIndex: must be <= 4 (got 5)" },
 			{ overrides = { glass = { lipStrips = 0 } }, message = "Arena.glass.lipStrips: must be >= 1 (got 0)" },
-			{
-				overrides = { gatePanel = { segments = 2 } },
-				message = "Arena.gatePanel.segments: must be >= 3 (got 2)",
-			},
 			-- Counts of parts and gates are whole numbers.
 			{
 				overrides = { stripsPerSection = 20.5 },
@@ -638,20 +636,6 @@ describe("Config.forMode", function()
 				message = "Arena.goal.rimSegments: must be an integer (got 16.5)",
 			},
 			{
-				overrides = { gatePanel = { segments = 16.5 } },
-				message = "Arena.gatePanel.segments: must be an integer (got 16.5)",
-			},
-			{
-				-- Over where the lips start (108).
-				overrides = { gatePanel = { openingHeight = 110 } },
-				message = "Arena: the gate panel's opening must stand between the outer wall's top and the lips",
-			},
-			{
-				-- No higher than its feet on the outer wall's top (28).
-				overrides = { gatePanel = { openingHeight = 28 } },
-				message = "Arena: the gate panel's opening must stand between the outer wall's top and the lips",
-			},
-			{
 				overrides = { top = { kind = "Lid" } },
 				message = 'Arena.top.kind: must be one of Closed, Open (got "Lid")',
 			},
@@ -659,6 +643,13 @@ describe("Config.forMode", function()
 				overrides = { glass = { material = "Glass" } },
 				message = 'Arena.glass.material: must be a Material (got "Glass")',
 			},
+			-- The goal hangs centred on its gate's plane and the gate's wall hangs behind it: a wall as thick as half
+			-- the goal's thinnest part (the panel's 0.5 by default), or any one part thinner than twice the wall's 0.2,
+			-- would put a face of each in one plane, where they flicker.
+			{ overrides = { gatePanel = { depth = 0.25 } }, message = WALL_THICKNESS },
+			{ overrides = { goal = { rimThickness = 0.3 } }, message = WALL_THICKNESS },
+			{ overrides = { goal = { panelThickness = 0.3 } }, message = WALL_THICKNESS },
+			{ overrides = { goal = { arm = { thickness = 0.3 } } }, message = WALL_THICKNESS },
 		}
 		for _, case in cases do
 			expect(function()
