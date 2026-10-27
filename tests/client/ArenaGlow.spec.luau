@@ -16,11 +16,13 @@ local config = Config.defaults()
 local glow = config.UI.arenaGlow
 local colors = config.UI.teamColors
 local DT = 1 / 60
+-- An invisible part: every gate's panel but the next gate's.
+local HIDDEN = 1
 
 local folder: Folder
 local arena: Fixtures.HudArena
 -- How each part looked before anything glowed.
-local plain: { color: Color3, material: Enum.Material }
+local plain: { color: Color3, material: Enum.Material, transparency: number }
 -- Every slide asked for: the part's name, where to, over how long.
 local slides: { { part: string, to: CFrame, seconds: number } }
 
@@ -37,10 +39,15 @@ local function glows(part: BasePart, color: Color3?): boolean
 	return part.Color == color and part.Material == glow.material
 end
 
--- Whether every pane of a gate's panel glows in `color`, or looks as before (`color` nil).
-local function panelGlows(marker: Model, color: Color3?): boolean
-	for _, pane in marker:GetChildren() do
-		if not glows(pane :: BasePart, color) then
+-- Whether every pane of a gate's panel shows, glowing in `color` at the glass's transparency it was built with, or
+-- is hidden (`color` nil).
+local function panelShows(marker: Model, color: Color3?): boolean
+	for _, child in marker:GetChildren() do
+		local pane = child :: BasePart
+		local shows = if color == nil
+			then pane.Transparency == HIDDEN
+			else glows(pane, color) and math.abs(pane.Transparency - config.Arena.glass.transparency) < 1e-4
+		if not shows then
 			return false
 		end
 	end
@@ -52,7 +59,13 @@ beforeEach(function()
 	folder.Name = "ArenaGlowTest"
 	folder.Parent = workspace
 	arena = Fixtures.hudArena(folder)
-	plain = { color = arena.panel.Color, material = arena.panel.Material }
+	plain = { color = arena.panel.Color, material = arena.panel.Material, transparency = arena.panel.Transparency }
+	-- Built as the Builder builds the gate walls: see-through glass.
+	for _, marker in arena.markers do
+		for _, pane in marker:GetChildren() do
+			(pane :: BasePart).Transparency = config.Arena.glass.transparency
+		end
+	end
 	slides = {}
 	ArenaParts:init({})
 	HudStore:init({ Config = config })
@@ -87,38 +100,57 @@ describe("ArenaGlow", function()
 		end
 	end)
 
-	it(
-		"lights every part of the next gate's panel for the team with the ball, and none before their first gate",
-		function()
-			local markers = arena.markers
-			snapshot({ possessingTeam = "Blue" })
-			for _, marker in markers do
-				expect(panelGlows(marker, nil)).toBe(true)
-			end
-			snapshot({ possessingTeam = "Blue", nextGate = 2 })
-			expect(panelGlows(markers[2], colors.Blue)).toBe(true)
-			expect(panelGlows(markers[1], nil) and panelGlows(markers[3], nil) and panelGlows(markers[4], nil)).toBe(
-				true
-			)
-			snapshot({ possessingTeam = "Blue", nextGate = 3 })
-			expect(panelGlows(markers[2], nil)).toBe(true)
-			expect(panelGlows(markers[3], colors.Blue)).toBe(true)
-			snapshot({ possessingTeam = "Orange", nextGate = 3 })
-			expect(panelGlows(markers[3], colors.Orange)).toBe(true)
-			snapshot()
-			expect(panelGlows(markers[3], nil)).toBe(true)
+	-- The owner's choice (2026-10-27): only the next gate's panel shows, and every other one is invisible.
+	it("shows only the next gate's panel, lit for the team with the ball, and none before their first gate", function()
+		local markers = arena.markers
+		snapshot({ possessingTeam = "Blue" })
+		for _, marker in markers do
+			expect(panelShows(marker, nil)).toBe(true)
 		end
-	)
+		snapshot({ possessingTeam = "Blue", nextGate = 2 })
+		expect(panelShows(markers[2], colors.Blue)).toBe(true)
+		expect(panelShows(markers[1], nil) and panelShows(markers[3], nil) and panelShows(markers[4], nil)).toBe(true)
+		-- The panel the carrier passed disappears as the next one lights.
+		snapshot({ possessingTeam = "Blue", nextGate = 3 })
+		expect(panelShows(markers[2], nil)).toBe(true)
+		expect(panelShows(markers[3], colors.Blue)).toBe(true)
+		snapshot({ possessingTeam = "Orange", nextGate = 3 })
+		expect(panelShows(markers[3], colors.Orange)).toBe(true)
+		snapshot()
+		expect(panelShows(markers[3], nil)).toBe(true)
+	end)
+
+	it("hides every gate's panel from the start, and never the goal", function()
+		-- beforeEach stepped once with no match.
+		for _, marker in arena.markers do
+			expect(panelShows(marker, nil)).toBe(true)
+		end
+		local function goalShows(): boolean
+			for _, rim in arena.rim do
+				if rim.Transparency ~= plain.transparency then
+					return false
+				end
+			end
+			return arena.panel.Transparency == plain.transparency
+		end
+		expect(goalShows()).toBe(true)
+		snapshot({ possessingTeam = "Blue", goalOpenFor = "Blue", nextGate = 1 })
+		expect(goalShows()).toBe(true)
+		snapshot()
+		expect(goalShows()).toBe(true)
+	end)
 
 	it("keeps each part's first look when the arena's parts are found again while they glow", function()
 		snapshot({ possessingTeam = "Blue", goalOpenFor = "Blue" })
-		-- A new record of the same parts, the ring still glowing.
+		-- A new record of the same parts, the ring still glowing and every panel hidden.
 		ArenaParts:refresh()
 		ArenaGlow:step(DT)
-		snapshot({ possessingTeam = "Blue" })
+		snapshot({ possessingTeam = "Blue", nextGate = 2 })
 		for _, rim in arena.rim do
 			expect(glows(rim, nil)).toBe(true)
 		end
+		-- The panel shows at the transparency it was first seen with, not the hidden one.
+		expect(panelShows(arena.markers[2], colors.Blue)).toBe(true)
 	end)
 
 	it("slides the panel out of the ring while the goal is open, and back", function()
