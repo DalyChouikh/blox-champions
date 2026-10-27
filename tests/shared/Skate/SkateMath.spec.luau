@@ -50,10 +50,22 @@ describe("SkateMath on the ground", function()
 		expect(s.mode).toBe("Grounded")
 	end)
 
-	it("coasts without input, slowed by rolling friction and air drag", function()
+	it("coasts without input, slowed by rolling friction, air drag and coastDecel", function()
 		local s = skater(Vector3.new(0, 0, -60))
 		s:step(input(), ground(), 0.1)
-		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -59.48)) -- 60 − (4 + 1.2) × 0.1
+		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -58.73)) -- 60 − (4 + 7.5 + 1.2) × 0.1
+	end)
+
+	-- The owner (#215): a skater who presses nothing stops from cruise (72 km/h) in about 5 s on flat ground.
+	it("stops from cruise in about 5 s on flat ground with nothing pressed", function()
+		local s = skater(Vector3.new(0, 0, -movement.cruiseSpeed))
+		local steps = 0
+		while s.velocity.Magnitude > 0 and steps < 600 do
+			s:step(input(), ground(), 1 / 60)
+			steps += 1
+		end
+		-- dv/dt = −(4 + 7.5 + 0.02 v): 50 × ln(1 + 1.2 / 11.5) = 4.96 s
+		expect(steps / 60).toBeCloseTo(4.96, 1)
 	end)
 
 	it("strides only up to cruiseSpeed and settles there", function()
@@ -75,14 +87,16 @@ describe("SkateMath on the ground", function()
 	it("speeds up downhill by gravity's pull along the surface", function()
 		local s = skater(DOWNHILL * 10)
 		s:step(input(), ground(SLOPE), 0.1)
-		Fixtures.expectNear(s.velocity, DOWNHILL * 19.3704) -- + 196.2 × sin 30° × 0.1, then friction and drag
+		-- + 196.2 × sin 30° × 0.1, then friction, drag and coastDecel (nothing is pressed)
+		Fixtures.expectNear(s.velocity, DOWNHILL * 18.6204)
 	end)
 
 	it("scales speeding up down between softCap and hardCap", function()
 		local s = skater(DOWNHILL * 115)
 		s:step(input(), ground(SLOPE), 0.01)
-		-- 98.1 × (121 − 115)/(121 − 90) = 18.99 studs/s², then friction and drag, then the bleed: 90 + 25.127 × e^−0.05
-		expect(s.velocity.Magnitude).toBeCloseTo(113.9014, 3)
+		-- 98.1 × (121 − 115)/(121 − 90) = 18.99 studs/s², then friction, drag and coastDecel, then the bleed:
+		-- 90 + 25.052 × e^−0.05
+		expect(s.velocity.Magnitude).toBeCloseTo(113.8300, 3)
 	end)
 
 	-- Roller Champions (#214): a skater whipped to 144 km/h was back near 110 within about a second.
@@ -92,11 +106,11 @@ describe("SkateMath on the ground", function()
 			s:step(input(), ground(), 0.1)
 			return s.velocity.Magnitude
 		end
-		-- 120 − (4 + 2.4) × 0.1 = 119.36, then 90 + 29.36 × e^−0.5
-		expect(after(120)).toBeCloseTo(107.8077, 3)
-		expect(after(100)).toBeCloseTo(95.7014, 3) -- 99.4, then 90 + 9.4 × e^−0.5
-		expect(after(80)).toBeCloseTo(79.44, 3) -- under softCap: friction and drag only
-		expect(after(150)).toBeCloseTo(121, 3) -- 125.97 after the bleed, then hardCap
+		-- Nothing is pressed: 120 − (4 + 7.5 + 2.4) × 0.1 = 118.61, then 90 + 28.61 × e^−0.5
+		expect(after(120)).toBeCloseTo(107.3528, 3)
+		expect(after(100)).toBeCloseTo(95.2465, 3) -- 98.65, then 90 + 8.65 × e^−0.5
+		expect(after(80)).toBeCloseTo(78.69, 3) -- under softCap: friction, drag and coastDecel only
+		expect(after(150)).toBeCloseTo(121, 3) -- 125.51 after the bleed, then hardCap
 	end)
 
 	it("turns toward the stick at a rate that shrinks with speed", function()
@@ -135,20 +149,19 @@ describe("SkateMath on the ground", function()
 	it("pumps: more pull downhill, a small push on the flat, nothing uphill", function()
 		local downhill = skater(DOWNHILL * 10)
 		downhill:step(input({ pump = true }), ground(SLOPE), 0.1)
-		expect(downhill.velocity.Magnitude).toBeCloseTo(25.2446, 3) -- pull × 1.6 (19.3704 without)
+		expect(downhill.velocity.Magnitude).toBeCloseTo(25.2446, 3) -- 10 + 98.1 × 1.6 × 0.1, then friction and drag
 		local flat = skater(Vector3.new(0, 0, -30))
 		flat:step(input({ pump = true }), ground(), 0.1)
 		Fixtures.expectNear(flat.velocity, Vector3.new(0, 0, -30.3384)) -- + pumpFlatAccel 8
-		local pumping, coasting = skater(DOWNHILL * -30), skater(DOWNHILL * -30)
-		pumping:step(input({ pump = true }), ground(SLOPE), 0.1)
-		coasting:step(input(), ground(SLOPE), 0.1)
-		Fixtures.expectNear(pumping.velocity, coasting.velocity) -- both (0, 9.8748, 17.1037)
+		local uphill = skater(DOWNHILL * -30)
+		uphill:step(input({ pump = true }), ground(SLOPE), 0.1)
+		Fixtures.expectNear(uphill.velocity, -DOWNHILL * 19.7496) -- no push: 30 − 9.81, then friction and drag
 	end)
 
 	it("adds the draft's pull along the way it travels", function()
 		local s = skater(Vector3.new(0, 0, -30))
 		s:step(input({ draftAccel = 10 }), ground(), 0.1)
-		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -30.538))
+		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -29.788)) -- 31, then friction, drag and coastDecel
 	end)
 end)
 
@@ -197,7 +210,8 @@ describe("SkateMath off the ground and on walls", function()
 		falling.mode = "Airborne"
 		falling:step(input(), ground(FLAT, 2.4), 0.1)
 		expect(falling.mode).toBe("Grounded")
-		Fixtures.expectNear(falling.velocity, Vector3.new(0, 1.5, -29.54))
+		-- The hover's 0.1 × 15 up; 30 − (4 + 7.5 + 0.6) × 0.1 along
+		Fixtures.expectNear(falling.velocity, Vector3.new(0, 1.5, -28.79))
 		local rising = skater(Vector3.new(0, 20, -30))
 		rising.mode = "Airborne"
 		rising:step(input(), ground(FLAT, 2.4), 0.1)
