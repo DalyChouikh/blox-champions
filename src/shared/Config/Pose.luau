@@ -1,7 +1,7 @@
 --!strict
 -- How far each skater's body bends (spec §7.1): the lean into a turn, the crouch, the brake, the tuck in the air,
--- the arm that carries the ball, the lunge and the knockdown. Angles are in degrees. Every pose number lives here,
--- so tuning a pose is a config change.
+-- the arm that carries the ball, the lunge, the knockdown and the Air Pose. Angles are in degrees. Every pose number
+-- lives here, so tuning a pose is a config change.
 
 local Validate = require(script.Parent.Validate)
 
@@ -24,6 +24,10 @@ export type PoseConfig = {
 	lungeDeg: number,
 	-- A knocked-down skater tips back by this much.
 	knockdownTiltDeg: number,
+	-- The Air Pose (#218), Roller Champions' superman stretch: the body tips forward by this much, the legs stretch
+	-- straight, and the arm not carrying the ball reaches ahead by airPoseArmDeg.
+	airPoseDeg: number,
+	airPoseArmDeg: number,
 }
 
 local defaults: PoseConfig = {
@@ -36,6 +40,8 @@ local defaults: PoseConfig = {
 	airborneProbe = 1.5,
 	lungeDeg = 35,
 	knockdownTiltDeg = 60,
+	airPoseDeg = 70,
+	airPoseArmDeg = 150,
 }
 
 local angle = Validate.number({ min = 0, max = 180 })
@@ -50,6 +56,8 @@ local schema = Validate.record({
 	airborneProbe = Validate.number({ min = 0 }),
 	lungeDeg = angle,
 	knockdownTiltDeg = angle,
+	airPoseDeg = angle,
+	airPoseArmDeg = angle,
 })
 
 return {

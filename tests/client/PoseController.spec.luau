@@ -174,6 +174,21 @@ describe("PoseController", function()
 		expect(pitch()).toBeCloseTo(0, 5)
 	end)
 
+	-- The Air Pose (#218): the local skater's from its own skater at once, another's from the attribute the server
+	-- sets.
+	it("strikes the Air Pose: the local skater's from its own skater, another's from their attribute", function()
+		local tipped = -math.sin(math.rad(config.Pose.airPoseDeg))
+		local own = Fixtures.jointedRig(folder, "Own", HOVER_CFRAME)
+		PoseController:track(own, true)
+		skate.skater = { mode = "Airborne", airPosing = true }
+		local other = Fixtures.jointedRig(folder, "Other", HOVER_CFRAME)
+		PoseController:track(other, false)
+		other:SetAttribute(Attributes.AirPosing, true)
+		PoseController:step(1 / 60)
+		expect(jointOf(own, "Root").Transform.LookVector.Y).toBeCloseTo(tipped, 5)
+		expect(jointOf(other, "Root").Transform.LookVector.Y).toBeCloseTo(tipped, 5)
+	end)
+
 	it("poses the local skater's lunge from its own actions", function()
 		local own = Fixtures.jointedRig(folder, "Own", HOVER_CFRAME)
 		PoseController:track(own, true)

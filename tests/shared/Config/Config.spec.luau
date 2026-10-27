@@ -166,6 +166,8 @@ describe("Config defaults", function()
 			brakeDecel = 120,
 			tiptoeSpeed = 12,
 			jumpImpulse = 60,
+			jumpSpeedCost = 0.1,
+			airPoseImpulse = 42,
 			normalFilter = { maxTurnDeg = 30, smoothing = 30 },
 			draftRange = 18,
 			draftConeDeg = 30,
@@ -205,6 +207,8 @@ describe("Config defaults", function()
 			airborneProbe = 1.5,
 			lungeDeg = 35,
 			knockdownTiltDeg = 60,
+			airPoseDeg = 70,
+			airPoseArmDeg = 150,
 		})
 	end)
 
@@ -305,6 +309,7 @@ describe("Config defaults", function()
 		expect(ui.clockWarnings).toEqual({ 60, 30 })
 		expect(ui.controlLabels).toEqual({
 			Jump = "Jump",
+			AirPose = "Air Pose",
 			Pump = "Pump",
 			Brake = "Brake",
 			Attach = "Attach",
@@ -763,6 +768,18 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { coastDecel = -1 } },
 				message = "Movement.coastDecel: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { Movement = { jumpSpeedCost = -0.1 } },
+				message = "Movement.jumpSpeedCost: must be >= 0 (got -0.1)",
+			},
+			{
+				overrides = { Movement = { jumpSpeedCost = 1.5 } },
+				message = "Movement.jumpSpeedCost: must be <= 1 (got 1.5)",
+			},
+			{
+				overrides = { Movement = { airPoseImpulse = -1 } },
+				message = "Movement.airPoseImpulse: must be >= 0 (got -1)",
 			},
 			{
 				overrides = { Movement = { wallGravityScale = 0 } },

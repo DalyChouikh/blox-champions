@@ -10,6 +10,8 @@ local Validate = require(script.Parent.Validate)
 -- One label per action, plus the controls that start none (Ball Focus and the skating buttons).
 export type ControlLabels = {
 	Jump: string,
+	-- The jump button in the air (#218).
+	AirPose: string,
 	Pump: string,
 	Brake: string,
 	Attach: string,
@@ -177,6 +179,7 @@ local defaults: UIConfig = {
 	teamNames = { Blue = "Blue", Orange = "Orange" },
 	controlLabels = {
 		Jump = "Jump",
+		AirPose = "Air Pose",
 		Pump = "Pump",
 		Brake = "Brake",
 		Attach = "Attach",
@@ -397,6 +400,7 @@ local fields = Validate.record({
 	teamNames = Validate.record({ Blue = label, Orange = label }),
 	controlLabels = Validate.record({
 		Jump = label,
+		AirPose = label,
 		Pump = label,
 		Brake = label,
 		Attach = label,

@@ -239,7 +239,7 @@ Highest score on the **winning team**. Tie-breakers in order: more goals, more s
 - The controller **hovers**: the root is held at `Movement.hoverHeight` above the raycast hit, so seams between arena strips (§9.2) never snag.
 - **One ray's normal is not trusted.** Every arena part is a slab behind the riding surface, so a ray that lands exactly on a seam between two parts can hit the side face of a slab. Phase 3 measured this: a downward ray on a seam of the step returned the normal (0, 0.49, −0.87) instead of the step's slope. The controller therefore filters ground normals (for example, dropping one that turns sharply from the last and smoothing the rest) before using them for orientation or wall riding.
 - The Humanoid remains for avatar display and joints; its movement is disabled. Avatar limbs are non-colliding; **one fixed-size collider** (`Movement.colliderSize`) is the same for every player regardless of avatar scale.
-- Poses in M1 are code-driven on the character's Motor6D joints by `PoseController` (lean into turns, pump crouch, airborne tuck, tackle lunge, knockdown tilt). The default Animate script is disabled. Authored animations come in the art pass.
+- Poses in M1 are code-driven on the character's Motor6D joints by `PoseController` (lean into turns, pump crouch, airborne tuck, tackle lunge, knockdown tilt, the Air Pose). The default Animate script is disabled. Authored animations come in the art pass.
 
 ### 7.2 Behaviors (all numbers in `Config/Movement`; initial values are tuning starting points)
 
@@ -253,7 +253,8 @@ Highest score on the **winning team**. Tie-breakers in order: more goals, more s
 | Pump (hold) | Multiplies the downhill gravity component; small push on flat ground; no gain uphill. Crouch pose. | `pumpSlopeMultiplier = 1.6`, `pumpFlatAccel = 8` |
 | Brake (hold) | Strong deceleration to a stop. | `brakeDecel = 120` |
 | Tiptoe (brake + steer) | Precise low-speed movement capped at `tiptoeSpeed`. | `tiptoeSpeed = 12` |
-| Jump | Impulse along the current surface normal (walls launch you off). | `jumpImpulse = 60` |
+| Jump | Impulse along the current surface normal (walls launch you off); a jump keeps 1 − `jumpSpeedCost` of the speed along the surface. *The owner (#218): each jump costs 10%, no free jump spam.* | `jumpImpulse = 60` (a 9.2-stud jump), `jumpSpeedCost = 0.1` |
+| Air Pose | The jump input in the air, once until landing: the fall is cancelled and `airPoseImpulse` is added straight up (a 4.5-stud hop, about half a jump), costing `jumpSpeedCost` of the speed across like a jump, and the skater strikes a pose (`Pose.airPoseDeg`, `airPoseArmDeg`: Roller Champions' superman stretch). Landing ends the pose and re-arms it. Every client sees it: the skater's `SkateState` carries it and the server sets `AirPosing` on the character. The jump's hint reads "Air Pose" in the air. *The owner (#218), from RC's Air Pose.* | `airPoseImpulse = 42` |
 | Draft | Inside a cone behind any player, extra acceleration scaled by closeness. | `draftRange = 18`, `draftConeDeg = 30`, `draftMaxAccel = 20` |
 | Attach (Grapple Whip) | Any player holds Attach while within `attachRange` of a teammate and inside `attachConeDeg` of the direction directly behind them → attached: held at `attachFollowDistance` behind the leader, who keeps full control. Release (or `attachMaxSeconds` elapsed) → a boost of `attachBoostSpeed` toward the stick held as the skater lets go, or along the leader's travel direction with the stick at rest (RC's "Hold & Release + direction: Speed Boost", #214); then cooldown. | `attachRange = 8`, `attachConeDeg = 45`, `attachFollowDistance = 4`, `attachMaxSeconds = 3`, `attachBoostSpeed = 75` (90 km/h), `attachCooldown = 3` |
 | Speedometer | Display value = speed (studs/s) × `speedometerScale`, labeled "km/h". | `speedometerScale = 1.2` |
@@ -300,7 +301,7 @@ Tackle = {
 | Action | PC | Gamepad | Mobile |
 |---|---|---|---|
 | Move / Camera | WASD / Mouse | Left / Right stick | Thumbstick / swipe |
-| Jump | Space | ButtonA | Button |
+| Jump / Air Pose (in the air) | Space | ButtonA | Button |
 | Pump (hold) | LeftShift | ButtonR2 | Hold button |
 | Brake / Tiptoe (hold) | LeftControl | ButtonR1 | Hold button |
 | Charge Throw (with ball) | MouseButton1 hold | ButtonL2 hold | Hold button |
