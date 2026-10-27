@@ -109,9 +109,17 @@ afterEach(function()
 	folder:Destroy()
 end)
 
--- Stands the player `offset` from a spot on the track, facing -Z.
+-- Stands the player `offset` from a spot on the track, facing -Z: a server placement, as CharacterService announces
+-- one, so no fall.
 local function stand(id: string, offset: Vector3)
 	rigs[id]:PivotTo(CFrame.new(ON_TRACK + offset))
+	CharacterService.placed:Fire(id)
+end
+
+-- The offset from the track spot that puts a root `drop` studs above where it comes to rest there (hoverHeight over
+-- the floor).
+local function above(drop: number): Vector3
+	return Vector3.new(0, config.Movement.hoverHeight + drop - ON_TRACK.Y, 0)
 end
 
 local function giveBall(id: string)
@@ -135,6 +143,29 @@ local function advance(seconds: number, dt: number?): { string }
 		end
 	end
 	return knockdowns
+end
+
+-- Steps a frame where `id` is, then moves them to `offset` from the track spot a frame at a time at the speed ceiling,
+-- as the server sees a skater fly, adding the knockdowns of each frame to `listed`. Returns the frames it stepped.
+local function glide(id: string, offset: Vector3, listed: { string }?): number
+	local target = ON_TRACK + offset
+	local stride = config.Movement.hardCap * DT
+	local at = Fixtures.root(rigs[id]).Position
+	local frames = 0
+	while true do
+		for _, knockdown in advance(DT) do
+			if listed ~= nil then
+				table.insert(listed, knockdown)
+			end
+		end
+		frames += 1
+		if at == target then
+			return frames
+		end
+		local left = target - at
+		at = if left.Magnitude <= stride then target else at + left.Unit * stride
+		rigs[id]:PivotTo(CFrame.new(at))
+	end
 end
 
 -- `attacker` tackles `victim` from 5 studs behind, stepping until the strike lands: the victim's first frame down.
@@ -486,6 +517,39 @@ describe("ActionService", function()
 		humanoid.Health = 0
 		expect(advance(1)).toEqual({})
 		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+	end)
+
+	-- The owner (#222): a fall of 40 studs or more onto flat ground knocks the skater down like a tackle.
+	it("knocks down a skater who lands hard, for hardLanding.knockdownSeconds; no one scores it", function()
+		local a = blue[1]
+		local hard = config.Movement.hardLanding
+		stand(a, above(hard.drop + 0.5))
+		giveBall(a)
+		local listed: { string } = {}
+		glide(a, Vector3.zero, listed)
+		expect(listed).toEqual({})
+		expect(attribute(a, Attributes.KnockedDown)).toBe(true)
+		expect(BallService.state.status).toBe("Loose")
+		advance(hard.knockdownSeconds - 0.1)
+		expect(attribute(a, Attributes.KnockedDown)).toBe(true)
+		advance(0.2)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+		-- From just under the drop: no knockdown.
+		stand(a, above(hard.drop - 0.5))
+		glide(a, Vector3.zero)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+	end)
+
+	it("adds nothing to a knockdown when the skater lands hard while down", function()
+		local b = orange[1]
+		local hit = config.Actions.Tackle.hit :: Config.Hit
+		tackled(blue[1], b)
+		stand(b, above(config.Movement.hardLanding.drop + 5))
+		local seconds = glide(b, Vector3.zero) * DT
+		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
+		-- Up at the tackle's knockdownSeconds, as if they never fell.
+		advance(hit.knockdownSeconds - seconds + 0.05)
+		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
 	end)
 
 	it("ends a dive at a kickoff", function()

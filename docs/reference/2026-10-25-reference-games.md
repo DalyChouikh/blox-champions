@@ -214,6 +214,16 @@ about two thirds of a lap, swinging from wall to wall.
   skater sent straight at the outer glass from the middle lane, nothing pressed: from 60°, a 108 km/h ride climbed 30
   studs, a whip release 44 and 145 km/h 42; from 45°, 40, 49 and 49; from 30°, 46, 61 and 55. The pump step (19° at
   its steepest) keeps full gravity.
+- **How high a hard landing is** (asked before building it, #222, 2026-10-27): **a fall of 40 studs or more**, judged
+  by the height fallen, not the 20 first planned. Our Uppercut leaps 31.5 studs (29.3 from cruise) and an Air Pose at
+  its top adds about 4 (~36), so with 20 every uppercut coming down on flat floor would have knocked its own user
+  down. And the 145 km/h ceiling holds in the air too: a free fall reaches it after 121² / (2 × 196.2) = 37.3 studs,
+  so every fall over that lands at the same speed, which is why the height fallen decides. A jump + Air Pose (~13)
+  and an uppercut land safely; a fall from the glass (rides reach 46 to 80 studs) onto flat floor knocks down. Not
+  chosen: 20 with the landing after one's own uppercut exempt; 20 with no exemption.
+- **An Air Pose breaks a fall** (same answer, recommended): it stops the fall and hops the skater about 4.5 studs up, so
+  the height counts from its hop: a skater falling 60 studs off the glass who strikes an Air Pose just above the
+  floor lands safely. Not chosen: the whole fall counts from the highest point since leaving the ground.
 
 ## Roller Champions
 

@@ -5,10 +5,11 @@
 -- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns, the
 -- running action (until its recovery) and calls for a pass show as character attributes every client reads. A
 -- knocked-down player whose client asks to get up (GetUp, sent when they move) is up once Actions.getUpAfter has passed
--- since the knockdown, never sooner; one who never asks, after the hit's knockdownSeconds. An action with a landing
--- (the Dive) ends on the skater's belly: nothing else starts until, past its active phase, the server's own ray along
--- their down finds a ride surface, which knocks them down; no one scores that knockdown. A throw keeps no more of the
--- carrier's speed than skating allows, and no more charge than the ball was held for.
+-- since the knockdown, never sooner; one who never asks, after the hit's knockdownSeconds. Each frame the server casts
+-- its own ray along each skater's down: a hard landing (Skate/Fall) knocks them down, and so does a diver's first touch
+-- of the ground past the dive's active phase (an action with a landing ends on the belly; nothing else starts
+-- meanwhile). No one scores those knockdowns. A throw keeps no more of the carrier's speed than skating allows, and no
+-- more charge than the ball was held for.
 -- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
 -- sum of the frames it is stepped, so a request between frames counts as the last frame's.
 
@@ -19,6 +20,7 @@ local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallService = require(script.Parent.BallService)
 local CharacterService = require(script.Parent.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fall = require(ReplicatedStorage.Shared.Skate.Fall)
 local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local NetService = require(script.Parent.NetService)
 local PassTarget = require(ReplicatedStorage.Shared.Actions.PassTarget)
@@ -26,6 +28,7 @@ local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
 local Reach = require(ReplicatedStorage.Shared.Actions.Reach)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
+local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local TeamService = require(script.Parent.TeamService)
 local Throw = require(ReplicatedStorage.Shared.Actions.Throw)
@@ -52,6 +55,8 @@ type Record = {
 	getUp: boolean,
 	-- The running action with a landing, until their touchdown knocks them down: nothing else starts meanwhile.
 	landing: Config.ActionName?,
+	-- Their fall, as the server's ray sees it each frame.
+	fall: Fall.Fall,
 	-- The action the character's Action attribute shows.
 	shown: Config.ActionName?,
 }
@@ -91,8 +96,9 @@ export type ActionService = {
 	_calls: { [PlayerId]: number },
 	_candidates: { Reach.Candidate },
 	_context: ActionRunner.Context,
-	-- The arena's ride surfaces, the only things a diver's touchdown ray hits.
+	-- The arena's ride surfaces, the only things the server's ground rays hit, and what the last one found.
 	_rideParams: RaycastParams,
+	_ground: SkateTypes.Ground,
 	_knockdowns: { Knockdown },
 	-- Every Knockdown record ever made, reused frame after frame.
 	_knockdownPool: { Knockdown },
@@ -132,6 +138,7 @@ local function recordOf(self: ActionService, player: PlayerId): Record
 			downSince = 0,
 			getUp = false,
 			landing = nil,
+			fall = Fall.new(self._config.Movement),
 			shown = nil,
 		}
 		self._records[player] = record
@@ -225,17 +232,32 @@ local function knockDown(self: ActionService, attacker: PlayerId?, victim: Playe
 	end
 end
 
--- Whether a skater whose action has a landing has touched down: past that action's active phase, a ride surface lies
--- within Movement.groundProbeLength along their down, as the skating's own ground ray looks.
-local function touchedDown(self: ActionService, player: PlayerId, record: Record, landing: Config.ActionName): boolean
-	local runner = record.runner
-	local holder = self._holderOf[player]
-	if holder == nil or (runner.action == landing and runner.phase ~= "Recovery") then
-		return false
-	end
+-- The server's own look at the ground under a skater, once a frame: a ray along their down as their skating casts it
+-- (Movement.groundProbeLength, through the arena's ride surfaces). A hard landing knocks them down; so does a diver's
+-- first touch of the ground past the dive's active phase. Neither adds to a knockdown already running.
+local function lookDown(self: ActionService, holder: Holder)
+	local player = holder.player
+	local record = recordOf(self, player)
 	local root = holder.root
-	local down = -root.CFrame.UpVector * self._config.Movement.groundProbeLength
-	return workspace:Raycast(root.Position, down, self._rideParams) ~= nil
+	local movement = self._config.Movement
+	local hit = workspace:Raycast(root.Position, -root.CFrame.UpVector * movement.groundProbeLength, self._rideParams)
+	local ground = self._ground
+	ground.hit = hit ~= nil
+	if hit ~= nil then
+		ground.normal = hit.Normal
+		ground.distance = hit.Distance
+	end
+	local hard = record.fall:step(root.Position.Y, ground)
+	if hit == nil or record.knockdownLeft > 0 then
+		return
+	end
+	local landing: Config.ActionName? = record.landing
+	local runner = record.runner
+	if hard then
+		knockDown(self, nil, player, movement.hardLanding.knockdownSeconds)
+	elseif landing ~= nil and (runner.action ~= landing or runner.phase == "Recovery") then
+		knockDown(self, nil, player, (self._config.Actions[landing].landing :: Config.Landing).knockdownSeconds)
+	end
 end
 
 -- A strike whose active phase this frame reached, and that has not landed yet, aims at the nearest opponent it
@@ -308,6 +330,7 @@ local ActionService: ActionService = {
 	_candidates = {},
 	_context = { hasBall = false, knockedDown = false },
 	_rideParams = nil :: any,
+	_ground = nil :: any,
 	_knockdowns = {},
 	_knockdownPool = {},
 
@@ -332,6 +355,7 @@ local ActionService: ActionService = {
 		rideParams.FilterType = Enum.RaycastFilterType.Include
 		rideParams.FilterDescendantsInstances = deps.ArenaService.arena.rideSurfaces
 		self._rideParams = rideParams
+		self._ground = { hit = false, normal = Vector3.yAxis, distance = 0 }
 		self._knockdowns = {}
 		self._knockdownPool = {}
 		self._net:listen(
@@ -355,6 +379,13 @@ local ActionService: ActionService = {
 		end)
 		self._teams.unseated:Connect(function(player: PlayerId)
 			self:forget(player)
+		end)
+		-- The server's own moves are no fall.
+		self._characters.placed:Connect(function(player: PlayerId)
+			local record = self._records[player]
+			if record ~= nil then
+				record.fall:reset()
+			end
 		end)
 	end,
 
@@ -417,12 +448,10 @@ local ActionService: ActionService = {
 					setAttribute(self, player, Attributes.KnockedDown, nil)
 				end
 			end
-			-- One ray per diver, none for anyone else.
-			local landing: Config.ActionName? = record.landing
-			if landing ~= nil and touchedDown(self, player, record, landing) then
-				knockDown(self, nil, player, (actions[landing].landing :: Config.Landing).knockdownSeconds)
-			end
 			show(self, player, record)
+		end
+		for _, holder in self._holderList do
+			lookDown(self, holder)
 		end
 		for _, player in self._order do
 			aim(self, player, self._records[player])
