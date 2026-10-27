@@ -433,6 +433,7 @@ describe("Config defaults", function()
 		expect(a.stripsPerSection).toBe(20)
 		expect(a.surfaceThickness).toBe(1)
 		expect(a.barrier).toEqual({ top = 85, thickness = 1, transparency = 0.7 })
+		expect(a.top).toEqual({ kind = "Closed", ceilingAbove = 20 })
 		expect(a.goalGateIndex).toBe(2)
 		expect(a.goal).toEqual({
 			ringRadius = 7,
@@ -595,6 +596,10 @@ describe("Config.forMode", function()
 			{ overrides = { goal = { wallGap = 0 } }, message = "Arena.goal.wallGap: must be > 0 (got 0)" },
 			{ overrides = { stripsPerSection = 5 }, message = "Arena.stripsPerSection: must be >= 6 (got 5)" },
 			{ overrides = { goalGateIndex = 5 }, message = "Arena.goalGateIndex: must be <= 4 (got 5)" },
+			{
+				overrides = { top = { kind = "Lid" } },
+				message = 'Arena.top.kind: must be one of Closed, Open (got "Lid")',
+			},
 		}
 		for _, case in cases do
 			expect(function()
@@ -619,6 +624,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { barrier = { thickness = 0.0005 } },
 				message = "Arena.barrier.thickness: must be >= 0.001 (got 0.0005)",
+			},
+			{
+				overrides = { top = { ceilingAbove = 3000 } },
+				message = "Arena.top.ceilingAbove: must be <= 2048 (got 3000)",
 			},
 		}
 		for _, case in cases do

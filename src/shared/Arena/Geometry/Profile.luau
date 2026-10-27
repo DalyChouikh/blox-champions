@@ -1,10 +1,11 @@
 --!strict
--- The track's cross-section (Arena spec §3.1) as points (u, y): u is the lateral distance from the inner glass's face
--- toward the outer glass, y the height above the lower floor. Six pieces, from the inner bank's top down and across:
--- the inner bank (a quarter circle, vertical where the glass stands on it), the lower floor, the step, the upper
--- floor, the outer wall's foot curve and the outer wall, up to its top. The top is open: glass stands on the two tops
--- (Features.barriers). Every cross-section has the same point layout and only the step's height changes, so the
--- straights' stepped profile blends point by point into the curved ends' flat one.
+-- The track's cross-sections (Arena spec §3.1) as points (u, y): u is the lateral distance from the inner glass's face
+-- toward the outer glass, y the height above the lower floor. The solid section has six pieces, from the inner bank's
+-- top down and across: the inner bank (a quarter circle, vertical where the glass stands on it), the lower floor, the
+-- step, the upper floor, the outer wall's foot curve and the outer wall, up to its top. Glass stands on the two tops
+-- (Features.barriers), and the top section closes the arena above them (R14). Every solid section has the same point
+-- layout and only the step's height changes, so the straights' stepped profile blends point by point into the curved
+-- ends' flat one.
 
 local Config = require(script.Parent.Parent.Parent.Config)
 
@@ -119,6 +120,26 @@ end
 -- The middle of the lower floor: the lane the team spawns line up on.
 function Profile.lowerFloorCenter(arena: ArenaConfig): number
 	return (arena.innerBankHeight + stepStart(arena)) / 2
+end
+
+-- How high the arena is closed (R14): at the walls' top under a closed map's roof, or ceilingAbove higher under an
+-- open map's ceiling. The gates are this tall, and nothing in play is found above it (Bounds.inArena).
+function Profile.topHeight(arena: ArenaConfig): number
+	local wallTop = arena.barrier.top
+	return if arena.top.kind == "Open" then wallTop + arena.top.ceilingAbove else wallTop
+end
+
+-- The top's cross-section. It closes the track's "O", running on from the outer glass's top back across to the inner
+-- glass's, so its slabs hang above it, outside the track, as every section's do: a closed map's roof across the walls'
+-- top, or an open map's strip up from the outer glass, its ceiling, and a strip down to the inner glass.
+function Profile.top(arena: ArenaConfig): { Vector2 }
+	local width, wallTop = arena.trackWidth, arena.barrier.top
+	local outerTop, innerTop = Vector2.new(width, wallTop), Vector2.new(0, wallTop)
+	if arena.top.kind ~= "Open" then
+		return { outerTop, innerTop }
+	end
+	local ceiling = Profile.topHeight(arena)
+	return { outerTop, Vector2.new(width, ceiling), Vector2.new(0, ceiling), innerTop }
 end
 
 return Profile

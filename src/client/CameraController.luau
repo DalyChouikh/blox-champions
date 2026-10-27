@@ -3,13 +3,14 @@
 -- (Scriptable turns Roblox's own camera off) and sits `distance` behind and `height` above the skater along its own up,
 -- which rolls with the surface the skater rides (ChaseCamera). The look input turns it; on a gamepad or touch it swings
 -- back behind the skater once the look rests; its view widens with speed. Two rays through the ride surfaces keep it
--- inside the arena: the point it looks past stops below a roof, and the camera stops in front of a wall, so it never
--- sees through either, however close that brings it (the owner's choice). With a mouse it keeps the mouse locked to the
--- screen's center, except while the controls are paused (Roblox's menu or Developer Console is open). At a kickoff, and
--- for a new character, it starts behind the skater's facing, at its resting view. Ball Focus (§8.2) turns it toward the
--- ball while the player doesn't carry it: held on PC and gamepad, toggled by a tap on touch (Config.Input). A player
--- with no character (or whose character is gone before the next is bound) watches the ball, from the spectator's
--- distance and height above it; with no ball either, the camera holds still.
+-- inside the arena: the point it looks past stops below any surface over the skater, and the camera stops in front of a
+-- wall, so it never sees through either, however close that brings it (the owner's choice). Both look through the
+-- barriers (the arena's top, A7). With a mouse it keeps the mouse locked to the screen's center, except while the
+-- controls are paused (Roblox's menu or Developer Console is open). At a kickoff, and for a new character, it starts
+-- behind the skater's facing, at its resting view. Ball Focus (§8.2) turns it toward the ball while the player doesn't
+-- carry it: held on PC and gamepad, toggled by a tap on touch (Config.Input). A player with no character (or whose
+-- character is gone before the next is bound) watches the ball, from the spectator's distance and height above it; with
+-- no ball either, the camera holds still.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -126,8 +127,7 @@ local function reach(self: CameraController, origin: Vector3, direction: Vector3
 end
 
 -- Sets the camera `distance` behind the point `height` above `anchor`. Two rays keep both inside the arena: the
--- point stops in front of any ride surface above the anchor (a roof over a leaping skater), and the camera in front
--- of any behind the point.
+-- point stops in front of any ride surface above the anchor, and the camera in front of any behind the point.
 local function place(self: CameraController, anchor: Vector3, height: number, distance: number)
 	local chase = self.chase
 	local up = chase.up

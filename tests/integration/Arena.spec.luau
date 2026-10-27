@@ -23,14 +23,14 @@ beforeAll(function()
 	root.Name = "ArenaIntegrationTest"
 	root.Parent = workspace
 	local started = os.clock()
-	arena = Builder.build(Geometry.build(config, Fixtures.GRAVITY.Magnitude), config, root)
+	arena = Builder.build(Geometry.build(config), config, root)
 	buildSeconds = os.clock() - started
 end)
 afterAll(function()
 	root:Destroy()
 end)
 
--- The top is open (A7): a ray from above finds the floors, and one across finds the walls and the glass.
+-- Rays from under the top (A7) find the floors below them, the walls and the glass across, and the top above.
 local function cast(origin: Vector3, direction: Vector3): RaycastResult
 	return workspace:Raycast(origin, direction) :: RaycastResult
 end
@@ -80,7 +80,7 @@ describe("The generated arena", function()
 		expect(after > 0.28 and after < 1.31).toBe(true)
 	end)
 
-	it("stands the walls and the glass where the profile says", function()
+	it("stands the walls, the glass and the roof where the profile says", function()
 		local outer = cast(Vector3.new(30, 24, -70), Vector3.new(0, 0, -100))
 		expect(outer.Position.Z).toBeCloseTo(-100, 2)
 		expect(outer.Instance.Parent == arena:FindFirstChild("Surface")).toBe(true)
@@ -90,6 +90,9 @@ describe("The generated arena", function()
 		local innerGlass = cast(Vector3.new(30, 40, -70), Vector3.new(0, 0, 100))
 		expect(innerGlass.Position.Z).toBeCloseTo(-40, 2)
 		expect(innerGlass.Instance.Parent == arena:FindFirstChild("Barriers")).toBe(true)
+		local roof = cast(Vector3.new(30, 40, -70), Vector3.new(0, 100, 0))
+		expect(roof.Position.Y).toBeCloseTo(85, 2)
+		expect(roof.Instance.Parent == arena:FindFirstChild("Top")).toBe(true)
 	end)
 
 	it("lets the rules count a lap around the generated track and score through its goal", function()

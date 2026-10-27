@@ -1,11 +1,12 @@
 --!strict
--- Where the ball is in play and where a skater can be (Arena spec §4.3, decision A7): one box inside the glass. Seen
+-- Where the ball is in play and where a skater can be (Arena spec §4.4, decision A7): one box inside the glass. Seen
 -- from above it is the track, the ring between two capsules around the arena's long axis (the inner and the outer
--- glass's faces); in height it runs from the lower floor up to the glass top. The ball outside it is out and
--- respawns, even over the glass top (R10); a skater outside it is placed back on their spawn (#181). No skater can
--- reach the glass top (Reach), so the top never decides a skater's case.
+-- glass's faces); in height it runs from the lower floor up to the top (Profile.topHeight). The top holds the ball and
+-- every skater, so only a fault puts either outside: the ball is then out and respawns (R10), and a skater is placed
+-- back on their spawn (#181).
 
 local Config = require(script.Parent.Parent.Parent.Config)
+local Profile = require(script.Parent.Profile)
 
 type ArenaConfig = Config.ArenaConfig
 
@@ -20,13 +21,13 @@ local function fromAxis(arena: ArenaConfig, position: Vector3): number
 end
 
 -- Inside the glass: between the two glass faces seen from above, no lower than the lower floor and no higher than the
--- glass top, each within `margin`. Across the track, u runs from the inner glass's face toward the outer glass's
+-- top, each within `margin`. Across the track, u runs from the inner glass's face toward the outer glass's
 -- (Profile). The floor is judged at the lower floor's height, so a skater under the upper floor is out once they are
 -- under the lower one.
 function Bounds.inArena(arena: ArenaConfig, position: Vector3, margin: number): boolean
 	local u = fromAxis(arena, position) - (arena.endRadius - arena.trackWidth / 2)
 	local y = position.Y
-	return u >= -margin and u <= arena.trackWidth + margin and y >= -margin and y <= arena.barrier.top + margin
+	return u >= -margin and u <= arena.trackWidth + margin and y >= -margin and y <= Profile.topHeight(arena) + margin
 end
 
 return Bounds

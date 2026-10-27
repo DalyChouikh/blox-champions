@@ -1,11 +1,14 @@
 --!strict
--- The graybox arena (spec §9.1, Arena spec §3): the track loop, its cross-section, the glass on its tops, the goal
--- ring, corner markers, spawns and colors. Lengths are in studs. Arena/Geometry turns these numbers into parts; the
--- cross-field checks here, and the goal ring's fit and the skaters' reach checked in Arena/Geometry, reject sizes that
--- could not be built without overlaps or gaps, or that a skater could leave.
+-- The graybox arena (spec §9.1, Arena spec §3): the track loop, its cross-section, the glass on its tops, the top that
+-- closes it, the goal ring, corner markers, spawns and colors. Lengths are in studs. Arena/Geometry turns these numbers
+-- into parts; the cross-field checks here, and the goal ring's fit checked in Arena/Geometry, reject sizes that could
+-- not be built without overlaps or gaps.
 
 local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
+
+-- A map's top (Arena spec R14): Closed, a glass roof across the walls' top; Open, an invisible ceiling above it.
+export type TopKind = "Closed" | "Open"
 
 export type ArenaConfig = {
 	straightLength: number,
@@ -33,6 +36,10 @@ export type ArenaConfig = {
 	-- `thickness` thick behind its face, outside the track. Skaters and the ball bounce off it; it never darkens the
 	-- track.
 	barrier: { top: number, thickness: number, transparency: number },
+	-- The top that closes the arena, set per map (R14): a closed map's roof spans the walls' top; an open map's ceiling
+	-- stands `ceilingAbove` higher, joined to the walls by strips. Either stops skaters and the ball, and neither is
+	-- ridden.
+	top: { kind: TopKind, ceilingAbove: number },
 	goalGateIndex: number,
 	goal: {
 		-- The opening's radius, which is also the scoring disc's.
@@ -73,6 +80,7 @@ local defaults: ArenaConfig = {
 	stripsPerSection = 20,
 	surfaceThickness = 1,
 	barrier = { top = 85, thickness = 1, transparency = 0.7 },
+	top = { kind = "Closed", ceilingAbove = 20 },
 	goalGateIndex = 2,
 	goal = {
 		ringRadius = 7,
@@ -124,6 +132,8 @@ local fields = Validate.record({
 	surfaceThickness = partSize,
 	-- The glass's height sizes each of its slabs.
 	barrier = Validate.record({ top = partSize, thickness = partSize, transparency = transparency }),
+	-- The ceiling's height above the walls sizes the strips up to it.
+	top = Validate.record({ kind = Validate.string({ oneOf = { "Closed", "Open" } }), ceilingAbove = partSize }),
 	-- The loop has four sections (two straights, two curved ends), and a lap gate starts each one.
 	goalGateIndex = Validate.number({ min = 1, max = 4, integer = true }),
 	goal = Validate.record({
@@ -146,8 +156,7 @@ local fields = Validate.record({
 })
 
 -- Checked in order; the first that fails is reported. Whether the goal ring fits is judged by Arena/Geometry
--- against the surface as built (Features.goal), which config cannot require; so is whether a skater could clear the
--- glass, which depends on the world's gravity (Reach).
+-- against the surface as built (Features.goal), which config cannot require.
 local crossFieldRules: { Validate.Rule } = {
 	{
 		message = "trackWidth must fit the inner bank, the outer wall's foot curve, the step, the upper floor and a "

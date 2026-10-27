@@ -5,6 +5,7 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 
 local arena = Config.defaults().Arena
@@ -23,7 +24,7 @@ describe("Profile", function()
 		end
 	)
 
-	it("ends at the outer wall's top: no roof", function()
+	it("ends at the outer wall's top, where the glass stands on it", function()
 		local p = Profile.points(arena, arena.stepHeight)
 		expect(#p).toBe(21)
 		near(p[#p], Vector2.new(arena.trackWidth, arena.outerWallHeight))
@@ -65,5 +66,23 @@ describe("Profile", function()
 			expect(flat[index].Y).toBeCloseTo(0, 4)
 		end
 		near(flat[20], Vector2.new(60, 14))
+	end)
+
+	-- The top closes the track's "O": it runs on from the outer side back to the inner side (Arena spec §3.1, R14).
+	it("closes the top across the track at the walls' top, or above it with an open map's ceiling", function()
+		local closed = Profile.top(arena)
+		expect(#closed).toBe(2)
+		near(closed[1], Vector2.new(60, 85))
+		near(closed[2], Vector2.new(0, 85))
+		expect(Profile.topHeight(arena)).toBe(85)
+
+		local open = Fixtures.config({ Arena = { top = { kind = "Open" } } }).Arena
+		local section = Profile.top(open)
+		expect(#section).toBe(4)
+		near(section[1], Vector2.new(60, 85))
+		near(section[2], Vector2.new(60, 105))
+		near(section[3], Vector2.new(0, 105))
+		near(section[4], Vector2.new(0, 85))
+		expect(Profile.topHeight(open)).toBe(105)
 	end)
 end)
