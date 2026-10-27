@@ -15,12 +15,13 @@ end
 describe("Crossing.throughRectangle", function()
 	local rect: Crossing.Rectangle = { frame = FACING_X, width = 10, height = 6 }
 
-	it("returns where along the segment it crosses forward inside the rectangle", function()
+	it("returns where along the segment it crosses inside the rectangle", function()
 		expect(Crossing.throughRectangle(rect, v(-1, 0, 0), v(3, 0, 0))).toBeCloseTo(0.25)
 	end)
 
-	it("ignores backward crossings and segments that stay on one side", function()
-		expect(Crossing.throughRectangle(rect, v(1, 0, 0), v(-1, 0, 0))).toBeNil()
+	-- The owner, 2026-10-27: a gate counts from its back as from its front.
+	it("counts a crossing either way inside the rectangle, and ignores segments that stay on one side", function()
+		expect(Crossing.throughRectangle(rect, v(3, 0, 0), v(-1, 0, 0))).toBeCloseTo(0.75)
 		expect(Crossing.throughRectangle(rect, v(-3, 0, 0), v(-1, 0, 0))).toBeNil()
 		expect(Crossing.throughRectangle(rect, v(1, 0, 0), v(2, 0, 0))).toBeNil()
 	end)
@@ -34,22 +35,29 @@ describe("Crossing.throughRectangle", function()
 	it("counts a ball that stops exactly on the plane once, not again when it moves on", function()
 		expect(Crossing.throughRectangle(rect, v(-1, 0, 0), v(0, 0, 0))).toBe(1)
 		expect(Crossing.throughRectangle(rect, v(0, 0, 0), v(1, 0, 0))).toBeNil()
+		expect(Crossing.throughRectangle(rect, v(1, 0, 0), v(0, 0, 0))).toBe(1)
+		expect(Crossing.throughRectangle(rect, v(0, 0, 0), v(-1, 0, 0))).toBeNil()
 	end)
 
-	it("uses the frame's position and facing", function()
+	it("uses the frame's position and plane", function()
 		local facingNegativeZ: Crossing.Rectangle =
 			{ frame = CFrame.lookAt(v(10, 5, 0), v(10, 5, -1)), width = 2, height = 2 }
 		expect(Crossing.throughRectangle(facingNegativeZ, v(10, 5, 1), v(10, 5, -1))).toBeCloseTo(0.5)
-		expect(Crossing.throughRectangle(facingNegativeZ, v(10, 5, -1), v(10, 5, 1))).toBeNil()
+		expect(Crossing.throughRectangle(facingNegativeZ, v(10, 5, -1), v(10, 5, 1))).toBeCloseTo(0.5)
+		-- Beside the rectangle, and along its plane.
+		expect(Crossing.throughRectangle(facingNegativeZ, v(0, 0, 1), v(0, 0, -1))).toBeNil()
+		expect(Crossing.throughRectangle(facingNegativeZ, v(9, 5, 0.5), v(11, 5, 0.5))).toBeNil()
 	end)
 end)
 
 describe("Crossing.throughDisc", function()
-	it("counts forward crossings within the radius only", function()
+	-- The owner, 2026-10-27: the goal scores from behind as from the front.
+	it("counts crossings either way within the radius only", function()
 		local disc: Crossing.Disc = { frame = FACING_X, radius = 7 }
 		expect(Crossing.throughDisc(disc, v(-1, 0, 6.9), v(1, 0, 6.9))).toBeCloseTo(0.5)
 		expect(Crossing.throughDisc(disc, v(-1, 5, 5), v(1, 5, 5))).toBeNil()
-		expect(Crossing.throughDisc(disc, v(1, 0, 0), v(-1, 0, 0))).toBeNil()
+		expect(Crossing.throughDisc(disc, v(1, 0, 0), v(-1, 0, 0))).toBeCloseTo(0.5)
+		expect(Crossing.throughDisc(disc, v(1, 5, 5), v(-1, 5, 5))).toBeNil()
 	end)
 end)
 

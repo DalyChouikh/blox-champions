@@ -12,18 +12,19 @@ function Trajectory.positionAt(position: Vector3, velocity: Vector3, gravity: Ve
 end
 
 -- t must be strictly ahead: like Crossing, a ball already on the plane has crossed it.
-local function isForwardCrossing(t: number, speedAlong: number, gravityAlong: number, maxTime: number): boolean
-	return t > 0 and t <= maxTime and speedAlong + gravityAlong * t > 0
+local function ahead(t: number, maxTime: number): boolean
+	return t > 0 and t <= maxTime
 end
 
--- Earliest time in (0, maxTime] at which the path crosses the frame's plane moving along frame.LookVector.
-function Trajectory.forwardCrossingTime(
+-- The times in (0, maxTime] at which the path meets the frame's plane, either way through it (the goal scores from
+-- either side), the earlier first; nil for each one there is not. Returned as two values, so it never allocates.
+function Trajectory.crossingTimes(
 	position: Vector3,
 	velocity: Vector3,
 	gravity: Vector3,
 	frame: CFrame,
 	maxTime: number
-): number?
+): (number?, number?)
 	-- Signed distance along LookVector: s(t) = start + speedAlong * t + gravityAlong * t^2 / 2.
 	local normal = frame.LookVector
 	local start = (position - frame.Position):Dot(normal)
@@ -31,28 +32,27 @@ function Trajectory.forwardCrossingTime(
 	local gravityAlong = gravity:Dot(normal)
 
 	if math.abs(gravityAlong) < FLAT_EPSILON then
-		if speedAlong <= 0 then
-			return nil
+		if speedAlong == 0 then
+			return nil, nil
 		end
 		local t = -start / speedAlong
-		return if isForwardCrossing(t, speedAlong, gravityAlong, maxTime) then t else nil
+		return if ahead(t, maxTime) then t else nil, nil
 	end
 
 	local discriminant = speedAlong * speedAlong - 2 * gravityAlong * start
 	if discriminant < 0 then
-		return nil
+		return nil, nil
 	end
 	local root = math.sqrt(discriminant)
 	local a = (-speedAlong - root) / gravityAlong
 	local b = (-speedAlong + root) / gravityAlong
 	local first, second = math.min(a, b), math.max(a, b)
-	if isForwardCrossing(first, speedAlong, gravityAlong, maxTime) then
-		return first
+	-- A path that only touches the plane meets it once.
+	local later = if root > 0 and ahead(second, maxTime) then second else nil
+	if ahead(first, maxTime) then
+		return first, later
 	end
-	if isForwardCrossing(second, speedAlong, gravityAlong, maxTime) then
-		return second
-	end
-	return nil
+	return later, nil
 end
 
 return Trajectory
