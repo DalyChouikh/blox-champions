@@ -150,7 +150,8 @@ describe("Config defaults", function()
 			airDrag = 0.02,
 			cruiseSpeed = 60,
 			softCap = 90,
-			hardCap = 140,
+			hardCap = 121,
+			overSpeedBleed = 5,
 			turnRateLow = 4.0,
 			turnRateHigh = 1.5,
 			airTurnRate = 1,
@@ -173,11 +174,23 @@ describe("Config defaults", function()
 			attachFollowDistance = 4,
 			attachSpring = 10,
 			attachMaxSeconds = 3,
-			attachBoostSpeed = 40,
+			attachBoostSpeed = 75,
 			attachCooldown = 3,
 			knockdownDecel = 75,
 			speedometerScale = 1.2,
 		})
+	end)
+
+	-- Roller Champions' readout, measured in the owner's recordings (#214): nothing past 145 km/h, extra speed bleeding
+	-- back to about 108, and a whip release adding about 90.
+	it("read Roller Champions' speeds on the speedometer", function()
+		local movement = Config.defaults().Movement
+		local function kmh(studsPerSecond: number): number
+			return math.round(studsPerSecond * movement.speedometerScale)
+		end
+		expect(kmh(movement.hardCap)).toBe(145)
+		expect(kmh(movement.softCap)).toBe(108)
+		expect(kmh(movement.attachBoostSpeed)).toBe(90)
 	end)
 
 	it("pose skaters with the starting angles", function()
@@ -741,6 +754,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { pumpSlopeMultiplier = 0.5 } },
 				message = "Movement.pumpSlopeMultiplier: must be >= 1 (got 0.5)",
+			},
+			{
+				overrides = { Movement = { overSpeedBleed = -1 } },
+				message = "Movement.overSpeedBleed: must be >= 0 (got -1)",
 			},
 		}
 		for _, case in cases do

@@ -1,7 +1,8 @@
 --!strict
 -- Attaching behind a teammate (spec §7.2, Roller Champions' Grapple Whip). A skater holding Attach right behind a
 -- teammate is pulled along behind them; letting go, holding too long or losing the leader releases them with a
--- boost along the leader's facing, then a cooldown. This module decides when; SkateMath.follow and release move.
+-- boost toward the stick held then, or along the leader's facing, then a cooldown. This module decides when;
+-- SkateMath.follow and release move.
 
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Rules.Types)
@@ -20,7 +21,7 @@ type Fields = {
 	leader: PlayerId?,
 	attachedFor: number,
 	cooldownLeft: number,
-	-- The leader's facing at the last update while attached: the way the release boosts.
+	-- The way the release boosts: the stick held at the release, else the leader's facing at the last update.
 	releaseDirection: Vector3,
 	_movement: Config.MovementConfig,
 }
@@ -73,7 +74,8 @@ function Attach.reset(self: Attach)
 end
 
 -- `leader` is the best candidate while not attached, and the current leader's record (nil once gone) while attached.
-function Attach.update(self: Attach, dt: number, holding: boolean, leader: Candidate?): Change
+-- `aim` is the stick's direction on the surface (zero at rest): a release boosts toward it, else the leader's way.
+function Attach.update(self: Attach, dt: number, holding: boolean, leader: Candidate?, aim: Vector3): Change
 	local movement = self._movement
 	self.cooldownLeft = math.max(0, self.cooldownLeft - dt)
 	if self.leader == nil then
@@ -93,6 +95,9 @@ function Attach.update(self: Attach, dt: number, holding: boolean, leader: Candi
 	if not holding or leader == nil or self.attachedFor >= movement.attachMaxSeconds then
 		self.leader = nil
 		self.cooldownLeft = movement.attachCooldown
+		if aim.Magnitude > Vectors.EPSILON then
+			self.releaseDirection = aim.Unit
+		end
 		return "Released"
 	end
 	return "None"

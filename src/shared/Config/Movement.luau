@@ -22,9 +22,13 @@ export type MovementConfig = {
 	-- Speed lost per second per stud/s of speed.
 	airDrag: number,
 	cruiseSpeed: number,
-	-- Speeding up fades from softCap to nothing at hardCap; hardCap is never exceeded.
+	-- Speeding up fades from softCap to nothing at hardCap; hardCap is never exceeded, on the ground or in the air
+	-- (Roller Champions' readout never passed 145 km/h, #214).
 	softCap: number,
 	hardCap: number,
+	-- On the ground, speed past softCap bleeds off at this rate per second: each step loses 1 − e^(−rate × dt) of
+	-- the excess, so the further over, the faster (RC: whipped to 144 km/h, back near 110 within a second).
+	overSpeedBleed: number,
 	-- Turn rate at rest and at hardCap: turns widen with speed.
 	turnRateLow: number,
 	turnRateHigh: number,
@@ -56,6 +60,7 @@ export type MovementConfig = {
 	-- How hard an attached skater is pulled to the follow point: speed per stud of error.
 	attachSpring: number,
 	attachMaxSeconds: number,
+	-- Letting go adds this speed toward the stick held then, or along the leader's way (RC: about +90 km/h, #214).
 	attachBoostSpeed: number,
 	attachCooldown: number,
 	-- A knocked-down skater slides, losing this much speed per second on top of friction.
@@ -74,7 +79,8 @@ local defaults: MovementConfig = {
 	airDrag = 0.02,
 	cruiseSpeed = 60,
 	softCap = 90,
-	hardCap = 140,
+	hardCap = 121,
+	overSpeedBleed = 5,
 	turnRateLow = 4.0,
 	turnRateHigh = 1.5,
 	airTurnRate = 1,
@@ -97,7 +103,7 @@ local defaults: MovementConfig = {
 	attachFollowDistance = 4,
 	attachSpring = 10,
 	attachMaxSeconds = 3,
-	attachBoostSpeed = 40,
+	attachBoostSpeed = 75,
 	attachCooldown = 3,
 	knockdownDecel = 75,
 	speedometerScale = 1.2,
@@ -118,6 +124,7 @@ local fields = Validate.record({
 	cruiseSpeed = positive,
 	softCap = positive,
 	hardCap = positive,
+	overSpeedBleed = nonNegative,
 	turnRateLow = nonNegative,
 	turnRateHigh = nonNegative,
 	airTurnRate = nonNegative,
