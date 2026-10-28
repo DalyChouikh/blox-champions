@@ -975,3 +975,112 @@ describe("SkateMath riding the roof by loop physics", function()
 		expect(s.mode).toBe("Grounded")
 	end)
 end)
+
+-- The owner (#257, Q26): real physics, a surface only pushes. A skater stays on only while the push their path's curve
+-- needs, speed² × curvature, reaches gravity's pull off the surface. Where the surface bends away from them the
+-- curvature is negative: an upright wall bending away holds no one, and a crest throws off a skater too fast for
+-- gravity to keep on it. Curves bending toward them hold, as before.
+describe("SkateMath on surfaces that bend away", function()
+	local DT = 1 / 60
+
+	-- Rides an arc of `radius` from `from` to `to` (radians), one step per DT, the velocity set along it each step, and
+	-- says whether the skater stayed on. `normalAt` and `alongAt` give the surface's normal and the way along it at an
+	-- angle. The skater first rides the surface the arc starts from.
+	local function staysOn(
+		speed: number,
+		radius: number,
+		from: number,
+		to: number,
+		normalAt: (number) -> Vector3,
+		alongAt: (number) -> Vector3
+	): boolean
+		local s = skater(Vector3.zero)
+		for _ = 1, 10 do
+			s.velocity = alongAt(from) * speed
+			s:step(input(), ground(normalAt(from)), DT)
+		end
+		local step = speed * DT / radius
+		for frame = 0, math.ceil((to - from) / step) do
+			local at = from + frame * step
+			s.velocity = alongAt(at) * speed
+			s:step(input(), ground(normalAt(at)), DT)
+			if s.mode == "Airborne" then
+				return false
+			end
+		end
+		return true
+	end
+
+	-- Over a crest, moving +X: the top at 0, the surface falling away ahead.
+	local function crestNormal(phi: number): Vector3
+		return Vector3.new(math.sin(phi), math.cos(phi), 0)
+	end
+	local function crestAlong(phi: number): Vector3
+		return Vector3.new(math.cos(phi), -math.sin(phi), 0)
+	end
+	-- Up a quarter-pipe from the floor (0) to upright (pi / 2), moving +X then up.
+	local function pipeNormal(phi: number): Vector3
+		return Vector3.new(-math.sin(phi), math.cos(phi), 0)
+	end
+	local function pipeAlong(phi: number): Vector3
+		return Vector3.new(math.cos(phi), math.sin(phi), 0)
+	end
+
+	-- Round the outside of an upright pillar of radius 20 (like the middle glass's round ends), built as flat strips
+	-- 3.75° apart (the arena's stations): the skater rides the first strip, then the face turns away from them.
+	it("flies off the outside of an upright pillar at its first turn, at any speed", function()
+		local RADIUS, STRIP = 20, math.rad(3.75)
+		for _, speed in { 10, 30, 60, movement.hardCap } do
+			local s = skater(Vector3.zero)
+			local around = 0
+			local firstTurn: number? = nil
+			local leftAt: number? = nil
+			for frame = 1, 120 do
+				local strip = math.floor(around / STRIP)
+				if strip > 0 and firstTurn == nil then
+					firstTurn = frame
+				end
+				local facing = (strip + 0.5) * STRIP
+				s.velocity = Vector3.new(-math.sin(around), 0, math.cos(around)) * speed
+				s:step(input(), ground(Vector3.new(math.cos(facing), 0, math.sin(facing))), DT)
+				if s.mode == "Airborne" then
+					leftAt = frame
+					break
+				end
+				around += speed * DT / RADIUS
+			end
+			expect(firstTurn).never.toBeNil()
+			expect(leftAt).toBe(firstTurn)
+		end
+	end)
+
+	-- A crest of radius 20, from 15° before its top to 15° past it: gravity keeps a skater on only while speed² / 20
+	-- stays within 196.2 × cos 15° = 189.5, up to 61.6 studs/s.
+	it("throws a skater too fast for gravity off a crest, and keeps a slower one on", function()
+		local edge = math.rad(15)
+		expect(staysOn(57, 20, -edge, edge, crestNormal, crestAlong)).toBe(true)
+		expect(staysOn(66, 20, -edge, edge, crestNormal, crestAlong)).toBe(false)
+	end)
+
+	-- The outer wall's foot (radius 18) bends toward the skater: it pushes harder the faster they go.
+	it("keeps a skater on a curve that bends toward them, however fast or slow", function()
+		for _, speed in { 8, 60, movement.hardCap } do
+			expect(staysOn(speed, 18, 0, math.pi / 2, pipeNormal, pipeAlong)).toBe(true)
+		end
+	end)
+
+	-- Built faces lean a hair (up to 6.5e-5 rad, measured, #234), so a ray crossing from face to face reads a turn of
+	-- float noise, not a curve: a skater along the glass at hardCap stays on it.
+	it("keeps a skater riding along glass whose faces lean only by float noise, even at hardCap", function()
+		local NOISE = 6.5e-5
+		local tilts = { NOISE, 0, -NOISE, 0 }
+		local s = skater(Vector3.zero)
+		local held = true
+		for frame = 1, 120 do
+			s.velocity = Vector3.new(movement.hardCap, 0, 0)
+			s:step(input(), ground(Vector3.new(tilts[frame % 4 + 1], 0, 1).Unit), DT)
+			held = held and s.mode == "Grounded"
+		end
+		expect(held).toBe(true)
+	end)
+end)

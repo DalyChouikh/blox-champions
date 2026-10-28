@@ -13,13 +13,16 @@ local alongSurface = Vectors.alongSurface
 local rotateToward = Vectors.rotateToward
 
 -- How many past grounded steps the curvature window can reach back over: at hardCap a window of ten studs spans five,
--- and at a crawl the window simply covers less road, where the loop rule's speed² makes the curve irrelevant.
+-- and at a crawl the window simply covers less road, where the contact rule's speed² makes the curve irrelevant.
 local HISTORY = 32
--- A ground normal turning less than this in a step (radians) has not turned: float noise on a flat surface.
-local TURN_EPSILON = 1e-6
--- A face leaning past straight up by less than this (the sine of the lean) is a vertical wall, not an overhang: the
--- arena's built glass reads up to 6.5e-5 past vertical (measured, #234). The lips' first strip leans 22.5°.
-local OVERHANG_EPSILON = 1e-3
+-- A ground normal turning less than this in a step (radians) has not turned: float noise on a flat surface. Measured
+-- on the arena (#257): neighbouring rays on one face differ by up to 1.5e-4, and where it really turns by 8.5e-3 or
+-- more.
+local TURN_EPSILON = 1e-3
+-- The contact rule's slack for float noise, as a share of gravity: the arena's built glass reads up to 6.5e-5 past
+-- vertical (measured, #234), so a face leaning less than this past straight up still holds like a wall. The lips'
+-- first strip leans 22.5°.
+local CONTACT_SLACK = 1e-3
 -- What a knocked-down skater's input becomes, one for each kind of knockdown: no stick, pump, brake, jump or draft.
 -- They only slide, for their kind's time (#252).
 local function locked(knockdown: Attributes.Knockdown): Types.SkateInput
@@ -71,8 +74,8 @@ type Fields = {
 	_wallCos: number,
 	-- Gravity's pull along a surface no steeper than pumpFlatSlopeDeg: pumping there counts as on the flat.
 	_flatPull: number,
-	-- Gravity's pull off a face leaning OVERHANG_EPSILON past vertical: up to it the face holds like a wall.
-	_overhangPull: number,
+	-- Gravity's pull at CONTACT_SLACK of its strength: a push this small that the curve misses is float noise.
+	_slackPull: number,
 	-- The cosine of cornerDeg: the ground turning less than that since the last step is a curve (#255).
 	_cornerCos: number,
 	-- The fall line (fallLineDeg below the facing): its angle's cosine and sine, and gravity's pull along it.
@@ -113,7 +116,7 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_worldUp = -gravity.Unit,
 		_wallCos = math.cos(math.rad(movement.wallAngle)),
 		_flatPull = gravity.Magnitude * math.sin(math.rad(movement.pumpFlatSlopeDeg)),
-		_overhangPull = gravity.Magnitude * OVERHANG_EPSILON,
+		_slackPull = gravity.Magnitude * CONTACT_SLACK,
 		_cornerCos = math.cos(math.rad(movement.cornerDeg)),
 		_lineCos = math.cos(line),
 		_lineSin = math.sin(line),
@@ -346,11 +349,12 @@ local function measure(self: Skater, normal: Vector3, dt: number): (number, numb
 	return speed * dt, if (normal - last):Dot(along) > 0 then -angle else angle
 end
 
--- How sharply the surface bends around the skater, 1/radius, from the turns of the last curvatureWindow studs of
--- path. Across a lip's flat strips the ground turns only at each strip's edge, so the curve is the turning
--- between the oldest and the newest turn in the window over the road between them: one strip's angle per strip's
--- width, the arc they make. On a smooth curve every step turns, and this is the turn per stud. With fewer than two
--- turns in the window it is the turning over the window's road. Zero until a grounded step has measured a turn.
+-- How sharply the surface bends around the skater, 1/radius (negative where it bends away), from the turns of the
+-- last curvatureWindow studs of path. Across a lip's flat strips the ground turns only at each strip's edge, so the
+-- curve is the turning between the oldest and the newest turn in the window over the road between them: one strip's
+-- angle per strip's width, the arc they make. On a smooth curve every step turns, and this is the turn per stud. With
+-- fewer than two turns in the window it is the turning over the window's road. Zero until a grounded step has
+-- measured a turn.
 local function curvature(self: Skater, travel: number, turn: number): number
 	local window = self._movement.curvatureWindow
 	-- Walking back from now, a step's turn happened where that step ended: `behind` studs ago.
@@ -381,16 +385,13 @@ local function curvature(self: Skater, travel: number, turn: number): number
 	return if behind > EPSILON then turned / behind else 0
 end
 
--- Past straight up the surface overhangs, and gravity pulls the skater off it: they stay on only while speed² ×
--- curvature reaches that pull. A flat ceiling has no curvature, so it never holds (spec §7.2, A3). A face only float
--- noise past vertical is a wall.
-local function loopBreaks(self: Skater, normal: Vector3, travel: number, turn: number): boolean
-	local pull = self._gravity:Dot(normal)
-	if pull <= self._overhangPull then
-		return false
-	end
+-- A surface only pushes (#257, A3): the skater stays on while the push their path's curve needs, speed² × curvature
+-- (negative where the surface bends away from them), reaches gravity's pull off the surface, within the slack. So a
+-- flat ceiling never holds, an overhang holds only fast enough round its curve, a wall bending away holds no one, a
+-- crest throws off a skater too fast for gravity to keep on it, and a curve bending toward them always holds.
+local function letsGo(self: Skater, normal: Vector3, travel: number, turn: number): boolean
 	local speed = alongSurface(self.velocity, normal).Magnitude
-	return speed * speed * curvature(self, travel, turn) < pull
+	return speed * speed * curvature(self, travel, turn) < self._gravity:Dot(normal) - self._slackPull
 end
 
 -- Keeps this grounded step's travel and turn for the curvature window.
@@ -450,8 +451,8 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 			self.velocity -= alongSurface(self.velocity, ground.normal) * movement.jumpSpeedCost
 			self.velocity += ground.normal * movement.jumpImpulse
 			self.mode = "Airborne"
-		elseif not ground.hit or loopBreaks(self, ground.normal, travel, turn) then
-			-- No ground, or past straight up the surface's curve no longer holds the skater (A3).
+		elseif not ground.hit or letsGo(self, ground.normal, travel, turn) then
+			-- No ground, or the surface can no longer push the skater round their path's curve (#257).
 			self.mode = "Airborne"
 		end
 		return
