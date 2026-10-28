@@ -163,6 +163,7 @@ describe("Config defaults", function()
 			airUprightRate = 6,
 			wallAngle = 30,
 			wallGravityScale = 1 / 3,
+			wallTurnRate = 1,
 			curvatureWindow = 10,
 			pumpSlopeMultiplier = 1.6,
 			pumpFlatAccel = 8,
@@ -806,6 +807,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { wallGravityScale = 1.5 } },
 				message = "Movement.wallGravityScale: must be <= 1 (got 1.5)",
+			},
+			{
+				overrides = { Movement = { wallTurnRate = -1 } },
+				message = "Movement.wallTurnRate: must be >= 0 (got -1)",
 			},
 		}
 		for _, case in cases do

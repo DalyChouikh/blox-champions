@@ -238,6 +238,56 @@ about two thirds of a lap, swinging from wall to wall.
   - **How high skilled combos reach** (measured 70–80 studs; the lips start at 108): judged at the Feel playtest; if
     too low, measured options then (a stronger whip or uppercut, lighter wall gravity).
 
+## The owner's answers, 2026-10-28 (the Feel playtest, the published build at the stack's head)
+
+- **Combo heights: high enough** (recommended): today's 70–80 studs stay.
+- **Climbing the glass costs speed** (recommended). Told first: since the glass fix (#234), holding the stick toward
+  the glass kept a skater at cruise while climbing it (20–60° entries reached 39–64 studs within one straight), while
+  a ranked RC rider climbing the glass lost speed fast (98 to 21 km/h in about a second, Video 3, 21:01). So on a wall
+  the stride no longer pushes uphill. Not chosen: keep it.
+- **Findings, in the owner's words:** "why the player can just ride the wall and be stick to it like skating on the
+  ground floor? and abiliting to keep spaming Tackle in short durations, and also even when on the ground, he should
+  be able to dive after a tackle, like tackle then dive in the ground, and when he dive, there should be a duration for
+  him to get up, give him like a real human being weight, just like RC, always follow RC, we try to get 1:1". So:
+  - wall riding feels like skating on the floor (the skater sticks to it);
+  - tackles can be spammed in short intervals;
+  - on the ground a tackle should be followed by a dive (tackle, then dive), as in RC;
+  - after a dive the skater should take a weighty, human time to get up, as in RC.
+- **The findings' round** (2026-10-28; the owner: "do your recommendations"). RC measured first from Video 4's hint
+  column at 10 frames a second (five ground tackles) and Video 3's glass rides; ours in Studio:
+  - **Wall riding:** on a wall (steeper than 30°) the stick no longer pushes and steers at most **1 rad/s** (on the
+    floor 2.8 at cruise). Measured on an upright wall, stick held level along it: today every rider stays above 20 studs
+    for the whole 20 s tested and ends at 72 km/h (a slow one speeds up); with the rule only a rider faster than
+    ~78 km/h holds a line (90 km/h: level ~1.9 s, then curves down), a 30 km/h rider is back on the floor in 1.6 s at
+    86 km/h, a 104 km/h entry stays above 20 studs 4.4 s. RC: slow riders swing up and down low on the glass (Video 3,
+    31:16, 1–41 km/h), a 104 km/h entry stayed high ~6 s with the readout swinging 9–56 (14:25), a 90 km/h rider held a
+    line ~2 s (21:09). Pumping on walls unchanged. Not chosen: no push only (still ~16 s above 20 studs); no steering.
+  - **Tackle, then Dive, on the ground and in the air:** the Dive is only a follow-up of a Tackle, pressed 0.1–1.0 s
+    after the Tackle press; the hints and the touch button read "Dive" then. RC: "Dive" replaces "Tackle" 0.1–0.2 s
+    after the press for 0.7–0.8 s, and "Tackle" is back 0.9–1.0 s after it; in the air the first press is a Tackle
+    (Video 5). Replaces #221's "the first press in the air dives".
+  - **The tackle's wait: 1.0 s** (was 0.8): RC's plain tackles come ~1.0 s apart.
+  - **The tackle's push:** a lunge to **72 km/h** along the facing for its strike, then the slower of that and the speed
+    before it, so a tackle never makes a skater faster (in the air 0.8 as strong, 58 km/h). RC's lunge peaked at
+    65–75 km/h from 31–96 km/h and fell back within ~0.3 s. Today: +48 km/h that stays.
+  - **The dive's push:** a lunge to 72 km/h along the way, or the speed already had if faster; falling adds the rest
+    (cap 145). RC: a ground dive 47 → 71 km/h, an air dive 27 → 82 in 0.33 s and 124 at the bottom. Today: +72 km/h.
+  - **A diver gets up when the slide stops** (at 1.5 s at the latest), with no early get-up by the stick and no Get Up
+    prompt; tackled skaters and hard landings keep today's Get Up. RC: actions back exactly at 0 km/h, 0.7–1.0 s after
+    touchdown. Today: up from 0.5 s with the stick (measured: 0.53 s after touchdown, still at 37 km/h).
+  - **The look of weight:** a diver lies face-down and forward (not tipped back), and every knockdown eases down and back
+    up over ~0.3 s instead of snapping; judged on screenshots and at the playtest. RC (Video 4, 0:32.2–0:33.7): the
+    diver stretches out low, lands on the knees and belly, slides kneeling and rises as the slide ends.
+  - **An air Tackle soon after an Uppercut** (round 2, recommended): the Uppercut's 0.4 s recovery goes, so a Tackle
+    may start once its strike ends, 0.25 s after the press (the Uppercut's 1.2 s cooldown stays). RC (Video 5, 1:19.5):
+    Tackle ready 0.13 s after the Uppercut, the chain Uppercut → Tackle 0.33 s later → Dive 0.53 s after that. Today:
+    busy 0.65 s. The owner approved the five tickets (walls; Dive after Tackle; lunges to 72 km/h; a diver up when the
+    slide stops; face-down diver and eased knockdowns).
+  - **The brake on a wall** (2026-10-28, while building #239, AskUserQuestion, recommended): **it does nothing** on a
+    wall (steeper than 30°), like the stride. Measured first on an upright wall: holding Brake stopped a skater dead
+    and kept them there (34.9 studs up, 0 speed, all 6 s), and Brake with the stick up tiptoed them straight up the
+    glass at 12 studs/s (14 km/h), 40 to 112 studs in 6 s. Not chosen: the brake slows but cannot hold; keep it.
+
 ## Roller Champions
 
 ### Video 1: TmarTn2, "Roller Champions Gameplay" (E3 2019 pre-alpha, 11:03), sampled every 2 s

@@ -294,6 +294,39 @@ describe("SkateMath off the ground and on walls", function()
 		expect(bank.velocity.Magnitude).toBeCloseTo(3.4652, 3)
 	end)
 
+	-- The owner (#239): on a wall the skates only roll. The stick neither strides nor steers hard and the brake does
+	-- nothing, so climbing costs speed and a slow rider curves back down (RC's glass rides), never holding a line.
+	it("never strides on a wall: holding the stick along it adds no speed", function()
+		local s = skater(Vector3.new(0, 0, -20))
+		s:step(input({ move = -Vector3.zAxis }), ground(Vector3.xAxis), 0.1)
+		-- (0, −6.54, −20) after a third of gravity, |21.0421| − (4 + 0.4208) × 0.1 = 20.6000 along it
+		Fixtures.expectNear(s.velocity, Vector3.new(0, -6.4026, -19.5798))
+	end)
+
+	it("steers on a wall no faster than wallTurnRate", function()
+		local s = skater(Vector3.new(0, 0, -30))
+		s:step(input({ move = Vector3.yAxis }), ground(Vector3.xAxis), 0.1)
+		-- Turned 1 × 0.1 rad up (the floor's rate at 30 is 3.38), plus (0, −6.54, 0), then friction and drag
+		Fixtures.expectNear(s.velocity, Vector3.new(0, -3.4907, -29.3932))
+	end)
+
+	it("ignores the brake on a wall: no standing still on it, no tiptoeing up it", function()
+		local held = skater(Vector3.zero)
+		held:step(input({ brake = true }), ground(Vector3.xAxis), 0.1)
+		Fixtures.expectNear(held.velocity, Vector3.new(0, -5.3769, 0)) -- as with nothing pressed
+		local tiptoe = skater(Vector3.zero)
+		tiptoe:step(input({ brake = true, move = Vector3.yAxis }), ground(Vector3.xAxis), 0.1)
+		-- Sliding down, the stick held: 6.54 − (4 + 0.1308) × 0.1
+		Fixtures.expectNear(tiptoe.velocity, Vector3.new(0, -6.1269, 0))
+	end)
+
+	it("pumps on a wall as on any slope: more pull on the way down", function()
+		local s = skater(Vector3.new(0, -10, 0))
+		s:step(input({ pump = true }), ground(Vector3.xAxis), 0.1)
+		-- 10 + 65.4 × 1.6 × 0.1 = 20.464, then 20.464 − (4 + 0.4093) × 0.1
+		Fixtures.expectNear(s.velocity, Vector3.new(0, -20.0231, 0))
+	end)
+
 	it("steers a little in the air", function()
 		local s = skater(Vector3.new(0, 0, -30))
 		s.mode = "Airborne"

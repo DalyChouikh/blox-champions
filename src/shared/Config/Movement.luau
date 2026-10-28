@@ -43,6 +43,10 @@ export type MovementConfig = {
 	-- straight up the loop rule decides (A3).
 	wallAngle: number,
 	wallGravityScale: number,
+	-- On a wall the skates only roll (the owner, #239): no stride, no brake, and the stick turns the heading at most
+	-- this fast, so only a rider above wallGravityScale × g / wallTurnRate (78 km/h) holds a line along the glass, as
+	-- in RC; slower ones curve back down.
+	wallTurnRate: number,
 	-- How far back along the skater's path the curve of an overhang is measured (A3): a few of a lip's flat strips,
 	-- so a curve of strips reads as the arc it makes, yet short enough to follow a curve from where it starts.
 	curvatureWindow: number,
@@ -102,6 +106,7 @@ local defaults: MovementConfig = {
 	airUprightRate = 6,
 	wallAngle = 30,
 	wallGravityScale = 1 / 3,
+	wallTurnRate = 1,
 	curvatureWindow = 10,
 	pumpSlopeMultiplier = 1.6,
 	pumpFlatAccel = 8,
@@ -150,6 +155,7 @@ local fields = Validate.record({
 	airUprightRate = positive,
 	wallAngle = angle,
 	wallGravityScale = Validate.number({ above = 0, max = 1 }),
+	wallTurnRate = nonNegative,
 	curvatureWindow = positive,
 	pumpSlopeMultiplier = Validate.number({ min = 1 }),
 	pumpFlatAccel = nonNegative,
