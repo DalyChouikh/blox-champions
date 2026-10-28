@@ -464,7 +464,7 @@ local SkateController: SkateController = {
 			jump = false,
 			jumpHeld = false,
 			draftAccel = 0,
-			knockedDown = false,
+			knockdown = nil,
 			diving = false,
 		}
 		self._ground = { hit = false, normal = worldUp(self), distance = 0 }
@@ -559,7 +559,7 @@ local SkateController: SkateController = {
 		input.brake = keys.brake
 		input.jump = keys.jump
 		input.jumpHeld = keys.jumpHeld
-		input.knockedDown = self.knockedDown
+		input.knockdown = knockdown
 		input.diving = self.diving
 		self.move = input.move
 		castGround(self, root, skater, dt)
