@@ -61,6 +61,7 @@ describe("Config defaults", function()
 			hitLagToleranceStuds = 3,
 			actionTimingTolerance = 0.1,
 			maxGetUpsPerSecond = 2,
+			posedLandingTolerance = 0.3,
 		})
 	end)
 
@@ -180,6 +181,8 @@ describe("Config defaults", function()
 			jumpImpulse = 60,
 			jumpSpeedCost = 0.1,
 			airPoseImpulse = 42,
+			-- A touchdown on the belly from the air keeps this much of the speed (#245: RC kept 59-73%).
+			bellyLandingKeep = 0.65,
 			normalFilter = { maxTurnDeg = 30, smoothing = 30 },
 			draftRange = 18,
 			draftConeDeg = 30,
@@ -808,6 +811,14 @@ describe("Config.forMode", function()
 				message = "Movement.airPoseImpulse: must be >= 0 (got -1)",
 			},
 			{
+				overrides = { Movement = { bellyLandingKeep = 0 } },
+				message = "Movement.bellyLandingKeep: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { bellyLandingKeep = 1.5 } },
+				message = "Movement.bellyLandingKeep: must be <= 1 (got 1.5)",
+			},
+			{
 				overrides = { Movement = { wallGravityScale = 0 } },
 				message = "Movement.wallGravityScale: must be > 0 (got 0)",
 			},
@@ -919,6 +930,12 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Network = { maxGetUpsPerSecond = 0 } })
 		end).toThrow("Network.maxGetUpsPerSecond: must be > 0 (got 0)")
+	end)
+
+	it("rejects a posed landing reported for less than no time", function()
+		expect(function()
+			Fixtures.config({ Network = { posedLandingTolerance = -0.1 } })
+		end).toThrow("Network.posedLandingTolerance: must be >= 0 (got -0.1)")
 	end)
 
 	it("rejects a knockdown pose that snaps, bends past half a turn or sinks upward", function()

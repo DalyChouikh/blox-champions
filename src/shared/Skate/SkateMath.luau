@@ -25,6 +25,7 @@ local LOCKED: Types.SkateInput = table.freeze({
 	pump = false,
 	brake = false,
 	jump = false,
+	jumpHeld = false,
 	draftAccel = 0,
 	knockedDown = true,
 	diving = false,
@@ -36,6 +37,7 @@ local GLIDING: Types.SkateInput = table.freeze({
 	pump = false,
 	brake = false,
 	jump = false,
+	jumpHeld = false,
 	draftAccel = 0,
 	knockedDown = false,
 	diving = true,
@@ -51,9 +53,12 @@ type Fields = {
 	up: Vector3,
 	-- The way the skater faces; kept while stopped.
 	forward: Vector3,
-	-- Whether a press in the air would strike the Air Pose (once until landing), and whether it is struck now.
+	-- Whether a press in the air would strike the Air Pose (once until landing), and whether it is struck now: from
+	-- the press until the jump key is let go or the skater lands (#245).
 	airPoseReady: boolean,
 	airPosing: boolean,
+	-- Whether this step touched down still posing: a fall, which the server judges (#245).
+	landedPosed: boolean,
 	_movement: Config.MovementConfig,
 	_gravity: Vector3,
 	_worldUp: Vector3,
@@ -88,6 +93,7 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		forward = -Vector3.zAxis,
 		airPoseReady = true,
 		airPosing = false,
+		landedPosed = false,
 		_movement = movement,
 		_gravity = gravity,
 		_worldUp = -gravity.Unit,
@@ -231,13 +237,13 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	self.forward = if speed > EPSILON then direction else heading
 end
 
--- Ballistic: gravity and drag, a little horizontal steering, and turning back upright. A diver flies down the fall
--- line instead, gravity's pull along it speeding them up (#241).
+-- Ballistic: gravity and drag, a little horizontal steering, and turning back upright. A diver, and a posed skater
+-- once falling (#245), fly down the fall line instead, gravity's pull along it speeding them up (#241).
 local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
 	local movement = self._movement
 	local worldUp = self._worldUp
 	local velocity = self.velocity
-	if input.diving then
+	if input.diving or (self.airPosing and velocity:Dot(worldUp) <= 0) then
 		local line = fallLine(self)
 		velocity = line * (math.max(velocity:Dot(line), 0) + self._linePull * dt)
 	else
@@ -349,6 +355,16 @@ local function land(self: Skater)
 	self.airPosing = false
 end
 
+-- Down from the air. A touchdown on the belly, diving or still posing, keeps bellyLandingKeep of the speed (#245); a
+-- posed one is a fall, and says so for this step.
+local function touchDown(self: Skater, input: Types.SkateInput)
+	if self.airPosing or input.diving then
+		self.velocity *= self._movement.bellyLandingKeep
+		self.landedPosed = self.airPosing
+	end
+	land(self)
+end
+
 -- The Air Pose's hop (#218): the fall cancelled, airPoseImpulse straight up, and jumpSpeedCost of the speed across.
 local function airPose(self: Skater)
 	local movement = self._movement
@@ -360,7 +376,9 @@ local function airPose(self: Skater)
 	self.airPosing = true
 end
 
--- The mode changes first, so a jump or a fall is stepped in the air at once.
+-- The mode changes first, so a jump or a fall is stepped in the air at once. In the air, letting go of the jump key
+-- ends the Air Pose before the touchdown is judged (#245); a press and release between two steps poses for one step,
+-- and its hop still breaks a fall.
 local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.Ground, travel: number, turn: number)
 	local movement = self._movement
 	if self.mode == "Grounded" then
@@ -373,8 +391,13 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 			-- No ground, or past straight up the surface's curve no longer holds the skater (A3).
 			self.mode = "Airborne"
 		end
-	elseif ground.hit and ground.distance <= movement.hoverHeight and self.velocity:Dot(ground.normal) <= 0 then
-		land(self)
+		return
+	end
+	if not input.jumpHeld then
+		self.airPosing = false
+	end
+	if ground.hit and ground.distance <= movement.hoverHeight and self.velocity:Dot(ground.normal) <= 0 then
+		touchDown(self, input)
 	elseif input.jump and self.airPoseReady then
 		airPose(self)
 	end
@@ -382,6 +405,7 @@ end
 
 function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
 	local controls = if input.knockedDown then LOCKED elseif input.diving then GLIDING else input
+	self.landedPosed = false
 	local travel, turn = 0, 0
 	if self.mode == "Grounded" and ground.hit then
 		travel, turn = measure(self, ground.normal, dt)
@@ -403,7 +427,8 @@ local function capped(self: Skater, velocity: Vector3): Vector3
 	return if speed > hardCap then velocity * (hardCap / speed) else velocity
 end
 
--- Attached behind a leader (Attach): moving with them, pulled toward the follow point.
+-- Attached behind a leader (Attach): moving with them, pulled toward the follow point. A step of its own, with no
+-- touchdown.
 function SkateMath.follow(
 	self: Skater,
 	target: Vector3,
@@ -414,6 +439,7 @@ function SkateMath.follow(
 	self.velocity = capped(self, leaderVelocity + (target - position) * self._movement.attachSpring)
 	self.mode = "Attached"
 	self.forward = leaderForward
+	self.landedPosed = false
 end
 
 -- Let go of the leader with a boost; the next step lands the skater if the ground is close.

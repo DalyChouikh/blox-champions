@@ -607,6 +607,22 @@ describe("ActionService", function()
 		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 	end)
 
+	-- The owner (#245, Q13): touching down still posing is a fall at any height, judged like a hard landing; a pose
+	-- let go before the touchdown is none (the client keeps reporting a pose it landed in: SkateController).
+	it("knocks down a skater who touches down still posing, from any height; no one scores it", function()
+		local a, b = blue[1], blue[2]
+		stand(a, above(10))
+		rigs[a]:SetAttribute(Attributes.AirPosing, true)
+		local listed: { string } = {}
+		glide(a, Vector3.zero, listed)
+		expect(listed).toEqual({})
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Fall")
+		stand(b, above(10) + Vector3.new(10, 0, 0))
+		rigs[b]:SetAttribute(Attributes.AirPosing, false)
+		glide(b, Vector3.new(10, 0, 0))
+		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
+	end)
+
 	it("adds nothing to a knockdown when the skater lands hard while down", function()
 		local b = orange[1]
 		local hit = config.Actions.Tackle.hit :: Config.Hit

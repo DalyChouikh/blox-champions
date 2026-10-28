@@ -85,6 +85,7 @@ describe("MovementCheck", function()
 			pump = false,
 			brake = false,
 			jump = false,
+			jumpHeld = false,
 			draftAccel = 0,
 			knockedDown = false,
 			diving = true,
