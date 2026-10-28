@@ -61,13 +61,16 @@ describe("Fall", function()
 		expect(landing(leap)).toBe("Soft")
 	end)
 
-	it("lands on a wall or a bank steeper than wallAngle safely", function()
+	-- Landing on a wall the way it slopes carries the skater on (Q6), so it is never hard; touching down posed there is
+	-- still a fall (the owner, #258, RC Video 10), so it is a soft landing.
+	it("lands softly on a wall or a bank steeper than wallAngle, however far the fall", function()
 		-- 45° and 20°, either side of wallAngle 30.
-		expect(landing(hard.drop + 10, slope(45))).toBe("None")
+		expect(landing(hard.drop + 10, slope(45))).toBe("Soft")
 		expect(landing(hard.drop + 10, slope(20))).toBe("Hard")
-		-- A short drop onto a wall is no landing either; onto flatter ground it is a soft one.
-		expect(landing(2, slope(45))).toBe("None")
+		expect(landing(2, slope(45))).toBe("Soft")
 		expect(landing(2, slope(20))).toBe("Soft")
+		-- An upright wall too.
+		expect(landing(2, Vector3.xAxis)).toBe("Soft")
 	end)
 
 	-- The owner (#222): an Air Pose breaks a fall.

@@ -395,6 +395,31 @@ about two thirds of a lap, swinging from wall to wall.
     the wall rules apply; one who flies straight up off a wall stays turned to it and comes back down onto it (RC Video
     7). Not chosen: only coming back down. The no-input loop (the ground filter's lag adding energy) is a bug, fixed
     without a question.
+  - **Round 12, while building #258** (2026-10-28, session 36, AskUserQuestion): asked what an Uppercut does while
+    riding the upright glass (its leap is straight up, along the glass): (A, recommended) stay on the glass, the leap
+    pushes them up along it feet on it, no Air Pose / air Tackle / Dive during it; or (B) fly up turned to the glass
+    (Air Pose, air Tackle and Dive work), landing back on it feet first once falling within ~6 studs. The owner, Q28:
+    "Well I think it should be both, if they somehow manage to get a good speed and uppercut into the well or jump,
+    they should be able to tackle, pose, dive, but also should stay on the glass if you understand what I mean, if you
+    always need anything from RC to check mechanics or anything, let me know, I can record and you see, like for
+    example spamming jump on the wall ,or uppercut or anything like that, and edge cases". Read as B: in the air they
+    keep every air action and stay turned to the glass, and the glass catches them (they come back onto it feet
+    first, not down beside it). The owner offers RC recordings of wall edge cases (jump spam on a wall, uppercut).
+  - **Videos 10 and 11, the owner's RC wall edge cases** (2026-10-28, session 36, recorded for #258 on request; map
+    "Fallen Stadium": a low curved outer wall with the crowd right behind it, open top, a curved inner glass):
+    Video 10 `D:\Screenshots\Videos\Screen Recording 2026-10-28 174406.mp4` (2:37, 1918x1078, 30 fps), Video 11
+    `...2026-10-28 174631.mp4` (1:52, 1892x1076, 30 fps). The owner's words: "make sure if a player jump, he can't
+    sequence it with an uppercut unless he touches a ground or wall, basically something solid, take a look, be
+    really thorough, notice the mechanics, gameplay, physics, gravity, I couldn't spam jump, and about the uppercut and
+    jump and air posing, if the player airpose next to the wall, he falls like in the video, same for the dive of
+    course". Seen (1 frame/s over both, 10 frames/s on Video 10 45.8-49.3, full-size hint crops): **in the air RC
+    greys Uppercut** (and Pump, Brake): the hint column shows Air Pose and Tackle (or Dive) lit and Uppercut dim at
+    Video 10 82.0 and 107.0 s and Video 11 51.0 s; on the ground every hint is lit (Video 10 21.0, 28.5, 41.0 s, the
+    last with the press marker on Jump). Video 10 46.2-48.9: Uppercut pressed at the outer wall (32 km/h), the skater
+    rises beside it, flips (Air Pose) at the top, falls back 56 -> 77 km/h and touches down on the wall's curved foot
+    at 57 km/h with the Get Up prompt: a fall. Get Up prompts after wall excursions with an Air Pose offered: Video 10
+    0:43, 0:48, 0:54, 0:59, 1:04, 1:54, 2:22, 2:34. Excursions over the wall top without a pose came back onto the
+    wall or track riding (Video 10 0:29-0:31, 1:10-1:13).
 
 ## Roller Champions
 

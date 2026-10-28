@@ -1,12 +1,12 @@
 --!strict
--- A skater's falls and landings, as the server judges them (#222, #245). A skater lands on the first frame that finds
--- ground in reach after a frame that found none, onto ground flatter than wallAngle: touching a wall or a bank is no
--- landing, and is safe. A landing is hard when the skater fell Movement.hardLanding.drop or more, from the top of their
--- last rise to the height they come to rest at (hoverHeight over the ground), and soft otherwise: still a fall for one
--- who touches down posing (#245). Any rise (a jump, an Air Pose's hop, a ride up the glass) carries the top up with it,
--- and so does riding the ground, so an Air Pose breaks a fall. Heights are along world up (Roblox's gravity pulls
--- along -Y). Fed one frame at a time with the root's height and what a ray along the skater's down found; a placement
--- starts the fall over. Allocates only in `new`.
+-- A skater's falls and landings, as the server judges them (#222, #245, #258). A skater lands on the first frame that
+-- finds ground in reach after a frame that found none. A landing onto ground flatter than wallAngle is hard when the
+-- skater fell Movement.hardLanding.drop or more, from the top of their last rise to the height they come to rest at
+-- (hoverHeight over the ground); any other is soft, onto a wall or a bank too (the slope carries them on): still a
+-- fall for one who touches down posing (#245, #258). Any rise (a jump, an Air Pose's hop, a ride up the glass)
+-- carries the top up with it, and so does riding the ground, so an Air Pose breaks a fall. Heights are along world up
+-- (Roblox's gravity pulls along -Y). Fed one frame at a time with the root's height and what a ray along the skater's
+-- down found; a placement starts the fall over. Allocates only in `new`.
 
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Types)
@@ -58,12 +58,9 @@ function Fall.step(self: Fall, height: number, ground: Types.Ground): Landing
 	end
 	local top = self._top
 	self._top = height
-	if ground.normal.Y < self._flatCos then
-		return "None"
-	end
 	local movement = self._movement
 	local rest = height - (ground.distance - movement.hoverHeight)
-	if top - rest >= movement.hardLanding.drop then
+	if ground.normal.Y >= self._flatCos and top - rest >= movement.hardLanding.drop then
 		return "Hard"
 	end
 	return if aloft then "Soft" else "None"

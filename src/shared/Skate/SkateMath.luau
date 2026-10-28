@@ -23,6 +23,10 @@ local TURN_EPSILON = 1e-3
 -- vertical (measured, #234), so a face leaning less than this past straight up still holds like a wall. The lips'
 -- first strip leans 22.5°.
 local CONTACT_SLACK = 1e-3
+-- A skater leaving a wall along it moves off it by float noise only (studs/s): the glass leans up to 6.5e-5 past
+-- upright (#234), so at hardCap and through a second of gravity under 0.03. A jump leaves at jumpImpulse (60), a bend
+-- turning away at several studs/s: neither is caught back (#258).
+local DRIFT_EPSILON = 0.1
 -- What a knocked-down skater's input becomes, one for each kind of knockdown: no stick, pump, brake, jump or draft.
 -- They only slide, for their kind's time (#252).
 local function locked(knockdown: Attributes.Knockdown): Types.SkateInput
@@ -91,6 +95,9 @@ type Fields = {
 	_slideLeft: number?,
 	-- The ground normal the last grounded step rode on, nil in the air: each step's turn is measured from it (A3).
 	_lastNormal: Vector3?,
+	-- The wall the skater last left, nil once on the ground again: falling, they look for it and come back onto it
+	-- (#258), unless it is out of reach or they move away from it.
+	_leftWall: Vector3?,
 	-- The last grounded steps, newest at `_historyHead`: how far each went and how much the ground turned under it,
 	-- positive on the inside of a loop. The curve is read over curvatureWindow studs of them.
 	_steps: { number },
@@ -126,6 +133,7 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_backwards = false,
 		_slideLeft = nil,
 		_lastNormal = nil,
+		_leftWall = nil,
 		_steps = table.create(HISTORY, 0),
 		_turns = table.create(HISTORY, 0),
 		_historyHead = 0,
@@ -417,6 +425,31 @@ local function land(self: Skater)
 	self.mode = "Grounded"
 	self.airPoseReady = true
 	self.airPosing = false
+	self._leftWall = nil
+end
+
+-- Whether a surface can hold a skater touching down on it: an overhang's push depends on a curve no touchdown knows
+-- yet, so it holds no one (#258).
+local function holds(self: Skater, normal: Vector3): boolean
+	return self._gravity:Dot(normal) <= self._slackPull
+end
+
+-- Into the air from the surface they rode (`up`), which they may come back onto if it is a wall that holds (#258).
+local function liftOff(self: Skater)
+	local up = self.up
+	self._leftWall = if isWall(self, up) and holds(self, up) then up else nil
+	self.mode = "Airborne"
+end
+
+-- Falling beside the wall they left: they look for it to come back onto (#258).
+local function catching(self: Skater): boolean
+	return self._leftWall ~= nil and self.velocity:Dot(self._worldUp) <= 0
+end
+
+-- Whether a touchdown onto `normal` lands them: onto a surface that holds, and never while they rise off the wall they
+-- left, since a leap up the glass is a flight with every air action until they fall (#258, Q28).
+local function landsOn(self: Skater, normal: Vector3): boolean
+	return holds(self, normal) and (self._leftWall == nil or catching(self))
 end
 
 -- Down from the air. A touchdown on the belly, diving or still posing, keeps bellyLandingKeep of the speed (#245); a
@@ -450,19 +483,31 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 			-- A jump keeps 1 − jumpSpeedCost of the speed along the surface (#218).
 			self.velocity -= alongSurface(self.velocity, ground.normal) * movement.jumpSpeedCost
 			self.velocity += ground.normal * movement.jumpImpulse
-			self.mode = "Airborne"
+			liftOff(self)
 		elseif not ground.hit or letsGo(self, ground.normal, travel, turn) then
 			-- No ground, or the surface can no longer push the skater round their path's curve (#257).
-			self.mode = "Airborne"
+			liftOff(self)
 		end
 		return
 	end
 	if not input.jumpHeld then
 		self.airPosing = false
 	end
-	if ground.hit and ground.distance <= movement.hoverHeight and self.velocity:Dot(ground.normal) <= 0 then
-		touchDown(self, input)
-	elseif input.jump and self.airPoseReady then
+	-- Down onto ground they land on: within hoverHeight and not moving off it, or the wall they left anywhere the ray
+	-- reaches while they do not move away from it (#258). A wall that no longer can catch them is let go.
+	local catch = catching(self)
+	if ground.hit and landsOn(self, ground.normal) then
+		local into = self.velocity:Dot(ground.normal)
+		local down = if catch then into <= DRIFT_EPSILON else ground.distance <= movement.hoverHeight and into <= 0
+		if down then
+			touchDown(self, input)
+			return
+		end
+	end
+	if catch then
+		self._leftWall = nil
+	end
+	if input.jump and self.airPoseReady then
 		airPose(self)
 	end
 end
@@ -511,6 +556,7 @@ function SkateMath.follow(
 	self.forward = leaderForward
 	self.landedPosed = false
 	self._backwards = false
+	self._leftWall = nil
 end
 
 -- Let go of the leader with a boost; the next step lands the skater if the ground is close.
@@ -520,11 +566,13 @@ function SkateMath.release(self: Skater, direction: Vector3)
 end
 
 -- An action's push (a lunge, a dodge, a wall leap) added to the velocity, never past hardCap. A launch leaves the
--- ground.
+-- ground with the speed along it: the hover's pull off the surface is no momentum (measured, #258: kept, up to 1.5
+-- studs/s carried a skater leaping up a wall off it, out of its catch).
 function SkateMath.push(self: Skater, change: Vector3, launch: boolean)
-	self.velocity = capped(self, self.velocity + change)
+	local velocity = if launch and self.mode == "Grounded" then alongSurface(self.velocity, self.up) else self.velocity
+	self.velocity = capped(self, velocity + change)
 	if launch then
-		self.mode = "Airborne"
+		liftOff(self)
 	end
 end
 
@@ -568,6 +616,30 @@ function SkateMath.block(self: Skater, normal: Vector3): boolean
 	end
 	self.velocity -= normal * into
 	return true
+end
+
+-- A surface the collider meets in the air (the controller finds it, #258): a ride surface they land on (landsOn) takes
+-- them feet first, as any touchdown (a diver's on the belly); anything else, or on the ground, only blocks, so a leap
+-- up the glass slides up it. Says whether anything was lost.
+function SkateMath.touch(self: Skater, normal: Vector3, input: Types.SkateInput): boolean
+	if not self:block(normal) then
+		return false
+	end
+	if self.mode == "Airborne" and landsOn(self, normal) then
+		touchDown(self, input)
+		self.up = normal
+	end
+	return true
+end
+
+-- The way the controller's ground ray looks (a unit direction): along the feet, or toward the wall they left while
+-- falling beside it (#258). Says which: what that ray finds is no seam under the feet.
+function SkateMath.groundRay(self: Skater): (Vector3, boolean)
+	local wall = self._leftWall
+	if wall ~= nil and catching(self) then
+		return -wall, true
+	end
+	return -self.up, false
 end
 
 -- Still and on the ground: the kickoff freeze and a fresh character start from rest.
