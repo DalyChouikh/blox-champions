@@ -3,7 +3,8 @@
 -- (FrameController): the lean into a turn, a crouch while pumping, a lean back while braking, a tuck in the air, the
 -- arm that carries the ball, a lunge, a knockdown and the Air Pose. The local skater's state comes from SkateController
 -- and its lunge from ActionController, at once; everyone else's from their character's attributes and the ground under
--- them. The carrier comes from BallCarrier. The joints it writes are local to this client: the server never sees them,
+-- them; everyone's knockdown from the KnockedDown attribute, its pose eased in and out per character (#243). The
+-- carrier comes from BallCarrier. The joints it writes are local to this client: the server never sees them,
 -- and every client poses its own view.
 
 local Players = game:GetService("Players")
@@ -37,6 +38,9 @@ type Tracked = {
 	joints: { JointEntry },
 	heading: number?,
 	lean: number,
+	-- The knockdown posed, kept while they rise from it, and how far into its pose they are (Pose.settle).
+	knockdown: Attributes.Knockdown?,
+	down: number,
 }
 
 -- The local skater's state, as SkateController publishes it.
@@ -175,7 +179,13 @@ local function poseOne(self: PoseController, tracked: Tracked, dt: number)
 		input.lunging = action ~= nil and self._config.Actions[action].pose == "Lunge"
 		input.airPosing = character:GetAttribute(Attributes.AirPosing) == true
 	end
-	input.knockedDown = character:GetAttribute(Attributes.KnockedDown) ~= nil
+	local knockdown: Attributes.Knockdown? = character:GetAttribute(Attributes.KnockedDown) :: Attributes.Knockdown?
+	if knockdown ~= nil then
+		tracked.knockdown = knockdown
+	end
+	tracked.down = Pose.settle(self._config.Pose, tracked.down, knockdown ~= nil, dt)
+	input.knockdown = tracked.knockdown
+	input.down = tracked.down
 	local playerId = tracked.playerId
 	input.carrying = playerId ~= nil and playerId == self._carrier.carrier
 
@@ -242,7 +252,8 @@ local PoseController: PoseController = {
 			carrying = false,
 			lunging = false,
 			airPosing = false,
-			knockedDown = false,
+			knockdown = nil,
+			down = 0,
 			bodyOffset = 0,
 		}
 		self._surfaces = deps.RideSurfaces
@@ -269,6 +280,8 @@ local PoseController: PoseController = {
 			joints = findJoints(character, humanoid),
 			heading = nil,
 			lean = 0,
+			knockdown = nil,
+			down = 0,
 		}
 	end,
 

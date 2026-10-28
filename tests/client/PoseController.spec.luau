@@ -160,8 +160,9 @@ describe("PoseController", function()
 	it("poses another skater's lunge and knockdown from their attributes", function()
 		local other = Fixtures.jointedRig(folder, "Other", HOVER_CFRAME)
 		PoseController:track(other, false)
+		-- One step as long as a knockdown's ease: all the way down, or back up.
 		local function pitch(): number
-			PoseController:step(1 / 60)
+			PoseController:step(config.Pose.knockdownEaseSeconds)
 			return jointOf(other, "Root").Transform.LookVector.Y
 		end
 		other:SetAttribute(Attributes.Action, "Tackle")
@@ -172,6 +173,38 @@ describe("PoseController", function()
 		other:SetAttribute(Attributes.KnockedDown, nil)
 		other:SetAttribute(Attributes.Action, "Uppercut")
 		expect(pitch()).toBeCloseTo(0, 5)
+	end)
+
+	-- The owner (#243): a knockdown eases down and back up over knockdownEaseSeconds, each character on its own, and a
+	-- diver goes face-down (RC, Video 4).
+	it("eases each character into and out of its own knockdown, a diver's face-down", function()
+		local pose = config.Pose
+		local hit = Fixtures.jointedRig(folder, "Hit", HOVER_CFRAME)
+		local diver = Fixtures.jointedRig(folder, "Diver", HOVER_CFRAME + Vector3.new(6, 0, 0))
+		PoseController:track(hit, false)
+		PoseController:track(diver, false)
+		local function pitchOf(rig: Model): number
+			return jointOf(rig, "Root").Transform.LookVector.Y
+		end
+		-- Half the ease a step: halfway is smoothstep(0.5) = 0.5 of the pose.
+		local half = pose.knockdownEaseSeconds / 2
+		hit:SetAttribute(Attributes.KnockedDown, "Hit")
+		PoseController:step(half)
+		expect(pitchOf(hit)).toBeCloseTo(math.sin(math.rad(pose.knockdownTiltDeg / 2)), 5)
+		expect(pitchOf(diver)).toBeCloseTo(0, 5)
+		diver:SetAttribute(Attributes.KnockedDown, "Dive")
+		PoseController:step(half)
+		expect(pitchOf(hit)).toBeCloseTo(math.sin(math.rad(pose.knockdownTiltDeg)), 5)
+		expect(pitchOf(diver)).toBeCloseTo(-math.sin(math.rad(pose.diveDeg / 2)), 5)
+		PoseController:step(half)
+		expect(pitchOf(diver)).toBeCloseTo(-math.sin(math.rad(pose.diveDeg)), 5)
+		-- Up again: the diver rises from face-down, easing back upright.
+		diver:SetAttribute(Attributes.KnockedDown, nil)
+		PoseController:step(half)
+		expect(pitchOf(diver)).toBeCloseTo(-math.sin(math.rad(pose.diveDeg / 2)), 5)
+		PoseController:step(half)
+		expect(pitchOf(diver)).toBeCloseTo(0, 5)
+		expect(pitchOf(hit)).toBeCloseTo(math.sin(math.rad(pose.knockdownTiltDeg)), 5)
 	end)
 
 	-- The Air Pose (#218): the local skater's from its own skater at once, another's from the attribute the server

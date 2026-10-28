@@ -319,6 +319,22 @@ about two thirds of a lap, swinging from wall to wall.
     6); the air dodge and uppercut keep 0.8; not chosen: 0.8 (38 km/h added). Q18 the air Tackle's ceiling is the
     ground's **72 km/h** (one rule everywhere; RC's air tackles never came near a ceiling, so the videos can't tell);
     not chosen: 0.8 of it (58 km/h).
+  - **Round 6, after #242's Studio check** (2026-10-28, session 33, AskUserQuestion, recommended): Q19 **a belly
+    touchdown from the air keeps about 2/3 of the speed**, like RC: landing from the air while diving or still
+    posing loses a third of the speed shown at that moment, then the slide (RC: 133 → 84 km/h, Video 6 dive; 139 →
+    101, Video 5 dive; 104 → 70 and 97 → 57, Video 7 posed falls: 59–73% kept; slide 0.7–0.8 s). Ours kept ~95% (an
+    air dive touched down at 121 km/h and slid 117 → 0 in 1.2 s). A ground dive loses nothing (RC Video 4; ours
+    too). A new setting, built test-first in #245; not chosen: its own ticket now; keep ours.
+  - **Round 7, #243's screenshots** (2026-10-28, session 33, private page
+    https://claude.ai/artifact/C6ScXy34F1bKJbmS5399me, AskUserQuestion, both recommended): Q20 **the diver's pose
+    stays as shown**: face-down, kneeling on the belly (body tipped 70° forward, thighs 70° forward under it, shins
+    folded back 90°, sunk 1.5 studs), beside RC's kneeling slide (Video 4, 32.3–33.4 s); not chosen: flatter (~85°).
+    Q21 **a tackled or hard-landing skater lies flat on the back on the floor** (tipped 85°, sunk 2.2 studs, eased
+    like the diver), in #243: before, they tipped 60° back at standing height and floated at a slant; RC's tackled
+    skaters lie flat sliding (Video 1); not chosen: keep the 60° tilt. Then fitted (my ruling, measured by forward
+    kinematics on the owner's avatar): the shots had the diver's shins and feet up to 1.2 studs below the floor and the
+    flat skater half sunk, so the diver's thighs go 50° (shins 110°, sink 0.7: shins on the floor, torso 0.6 up) and
+    the tackled skater sinks 1.3 (back 0.18 up, feet touching); the tips (70° forward, 85° back) are unchanged.
 
 ## Roller Champions
 
