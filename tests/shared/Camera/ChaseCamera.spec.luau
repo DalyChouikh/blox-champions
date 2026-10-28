@@ -21,7 +21,7 @@ end
 local function target(overrides: { [string]: any }?): ChaseCamera.Target
 	local value: ChaseCamera.Target = {
 		up = Vector3.yAxis,
-		travel = Vector3.zero,
+		behind = Vector3.zero,
 		look = Vector2.zero,
 		recenter = false,
 		aimAt = nil,
@@ -109,8 +109,8 @@ describe("ChaseCamera", function()
 		Fixtures.expectNear(chase.up, Vector3.yAxis)
 	end)
 
-	it("swings behind the travel once the look input rests, only when the device allows it", function()
-		local moving = target({ travel = Vector3.new(50, 0, 0), recenter = true })
+	it("swings behind the way it is given once the look input rests, only when the device allows it", function()
+		local moving = target({ behind = Vector3.new(50, 0, 0), recenter = true })
 		local chase = camera()
 		chase:step(moving, 0.4)
 		Fixtures.expectNear(chase.forward, Vector3.new(0, 0, -1))
@@ -120,16 +120,16 @@ describe("ChaseCamera", function()
 
 		-- With a mouse it never swings.
 		local mouse = camera()
-		mouse:step(target({ travel = Vector3.new(50, 0, 0) }), 2)
+		mouse:step(target({ behind = Vector3.new(50, 0, 0) }), 2)
 		Fixtures.expectNear(mouse.forward, Vector3.new(0, 0, -1))
 		-- Nor behind a skater slower than recenterMinSpeed.
 		local slow = camera()
-		slow:step(target({ travel = Vector3.new(5, 0, 0), recenter = true }), 2)
+		slow:step(target({ behind = Vector3.new(5, 0, 0), recenter = true }), 2)
 		Fixtures.expectNear(slow.forward, Vector3.new(0, 0, -1))
 		-- A look input rests the swing-back: the camera waits recenterDelay again.
 		local looking = camera()
 		looking:step(moving, 0.4)
-		looking:step(target({ travel = Vector3.new(50, 0, 0), recenter = true, look = Vector2.new(0, 0.01) }), 0.2)
+		looking:step(target({ behind = Vector3.new(50, 0, 0), recenter = true, look = Vector2.new(0, 0.01) }), 0.2)
 		Fixtures.expectNear(looking.forward, Vector3.new(0, 0, -1))
 	end)
 
@@ -169,7 +169,7 @@ describe("ChaseCamera", function()
 		Fixtures.expectNear(chase.forward, Vector3.new(-1, 0, 0))
 		expect(chase.idle).toBe(0)
 		-- Let go on a gamepad: it stays where it turned until the look has rested recenterDelay.
-		chase:step(target({ travel = Vector3.new(50, 0, 0), recenter = true }), 0.4)
+		chase:step(target({ behind = Vector3.new(50, 0, 0), recenter = true }), 0.4)
 		Fixtures.expectNear(chase.forward, Vector3.new(-1, 0, 0))
 	end)
 

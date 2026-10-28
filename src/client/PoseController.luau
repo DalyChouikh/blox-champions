@@ -142,6 +142,10 @@ local function updateLean(self: PoseController, tracked: Tracked, velocity: Vect
 	tracked.heading = heading
 	local pose = self._config.Pose
 	local target = Pose.leanDeg(pose, flat.Magnitude, turnRate, self._gravity)
+	-- Riding backwards (#246) the body faces against its way round the turn, so leaning into it is its other side.
+	if flat:Dot(tracked.root.CFrame.LookVector) < 0 then
+		target = -target
+	end
 	tracked.lean += (target - tracked.lean) * (1 - math.exp(-pose.leanSmoothing * dt))
 	return tracked.lean
 end

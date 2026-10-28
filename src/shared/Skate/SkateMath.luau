@@ -51,7 +51,7 @@ type Fields = {
 	velocity: Vector3,
 	mode: Types.Mode,
 	up: Vector3,
-	-- The way the skater faces; kept while stopped.
+	-- The way the skater faces; kept while stopped, turning toward the way they move (#246: turnFacing).
 	forward: Vector3,
 	-- Whether a press in the air would strike the Air Pose (once until landing), and whether it is struck now: from
 	-- the press until the jump key is let go or the skater lands (#245).
@@ -72,6 +72,11 @@ type Fields = {
 	_lineCos: number,
 	_lineSin: number,
 	_linePull: number,
+	-- How fast the facing turns (a half-turn in turnRoundSeconds), and the cosine of backwardsConeDeg.
+	_turnRoundRate: number,
+	_backwardsCos: number,
+	-- Whether the skater rides backwards (#246).
+	_backwards: boolean,
 	-- The ground normal the last grounded step rode on, nil in the air: each step's turn is measured from it (A3).
 	_lastNormal: Vector3?,
 	-- The last grounded steps, newest at `_historyHead`: how far each went and how much the ground turned under it,
@@ -103,6 +108,9 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_lineCos = math.cos(line),
 		_lineSin = math.sin(line),
 		_linePull = gravity.Magnitude * math.sin(line),
+		_turnRoundRate = math.pi / movement.turnRoundSeconds,
+		_backwardsCos = math.cos(math.rad(movement.backwardsConeDeg)),
+		_backwards = false,
 		_lastNormal = nil,
 		_steps = table.create(HISTORY, 0),
 		_turns = table.create(HISTORY, 0),
@@ -125,6 +133,24 @@ local function facingOn(self: Skater, normal: Vector3): Vector3
 		return uphill.Unit
 	end
 	return normal:Cross(Vector3.zAxis).Unit
+end
+
+-- Turns the facing toward `way` (unit, the way the skater moves on the plane `up` defines), at most a half-turn in
+-- turnRoundSeconds, so it never snaps (#246). A skater `carried` back against their facing (down a slope) rides
+-- backwards instead while the stick (`wish`, unit or zero) points the way they move and the facing the way back,
+-- both within backwardsConeDeg; then the facing turns toward the way back, so their back leads. Once they stop
+-- holding it they turn round, and a turn begun leaves the cone at once, so it never flips back. A facing along `up`
+-- lies on the plane nowhere: there is nothing to turn from, so they face the way they move at once.
+local function turnFacing(self: Skater, up: Vector3, way: Vector3, wish: Vector3, carried: boolean, dt: number)
+	local flat = alongSurface(self.forward, up)
+	if flat.Magnitude <= EPSILON then
+		self.forward = way
+		return
+	end
+	local from = flat.Unit
+	local cone = self._backwardsCos
+	self._backwards = (self._backwards or carried) and wish:Dot(way) >= cone and from:Dot(way) <= -cone
+	self.forward = rotateToward(from, if self._backwards then -way else way, self._turnRoundRate * dt, up)
 end
 
 -- The way a diver flies (#241): fallLineDeg below the facing.
@@ -234,7 +260,12 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 
 	self.velocity = direction * speed + normal * ((movement.hoverHeight - ground.distance) * movement.hoverSpring)
 	self.up = normal
-	self.forward = if speed > EPSILON then direction else heading
+	if speed > EPSILON then
+		-- A slope or a wall pulling them the way they go carries them (#246).
+		turnFacing(self, normal, direction, wishDirection, gravityAlong:Dot(direction) > self._flatPull, dt)
+	else
+		self.forward = heading
+	end
 end
 
 -- Ballistic: gravity and drag, a little horizontal steering, and turning back upright. A diver, and a posed skater
@@ -243,6 +274,8 @@ local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
 	local movement = self._movement
 	local worldUp = self._worldUp
 	local velocity = self.velocity
+	local wish = input.move - worldUp * input.move:Dot(worldUp)
+	local wishDirection = if wish.Magnitude > EPSILON then wish.Unit else Vector3.zero
 	if input.diving or (self.airPosing and velocity:Dot(worldUp) <= 0) then
 		local line = fallLine(self)
 		velocity = line * (math.max(velocity:Dot(line), 0) + self._linePull * dt)
@@ -250,9 +283,8 @@ local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
 		local rising = worldUp * velocity:Dot(worldUp)
 		local horizontal = velocity - rising
 		local horizontalSpeed = horizontal.Magnitude
-		local wish = input.move - worldUp * input.move:Dot(worldUp)
 		if horizontalSpeed > EPSILON and wish.Magnitude > EPSILON then
-			local turned = rotateToward(horizontal / horizontalSpeed, wish.Unit, movement.airTurnRate * dt, worldUp)
+			local turned = rotateToward(horizontal / horizontalSpeed, wishDirection, movement.airTurnRate * dt, worldUp)
 			horizontal = turned * horizontalSpeed
 		end
 		velocity = horizontal + rising + self._gravity * dt
@@ -263,9 +295,10 @@ local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
 	end
 	self.velocity = velocity
 	self.up = rotateToward(self.up, worldUp, movement.airUprightRate * dt, self.forward)
+	-- Nothing carries a skater back in the air; one already riding backwards keeps on while they hold it (#246).
 	local travel = velocity - worldUp * velocity:Dot(worldUp)
 	if travel.Magnitude > EPSILON then
-		self.forward = travel.Unit
+		turnFacing(self, worldUp, travel.Unit, wishDirection, false, dt)
 	end
 end
 
@@ -440,6 +473,7 @@ function SkateMath.follow(
 	self.mode = "Attached"
 	self.forward = leaderForward
 	self.landedPosed = false
+	self._backwards = false
 end
 
 -- Let go of the leader with a boost; the next step lands the skater if the ground is close.
@@ -502,6 +536,7 @@ end
 -- Still and on the ground: the kickoff freeze and a fresh character start from rest.
 function SkateMath.stop(self: Skater)
 	self.velocity = Vector3.zero
+	self._backwards = false
 	land(self)
 	forget(self)
 end

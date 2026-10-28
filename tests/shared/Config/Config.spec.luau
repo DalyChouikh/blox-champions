@@ -165,6 +165,10 @@ describe("Config defaults", function()
 			overSpeedBleed = 5,
 			turnRateLow = 4.0,
 			turnRateHigh = 1.5,
+			-- A half-turn of the facing, never a snap (#246: RC turned round over ~0.3 s), and how near the way back
+			-- the stick and the facing keep a skater riding backwards.
+			turnRoundSeconds = 0.3,
+			backwardsConeDeg = 30,
 			airTurnRate = 1,
 			airUprightRate = 6,
 			-- A diver's way down (#241: RC's dive gained ~75 km/h per s).
@@ -837,6 +841,18 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { wallTurnRate = -1 } },
 				message = "Movement.wallTurnRate: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { Movement = { turnRoundSeconds = 0 } },
+				message = "Movement.turnRoundSeconds: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { backwardsConeDeg = 0 } },
+				message = "Movement.backwardsConeDeg: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { backwardsConeDeg = 91 } },
+				message = "Movement.backwardsConeDeg: must be <= 90 (got 91)",
 			},
 			-- The fall line (#241): below the facing, at most straight down.
 			{

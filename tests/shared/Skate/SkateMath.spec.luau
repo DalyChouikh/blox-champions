@@ -8,6 +8,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local Types = require(ReplicatedStorage.Shared.Skate.Types)
+local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
 -- Expected values come from a reference model of the formulas in the Phase 5 plan's decision 6; each comment shows
 -- how to check one by hand.
@@ -618,6 +619,110 @@ describe("SkateMath lunges", function()
 		Fixtures.expectNear(falling.velocity * Vector3.new(1, 0, 1), Vector3.new(0, 0, -59.88))
 		expect(falling.velocity.Y).toBeCloseTo(-19.62 * (1 - 0.02 * 0.1), 3)
 	end)
+end)
+
+-- The owner (#246): RC's skater rode back down a bank still facing up it, then turned round over ~0.3 s, never in a
+-- snap (Video 7, 16.9-17.9 s).
+describe("SkateMath facing", function()
+	-- The most one step of 1/60 s turns the facing: a half-turn in turnRoundSeconds, π / 0.3 / 60 = 0.1745 rad.
+	local STEP_TURN = math.pi / movement.turnRoundSeconds / 60
+	local UPHILL = -DOWNHILL
+
+	-- Rolling back down the slope at `speed`, still facing up it, as after a climb.
+	local function rollingBack(speed: number): SkateMath.Skater
+		local s = skater(DOWNHILL * speed)
+		s.forward = UPHILL
+		return s
+	end
+
+	it("turns its facing toward the way it moves, a half-turn in turnRoundSeconds, never at once", function()
+		-- Rolling along +Z while facing -Z, nothing pressed.
+		local s = skater(Vector3.new(0, 0, 30))
+		s:step(input(), ground(), 1 / 60)
+		expect(Vectors.angleBetween(s.forward, -Vector3.zAxis)).toBeCloseTo(STEP_TURN, 4)
+		expect(s.forward.Y).toBeCloseTo(0, 6)
+		for _ = 1, math.ceil(movement.turnRoundSeconds * 60) do
+			s:step(input(), ground(), 1 / 60)
+		end
+		Fixtures.expectNear(s.forward, Vector3.zAxis)
+		-- In the air too.
+		local flying = skater(Vector3.new(30, 0, 0))
+		flying.mode = "Airborne"
+		flying:step(input(), ground(FLAT, 0, false), 1 / 60)
+		expect(Vectors.angleBetween(flying.forward, -Vector3.zAxis)).toBeCloseTo(STEP_TURN, 4)
+		-- Off the top of a wall ridden straight up, the facing (up) lies on no level plane: nothing to turn from.
+		local offTheTop = skater(Vector3.new(0, 5, 30))
+		offTheTop.mode = "Airborne"
+		offTheTop.forward = Vector3.yAxis
+		offTheTop:step(input(), ground(FLAT, 0, false), 1 / 60)
+		Fixtures.expectNear(offTheTop.forward, Vector3.zAxis)
+		-- Steering at speed turns the way it moves slower than that (3.38 rad/s at 30), and the facing keeps up.
+		local steering = skater(Vector3.new(0, 0, -30))
+		for _ = 1, 10 do
+			steering:step(input({ move = Vector3.xAxis }), ground(), 1 / 60)
+		end
+		Fixtures.expectNear(steering.forward, steering.velocity.Unit)
+	end)
+
+	it("rides backwards down a slope while the stick holds the way it rolls, and on across the flat below", function()
+		local s = rollingBack(10)
+		for _ = 1, 30 do
+			s:step(input({ move = DOWNHILL }), ground(SLOPE), 1 / 60)
+		end
+		-- Still facing up the slope, its back leading, speeding up downhill as anyone would.
+		Fixtures.expectNear(s.forward, UPHILL)
+		expect(s.velocity:Dot(DOWNHILL)).toBeGreaterThan(10)
+		-- Onto the flat at the foot, the stick still held the way it rolls: still backwards.
+		for _ = 1, 10 do
+			s:step(input({ move = -Vector3.zAxis }), ground(), 1 / 60)
+		end
+		Fixtures.expectNear(s.forward, Vector3.zAxis)
+	end)
+
+	it("turns round from riding backwards once the stick lets go or steers elsewhere, never at once", function()
+		-- Let go; steering sideways; and S with A, 45° off the way back, outside backwardsConeDeg (30).
+		local moves: { Vector3 } = { Vector3.zero, Vector3.xAxis, (DOWNHILL + Vector3.xAxis).Unit }
+		for _, move in moves do
+			local s = rollingBack(10)
+			s:step(input({ move = DOWNHILL }), ground(SLOPE), 1 / 60)
+			Fixtures.expectNear(s.forward, UPHILL)
+			s:step(input({ move = move }), ground(SLOPE), 1 / 60)
+			expect(Vectors.angleBetween(s.forward, UPHILL)).toBeCloseTo(STEP_TURN, 4)
+			for _ = 1, math.ceil(movement.turnRoundSeconds * 60) do
+				s:step(input({ move = move }), ground(SLOPE), 1 / 60)
+			end
+			expect(s.forward:Dot(s.velocity.Unit)).toBeCloseTo(1, 4)
+		end
+	end)
+
+	-- The owner (#246, Q23): from a stop, S turns the skater round smoothly; riding backwards needs being carried back.
+	it(
+		"turns round, never riding backwards, pushing off from a stop, after a freeze or an attach, and in the air",
+		function()
+			-- Pushed off against the facing: how far the facing turned in one step.
+			local function pushedOff(s: SkateMath.Skater): number
+				local before = Vectors.alongSurface(s.forward, FLAT).Unit
+				s:step(input({ move = -before }), ground(), 1 / 60)
+				return Vectors.angleBetween(s.forward, before)
+			end
+			expect(pushedOff(skater(Vector3.zero))).toBeCloseTo(STEP_TURN, 4)
+			-- A freeze or an attach ends riding backwards.
+			local frozen = rollingBack(10)
+			frozen:step(input({ move = DOWNHILL }), ground(SLOPE), 1 / 60)
+			frozen:stop()
+			expect(pushedOff(frozen)).toBeCloseTo(STEP_TURN, 4)
+			local attached = rollingBack(10)
+			attached:step(input({ move = DOWNHILL }), ground(SLOPE), 1 / 60)
+			attached:follow(Vector3.zero, Vector3.zero, Vector3.zero, attached.forward)
+			expect(pushedOff(attached)).toBeCloseTo(STEP_TURN, 4)
+			-- Nothing carries a skater back in the air: flying against the facing, the stick along the way, they turn
+			-- round.
+			local flying = skater(Vector3.new(0, 0, 30))
+			flying.mode = "Airborne"
+			flying:step(input({ move = Vector3.zAxis }), ground(FLAT, 0, false), 1 / 60)
+			expect(Vectors.angleBetween(flying.forward, -Vector3.zAxis)).toBeCloseTo(STEP_TURN, 4)
+		end
+	)
 end)
 
 -- Loop physics (A3). A roof is an arc around the origin with the skater inside the tube, so its normal at angle phi
