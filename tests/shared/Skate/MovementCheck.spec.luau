@@ -5,7 +5,10 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
+local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
+local Types = require(ReplicatedStorage.Shared.Skate.Types)
 
 local config = Config.defaults()
 local movement = config.Movement
@@ -69,5 +72,36 @@ describe("MovementCheck", function()
 		check:forget("A")
 		expect(check:lastValid("A")).toBe(nil)
 		expect(check:sample("A", Vector3.new(500, 0, 0), 0.25)).toBe("Ok")
+	end)
+
+	-- The dive (#241) speeds up down the fall line to hardCap, never past it.
+	it("accepts a whole dive down the fall line, sampled as the server samples it", function()
+		local dt = 1 / 60
+		local diver = SkateMath.new(movement, Fixtures.GRAVITY)
+		diver.mode = "Airborne"
+		diver:push(diver:diveChange((config.Actions.Dive.motion :: Config.Motion).diveSpeed :: number), false)
+		local input: Types.SkateInput = {
+			move = Vector3.zero,
+			pump = false,
+			brake = false,
+			jump = false,
+			draftAccel = 0,
+			knockedDown = true,
+			diving = true,
+		}
+		local noGround: Types.Ground = { hit = false, normal = Vector3.yAxis, distance = 0 }
+		local check = MovementCheck.new(movement, network)
+		local position = Vector3.new(0, 100, 0)
+		check:reset("A", position, 0)
+		local verdicts: { string } = {}
+		for frame = 1, 120 do
+			diver:step(input, noGround, dt)
+			position += diver.velocity * dt
+			if frame % 15 == 0 then
+				table.insert(verdicts, check:sample("A", position, frame * dt))
+			end
+		end
+		expect(diver.velocity.Magnitude).toBeCloseTo(movement.hardCap, 3)
+		expect(verdicts).toEqual(table.create(8, "Ok"))
 	end)
 end)

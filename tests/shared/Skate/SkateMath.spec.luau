@@ -19,8 +19,15 @@ local SLOPE = Vector3.new(0, math.cos(SLOPE_ANGLE), -math.sin(SLOPE_ANGLE))
 local DOWNHILL = Vector3.new(0, -math.sin(SLOPE_ANGLE), -math.cos(SLOPE_ANGLE))
 
 local function input(overrides: { [string]: any }?): Types.SkateInput
-	local record: Types.SkateInput =
-		{ move = Vector3.zero, pump = false, brake = false, jump = false, draftAccel = 0, knockedDown = false }
+	local record: Types.SkateInput = {
+		move = Vector3.zero,
+		pump = false,
+		brake = false,
+		jump = false,
+		draftAccel = 0,
+		knockedDown = false,
+		diving = false,
+	}
 	local changes: { [string]: any } = overrides or {}
 	for key, value in changes do
 		(record :: any)[key] = value
@@ -425,6 +432,78 @@ describe("SkateMath pushes and knockdowns", function()
 		expect(s:shownSpeed()).toBe(0)
 		s.velocity = Vector3.new(30, -80, -40)
 		expect(s:shownSpeed()).toBeCloseTo(50, 4)
+	end)
+end)
+
+-- The lunges (#241), in the speedometer's terms (shownSpeed): Roller Champions' tackle peaked at 65-75 km/h whatever
+-- the speed before, and its dive went to ~70 km/h, then sped up diving down (Videos 4-6).
+describe("SkateMath lunges", function()
+	-- The line a diver facing -Z flies along: fallLineDeg (20°) below the facing.
+	local LINE = Vector3.new(0, -math.sin(math.rad(movement.fallLineDeg)), -math.cos(math.rad(movement.fallLineDeg)))
+
+	local function airborne(velocity: Vector3): SkateMath.Skater
+		local s = skater(velocity)
+		s.mode = "Airborne"
+		return s
+	end
+
+	it("lunges along the facing, never past the ceiling: a faster skater slows to it", function()
+		-- From rest, at cruise (60 + 40 held at 60) and at 108 km/h (90, slowed to 60), all facing -Z.
+		Fixtures.expectNear(skater(Vector3.zero):lungeChange(40, 60), Vector3.new(0, 0, -40))
+		Fixtures.expectNear(skater(Vector3.new(0, 0, -60)):lungeChange(40, 60), Vector3.zero)
+		Fixtures.expectNear(skater(Vector3.new(0, 0, -90)):lungeChange(40, 60), Vector3.new(0, 0, 30))
+		-- Moving sideways: (50, 0, -40) is 64.03, held at 60: (46.852, 0, -37.482).
+		Fixtures.expectNear(skater(Vector3.new(50, 0, 0)):lungeChange(40, 60), Vector3.new(-3.148, 0, -37.482))
+		-- In the air, across the ground only: the rise stays.
+		Fixtures.expectNear(airborne(Vector3.new(0, 50, -30)):lungeChange(40, 60), Vector3.new(0, 0, -30))
+	end)
+
+	it("slows the shown speed down to a ceiling, and leaves a slower skater and the rise alone", function()
+		Fixtures.expectNear(skater(Vector3.new(0, 0, -40)):slowChange(25), Vector3.new(0, 0, 15))
+		Fixtures.expectNear(skater(Vector3.new(0, 0, -40)):slowChange(50), Vector3.zero)
+		Fixtures.expectNear(airborne(Vector3.new(0, 30, -40)):slowChange(10), Vector3.new(0, 0, 30))
+	end)
+
+	it("dives along the facing on the ground, at the dive's speed or a faster skater's own", function()
+		Fixtures.expectNear(skater(Vector3.new(0, 0, -30)):diveChange(60), Vector3.new(0, 0, -30))
+		Fixtures.expectNear(skater(Vector3.new(0, 0, -90)):diveChange(60), Vector3.zero)
+	end)
+
+	it("dives down the fall line in the air, at the dive's speed or the shown speed if faster", function()
+		-- From 10 across: 60 along the line, (0, -20.521, -56.382).
+		local slow = airborne(Vector3.new(0, 0, -10))
+		slow:push(slow:diveChange(60), false)
+		Fixtures.expectNear(slow.velocity, LINE * 60)
+		-- Falling at 30 with 80 across: 80 along it, (0, -27.362, -75.175).
+		local fast = airborne(Vector3.new(0, -30, -80))
+		fast:push(fast:diveChange(60), false)
+		Fixtures.expectNear(fast.velocity, LINE * 80)
+	end)
+
+	it("speeds a diver down the fall line by gravity's pull along it, never past hardCap", function()
+		local function dived(speed: number, seconds: number): SkateMath.Skater
+			local s = airborne(LINE * speed)
+			for _ = 1, math.round(seconds * 60) do
+				s:step(input({ diving = true, knockedDown = true }), ground(FLAT, 0, false), 1 / 60)
+			end
+			return s
+		end
+		-- 196.2 × sin 20° = 67.1 along the line, less air drag, each 1/60 s: 60 -> 92.782 in 0.5 s, still on the line
+		-- (63 studs/s² across the ground: RC's readout climbed ~75 km/h per s).
+		local s = dived(60, 0.5)
+		Fixtures.expectNear(s.velocity, LINE * 92.782)
+		Fixtures.expectNear(s.forward, -Vector3.zAxis)
+		Fixtures.expectNear(dived(115, 0.5).velocity, LINE * movement.hardCap)
+		-- Rising straight up a wall as they leave it: nothing of that goes down the line, so they start from rest on
+		-- it (one step's pull, 67.1 / 60 = 1.118, less drag).
+		local rising = airborne(Vector3.new(0, 60, 0))
+		rising:step(input({ diving = true, knockedDown = true }), ground(FLAT, 0, false), 1 / 60)
+		Fixtures.expectNear(rising.velocity, LINE * 1.118)
+		-- Not diving: gravity straight down, as ever.
+		local falling = airborne(Vector3.new(0, 0, -60))
+		falling:step(input({ knockedDown = true }), ground(FLAT, 0, false), 0.1)
+		Fixtures.expectNear(falling.velocity * Vector3.new(1, 0, 1), Vector3.new(0, 0, -59.88))
+		expect(falling.velocity.Y).toBeCloseTo(-19.62 * (1 - 0.02 * 0.1), 3)
 	end)
 end)
 

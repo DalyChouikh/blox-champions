@@ -38,6 +38,10 @@ export type MovementConfig = {
 	airTurnRate: number,
 	-- How fast a skater in the air turns back upright.
 	airUprightRate: number,
+	-- A diver in the air flies down a line this far below their facing, gravity's pull along it speeding them up:
+	-- 196.2 × sin 20° × cos 20° = 63 studs/s² across the ground, 76 km/h per s (the owner, #241: RC's readout climbed
+	-- ~75 km/h per s diving down).
+	fallLineDeg: number,
 	-- A surface steeper than wallAngle (degrees from flat) is a wall: gravity pulls along it at wallGravityScale of its
 	-- full strength (the owner, #216: about a third, from RC's glass rides). A wall holds a skater at any speed; past
 	-- straight up the loop rule decides (A3).
@@ -104,6 +108,7 @@ local defaults: MovementConfig = {
 	turnRateHigh = 1.5,
 	airTurnRate = 1,
 	airUprightRate = 6,
+	fallLineDeg = 20,
 	wallAngle = 30,
 	wallGravityScale = 1 / 3,
 	wallTurnRate = 1,
@@ -153,6 +158,7 @@ local fields = Validate.record({
 	turnRateHigh = nonNegative,
 	airTurnRate = nonNegative,
 	airUprightRate = positive,
+	fallLineDeg = Validate.number({ above = 0, max = 90 }),
 	wallAngle = angle,
 	wallGravityScale = Validate.number({ above = 0, max = 1 }),
 	wallTurnRate = nonNegative,

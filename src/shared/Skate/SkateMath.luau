@@ -27,6 +27,7 @@ local LOCKED: Types.SkateInput = table.freeze({
 	jump = false,
 	draftAccel = 0,
 	knockedDown = true,
+	diving = false,
 })
 
 local SkateMath = {}
@@ -51,6 +52,10 @@ type Fields = {
 	_flatPull: number,
 	-- Gravity's pull off a face leaning OVERHANG_EPSILON past vertical: up to it the face holds like a wall.
 	_overhangPull: number,
+	-- The fall line (fallLineDeg below the facing): its angle's cosine and sine, and gravity's pull along it.
+	_lineCos: number,
+	_lineSin: number,
+	_linePull: number,
 	-- The ground normal the last grounded step rode on, nil in the air: each step's turn is measured from it (A3).
 	_lastNormal: Vector3?,
 	-- The last grounded steps, newest at `_historyHead`: how far each went and how much the ground turned under it,
@@ -64,6 +69,7 @@ type Fields = {
 export type Skater = typeof(setmetatable({} :: Fields, SkateMath))
 
 function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skater
+	local line = math.rad(movement.fallLineDeg)
 	local self: Fields = {
 		velocity = Vector3.zero,
 		mode = "Grounded",
@@ -77,6 +83,9 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_wallCos = math.cos(math.rad(movement.wallAngle)),
 		_flatPull = gravity.Magnitude * math.sin(math.rad(movement.pumpFlatSlopeDeg)),
 		_overhangPull = gravity.Magnitude * OVERHANG_EPSILON,
+		_lineCos = math.cos(line),
+		_lineSin = math.sin(line),
+		_linePull = gravity.Magnitude * math.sin(line),
 		_lastNormal = nil,
 		_steps = table.create(HISTORY, 0),
 		_turns = table.create(HISTORY, 0),
@@ -99,6 +108,18 @@ local function facingOn(self: Skater, normal: Vector3): Vector3
 		return uphill.Unit
 	end
 	return normal:Cross(Vector3.zAxis).Unit
+end
+
+-- The way a diver flies (#241): fallLineDeg below the facing.
+local function fallLine(self: Skater): Vector3
+	local worldUp = self._worldUp
+	return facingOn(self, worldUp) * self._lineCos - worldUp * self._lineSin
+end
+
+-- Across what the speedometer reads (#233): the surface on the ground, on walls and behind a teammate; the ground
+-- below in the air.
+local function readingUp(self: Skater): Vector3
+	return if self.mode == "Airborne" then self._worldUp else self.up
 end
 
 -- Turns widen with speed: turnRateLow at rest down to turnRateHigh at hardCap, and never faster than wallTurnRate on a
@@ -197,21 +218,26 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	self.forward = if speed > EPSILON then direction else heading
 end
 
--- Ballistic: gravity and drag, a little horizontal steering, and turning back upright.
-local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
+-- Ballistic: gravity and drag, a little horizontal steering, and turning back upright. A diver flies down the fall
+-- line instead, gravity's pull along it speeding them up (#241).
+local function stepAirborne(self: Skater, input: Types.SkateInput, diving: boolean, dt: number)
 	local movement = self._movement
 	local worldUp = self._worldUp
 	local velocity = self.velocity
-	local rising = worldUp * velocity:Dot(worldUp)
-	local horizontal = velocity - rising
-	local horizontalSpeed = horizontal.Magnitude
-	local wish = input.move - worldUp * input.move:Dot(worldUp)
-	if horizontalSpeed > EPSILON and wish.Magnitude > EPSILON then
-		local turned = rotateToward(horizontal / horizontalSpeed, wish.Unit, movement.airTurnRate * dt, worldUp)
-		horizontal = turned * horizontalSpeed
+	if diving then
+		local line = fallLine(self)
+		velocity = line * (math.max(velocity:Dot(line), 0) + self._linePull * dt)
+	else
+		local rising = worldUp * velocity:Dot(worldUp)
+		local horizontal = velocity - rising
+		local horizontalSpeed = horizontal.Magnitude
+		local wish = input.move - worldUp * input.move:Dot(worldUp)
+		if horizontalSpeed > EPSILON and wish.Magnitude > EPSILON then
+			local turned = rotateToward(horizontal / horizontalSpeed, wish.Unit, movement.airTurnRate * dt, worldUp)
+			horizontal = turned * horizontalSpeed
+		end
+		velocity = horizontal + rising + self._gravity * dt
 	end
-
-	velocity = horizontal + rising + self._gravity * dt
 	local speed = velocity.Magnitude
 	if speed > EPSILON then
 		velocity *= math.min(speed - movement.airDrag * speed * dt, movement.hardCap) / speed
@@ -353,7 +379,7 @@ function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Gro
 		stepGrounded(self, controls, ground, dt)
 	else
 		forget(self)
-		stepAirborne(self, controls, dt)
+		stepAirborne(self, controls, input.diving, dt)
 	end
 end
 
@@ -392,6 +418,37 @@ function SkateMath.push(self: Skater, change: Vector3, launch: boolean)
 	end
 end
 
+-- The pushes below are worked out in the speedometer's terms (shownSpeed), keeping the velocity off its plane (a
+-- rise, a fall, the hover's pull), and handed to `push`.
+
+-- A lunge's change (#241): `add` more speed along the facing, never past `ceiling`; a faster skater slows to it.
+function SkateMath.lungeChange(self: Skater, add: number, ceiling: number): Vector3
+	local up = readingUp(self)
+	local across = alongSurface(self.velocity, up)
+	local lunged = across + facingOn(self, up) * add
+	local speed = lunged.Magnitude
+	return (if speed > ceiling then lunged * (ceiling / speed) else lunged) - across
+end
+
+-- The change that brings the speed down to `ceiling` if it is above (a lunge easing back, #241).
+function SkateMath.slowChange(self: Skater, ceiling: number): Vector3
+	local across = alongSurface(self.velocity, readingUp(self))
+	local speed = across.Magnitude
+	return if speed > ceiling then across * (ceiling / speed - 1) else Vector3.zero
+end
+
+-- The Dive's change (#241): `speed` along the way, or the skater's own if faster: along the facing on the ground,
+-- down the fall line in the air, where stepAirborne keeps a diver.
+function SkateMath.diveChange(self: Skater, speed: number): Vector3
+	local up = readingUp(self)
+	local across = alongSurface(self.velocity, up)
+	local target = math.max(across.Magnitude, speed)
+	if self.mode == "Airborne" then
+		return fallLine(self) * target - self.velocity
+	end
+	return facingOn(self, up) * target - across
+end
+
 -- A surface in the way (the controller finds it): the velocity loses its part into the surface and keeps the rest, so
 -- the skater slides along it. Says whether anything was lost.
 function SkateMath.block(self: Skater, normal: Vector3): boolean
@@ -414,8 +471,7 @@ end
 -- on walls and behind a teammate, without the hover's pull off it; across the ground in the air, so a standing jump
 -- reads 0 and a fall adds nothing.
 function SkateMath.shownSpeed(self: Skater): number
-	local normal = if self.mode == "Airborne" then self._worldUp else self.up
-	return alongSurface(self.velocity, normal).Magnitude
+	return alongSurface(self.velocity, readingUp(self)).Magnitude
 end
 
 return SkateMath

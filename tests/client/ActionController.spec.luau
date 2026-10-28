@@ -22,6 +22,8 @@ local config = Config.defaults()
 local movement = config.Movement
 -- The Tackle's Dive (#240).
 local FOLLOW_UP = config.Actions.Tackle.followUp :: Config.FollowUp
+-- The line a diver facing -Z flies along (#241): fallLineDeg below the facing.
+local FALL_LINE = Vector3.new(0, -math.sin(math.rad(movement.fallLineDeg)), -math.cos(math.rad(movement.fallLineDeg)))
 local DT = 1 / 60
 -- Looking toward -Z from behind the skater, so the skater's right is the camera's right, +X.
 local CAMERA = { CFrame = CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)) }
@@ -174,41 +176,119 @@ describe("ActionController", function()
 		expect(ActionController:pose()).toBe("None")
 	end)
 
+	-- The owner (#241): a tackle adds 48 km/h but never past 72 km/h, and eases back to the speed before over its
+	-- recovery (RC's readout: 75 -> 33 km/h within ~0.3 s), so it never makes a skater faster.
+	it("lunges up to the tackle's ceiling, then eases back to the speed before over the recovery", function()
+		setup()
+		local phases = config.Actions.Tackle.phases
+		-- Frames from the press: inside the strike, halfway through the recovery, and past the tackle's end.
+		local striking = math.floor((phases.windup + phases.active) / DT) - 2
+		local easing = math.floor(phases.recovery / 2 / DT)
+		local ended = math.ceil(phases.recovery / DT)
+		-- From rest (+40), at cruise (60, held at 60) and at 108 km/h (90, slowed to 60).
+		for _, case in { { before = 0, lunge = 40 }, { before = 60, lunge = 60 }, { before = 90, lunge = 60 } } do
+			ActionController.runner:reset()
+			skater().velocity = Vector3.new(0, 0, -case.before)
+			press("Tackle")
+			for _ = 1, striking do
+				actionsOnly()
+			end
+			expect(skater():shownSpeed()).toBeCloseTo(case.lunge, 3)
+			for _ = 1, 2 + easing do
+				actionsOnly()
+			end
+			local eased = skater():shownSpeed()
+			for _ = 1, ended do
+				actionsOnly()
+			end
+			-- The slower of the lunge and the speed before, and between the two halfway through.
+			local after = math.min(case.lunge, case.before)
+			expect(skater():shownSpeed()).toBeCloseTo(after, 3)
+			if case.lunge > after then
+				expect(eased > after + 10 and eased < case.lunge - 10).toBe(true)
+			end
+		end
+	end)
+
+	it("leaves a skater the tackle slowed free to gain speed in its recovery", function()
+		setup()
+		local phases = config.Actions.Tackle.phases
+		-- 108 km/h, slowed to 60 by the lunge: nothing to give back, so speed gained after it stays.
+		skater().velocity = Vector3.new(0, 0, -90)
+		press("Tackle")
+		for _ = 1, math.floor((phases.windup + phases.active) / DT) + 2 do
+			actionsOnly()
+		end
+		expect(ActionController.runner.phase).toBe("Recovery")
+		skater().velocity = Vector3.new(0, 0, -80)
+		actionsOnly()
+		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -80))
+	end)
+
+	it("gives a refused tackle's lunge back at once", function()
+		setup()
+		press("Tackle")
+		actionsOnly()
+		ActionController:rejected({ action = "Tackle" })
+		actionsOnly()
+		Fixtures.expectNear(skater().velocity, Vector3.zero)
+	end)
+
 	-- Roller Champions' tackle key (#240): "Air Tackle Dive: X then Square then Square".
-	it("tackles in the air at airMultiplier, then dives in its follow-up window at the dive's full push", function()
+	it("tackles in the air at the tackle's own air strength, then dives down the fall line", function()
 		setup()
 		flying(Vector3.new(0, 0, -10))
 		press("Tackle")
 		actionsOnly()
 		expect(requests).toEqual({ { action = "Tackle" } })
-		-- 10 + lungeSpeed 40 × airMultiplier 0.8.
-		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -42))
+		-- 10 + lungeSpeed 40 × the tackle's airMultiplier 0.4 (#241: RC's 27 -> 42 km/h).
+		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -26))
 		intoWindow(actionsOnly)
 		press("Tackle")
 		actionsOnly()
 		expect(requests).toEqual({ { action = "Tackle" }, { action = "Dive" } })
-		-- 42 + lungeSpeed 60: the push of an action that ends on the belly is never airMultiplier'd.
-		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -102))
+		-- 26 across is under diveSpeed 60: 60 along the line 20° below the facing, never airMultiplier'd.
+		Fixtures.expectNear(skater().velocity, FALL_LINE * 60)
 		expect(ActionController:pose()).toBe("Lunge")
+		-- Past the tackle's phases the dive keeps its own speed: nothing eases it back.
+		for _ = 1, math.ceil(config.Actions.Tackle.phases.recovery * 2 / DT) do
+			actionsOnly()
+		end
+		Fixtures.expectNear(skater().velocity, FALL_LINE * 60)
 	end)
 
-	it("dives on the ground after a tackle, at the dive's full push", function()
+	it("holds an air tackle under the same ceiling as on the ground", function()
 		setup()
-		frame()
-		local before = skater().velocity
+		-- 80 + 16 held at 60, and 60 after: the slower of that and the speed before.
+		flying(Vector3.new(0, 0, -80))
+		press("Tackle")
+		actionsOnly()
+		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -60))
+		for _ = 1, math.ceil(config.Actions.Tackle.cooldown / DT) do
+			actionsOnly()
+		end
+		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -60))
+	end)
+
+	it("dives on the ground after a tackle, at the dive's speed along the facing", function()
+		setup()
 		dive(actionsOnly)
 		expect(requests).toEqual({ { action = "Tackle" }, { action = "Dive" } })
 		expect(SkateController.diving).toBe(true)
-		-- lungeSpeed 40 + 60 along the facing.
-		Fixtures.expectNear(skater().velocity, before + skater().forward * 100)
+		-- The tackle's 40, then diveSpeed 60 along the facing.
+		Fixtures.expectNear(skater().velocity, skater().forward * 60)
 	end)
 
-	it("never dives past the ceiling", function()
+	-- Roller Champions (Video 6): the readout climbed ~7.5 km/h every 0.1 s as the diver went down.
+	it("flies a dive down the fall line, gravity speeding the diver up along it", function()
 		setup()
-		flying(Vector3.new(0, 0, -80))
-		dive(actionsOnly)
-		-- 80 + 32 + 60 = 172, held at hardCap.
-		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -movement.hardCap))
+		flying(Vector3.new(0, 0, -10))
+		dive(frame)
+		for _ = 1, 30 do
+			frame()
+		end
+		-- 60 along the line, then 0.5 s of gravity's pull along it (196.2 × sin 20°) less air drag: 92.782.
+		Fixtures.expectNear(skater().velocity, FALL_LINE * 92.782)
 	end)
 
 	it("dodges in the air airMultiplier as hard as on the ground", function()

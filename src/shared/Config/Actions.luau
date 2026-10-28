@@ -1,8 +1,8 @@
 --!strict
 -- The players' actions (spec §8.1–8.2): one entry per action, with its phases, cooldown, what it requires and what it
 -- does. Adding an action is an entry here plus one effect function in ActionService. Times are in seconds, speeds in
--- studs/s and cones are half-angles in degrees, as Movement's are. The values the spec doesn't give (Dive's push and
--- cooldown, Dodge's and Uppercut's phases, the aim of each strike) are starting points for tuning, like the spec's own.
+-- studs/s and cones are half-angles in degrees, as Movement's are. The values the spec doesn't give (Dive's cooldown,
+-- Dodge's and Uppercut's phases, the aim of each strike) are starting points for tuning, like the spec's own.
 
 local Validate = require(script.Parent.Validate)
 
@@ -24,12 +24,19 @@ export type Requires = {
 }
 -- Who a strike reaches: within range, and within coneDeg of the facing pitched up by aimUpDeg.
 export type Hit = { range: number, coneDeg: number, aimUpDeg: number, knockdownSeconds: number }
--- The push an action gives its skater when it starts.
+-- The push an action gives its skater when it starts. The lunges' speeds are as the speedometer reads them: along the
+-- surface on the ground, across the ground in the air (#233).
 export type Motion = {
+	-- More speed along the facing, never past lungeCap: a faster skater slows to it. From the strike's end the speed
+	-- eases back to the speed before over the recovery, so a lunge never makes a skater faster (#241).
 	lungeSpeed: number?,
+	lungeCap: number?,
 	sideSpeed: number?,
 	-- Straight up, anywhere: the Uppercut's leap (#219).
 	leapImpulse: number?,
+	-- The Dive's: this speed along the facing, or a faster skater's own, down the fall line in the air
+	-- (Movement.fallLineDeg, #241).
+	diveSpeed: number?,
 }
 -- How an action that ends on the skater's belly (the Dive, #221) ends: from its start they can do nothing until their
 -- first touch of the ground after its active phase, which knocks them down for knockdownSeconds.
@@ -64,14 +71,16 @@ export type ActionConfig = {
 	pose: PoseName,
 	hit: Hit?,
 	motion: Motion?,
+	-- In the air its push is this much of its ground value instead of Actions.airMultiplier.
+	airMultiplier: number?,
 	landing: Landing?,
 	followUp: FollowUp?,
 	throw: ThrowSettings?,
 	pass: PassSettings?,
 }
 export type ActionsConfig = {
-	-- Pushes in the air are this much of their ground value (an air tackle, an air dodge, an uppercut in the air). An
-	-- action that ends on the belly (one with a landing: the Dive) pushes as configured.
+	-- Pushes in the air are this much of their ground value (an air dodge, an uppercut in the air), unless the action
+	-- sets its own (the Tackle). The Dive's speed is never scaled.
 	airMultiplier: number,
 	-- A call for a pass lasts this long.
 	callPassWindow: number,
@@ -114,7 +123,10 @@ local defaults: ActionsConfig = {
 	-- The owner (#220): any movement key gets a skater up, not before 0.5 s; RC's knockdown lasted under 1.8 s.
 	getUpAfter = 0.5,
 	-- On the ground and in the air. Roller Champions' tackle key (the owner, #240; Video 4): "Dive" replaces "Tackle"
-	-- 0.1-0.2 s after the press for 0.7-0.8 s, and "Tackle" is back 0.9-1.0 s after it.
+	-- 0.1-0.2 s after the press for 0.7-0.8 s, and "Tackle" is back 0.9-1.0 s after it. Its lunge adds 48 km/h but
+	-- never past 72 km/h, and eases back over the recovery (the owner, #241: RC's peaked at 65-75 km/h whatever the
+	-- speed before, and fell back within ~0.3 s); in the air 0.4 as much, 19 km/h, under the same ceiling (RC: 27 -> 42
+	-- km/h, 18 -> 37).
 	Tackle = {
 		phases = { windup = 0.05, active = 0.25, recovery = 0.35 },
 		cooldown = 1,
@@ -122,12 +134,13 @@ local defaults: ActionsConfig = {
 		effect = "Knockdown",
 		pose = "Lunge",
 		hit = { range = 7, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
-		motion = { lungeSpeed = 40 },
+		motion = { lungeSpeed = 40, lungeCap = 60 },
+		airMultiplier = 0.4,
 		followUp = { action = "Dive", from = 0.1, to = 1 },
 	},
-	-- Roller Champions' dive (the owner's recording, Video 5 at 1:13), only as the Tackle's follow-up: 60 studs/s more
-	-- along the way the skater goes (from RC's 69 km/h, 57.5 studs/s, to 117.5 = 141 km/h at once; RC's rose to 139),
-	-- then on the belly for as long as a tackle leaves its victim down.
+	-- Roller Champions' dive (the owner's Videos 5 and 6), only as the Tackle's follow-up: 72 km/h along the way, or a
+	-- faster skater's own speed, and in the air down the fall line, speeding up (RC: 19 -> 65 km/h at the press, 133
+	-- at the touchdown 1.1 s later); then on the belly for as long as a tackle leaves its victim down.
 	Dive = {
 		phases = { windup = 0, active = 0.35, recovery = 0.9 },
 		cooldown = 0.8,
@@ -135,7 +148,7 @@ local defaults: ActionsConfig = {
 		effect = "Knockdown",
 		pose = "Lunge",
 		hit = { range = 11, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
-		motion = { lungeSpeed = 60 },
+		motion = { diveSpeed = 60 },
 		landing = { knockdownSeconds = 1.5 },
 	},
 	-- Tackle-immune exactly while active.
@@ -276,12 +289,13 @@ local schema = Validate.record({
 	getUpAfter = positive,
 	Tackle = action(defaults.Tackle, {
 		hit = hit,
-		motion = Validate.record({ lungeSpeed = positive }),
+		motion = Validate.record({ lungeSpeed = positive, lungeCap = positive }),
+		airMultiplier = fraction,
 		followUp = followUp("Tackle"),
 	}),
 	Dive = action(defaults.Dive, {
 		hit = hit,
-		motion = Validate.record({ lungeSpeed = positive }),
+		motion = Validate.record({ diveSpeed = positive }),
 		landing = Validate.record({ knockdownSeconds = positive }),
 	}),
 	Dodge = action(defaults.Dodge, { motion = Validate.record({ sideSpeed = positive }) }),
