@@ -2,7 +2,7 @@
 -- Skating (spec §7.2): the skater's body, momentum, steering, wall riding, pump, brake, jump, draft and attach, the
 -- slide of a knocked-down skater, a hard landing and a belly landing, and the speedometer's scale.
 -- Speeds are in studs/s, accelerations in studs/s², turn rates in rad/s, angles in degrees. The values the spec
--- doesn't give (hoverSpring, strideAccel, airTurnRate, airUprightRate, pumpFlatSlopeDeg, normalFilter, attachSpring)
+-- doesn't give (hoverSpring, strideAccel, airTurnRate, airUprightRate, pumpFlatSlopeDeg, bodyUpSmoothing, attachSpring)
 -- are starting points for tuning, like the spec's own.
 
 local PartSize = require(script.Parent.Parent.Util.PartSize)
@@ -78,9 +78,15 @@ export type MovementConfig = {
 	-- Touching down from the air on the belly (diving, or still posing) keeps this share of the speed, then the slide
 	-- (the owner, #245: RC kept 59-73%, 65.5% on average: 133 -> 84, 139 -> 101, 104 -> 70, 97 -> 57 km/h).
 	bellyLandingKeep: number,
-	-- A ground normal turning more than maxTurnDeg is trusted only once a second ray agrees; smaller turns are
-	-- smoothed at this rate (per second).
-	normalFilter: { maxTurnDeg: number, smoothing: number },
+	-- The ground's normal turning more than this between two rays is a corner, or a seam's side face: it is trusted
+	-- only once a second ray agrees, and the speed into the new face is lost. A smaller turn is a curve the arena's
+	-- flat strips stand for: the skating follows it at once and keeps its speed through it, since the ground does no
+	-- work (#255: smoothing the turn lagged the skating and added energy on curved walls; projecting the speed onto
+	-- each strip lost ~12% of it per wall visit).
+	cornerDeg: number,
+	-- The skater body's up eases toward the skating's at this rate (each step closes 1 − e^(−rate × dt) of the turn),
+	-- so it turns smoothly where the skating turns at each strip of a curve (#255).
+	bodyUpSmoothing: number,
 	draftRange: number,
 	draftConeDeg: number,
 	draftMaxAccel: number,
@@ -139,7 +145,8 @@ local defaults: MovementConfig = {
 	jumpSpeedCost = 0.1,
 	airPoseImpulse = 42,
 	bellyLandingKeep = 0.65,
-	normalFilter = { maxTurnDeg = 30, smoothing = 30 },
+	cornerDeg = 30,
+	bodyUpSmoothing = 30,
 	draftRange = 18,
 	draftConeDeg = 30,
 	draftMaxAccel = 20,
@@ -158,6 +165,8 @@ local defaults: MovementConfig = {
 local positive = Validate.number({ above = 0 })
 local nonNegative = Validate.number({ min = 0 })
 local angle = Validate.number({ above = 0, max = 180 })
+-- Above zero, at most a quarter turn.
+local quarterTurn = Validate.number({ above = 0, max = 90 })
 
 local fields = Validate.record({
 	colliderDiameter = Validate.number({ above = 0, max = PartSize.MAX }),
@@ -175,10 +184,10 @@ local fields = Validate.record({
 	turnRateLow = nonNegative,
 	turnRateHigh = nonNegative,
 	turnRoundSeconds = positive,
-	backwardsConeDeg = Validate.number({ above = 0, max = 90 }),
+	backwardsConeDeg = quarterTurn,
 	airTurnRate = nonNegative,
 	airUprightRate = positive,
-	fallLineDeg = Validate.number({ above = 0, max = 90 }),
+	fallLineDeg = quarterTurn,
 	wallAngle = angle,
 	wallGravityScale = Validate.number({ above = 0, max = 1 }),
 	wallTurnRate = nonNegative,
@@ -194,7 +203,8 @@ local fields = Validate.record({
 	jumpSpeedCost = Validate.number({ min = 0, max = 1 }),
 	airPoseImpulse = nonNegative,
 	bellyLandingKeep = Validate.number({ above = 0, max = 1 }),
-	normalFilter = Validate.record({ maxTurnDeg = angle, smoothing = positive }),
+	cornerDeg = quarterTurn,
+	bodyUpSmoothing = positive,
 	draftRange = positive,
 	draftConeDeg = angle,
 	draftMaxAccel = nonNegative,

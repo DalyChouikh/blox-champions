@@ -16,6 +16,7 @@ local SkaterBody = require(ServerScriptService.Server.SkaterBody)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
+local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
 local config = Config.defaults()
 local movement = config.Movement
@@ -653,7 +654,7 @@ describe("SkateController", function()
 			end,
 		})
 		SkateController:bind(rig)
-		local turnCos = math.cos(math.rad(movement.normalFilter.maxTurnDeg))
+		local turnCos = math.cos(math.rad(movement.cornerDeg))
 		for _ = 1, #normals do
 			-- Riding at cruise: a steep normal is ridden, not fallen from, so only the filter keeps the skater's up.
 			local riding = SkateController.skater :: any
@@ -661,6 +662,30 @@ describe("SkateController", function()
 			SkateController:step(1 / 60)
 			expect(riding.up:Dot(Vector3.yAxis) >= turnCos).toBe(true)
 		end
+	end)
+
+	-- The owner's re-playtest (#255): the skating turns at once at each strip of a curved wall, so the body eases
+	-- toward it, as the smoothed skating used to; a new character and a freeze stand it upright at once.
+	it("eases the body toward the skating's up, upright at once for a new character or a freeze", function()
+		local tilted = Vector3.new(math.sin(math.rad(15)), math.cos(math.rad(15)), 0)
+		setup({
+			Raycast = function(): any
+				return { Normal = tilted, Distance = movement.hoverHeight }
+			end,
+		})
+		local respawned = skaterAt("Respawned", Vector3.new(50, 0, 0))
+		for _, model in { rig, respawned } do
+			SkateController:bind(model)
+			SkateController:step(1 / 60)
+			Fixtures.expectNear((SkateController.skater :: any).up, tilted)
+			local shown = alignOf(model).SecondaryAxis
+			-- 15° × (1 − e^(−30 / 60)) of the turn in one step, from upright.
+			expect(math.deg(Vectors.angleBetween(shown, Vector3.yAxis))).toBeCloseTo(5.902, 2)
+			expect(math.deg(Vectors.angleBetween(shown, tilted))).toBeCloseTo(9.098, 2)
+		end
+		Fixtures.root(respawned).Anchored = true
+		SkateController:step(1 / 60)
+		Fixtures.expectNear(alignOf(respawned).SecondaryAxis, Vector3.yAxis)
 	end)
 
 	it("steps in under half a millisecond", function()

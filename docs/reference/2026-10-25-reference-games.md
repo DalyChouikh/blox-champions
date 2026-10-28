@@ -360,6 +360,41 @@ about two thirds of a lap, swinging from wall to wall.
     found: the Get Up prompt searched by template over Videos 4 and 6 (one in Video 4, none in Video 6; Video 7's
     frames differ in size, so its posed falls were read at the times already noted); none found in Video 3 (2021).
     Not chosen: 1.5 s with dives as today; the issue's fixed ~48 km/h per s for falls only.
+  - **The re-playtest of the published stack head bf426a2** (2026-10-28, session 35), the owner's words: "it is still
+    far from RC gamepaly and real physics and realism"; (1) Video 8 (ours, `D:\Screenshots\Videos\Screen Recording
+    2026-10-28 145738.mp4`, 1:24): "the player can still ride the walls outer and middle, and specially the middle how
+    he can turn the hard curved turns and being able to stick to the wall"; "I think it is wrong that we keep
+    measuring by the physics and stuff from the speedometer, I am not sure I don't know"; (2) Video 9 (ours,
+    `...2026-10-28 150133.mp4`, 0:15): "the player can still be in a ride loop between walls, even when not clicking
+    on any buttons"; (3) "when a player jump, or uppercut or goes into a wall, make sure that his legs are riding the
+    wall, and not just drop down vertical next to it" (RC reference: Video 7's start).
+    Measured (session 35): Video 9 swings middle glass -> outer glass -> middle -> outer for 13 s, crossing the floor at
+    104-113 km/h every time (3 frames a second). Video 8 0:02.0-2.8 and 0:04.8-5.5: our skater comes off the glass and
+    falls upright beside it to the floor. RC Video 7 0:01.1-3.0 and 0:05.9-7.3 (10 frames a second): up the bank,
+    straight up off its top, a flip, then back down feet first onto the bank's face and down it. Cause of (2), found
+    with a harness stepping SkateMath over the real arena (no Roblox physics): the ground-normal filter's smoothing
+    lags the surface on curves and adds energy each wall visit: from 108 km/h, nothing pressed, floor crossings 96,
+    107, 97, 104, 90, 95, 77, 78, 54, 47, 29 km/h (32 s); raw normals 61, 38 (stop 6.1 s); smoothing 120: 65, 44, 20;
+    smoothing 10: 111, 145. In Play with the lag removed: 107 -> 62 -> 38 -> 8, stopped at 6.2 s (Play with it: 7 visits
+    in 20 s). Cause of (1): only an overhang can throw a rider off; a pure-SkateMath test kept a skater on the outside
+    of an upright round pillar (r 20) at any speed (196 deg round at 108 km/h). Cause of (3): in the air the skater turns
+    upright and only a surface along their feet's ray lands them, so a wall beside them never does. Wall gravity, lag
+    removed, real arena, nothing pressed: straight at the outer wall 108 / 145 km/h climbs 28 / 39 studs (a third), 22 /
+    30 (half), 16 / 21 (full); along the glass 40 up with the stick along it, 72 / 108 km/h stay above 20 for 2.5 / 4.5 s
+    (a third), 1.0 / 2.0 (half), 0.55 / 0.63 (full). The third (Q16) came from RC's readout at Video 3 21:01, assumed to
+    be the full speed on the glass; RC's air readout is speed across the ground, so on the glass it may not be.
+  - **Round 11, after the re-playtest** (2026-10-28, session 35, AskUserQuestion, all recommended): Q25 **one gravity
+    everywhere: walls and glass pull at full gravity, like the air** (reverses Q16's third; real physics; the owner's
+    Video 6 note on RC: "the gravity is strong and pull him, it is hard to go up"): riding alone climbs 16 / 21 studs at
+    108 / 145 km/h and a line along the glass lasts ~0.6 s; higher only through combos, re-measured for the next
+    playtest. Not chosen: half (22 / 30, 2.0 s); keep a third (28 / 39, 4.5 s). Q26 **skaters fly off surfaces that
+    bend away from them** (real physics: a surface only pushes): off the middle glass's round ends at any speed, off a
+    floor crest when gravity cannot hold them on at that speed; overhangs keep today's rule; the outer wall's curves
+    (bending toward the skater) still hold them. Not chosen: walls only. Q27 **a skater in the air who touches a ride
+    surface lands on it feet first**: the feet turn onto it, the speed along it is kept and the speed into it lost, then
+    the wall rules apply; one who flies straight up off a wall stays turned to it and comes back down onto it (RC Video
+    7). Not chosen: only coming back down. The no-input loop (the ground filter's lag adding energy) is a bug, fixed
+    without a question.
 
 ## Roller Champions
 
