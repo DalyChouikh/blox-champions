@@ -398,6 +398,16 @@ function Fixtures.spawnSkater(folder: Instance, config: Config.GameConfig): Mode
 	return rig
 end
 
+-- The local player's tackle, just into its follow-up window (#240): the tackle key names the Dive now
+-- (Fixtures.startSkating first).
+function Fixtures.intoDiveWindow(config: Config.GameConfig)
+	local ActionController =
+		require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.ActionController) :: any
+	local runner = ActionController.runner
+	runner:start("Tackle", { hasBall = false, knockedDown = false })
+	runner:step((config.Actions.Tackle.followUp :: Config.FollowUp).from + 0.02)
+end
+
 -- An R15 rig whose joints are Motor6Ds, named as the avatar's own joints are. The parts all sit on `cframe`: only the
 -- joints matter to the tests that use it.
 function Fixtures.jointedRig(parent: Instance, name: string, cframe: CFrame): Model

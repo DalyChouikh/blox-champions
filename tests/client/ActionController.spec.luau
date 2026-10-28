@@ -20,6 +20,8 @@ local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
 local config = Config.defaults()
 local movement = config.Movement
+-- The Tackle's Dive (#240).
+local FOLLOW_UP = config.Actions.Tackle.followUp :: Config.FollowUp
 local DT = 1 / 60
 -- Looking toward -Z from behind the skater, so the skater's right is the camera's right, +X.
 local CAMERA = { CFrame = CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)) }
@@ -114,6 +116,27 @@ local function frame()
 	ActionController:step(DT)
 end
 
+-- Only the actions' step: the skater's velocity is then only what the pushes made it.
+local function actionsOnly()
+	ActionController:step(DT)
+end
+
+-- Steps `step` past the Tackle's follow-up window's start, two frames in.
+local function intoWindow(step: () -> ())
+	for _ = 1, math.floor(FOLLOW_UP.from / DT) + 2 do
+		step()
+	end
+end
+
+-- Roller Champions' tackle key (#240): a press tackles, a second one in the tackle's follow-up window dives.
+local function dive(step: () -> ())
+	press("Tackle")
+	step()
+	intoWindow(step)
+	press("Tackle")
+	step()
+end
+
 beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "ActionControllerTest"
@@ -151,24 +174,40 @@ describe("ActionController", function()
 		expect(ActionController:pose()).toBe("None")
 	end)
 
-	-- Roller Champions' tackle key dives in the air (#221).
-	it("dives in the air: lunges at the dive's full push and asks the server", function()
+	-- Roller Champions' tackle key (#240): "Air Tackle Dive: X then Square then Square".
+	it("tackles in the air at airMultiplier, then dives in its follow-up window at the dive's full push", function()
 		setup()
-		flying(Vector3.new(0, 0, -30))
+		flying(Vector3.new(0, 0, -10))
 		press("Tackle")
-		ActionController:step(DT)
-		expect(requests).toEqual({ { action = "Dive" } })
-		-- 30 + lungeSpeed 60: the push of an action that starts only in the air is never airMultiplier'd.
-		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -90))
+		actionsOnly()
+		expect(requests).toEqual({ { action = "Tackle" } })
+		-- 10 + lungeSpeed 40 × airMultiplier 0.8.
+		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -42))
+		intoWindow(actionsOnly)
+		press("Tackle")
+		actionsOnly()
+		expect(requests).toEqual({ { action = "Tackle" }, { action = "Dive" } })
+		-- 42 + lungeSpeed 60: the push of an action that ends on the belly is never airMultiplier'd.
+		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -102))
 		expect(ActionController:pose()).toBe("Lunge")
+	end)
+
+	it("dives on the ground after a tackle, at the dive's full push", function()
+		setup()
+		frame()
+		local before = skater().velocity
+		dive(actionsOnly)
+		expect(requests).toEqual({ { action = "Tackle" }, { action = "Dive" } })
+		expect(SkateController.diving).toBe(true)
+		-- lungeSpeed 40 + 60 along the facing.
+		Fixtures.expectNear(skater().velocity, before + skater().forward * 100)
 	end)
 
 	it("never dives past the ceiling", function()
 		setup()
 		flying(Vector3.new(0, 0, -80))
-		press("Tackle")
-		ActionController:step(DT)
-		-- 80 + 60 = 140, held at hardCap.
+		dive(actionsOnly)
+		-- 80 + 32 + 60 = 172, held at hardCap.
 		Fixtures.expectNear(skater().velocity, Vector3.new(0, 0, -movement.hardCap))
 	end)
 
@@ -189,12 +228,12 @@ describe("ActionController", function()
 	it("does nothing more while diving, until the knockdown that ends the dive is over", function()
 		setup()
 		flying(Vector3.new(0, 0, -30))
-		press("Tackle")
-		frame()
+		dive(frame)
 		expect(SkateController.diving).toBe(true)
 		press("Uppercut")
 		frame()
-		expect(requests).toEqual({ { action = "Dive" } })
+		local dived = { { action = "Tackle" }, { action = "Dive" } }
+		expect(requests).toEqual(dived)
 		-- Nor once the dive's phases are over, while they still fly.
 		local phases = config.Actions.Dive.phases
 		for _ = 1, math.ceil((phases.windup + phases.active + phases.recovery) / DT) do
@@ -202,7 +241,7 @@ describe("ActionController", function()
 		end
 		press("Uppercut")
 		frame()
-		expect(requests).toEqual({ { action = "Dive" } })
+		expect(requests).toEqual(dived)
 		-- The server's knockdown arrives: the dive is over and stops, as the server stops it, and the knockdown holds
 		-- the skater.
 		rig:SetAttribute(Attributes.KnockedDown, true)
@@ -210,19 +249,19 @@ describe("ActionController", function()
 		expect(SkateController.diving).toBe(false)
 		press("Uppercut")
 		frame()
-		expect(#requests).toBe(1)
+		expect(requests).toEqual(dived)
 		rig:SetAttribute(Attributes.KnockedDown, nil)
 		frame()
 		press("Uppercut")
 		frame()
-		expect(requests).toEqual({ { action = "Dive" }, { action = "Uppercut" } })
+		expect(requests).toEqual({ { action = "Tackle" }, { action = "Dive" }, { action = "Uppercut" } })
 	end)
 
 	it("frees a diver the server refused", function()
 		setup()
 		flying(Vector3.new(0, 0, -30))
-		press("Tackle")
-		frame()
+		dive(frame)
+		expect(SkateController.diving).toBe(true)
 		ActionController:rejected({ action = "Dive" })
 		expect(SkateController.diving).toBe(false)
 	end)
@@ -426,11 +465,30 @@ describe("ActionController", function()
 		BallCarrier:set(LOCAL_ID)
 		expect(names()).toEqual({ tackle = "Dodge", uppercut = "none", pass = "Pass", throw = "ChargeThrow" })
 
-		-- In the air the tackle key dives; with the ball it still dodges.
+		-- In the air the keys name the same (#240: the first press of the tackle key tackles there too).
 		skater().mode = "Airborne"
 		expect(names()).toEqual({ tackle = "Dodge", uppercut = "none", pass = "Pass", throw = "ChargeThrow" })
 		BallCarrier:set(nil)
-		expect(names()).toEqual({ tackle = "Dive", uppercut = "Uppercut", pass = "CallPass", throw = "none" })
+		expect(names()).toEqual({ tackle = "Tackle", uppercut = "Uppercut", pass = "CallPass", throw = "none" })
+	end)
+
+	-- Roller Champions (the owner's Video 4): "Dive" replaces "Tackle" 0.1-0.2 s after the press, and "Tackle" is back
+	-- 0.9-1.0 s after it.
+	it("names the dive for the tackle key only in the tackle's follow-up window, then tackles again", function()
+		setup()
+		press("Tackle")
+		actionsOnly()
+		expect(ActionController:keyAction("tackle")).toBe("Tackle")
+		intoWindow(actionsOnly)
+		expect(ActionController:keyAction("tackle")).toBe("Dive")
+		-- Past the window, which closes as the tackle's cooldown ends (both at 1 s).
+		for _ = 1, math.ceil((FOLLOW_UP.to - FOLLOW_UP.from) / DT) do
+			actionsOnly()
+		end
+		expect(ActionController:keyAction("tackle")).toBe("Tackle")
+		press("Tackle")
+		actionsOnly()
+		expect(requests).toEqual({ { action = "Tackle" }, { action = "Tackle" } })
 	end)
 
 	it("steps in under 0.1 ms", function()

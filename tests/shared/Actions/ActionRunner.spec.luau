@@ -43,7 +43,8 @@ describe("ActionRunner", function()
 	it("keeps an action waiting for its cooldown, and allows it within the tolerance", function()
 		local runner = ActionRunner.new(actions)
 		runner:start("Tackle", context())
-		runner:step(0.7)
+		-- Past the tackle's 0.65 s of phases, 0.1 s before its cooldown ends.
+		runner:step(actions.Tackle.cooldown - 0.1)
 		expect(runner.action).toBe(nil)
 		expect(runner:start("Tackle", context())).toBe("CoolingDown")
 		runner:step(0.05)
@@ -76,23 +77,75 @@ describe("ActionRunner", function()
 		expect(runner.action).toBe("Tackle")
 	end)
 
-	-- Roller Champions' tackle key tackles on the ground and dives in the air (#221).
-	it("starts a tackle only on the ground and a dive only in the air", function()
-		expect(ActionRunner.new(actions):start("Dive", context(false, false))).toBe("NotAllowed")
-		expect(ActionRunner.new(actions):start("Tackle", context(false, true))).toBe("NotAllowed")
-		local runner = ActionRunner.new(actions)
-		expect(runner:start("Dive", context(false, true))).toBe("Started")
-		expect(runner.phase).toBe("Active")
-		-- Nothing replaces it: no action follows another.
-		runner:step(0.1)
-		expect(runner:start("Dive", context(false, true))).toBe("Busy")
-	end)
-
 	-- The server's view of a jump lags the client's, so it never judges the air: either starts there.
 	it("lets a context that cannot tell the air from the ground start either", function()
 		local unseen: ActionRunner.Context = { hasBall = false, airborne = nil, knockedDown = false }
-		expect(ActionRunner.new(actions):start("Tackle", unseen)).toBe("Started")
-		expect(ActionRunner.new(actions):start("Dive", unseen)).toBe("Started")
+		for _, grounded in { "grounded", "airborne" } do
+			local only = Fixtures.config({ Actions = { Uppercut = { requires = { grounded = grounded } } } })
+			expect(ActionRunner.new(only.Actions):start("Uppercut", unseen)).toBe("Started")
+		end
+	end)
+
+	-- Roller Champions' tackle key (#240): a Tackle on the ground or in the air, then its Dive only from 0.1 to 1.0 s
+	-- after it (the owner's Video 4: "Dive" replaces "Tackle" 0.1-0.2 s after the press, for 0.7-0.8 s).
+	it("starts a dive only inside its tackle's follow-up window, on the ground or in the air", function()
+		expect(ActionRunner.new(actions):start("Dive", context())).toBe("NotAllowed")
+		local runner = ActionRunner.new(actions)
+		-- Long after the runner was made: the window counts from the tackle's start.
+		runner:step(2)
+		expect(runner:start("Tackle", context(false, true))).toBe("Started")
+		runner:step(0.06)
+		expect(runner:available("Dive", context(false, true))).toBe(false)
+		expect(runner:start("Dive", context(false, true))).toBe("NotAllowed")
+		runner:step(0.06)
+		expect(runner:available("Dive", context(false, true))).toBe(true)
+		-- 0.12 s in, during the tackle's strike: the dive replaces it.
+		expect(runner:start("Dive", context(false, true))).toBe("Started")
+		expect(runner.action).toBe("Dive")
+		local late = ActionRunner.new(actions)
+		late:start("Tackle", context())
+		late:step(1.02)
+		expect(late:available("Dive", context())).toBe(false)
+		-- The window is over and so is the tackle's 1 s cooldown: the key tackles again.
+		expect(late:start("Tackle", context())).toBe("Started")
+	end)
+
+	it("opens no dive window for a tackle the server refused, nor after a reset", function()
+		local refused = ActionRunner.new(actions)
+		refused:start("Tackle", context())
+		refused:cancel("Tackle", true)
+		refused:step(0.2)
+		expect(refused:start("Dive", context())).toBe("NotAllowed")
+		local reset = ActionRunner.new(actions)
+		reset:start("Tackle", context())
+		reset:reset()
+		reset:step(0.2)
+		expect(reset:start("Dive", context())).toBe("NotAllowed")
+	end)
+
+	it("lets a dive start within the tolerance of its window's edges", function()
+		local early = ActionRunner.new(actions)
+		early:start("Tackle", context())
+		early:step(0.08)
+		expect(early:start("Dive", context(), 0.05)).toBe("Started")
+		local late = ActionRunner.new(actions)
+		late:start("Tackle", context())
+		late:step(1.03)
+		expect(late:start("Dive", context(), 0.05)).toBe("Started")
+		local over = ActionRunner.new(actions)
+		over:start("Tackle", context())
+		over:step(1.06)
+		expect(over:start("Dive", context(), 0.05)).toBe("NotAllowed")
+	end)
+
+	-- The owner (Q8): RC's air Tackle was ready 0.13-0.3 s after an Uppercut; ours once the Uppercut's strike is over.
+	it("lets a tackle follow an uppercut once the uppercut's strike is over", function()
+		local runner = ActionRunner.new(actions)
+		runner:start("Uppercut", context())
+		runner:step(0.2)
+		expect(runner:start("Tackle", context(false, true))).toBe("Busy")
+		runner:step(0.06)
+		expect(runner:start("Tackle", context(false, true))).toBe("Started")
 	end)
 
 	it("lets an action start within the tolerance of the running action's end", function()
@@ -159,7 +212,7 @@ describe("ActionRunner", function()
 		runner:start("Tackle", context())
 		runner:cancel("Tackle", false)
 		expect(runner.action).toBe(nil)
-		expect(runner:cooldownLeft("Tackle")).toBe(0.8)
+		expect(runner:cooldownLeft("Tackle")).toBe(actions.Tackle.cooldown)
 
 		-- An instant action is never running, so only its cooldown is refunded.
 		runner:start("CallPass", context())

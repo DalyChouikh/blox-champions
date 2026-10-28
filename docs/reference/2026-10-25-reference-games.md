@@ -23,6 +23,10 @@ music.
   a full match on Pixel City (8:34; the players start in the arena) and a short game on the Mayan Stadium (1:44;
   jumps, and uppercut -> tackle -> dive, shown on purpose).
 - The owner's list of issues with today's game (2026-10-25): summarised in spec decision A6.
+- **Video 6, the owner's RC solo match on Hidden Cenote** (2026-10-28, 1:41; wall/bank rides, mashed Tackle → Dive,
+  Uppercut → Tackle → Dive): `D:\Screenshots\Videos\Screen Recording 2026-10-28 020627.mp4`.
+- **Video 7, the owner's second RC solo match on Hidden Cenote** (2026-10-28, 0:47; riding backwards after a
+  climb, Air Pose held into a landing → a fall): `D:\Screenshots\Videos\Screen Recording 2026-10-28 021412.mp4`.
 
 **How to look again:** yt-dlp 2026.10.21 (`gh release download 2026.10.21 -R yt-dlp/yt-dlp -p yt-dlp.exe`) and
 FFmpeg n9.0 (BtbN/FFmpeg-Builds `ffmpeg-n9.0-latest-win64-gpl-9.0.zip`), checksums verified, in a scratch `tools`
@@ -287,6 +291,27 @@ about two thirds of a lap, swinging from wall to wall.
     wall (steeper than 30°), like the stride. Measured first on an upright wall: holding Brake stopped a skater dead
     and kept them there (34.9 studs up, 0 speed, all 6 s), and Brake with the stick up tiptoed them straight up the
     glass at 12 studs/s (14 km/h), 40 to 112 studs in 6 s. Not chosen: the brake slows but cannot hold; keep it.
+  - **Round 3, after Video 6** (2026-10-28, the owner: "yes", all recommended): Q9 wall gravity stays a third, judged at
+    the re-playtest with #239's changes; Q10 the tackle ADDS 48 km/h (40 studs/s) but never past 72 km/h, a faster skater
+    slows to 72, and when the strike ends they keep the slower of that and the speed before (refines Q4: RC 14 → 59,
+    31 → 75, 47 → 71, 82 → 73, 96 → 74); Q11 the dive's strike lasts 0.7 s with no extra slowing (a glide), then the
+    belly slide, up at the stop, ~1.5 s in all (RC: 67-70 km/h within ~0.4 s, glide ~0.3 s, slide 0.7-0.8 s, up 1.5-1.6 s
+    after the press); Q12 the dive flies along a line 20° below the facing and gravity speeds the diver along it
+    (cap 145), so the readout climbs like RC's (19 → 65 at the press, +7.5 km/h every 0.1 s, 133 at touchdown 1.1 s later).
+  - **Two more, the owner's words (same message):** "when a player is coming on a certain speed I think and pressing S on
+    the direction of the player that is dropping from, he starts skating but his back on the front, I want that
+    mechanic, I want it to be smooth like RC, but I am not sure if this is now or later in arts and animations" and
+    "when a player jumps in the air and do an airpose, and keeps holding the airpose and drops to the ground with the
+    airpose, he should fall, because his feets are not in a normal position, it is like a human being, like RC". Video 7:
+    `D:\Screenshots\Videos\Screen Recording 2026-10-28 021412.mp4`.
+  - **Round 4, after Video 7** (2026-10-28, the owner: "yes", all recommended): Q13 the Air Pose lasts while the jump key
+    is held (letting go ends it); touching down still posing is a fall at any height, a knockdown like a hard landing
+    (Get Up prompt, the stick from 0.5 s); a pose let go before touchdown still breaks a fall. Q14 while posing and
+    falling, gravity pulls along a line 20° below the facing (Q12's dive rule), so a posed fall gains forward speed like
+    RC's (~85 km/h per s). Q15 riding backwards: moving against the way they face (back down a wall or bank, or slowing
+    past a stop) while holding the stick the way they move (S), the skater keeps facing and rides backwards; letting go
+    of S or steering elsewhere turns them round smoothly in ~0.3 s; never a snap. Its own ticket now; finer animation in
+    the art milestone. Q10–Q12 fold into #241/#242; Q13–Q14 one new Air Pose ticket, Q15 one new ticket, after #243.
 
 ## Roller Champions
 
@@ -479,6 +504,40 @@ Video 3's readout every 2 s for 46 minutes (about 1,380 readings): 100-120 km/h 
 skating, pumping and slopes reach about 100-110; boosts (a whip, a dive, a drop) reach about 140-145; anything above
 about 110 bleeds off within a second, faster the further above it is. The game's code is not public, so whether that
 is a physical drag or a tuned limit cannot be known; the behaviour is what the game copies.
+
+### Video 6: the owner's RC solo match on "Hidden Cenote" (recorded 2026-10-28 02:06, 1:41, 1918x1078, 30 fps)
+
+`D:\Screenshots\Videos\Screen Recording 2026-10-28 020627.mp4`. The owner (2026-10-28, session 31): "wall riding in the
+game currently is completely broklen and unrealistic, a player can't ride the wall like that like it is a ground ...
+look at the player just easily ride the wall, the gravity is strong and pull him, it is hard to go up, and bonus, look
+at the diving, tackling, uppercut the tackling and diving". Studied at 1 frame/s, 5 frames/s on the rides and 10
+frames/s on the hint column (speed readout, ">>" press marker):
+- **Walls and banks:** no straight climb up the upright glass in this video. Up the curved ends' banks the speed trades
+  hard with height: 74 → 21 km/h in 1.6 s (0:35.8) and back down 21 → 51 in 1.6 s; 78 → 22 in 1.4 s (1:33.2) and
+  22 → 47 in 1 s; along an end's bank 43 → 16 km/h over ~3 s, staying low (0:13-0:16). 0:41.4 is an Uppercut beside
+  a banner (Air Pose at 42.6), not a wall ride.
+- **Tackle then Dive, mashed on the ground (1:01.9-1:08):** four cycles, each: Tackle press → "Dive" 0.1-0.2 s later
+  → Dive pressed 0.15-0.4 s after the Tackle → the dive builds to 67-70 km/h within ~0.4 s, glides ~0.3 s → a belly
+  slide to 0-3 km/h in 0.7-0.8 s (55-92 km/h per s) → every action back exactly at the stop, 1.5-1.6 s after the Dive
+  press → Tackle at once. The tackle's lunge from low speed: 14 → 59, ~0 → 43-47 (cut short by the dive).
+- **Uppercut → Tackle → Dive in the air (1:09.65):** Tackle ready 0.2-0.3 s after the Uppercut press; the air Tackle
+  (pressed 0.45 s after) lunges 18 → 37 km/h; "Dive" 0.2 s after it; the Dive press: 19 → 65 at once, then the
+  readout climbs ~7.5 km/h every 0.1 s while diving down, 133 at the touchdown 1.1 s later; 133 → 84 at the
+  touchdown, then the slide 84 → 10 in 0.8 s. Same at 1:24-1:25 (Air Pose and Dive offered, 121 km/h).
+
+### Video 7: the owner's RC solo match on Hidden Cenote, 2 (recorded 2026-10-28 02:14, 0:47, 1916x1072, 30 fps)
+
+`D:\Screenshots\Videos\Screen Recording 2026-10-28 021412.mp4`. Studied at 1 frame/s, 5/s and 10/s (skater zoom, hint column):
+- **Riding backwards (0:16.1-0:18.4):** up the end's bank to ~17 km/h at its top, then back down it BACKWARDS (still
+  facing up the bank) for ~0.7 s (16.9-17.6), then a smooth half-turn over ~0.3 s (17.6-17.9) to face the way they go.
+  Which key was held can't be read from the video.
+- **Holding the Air Pose into a landing = a fall (0:19.4, 0:27.2):** Uppercut (">>" beside it) → Air Pose offered
+  0.1-0.2 s later → Air Pose pressed 0.6-0.8 s after the Uppercut (speed 54 → 46, 49 → 46 at the press) → while
+  falling posed the forward readout climbs ~8-9 km/h every 0.1 s (46 → 104 in 1.0 s; 46 → 97 in 1.0 s) → touching
+  down still posed: 104 → 70 and 97 → 57, every action greyed and the Get Up prompt → a slide to a stop in 1.3-1.4 s
+  (~30-42 studs/s², slower than a dive's).
+- Video 5's standing jump (re-read at 15 frames/s, 0:40.8-0:42.5): the readout is 0 through the whole flight, the
+  falling half included (15 for one frame at the landing): RC's air readout is speed across the ground.
 
 ## Illegal Soccer (the owner's recording of 2026-10-25), sampled every 2 s
 

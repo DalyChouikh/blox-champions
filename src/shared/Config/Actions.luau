@@ -34,6 +34,9 @@ export type Motion = {
 -- How an action that ends on the skater's belly (the Dive, #221) ends: from its start they can do nothing until their
 -- first touch of the ground after its active phase, which knocks them down for knockdownSeconds.
 export type Landing = { knockdownSeconds: number }
+-- Another action this one's key starts instead from `from` to `to` seconds after this one started (the Tackle's Dive,
+-- #240), replacing it if it still runs. An action named as a follow-up starts only that way.
+export type FollowUp = { action: ActionName, from: number, to: number }
 export type ThrowSettings = {
 	-- Holding this long charges the throw fully.
 	chargeMaxSeconds: number,
@@ -62,12 +65,13 @@ export type ActionConfig = {
 	hit: Hit?,
 	motion: Motion?,
 	landing: Landing?,
+	followUp: FollowUp?,
 	throw: ThrowSettings?,
 	pass: PassSettings?,
 }
 export type ActionsConfig = {
-	-- Pushes in the air are this much of their ground value (an air dodge, an uppercut in the air). An action that
-	-- starts only in the air (the Dive) pushes as configured.
+	-- Pushes in the air are this much of their ground value (an air tackle, an air dodge, an uppercut in the air). An
+	-- action that ends on the belly (one with a landing: the Dive) pushes as configured.
 	airMultiplier: number,
 	-- A call for a pass lasts this long.
 	callPassWindow: number,
@@ -97,9 +101,9 @@ local function nameOf(name: string?): ActionName?
 	return nil
 end
 
--- On the ground or in the air unless `grounded` says which.
-local function requires(ball: BallRequirement, grounded: Grounded?): Requires
-	return { ball = ball, grounded = grounded or "any", notKnockedDown = true }
+-- On the ground or in the air alike: no default action needs either alone (a mode can, through requires.grounded).
+local function requires(ball: BallRequirement): Requires
+	return { ball = ball, grounded = "any", notKnockedDown = true }
 end
 
 local INSTANT: Phases = { windup = 0, active = 0, recovery = 0 }
@@ -109,23 +113,25 @@ local defaults: ActionsConfig = {
 	callPassWindow = 3,
 	-- The owner (#220): any movement key gets a skater up, not before 0.5 s; RC's knockdown lasted under 1.8 s.
 	getUpAfter = 0.5,
-	-- On the ground; in the air the tackle key dives (#221).
+	-- On the ground and in the air. Roller Champions' tackle key (the owner, #240; Video 4): "Dive" replaces "Tackle"
+	-- 0.1-0.2 s after the press for 0.7-0.8 s, and "Tackle" is back 0.9-1.0 s after it.
 	Tackle = {
 		phases = { windup = 0.05, active = 0.25, recovery = 0.35 },
-		cooldown = 0.8,
-		requires = requires("without", "grounded"),
+		cooldown = 1,
+		requires = requires("without"),
 		effect = "Knockdown",
 		pose = "Lunge",
 		hit = { range = 7, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
 		motion = { lungeSpeed = 40 },
+		followUp = { action = "Dive", from = 0.1, to = 1 },
 	},
-	-- Roller Champions' dive (the owner's recording, Video 5 at 1:13): in the air, 60 studs/s more along the way the
-	-- skater flies (from RC's 69 km/h, 57.5 studs/s, to 117.5 = 141 km/h at once; RC's rose to 139), then on the belly
-	-- for as long as a tackle leaves its victim down.
+	-- Roller Champions' dive (the owner's recording, Video 5 at 1:13), only as the Tackle's follow-up: 60 studs/s more
+	-- along the way the skater goes (from RC's 69 km/h, 57.5 studs/s, to 117.5 = 141 km/h at once; RC's rose to 139),
+	-- then on the belly for as long as a tackle leaves its victim down.
 	Dive = {
 		phases = { windup = 0, active = 0.35, recovery = 0.9 },
 		cooldown = 0.8,
-		requires = requires("without", "airborne"),
+		requires = requires("without"),
 		effect = "Knockdown",
 		pose = "Lunge",
 		hit = { range = 11, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
@@ -142,9 +148,10 @@ local defaults: ActionsConfig = {
 		motion = { sideSpeed = 45 },
 	},
 	-- Aimed up, so its cone covers "in front and above"; it leaps the skater up anywhere, 110² / (2 × 196.2) = 31 studs
-	-- from the ground (the owner, #219: RC's uppercut launches on open floor).
+	-- from the ground (the owner, #219: RC's uppercut launches on open floor). No recovery: a Tackle may follow once
+	-- its strike is over (the owner, #240: RC's air Tackle was ready 0.13-0.3 s after an Uppercut).
 	Uppercut = {
-		phases = { windup = 0.05, active = 0.2, recovery = 0.4 },
+		phases = { windup = 0.05, active = 0.2, recovery = 0 },
 		cooldown = 1.2,
 		requires = requires("without"),
 		effect = "Knockdown",
@@ -221,6 +228,30 @@ local pass = Validate.check(
 	"angleWeight + distanceWeight must be above 0"
 )
 
+-- Every action's name as a plain string: Luau tables are invariant, so { ActionName } is not the { string } that
+-- oneOf takes.
+local nameStrings: { string } = {}
+for _, name in names do
+	table.insert(nameStrings, name)
+end
+
+-- Another action than `own`, in a window that ends after it starts.
+local function followUp(own: ActionName): Validate.Validator
+	return Validate.check(
+		Validate.record({
+			action = Validate.check(Validate.string({ oneOf = nameStrings }), function(action: string): boolean
+				return action ~= own
+			end, "must name another action"),
+			from = nonNegative,
+			to = positive,
+		}),
+		function(window: FollowUp): boolean
+			return window.to > window.from
+		end,
+		"to must be after from"
+	)
+end
+
 -- An action's record: the fields every action has, plus its own. Its effect is the default's and no other: modes
 -- change an action's numbers, never what it does (Net/Schemas shapes each action's request by its effect).
 local function action(default: ActionConfig, own: { [string]: Validate.Validator }): Validate.Validator
@@ -243,7 +274,11 @@ local schema = Validate.record({
 	airMultiplier = fraction,
 	callPassWindow = positive,
 	getUpAfter = positive,
-	Tackle = action(defaults.Tackle, { hit = hit, motion = Validate.record({ lungeSpeed = positive }) }),
+	Tackle = action(defaults.Tackle, {
+		hit = hit,
+		motion = Validate.record({ lungeSpeed = positive }),
+		followUp = followUp("Tackle"),
+	}),
 	Dive = action(defaults.Dive, {
 		hit = hit,
 		motion = Validate.record({ lungeSpeed = positive }),
