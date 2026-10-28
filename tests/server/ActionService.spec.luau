@@ -118,6 +118,11 @@ local function stand(id: string, offset: Vector3)
 	CharacterService.placed:Fire(id)
 end
 
+-- `id`'s root moving at `speed` along -Z, as their client's physics reports it: a diver's slide (#242).
+local function slide(id: string, speed: number)
+	Fixtures.root(rigs[id]).AssemblyLinearVelocity = Vector3.new(0, 0, -speed)
+end
+
 -- The offset from the track spot that puts a root `drop` studs above where it comes to rest there (hoverHeight over
 -- the floor).
 local function above(drop: number): Vector3
@@ -291,12 +296,12 @@ describe("ActionService", function()
 		expect(attribute(a, Attributes.Action)).toBe("Tackle")
 		expect(advance(0.7)).toEqual({ `{a}>{b}` })
 		expect(attribute(a, Attributes.Action)).toBeNil()
-		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
 		expect(attribute(c, Attributes.KnockedDown)).toBeNil()
 		expect(attribute(d, Attributes.KnockedDown)).toBeNil()
 		-- Down for knockdownSeconds from the strike, early in the active phase.
 		advance(0.7)
-		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
 		advance(0.3)
 		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
 	end)
@@ -308,13 +313,13 @@ describe("ActionService", function()
 		tackled(blue[1], b)
 		getUp(b)
 		advance(config.Actions.getUpAfter - 0.05)
-		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
 		advance(0.1)
 		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
 		-- Moving late in a knockdown: up on the next frame.
 		tackled(blue[2], b)
 		advance(1)
-		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
 		getUp(b)
 		advance(DT)
 		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
@@ -329,7 +334,7 @@ describe("ActionService", function()
 		getUp(b)
 		tackled(blue[2], b)
 		advance(config.Actions.getUpAfter + 0.1)
-		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
 	end)
 
 	it("takes requests to get up in their own shape, within their own rate limit", function()
@@ -459,8 +464,8 @@ describe("ActionService", function()
 		table.sort(expected)
 		expect(knockdowns).toEqual(expected)
 		for _, pair in pairs do
-			expect(attribute(pair[1], Attributes.KnockedDown)).toBe(true)
-			expect(attribute(pair[2], Attributes.KnockedDown)).toBe(true)
+			expect(attribute(pair[1], Attributes.KnockedDown)).toBe("Hit")
+			expect(attribute(pair[2], Attributes.KnockedDown)).toBe("Hit")
 		end
 	end)
 
@@ -488,6 +493,7 @@ describe("ActionService", function()
 	it("dives on the ground after a tackle, ending on the belly once the dive's active phase is over", function()
 		local a = blue[1]
 		stand(a, Vector3.zero)
+		slide(a, 30)
 		dive(a)
 		expect(rejected(a)).toEqual({})
 		expect(attribute(a, Attributes.Action)).toBe("Dive")
@@ -495,7 +501,30 @@ describe("ActionService", function()
 		advance(phases.windup + phases.active - 0.05)
 		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 		advance(0.1)
-		expect(attribute(a, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
+	end)
+
+	-- The owner (#242): RC's diver is up exactly when the slide stops (Videos 4 and 6), and moving changes nothing.
+	it("keeps a sliding diver down whatever the stick, up the frame the slide stops, that knockdown only", function()
+		local a = blue[1]
+		local landing = config.Actions.Dive.landing :: Config.Landing
+		stand(a, Vector3.zero)
+		slide(a, 30)
+		dive(a)
+		local phases = config.Actions.Dive.phases
+		advance(phases.windup + phases.active + 0.05)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
+		getUp(a)
+		advance(config.Actions.getUpAfter + 0.1)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
+		-- Under stopSpeed along the ground; the hover's pull off the floor is no slide.
+		Fixtures.root(rigs[a]).AssemblyLinearVelocity = Vector3.new(0, 5, -(landing.stopSpeed - 0.5))
+		advance(DT)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+		-- The next knockdown, a strike's, waits for Get Up however still they lie.
+		tackled(orange[1], a)
+		advance(config.Actions.getUpAfter + 0.1)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Hit")
 	end)
 
 	-- The server can't tell when a client left the ground (its view lags), so it takes the client's dive (#221).
@@ -518,25 +547,27 @@ describe("ActionService", function()
 		dive(a)
 		ActionService:request(a, { action = "Uppercut" })
 		expect(rejected(a)).toEqual({ "Uppercut" })
-		-- On the floor during the active phase (0.35 s): not yet.
+		-- On the floor during the active phase: not yet.
+		local phases = config.Actions.Dive.phases
 		advance(0.1)
 		stand(a, Vector3.zero)
-		advance(0.15)
+		advance(phases.active / 2)
 		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 		-- Still flying once the dive's phases are over: not yet either, and nothing else starts.
-		local phases = config.Actions.Dive.phases
 		stand(a, AIR)
 		advance(phases.windup + phases.active + phases.recovery)
 		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 		ActionService:request(a, { action = "Uppercut" })
 		expect(rejected(a)).toEqual({ "Uppercut", "Uppercut" })
-		-- The touchdown: their own knockdown, which no one scored, for the landing's knockdownSeconds.
+		-- The touchdown: their own knockdown, which no one scored. Still sliding at the landing's knockdownSeconds,
+		-- they are up then (a slope can keep a slide going).
 		stand(a, Vector3.zero)
+		slide(a, 30)
 		expect(advance(DT)).toEqual({})
-		expect(attribute(a, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
 		expect(attribute(a, Attributes.Action)).toBeNil()
 		advance(landing.knockdownSeconds - 0.05)
-		expect(attribute(a, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
 		advance(0.1)
 		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 		-- Free again.
@@ -564,10 +595,10 @@ describe("ActionService", function()
 		local listed: { string } = {}
 		glide(a, Vector3.zero, listed)
 		expect(listed).toEqual({})
-		expect(attribute(a, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Fall")
 		expect(BallService.state.status).toBe("Loose")
 		advance(hard.knockdownSeconds - 0.1)
-		expect(attribute(a, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Fall")
 		advance(0.2)
 		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 		-- From just under the drop: no knockdown.
@@ -582,7 +613,7 @@ describe("ActionService", function()
 		tackled(blue[1], b)
 		stand(b, above(config.Movement.hardLanding.drop + 5))
 		local seconds = glide(b, Vector3.zero) * DT
-		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
+		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
 		-- Up at the tackle's knockdownSeconds, as if they never fell.
 		advance(hit.knockdownSeconds - seconds + 0.05)
 		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
@@ -627,10 +658,11 @@ describe("ActionService", function()
 		-- The tackle recovers from 0.3 s.
 		advance(0.3)
 		expect(attribute(a, Attributes.Action)).toBeNil()
-		-- A dive, high in the air: shown through its active phase (0.35 s), not its recovery.
+		-- A dive, high in the air: shown through its active phase, not its recovery.
+		local active = config.Actions.Dive.phases.active
 		stand(b, AIR + Vector3.new(50, 0, 0))
 		dive(b)
-		advance(0.3)
+		advance(active - 0.05)
 		expect(attribute(b, Attributes.Action)).toBe("Dive")
 		advance(0.1)
 		expect(attribute(b, Attributes.Action)).toBeNil()

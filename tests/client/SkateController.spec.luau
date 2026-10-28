@@ -206,7 +206,7 @@ describe("SkateController", function()
 		skater.velocity = Vector3.new(0, 0, -60)
 		local stick = Fixtures.scriptedBinding(InputController.context, "Move")
 		stick:Fire(Vector2.new(1, 0))
-		rig:SetAttribute(Attributes.KnockedDown, true)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
 		SkateController:step(0.1)
 		expect(SkateController.knockedDown).toBe(true)
 		-- No steering: 60 − (4 + 0.02 × 60) × 0.1 − knockdownDecel 75 × 0.1, still along -Z.
@@ -220,7 +220,7 @@ describe("SkateController", function()
 		attachKey:Fire(true)
 		SkateController:step(1 / 60)
 		expect(skater.mode).toBe("Attached")
-		rig:SetAttribute(Attributes.KnockedDown, true)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
 		SkateController:step(1 / 60)
 		SkateController:step(1 / 60)
 		expect(skater.mode).never.toBe("Attached")
@@ -234,7 +234,7 @@ describe("SkateController", function()
 	-- Roller Champions' Get Up (#220): the server decides when the skater is up (ActionService).
 	it("asks the server to get up once per knockdown, as soon as the knocked-down skater moves", function()
 		local stick = Fixtures.scriptedBinding(InputController.context, "Move")
-		rig:SetAttribute(Attributes.KnockedDown, true)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
 		SkateController:step(1 / 60)
 		expect(getUps).toBe(0)
 		stick:Fire(Vector2.new(0, 1))
@@ -246,13 +246,35 @@ describe("SkateController", function()
 		rig:SetAttribute(Attributes.KnockedDown, nil)
 		SkateController:step(1 / 60)
 		expect(getUps).toBe(1)
-		rig:SetAttribute(Attributes.KnockedDown, true)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
 		SkateController:step(1 / 60)
 		expect(getUps).toBe(2)
+		expect(SkateController.promptsGetUp).toBe(true)
+		-- A hard landing's knockdown too.
+		rig:SetAttribute(Attributes.KnockedDown, nil)
+		SkateController:step(1 / 60)
+		rig:SetAttribute(Attributes.KnockedDown, "Fall")
+		SkateController:step(1 / 60)
+		expect(getUps).toBe(3)
 	end)
 
-	-- A dive ends on the belly (#221): the diver does nothing more, and slides from the moment they touch down.
-	it("locks a diver's input as a knockdown does, until the server's knockdown ends the dive", function()
+	-- The owner (#242): a diver is up when the slide stops, so moving asks nothing (ActionService decides).
+	it("never asks to get up from a dive's own knockdown", function()
+		local stick = Fixtures.scriptedBinding(InputController.context, "Move")
+		stick:Fire(Vector2.new(0, 1))
+		rig:SetAttribute(Attributes.KnockedDown, "Dive")
+		for _ = 1, 3 do
+			SkateController:step(1 / 60)
+		end
+		expect(SkateController.knockedDown).toBe(true)
+		expect(SkateController.knockdown).toBe("Dive")
+		expect(SkateController.promptsGetUp).toBe(false)
+		expect(getUps).toBe(0)
+	end)
+
+	-- A dive ends on the belly (#221): the diver does nothing more. The owner (#242): until the server's knockdown at
+	-- the touchdown they glide, slowed only by friction and drag (RC's dive glides ~0.3 s at ~70 km/h, Video 6).
+	it("locks a diver's input and glides them until the server's knockdown ends the dive", function()
 		local skater = SkateController.skater :: any
 		SkateController.diving = true
 		-- In the air the jump strikes no Air Pose.
@@ -261,13 +283,13 @@ describe("SkateController", function()
 		task.wait() -- the press arrives with the deferred events
 		SkateController:step(1 / 60)
 		expect(skater.airPosing).toBe(false)
-		-- On the ground, no steering, and the knockdown's slide: 60 − (4 + 0.02 × 60) × 0.1 − knockdownDecel 75 × 0.1.
+		-- On the ground, no steering, and a glide: 60 − (4 + 0.02 × 60) × 0.1, no coasting or knockdown slowing.
 		rig:PivotTo(CFrame.new(0, movement.hoverHeight, 0))
 		skater.mode = "Grounded"
 		skater.velocity = Vector3.new(0, 0, -60)
 		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(1, 0))
 		SkateController:step(0.1)
-		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -51.98))
+		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -59.48))
 		expect(SkateController.diving).toBe(true)
 		-- Nor does a teammate right ahead take them in tow.
 		local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
@@ -276,7 +298,7 @@ describe("SkateController", function()
 		SkateController:step(1 / 60)
 		expect(skater.mode).never.toBe("Attached")
 		-- The server's knockdown takes over; a kickoff freeze or a new character ends a dive too.
-		rig:SetAttribute(Attributes.KnockedDown, true)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
 		SkateController:step(1 / 60)
 		expect(SkateController.diving).toBe(false)
 		rig:SetAttribute(Attributes.KnockedDown, nil)

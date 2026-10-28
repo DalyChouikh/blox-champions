@@ -2,6 +2,10 @@
 -- Names of the attributes the server sets on Player and character instances; Roblox replicates them to every
 -- client.
 
+-- What KnockedDown holds: why the character is down. A strike's ("Hit") and a hard landing's ("Fall") knockdowns end
+-- early once the skater moves (Get Up, #220); a diver's own touchdown ("Dive") ends when the slide stops (#242).
+export type Knockdown = "Hit" | "Fall" | "Dive"
+
 return table.freeze({
 	-- "Blue" or "Orange" while the player has a seat; absent while they spectate.
 	Team = "Team",
@@ -10,7 +14,7 @@ return table.freeze({
 	Pumping = "Pumping",
 	Braking = "Braking",
 	AirPosing = "AirPosing",
-	-- On a character: knocked down by a strike (no control, cannot catch), set and cleared by the server.
+	-- On a character: knocked down (no control, cannot catch), set to its Knockdown and cleared by the server.
 	KnockedDown = "KnockedDown",
 	-- On a character: the action it is running (a Config.Actions name) until that action's recovery; absent otherwise.
 	Action = "Action",

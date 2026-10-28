@@ -86,7 +86,7 @@ describe("MovementCheck", function()
 			brake = false,
 			jump = false,
 			draftAccel = 0,
-			knockedDown = true,
+			knockedDown = false,
 			diving = true,
 		}
 		local noGround: Types.Ground = { hit = false, normal = Vector3.yAxis, distance = 0 }

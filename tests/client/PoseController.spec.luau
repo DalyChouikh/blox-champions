@@ -166,7 +166,7 @@ describe("PoseController", function()
 		end
 		other:SetAttribute(Attributes.Action, "Tackle")
 		expect(pitch()).toBeCloseTo(-math.sin(math.rad(config.Pose.lungeDeg)), 5)
-		other:SetAttribute(Attributes.KnockedDown, true)
+		other:SetAttribute(Attributes.KnockedDown, "Hit")
 		expect(pitch()).toBeCloseTo(math.sin(math.rad(config.Pose.knockdownTiltDeg)), 5)
 		-- An action that is not a lunge poses nothing.
 		other:SetAttribute(Attributes.KnockedDown, nil)

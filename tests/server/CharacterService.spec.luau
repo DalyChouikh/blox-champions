@@ -106,7 +106,7 @@ describe("CharacterService", function()
 		local a = Fixtures.rig(folder, "A", CFrame.new(0, 3, 0))
 		CharacterService:adopt("A", a)
 		CharacterService:adopt("B", Fixtures.rig(folder, "B", CFrame.new(5, 3, 0)))
-		a:SetAttribute(Attributes.KnockedDown, true)
+		a:SetAttribute(Attributes.KnockedDown, "Hit")
 		local canCatch: { [string]: boolean } = {}
 		for _, holder in CharacterService:holders() do
 			canCatch[holder.player] = holder.canCatch

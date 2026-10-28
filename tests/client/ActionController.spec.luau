@@ -279,6 +279,18 @@ describe("ActionController", function()
 		Fixtures.expectNear(skater().velocity, skater().forward * 60)
 	end)
 
+	-- The owner (#242): RC's dive glides ~0.3 s at ~70 km/h before the belly slide (Video 6).
+	it("glides a ground dive through its strike, slowed by friction and drag only", function()
+		setup()
+		dive(frame)
+		local speed = skater():shownSpeed()
+		for _ = 1, 30 do
+			frame()
+		end
+		-- 0.5 s of rollingFriction 4 and airDrag 0.02 × ~59: about 2.6, where a knockdown's slowing would take ~40.
+		expect(speed - skater():shownSpeed()).toBeCloseTo((movement.rollingFriction + movement.airDrag * 59) * 0.5, 1)
+	end)
+
 	-- Roller Champions (Video 6): the readout climbed ~7.5 km/h every 0.1 s as the diver went down.
 	it("flies a dive down the fall line, gravity speeding the diver up along it", function()
 		setup()
@@ -324,7 +336,7 @@ describe("ActionController", function()
 		expect(requests).toEqual(dived)
 		-- The server's knockdown arrives: the dive is over and stops, as the server stops it, and the knockdown holds
 		-- the skater.
-		rig:SetAttribute(Attributes.KnockedDown, true)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
 		frame()
 		expect(SkateController.diving).toBe(false)
 		press("Uppercut")
@@ -496,7 +508,7 @@ describe("ActionController", function()
 
 	it("does nothing while knocked down", function()
 		setup()
-		rig:SetAttribute(Attributes.KnockedDown, true)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
 		frame()
 		press("Tackle")
 		frame()

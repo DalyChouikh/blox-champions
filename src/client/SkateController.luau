@@ -6,10 +6,11 @@
 -- - steps SkateMath, slides the skater along any ride surface in its way, and writes the result into the skater body
 --   the server built.
 -- It holds the skater still during the kickoff freeze and until the arena has reached this client. A knocked-down
--- skater (the server's KnockedDown attribute) lets go of any attach and only slides, and asks the server to get up
--- (GetUp) once per knockdown, as soon as the stick moves: the server decides when. A diver (`diving`) is held the same
--- way until that knockdown. While Roblox's menu holds the keys the skater lets go of any attach too, with no release
--- boost. Actions push the skater through `push`.
+-- skater (the server's KnockedDown attribute) lets go of any attach and only slides; knocked down by a strike or a hard
+-- landing, they ask the server to get up (GetUp) once per knockdown, as soon as the stick moves: the server decides
+-- when. A diver's own knockdown ends when the slide stops (the server sees it, #242). A diver (`diving`) lets go of any
+-- attach too and glides until that knockdown. While Roblox's menu holds the keys the skater lets go of any attach too,
+-- with no release boost. Actions push the skater through `push`.
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
 -- humanoid's state machine off here, on the owning client only: the server keeps it on so deaths still fire Died.
 
@@ -58,15 +59,17 @@ export type SkateController = {
 	braking: boolean,
 	-- The last step's stick as a world direction (length 0..1).
 	move: Vector3,
-	-- Read each step: the character's KnockedDown attribute, and whether the skater is held still: the root anchored
-	-- (the kickoff freeze), or no arena on this client yet (RideSurfaces.ready), where the skater would fall through
-	-- the floor to come (#177).
+	-- Read each step: the character's KnockedDown attribute (why they are down, nil on their feet), whether they are
+	-- down, whether moving gets them up sooner (the Get Up prompt: not after a dive, #242), and whether the skater is
+	-- held still: the root anchored (the kickoff freeze), or no arena on this client yet (RideSurfaces.ready), where
+	-- the skater would fall through the floor to come (#177).
+	knockdown: Attributes.Knockdown?,
 	knockedDown: boolean,
+	promptsGetUp: boolean,
 	frozen: boolean,
 	-- Set by ActionController when a dive (an action with a landing) starts: the skater does nothing more until the
-	-- server's knockdown at their touchdown, which ends it, as do a freeze and a new character. Meanwhile the input
-	-- locks as a knockdown's does, so the belly slide starts the moment they touch down, and in the air they fly down
-	-- the fall line (SkateMath, #241).
+	-- server's knockdown at their touchdown, which ends it, as do a freeze and a new character. Meanwhile they glide,
+	-- slowed by friction and drag only (#242), and in the air fly down the fall line (SkateMath, #241).
 	diving: boolean,
 	-- Set each step: attached, or right behind a teammate with no cooldown, so holding Attach would attach.
 	attachable: boolean,
@@ -232,7 +235,7 @@ local function moveSkater(self: SkateController, root: BasePart, skater: SkateMa
 	local movement = self._config.Movement
 	local keys = self._keys
 	local attach = self._attach
-	if self._input.knockedDown or self._inputController.paused then
+	if self.knockedDown or self.diving or self._inputController.paused then
 		if attach.leader ~= nil then
 			attach:reset()
 			skater:release(Vector3.zero)
@@ -318,11 +321,12 @@ local function shareState(self: SkateController)
 	end
 end
 
--- A stick held through the knockdown asks at once: the server gets the skater up no sooner than Actions.getUpAfter.
+-- A stick held through the knockdown asks at once: the server gets the skater up no sooner than Actions.getUpAfter. A
+-- diver's own knockdown asks nothing (#242).
 local function askToGetUp(self: SkateController)
 	if not self.knockedDown then
 		self._askedToGetUp = false
-	elseif not self._askedToGetUp and self._keys.move.Magnitude > 0 then
+	elseif self.promptsGetUp and not self._askedToGetUp and self._keys.move.Magnitude > 0 then
 		self._askedToGetUp = true
 		self._sendGetUp()
 	end
@@ -354,7 +358,9 @@ local SkateController: SkateController = {
 	pumping = false,
 	braking = false,
 	move = Vector3.zero,
+	knockdown = nil,
 	knockedDown = false,
+	promptsGetUp = false,
 	frozen = false,
 	diving = false,
 	attachable = false,
@@ -463,7 +469,9 @@ local SkateController: SkateController = {
 		self.pumping = false
 		self.braking = false
 		self.move = Vector3.zero
+		self.knockdown = nil
 		self.knockedDown = false
+		self.promptsGetUp = false
 		self.frozen = false
 		self.diving = false
 		self.attachable = false
@@ -521,7 +529,10 @@ local SkateController: SkateController = {
 		local skater = self.skater :: SkateMath.Skater
 		local root = self.root :: BasePart
 		local character = self._character :: Model
-		self.knockedDown = character:GetAttribute(Attributes.KnockedDown) == true
+		local knockdown: Attributes.Knockdown? = character:GetAttribute(Attributes.KnockedDown) :: Attributes.Knockdown?
+		self.knockdown = knockdown
+		self.knockedDown = knockdown ~= nil
+		self.promptsGetUp = knockdown ~= nil and knockdown ~= "Dive"
 		if self.knockedDown then
 			self.diving = false
 		end
@@ -538,7 +549,7 @@ local SkateController: SkateController = {
 		input.pump = keys.pump
 		input.brake = keys.brake
 		input.jump = keys.jump
-		input.knockedDown = self.knockedDown or self.diving
+		input.knockedDown = self.knockedDown
 		input.diving = self.diving
 		self.move = input.move
 		castGround(self, root, skater, dt)
