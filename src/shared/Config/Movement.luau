@@ -50,14 +50,13 @@ export type MovementConfig = {
 	-- 196.2 × sin 20° × cos 20° = 63 studs/s² across the ground, 76 km/h per s (the owner, #241: RC's readout climbed
 	-- ~75 km/h per s diving down).
 	fallLineDeg: number,
-	-- A surface steeper than wallAngle (degrees from flat) is a wall: gravity pulls along it at wallGravityScale of its
-	-- full strength (the owner, #216: about a third, from RC's glass rides). A wall holds a skater at any speed; past
-	-- straight up the loop rule decides (A3).
+	-- A surface steeper than wallAngle (degrees from flat) is a wall. Gravity pulls along it at full strength, as
+	-- everywhere (the owner, #256: one gravity, real physics). A wall holds a skater at any speed; past straight up the
+	-- loop rule decides (A3).
 	wallAngle: number,
-	wallGravityScale: number,
 	-- On a wall the skates only roll (the owner, #239): no stride, no brake, and the stick turns the heading at most
-	-- this fast, so only a rider above wallGravityScale × g / wallTurnRate (78 km/h) holds a line along the glass, as
-	-- in RC; slower ones curve back down.
+	-- this fast. A level line along upright glass needs g / wallTurnRate (196 studs/s), past hardCap, so every rider
+	-- curves back down.
 	wallTurnRate: number,
 	-- How far back along the skater's path the curve of an overhang is measured (A3): a few of a lip's flat strips,
 	-- so a curve of strips reads as the arc it makes, yet short enough to follow a curve from where it starts.
@@ -133,7 +132,6 @@ local defaults: MovementConfig = {
 	airUprightRate = 6,
 	fallLineDeg = 20,
 	wallAngle = 30,
-	wallGravityScale = 1 / 3,
 	wallTurnRate = 1,
 	curvatureWindow = 10,
 	pumpSlopeMultiplier = 1.6,
@@ -189,7 +187,6 @@ local fields = Validate.record({
 	airUprightRate = positive,
 	fallLineDeg = quarterTurn,
 	wallAngle = angle,
-	wallGravityScale = Validate.number({ above = 0, max = 1 }),
 	wallTurnRate = nonNegative,
 	curvatureWindow = positive,
 	pumpSlopeMultiplier = Validate.number({ min = 1 }),

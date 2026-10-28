@@ -286,25 +286,25 @@ describe("SkateMath off the ground and on walls", function()
 		expect(falling.airPoseReady).toBe(true)
 	end)
 
-	-- Real physics on the glass (#216): no speed is needed to stay on a wall, and gravity pulls along it at
-	-- wallGravityScale (the owner: about a third, from a ranked player's ride up the glass).
-	it("stays on a wall at any speed, pulled along it by a third of gravity", function()
+	-- Real physics on the glass (#216): no speed is needed to stay on a wall. One gravity everywhere (the owner,
+	-- #256, Q25): a wall pulls at full strength, like the floor and the air.
+	it("stays on a wall at any speed, pulled along it by full gravity", function()
 		local wall = Vector3.xAxis -- vertical, facing +X
-		local climbing = skater(Vector3.new(0, 10, 0))
+		local climbing = skater(Vector3.new(0, 30, 0))
 		climbing:step(input(), ground(wall), 0.1)
 		expect(climbing.mode).toBe("Grounded")
-		-- 10 − 196.2 / 3 × 0.1 = 3.46, then 3.46 − (4 + 7.5 + 0.0692) × 0.1
-		Fixtures.expectNear(climbing.velocity, Vector3.new(0, 2.3031, 0))
+		-- 30 − 196.2 × 0.1 = 10.38, then 10.38 − (4 + 7.5 + 0.2076) × 0.1
+		Fixtures.expectNear(climbing.velocity, Vector3.new(0, 9.2092, 0))
 		local still = skater(Vector3.zero)
 		still:step(input(), ground(wall), 0.1)
 		expect(still.mode).toBe("Grounded")
-		-- It slides back down: 6.54, then 6.54 − (4 + 7.5 + 0.1308) × 0.1
-		Fixtures.expectNear(still.velocity, Vector3.new(0, -5.3769, 0))
-		-- A 45° bank is steeper than wallAngle, so a wall too: 65.4 × sin 45° × 0.1 = 4.6245, then friction, drag and
+		-- It slides back down: 19.62, then 19.62 − (4 + 7.5 + 0.3924) × 0.1
+		Fixtures.expectNear(still.velocity, Vector3.new(0, -18.4308, 0))
+		-- A 45° bank is steeper than wallAngle, so a wall too: 196.2 × sin 45° × 0.1 = 13.8734, then friction, drag and
 		-- coastDecel
 		local bank = skater(Vector3.zero)
 		bank:step(input(), ground(Vector3.new(0, math.cos(math.rad(45)), -math.sin(math.rad(45)))), 0.1)
-		expect(bank.velocity.Magnitude).toBeCloseTo(3.4652, 3)
+		expect(bank.velocity.Magnitude).toBeCloseTo(12.6957, 3)
 	end)
 
 	-- The owner (#239): on a wall the skates only roll. The stick neither strides nor steers hard and the brake does
@@ -312,32 +312,32 @@ describe("SkateMath off the ground and on walls", function()
 	it("never strides on a wall: holding the stick along it adds no speed", function()
 		local s = skater(Vector3.new(0, 0, -20))
 		s:step(input({ move = -Vector3.zAxis }), ground(Vector3.xAxis), 0.1)
-		-- (0, −6.54, −20) after a third of gravity, |21.0421| − (4 + 0.4208) × 0.1 = 20.6000 along it
-		Fixtures.expectNear(s.velocity, Vector3.new(0, -6.4026, -19.5798))
+		-- (0, −19.62, −20) after gravity, |28.0169| − (4 + 0.5603) × 0.1 = 27.5608 along it
+		Fixtures.expectNear(s.velocity, Vector3.new(0, -19.3006, -19.6745))
 	end)
 
 	it("steers on a wall no faster than wallTurnRate", function()
 		local s = skater(Vector3.new(0, 0, -30))
 		s:step(input({ move = Vector3.yAxis }), ground(Vector3.xAxis), 0.1)
-		-- Turned 1 × 0.1 rad up (the floor's rate at 30 is 3.38), plus (0, −6.54, 0), then friction and drag
-		Fixtures.expectNear(s.velocity, Vector3.new(0, -3.4907, -29.3932))
+		-- Turned 1 × 0.1 rad up (the floor's rate at 30 is 3.38), plus (0, −19.62, 0), then friction and drag
+		Fixtures.expectNear(s.velocity, Vector3.new(0, -16.3971, -29.441))
 	end)
 
 	it("ignores the brake on a wall: no standing still on it, no tiptoeing up it", function()
 		local held = skater(Vector3.zero)
 		held:step(input({ brake = true }), ground(Vector3.xAxis), 0.1)
-		Fixtures.expectNear(held.velocity, Vector3.new(0, -5.3769, 0)) -- as with nothing pressed
+		Fixtures.expectNear(held.velocity, Vector3.new(0, -18.4308, 0)) -- as with nothing pressed
 		local tiptoe = skater(Vector3.zero)
 		tiptoe:step(input({ brake = true, move = Vector3.yAxis }), ground(Vector3.xAxis), 0.1)
-		-- Sliding down, the stick held: 6.54 − (4 + 0.1308) × 0.1
-		Fixtures.expectNear(tiptoe.velocity, Vector3.new(0, -6.1269, 0))
+		-- Sliding down, the stick held: 19.62 − (4 + 0.3924) × 0.1
+		Fixtures.expectNear(tiptoe.velocity, Vector3.new(0, -19.1808, 0))
 	end)
 
 	it("pumps on a wall as on any slope: more pull on the way down", function()
 		local s = skater(Vector3.new(0, -10, 0))
 		s:step(input({ pump = true }), ground(Vector3.xAxis), 0.1)
-		-- 10 + 65.4 × 1.6 × 0.1 = 20.464, then 20.464 − (4 + 0.4093) × 0.1
-		Fixtures.expectNear(s.velocity, Vector3.new(0, -20.0231, 0))
+		-- 10 + 196.2 × 1.6 × 0.1 = 41.392, then 41.392 − (4 + 0.8278) × 0.1
+		Fixtures.expectNear(s.velocity, Vector3.new(0, -40.9092, 0))
 	end)
 
 	it("steers a little in the air", function()

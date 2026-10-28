@@ -174,7 +174,6 @@ describe("Config defaults", function()
 			-- A diver's way down (#241: RC's dive gained ~75 km/h per s).
 			fallLineDeg = 20,
 			wallAngle = 30,
-			wallGravityScale = 1 / 3,
 			wallTurnRate = 1,
 			curvatureWindow = 10,
 			pumpSlopeMultiplier = 1.6,
@@ -828,10 +827,6 @@ describe("Config.forMode", function()
 				message = "Movement.bellyLandingKeep: must be <= 1 (got 1.5)",
 			},
 			{
-				overrides = { Movement = { wallGravityScale = 0 } },
-				message = "Movement.wallGravityScale: must be > 0 (got 0)",
-			},
-			{
 				overrides = { Movement = { hardLanding = { drop = 0 } } },
 				message = "Movement.hardLanding.drop: must be > 0 (got 0)",
 			},
@@ -864,10 +859,6 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { knockdownSlideSeconds = { Dive = 0 } } },
 				message = "Movement.knockdownSlideSeconds.Dive: must be > 0 (got 0)",
-			},
-			{
-				overrides = { Movement = { wallGravityScale = 1.5 } },
-				message = "Movement.wallGravityScale: must be <= 1 (got 1.5)",
 			},
 			{
 				overrides = { Movement = { wallTurnRate = -1 } },
