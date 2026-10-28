@@ -32,7 +32,7 @@ export type Motion = {
 	lungeSpeed: number?,
 	lungeCap: number?,
 	sideSpeed: number?,
-	-- Straight up, anywhere: the Uppercut's leap (#219).
+	-- Straight up: the Uppercut's leap (#219).
 	leapImpulse: number?,
 	-- The Dive's: this speed along the facing, or a faster skater's own, down the fall line in the air
 	-- (Movement.fallLineDeg, #241).
@@ -111,9 +111,9 @@ local function nameOf(name: string?): ActionName?
 	return nil
 end
 
--- On the ground or in the air alike: no default action needs either alone (a mode can, through requires.grounded).
-local function requires(ball: BallRequirement): Requires
-	return { ball = ball, grounded = "any", notKnockedDown = true }
+-- On the ground or in the air alike, unless `grounded` says otherwise (a mode can too, through requires.grounded).
+local function requires(ball: BallRequirement, grounded: Grounded?): Requires
+	return { ball = ball, grounded = grounded or "any", notKnockedDown = true }
 end
 
 local INSTANT: Phases = { windup = 0, active = 0, recovery = 0 }
@@ -163,13 +163,14 @@ local defaults: ActionsConfig = {
 		pose = "None",
 		motion = { sideSpeed = 45 },
 	},
-	-- Aimed up, so its cone covers "in front and above"; it leaps the skater up anywhere, 110² / (2 × 196.2) = 31 studs
-	-- from the ground (the owner, #219: RC's uppercut launches on open floor). No recovery: a Tackle may follow once
-	-- its strike is over (the owner, #240: RC's air Tackle was ready 0.13-0.3 s after an Uppercut).
+	-- Aimed up, so its cone covers "in front and above"; it leaps the skater up from any ground, 110² / (2 × 196.2) =
+	-- 31 studs (the owner, #219: RC's uppercut launches on open floor), or from a wall, but never in the air (the
+	-- owner, #262: RC greys it there, Videos 10-11). No recovery: a Tackle may follow once its strike is over (the
+	-- owner, #240: RC's air Tackle was ready 0.13-0.3 s after an Uppercut).
 	Uppercut = {
 		phases = { windup = 0.05, active = 0.2, recovery = 0 },
 		cooldown = 1.2,
-		requires = requires("without"),
+		requires = requires("without", "grounded"),
 		effect = "Knockdown",
 		pose = "None",
 		hit = { range = 6, coneDeg = 60, aimUpDeg = 30, knockdownSeconds = 1.5 },

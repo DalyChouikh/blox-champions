@@ -322,7 +322,7 @@ describe("ActionController", function()
 		flying(Vector3.new(0, 0, -30))
 		dive(frame)
 		expect(SkateController.diving).toBe(true)
-		press("Uppercut")
+		press("Tackle")
 		frame()
 		local dived = { { action = "Tackle" }, { action = "Dive" } }
 		expect(requests).toEqual(dived)
@@ -331,7 +331,7 @@ describe("ActionController", function()
 		for _ = 1, math.ceil((phases.windup + phases.active + phases.recovery) / DT) do
 			frame()
 		end
-		press("Uppercut")
+		press("Tackle")
 		frame()
 		expect(requests).toEqual(dived)
 		-- The server's knockdown arrives: the dive is over and stops, as the server stops it, and the knockdown holds
@@ -339,14 +339,14 @@ describe("ActionController", function()
 		rig:SetAttribute(Attributes.KnockedDown, "Hit")
 		frame()
 		expect(SkateController.diving).toBe(false)
-		press("Uppercut")
+		press("Tackle")
 		frame()
 		expect(requests).toEqual(dived)
 		rig:SetAttribute(Attributes.KnockedDown, nil)
 		frame()
-		press("Uppercut")
+		press("Tackle")
 		frame()
-		expect(requests).toEqual({ { action = "Tackle" }, { action = "Dive" }, { action = "Uppercut" } })
+		expect(requests).toEqual({ { action = "Tackle" }, { action = "Dive" }, { action = "Tackle" } })
 	end)
 
 	it("frees a diver the server refused", function()
@@ -482,7 +482,7 @@ describe("ActionController", function()
 	end)
 
 	-- Roller Champions' uppercut launches on flat floor, away from any wall (#219): 110 studs/s up, about 31 studs.
-	it("leaps up with an uppercut anywhere, on open floor as beside a wall", function()
+	it("leaps up with an uppercut from the ground anywhere, on open floor as beside a wall", function()
 		setup()
 		frame()
 		press("Uppercut")
@@ -504,6 +504,18 @@ describe("ActionController", function()
 		expect(skater().mode).toBe("Airborne")
 		expect(skater().velocity.Y).toBeCloseTo(110, 3)
 		expect(requests).toEqual({ { action = "Uppercut" }, { action = "Uppercut" } })
+	end)
+
+	-- The owner (#262, Videos 10-11): "if a player jump, he can't sequence it with an uppercut unless he touches a
+	-- ground or wall, basically something solid"; RC greys the Uppercut in the air.
+	it("never uppercuts in the air", function()
+		setup()
+		flying(Vector3.new(0, -10, -30))
+		press("Uppercut")
+		frame()
+		expect(requests).toEqual({})
+		expect(ActionController.runner.action).toBe(nil)
+		expect(skater().velocity.Y).toBeLessThan(0)
 	end)
 
 	it("does nothing while knocked down", function()
@@ -557,11 +569,12 @@ describe("ActionController", function()
 		BallCarrier:set(LOCAL_ID)
 		expect(names()).toEqual({ tackle = "Dodge", uppercut = "none", pass = "Pass", throw = "ChargeThrow" })
 
-		-- In the air the keys name the same (#240: the first press of the tackle key tackles there too).
+		-- In the air the keys name the same (#240: the first press of the tackle key tackles there too), but the
+		-- uppercut key nothing: the Uppercut starts only from a surface (#262: RC greys it in the air).
 		skater().mode = "Airborne"
 		expect(names()).toEqual({ tackle = "Dodge", uppercut = "none", pass = "Pass", throw = "ChargeThrow" })
 		BallCarrier:set(nil)
-		expect(names()).toEqual({ tackle = "Tackle", uppercut = "Uppercut", pass = "CallPass", throw = "none" })
+		expect(names()).toEqual({ tackle = "Tackle", uppercut = "none", pass = "CallPass", throw = "none" })
 	end)
 
 	-- Roller Champions (the owner's Video 4): "Dive" replaces "Tackle" 0.1-0.2 s after the press, and "Tackle" is back
