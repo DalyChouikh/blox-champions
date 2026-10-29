@@ -905,6 +905,40 @@ about two thirds of a lap, swinging from wall to wall.
   - **Trial 288 kept** (2026-10-29, session 43, Q70; the owner played it: "Keep it"). Studio copy only: coastDecel
     0 (the same friction with or without keys). Measured in Play: 2 s of W then nothing rolled 11.2 s to a stop over
     100 studs (17 body lengths); RC's Video 27 ~11 s.
+  - **#289 traced; Q71** (2026-10-29, session 45). Traced in Studio Play (every step, real code): the round end's
+    glass is a half cylinder (radius 20) on the inner bank's top. Riding up into it straight at the tip, the feet
+    stay on it to ~4 bodies up, then at the top the smallest drift round it (2.6 studs/s) lets go (#257: a surface only
+    pushes, and on an upright wall gravity presses nothing onto it); in the air the body turns upright and the catch
+    (#258) gives up because drifting round convex glass always moves off it: the drop beside it. Coming in 14 deg off
+    the end's axis the drift round it grows to ~40 studs/s by the glass (pulling in toward the axis), so the feet
+    leave just above the bank's top (Video 29). A jump up the bank beside it drifts 1.5 bodies off by the top and
+    lands 5 bodies out on the floor. The same approach into a straight's flat glass stays feet first throughout.
+    Riding along the straight's middle bank into the round end: carried 15-30 deg round, then off onto the floor.
+    AskUserQuestion: first offered a grip as firm as gravity on a floor, on the glass and in the air beside it
+    (picked); the owner then: **"what do you mean exactly by beside it? I don't players riding the middle wall from
+    the straight side to be able to continue and stick to the wall and curve the curved edge sticking to it to the
+    other straight side"** (that grip would have held riders slower than ~9 body lengths a second round the curve).
+    Re-asked (recommended): **Q71 a small grip, slow drifts only**: the round glass holds the feet (on it, and in
+    the air beside it after a jump up it) only while the skater moves round it slower than about 5 body lengths a
+    second; riding along the middle wall from a straight (riding speed ~8 body lengths a second or more) flies off at
+    the round end as today, never carried round; riding up into a round end nearly head-on (within ~10-15 deg at
+    riding speed) or jumping up it keeps the feet on the glass, up and back down it feet first; coming in more from
+    the side still flies off. A playable trial first; the owner may ask for a bigger or smaller speed after playing.
+  - **Trial 289 kept; Q72 and Q73** (2026-10-29, session 45). Trial 289 (Studio copies only): walls grip the skates
+    against a bend away from them at 38 studs/s² (wallGrip; round the round glass, slower than ~29 studs/s, 5 body
+    lengths a second, holds), on them and in the air beside one they left or touched; the curve measured the way the
+    surface bends (exact on the round glass whatever the rise). The owner played it: "I think it is fine, but an issue
+    arised again, when I jump or uppercut into a wall, it pushes the player off ... in almost all ways, outer, middle,
+    round" (**Video 30** `D:\Screenshots\Videos\Screen Recording 2026-10-29 221454.mp4`, ours, 0:37). Traced: the
+    trial's first air-follow also acted on walls bending toward the skater (an Uppercut off the outer wall's curved
+    foot: 7 studs/s into the upright wall above became 8.6 away); today's code caught every such press. Fixed in the
+    trial (the follow only where the wall bends away); every Jump and Uppercut on the outer wall, the middle glass and
+    the round ends then rose along it and was caught back on it feet first. Re-played: **Q72 "Keep it"**. The owner
+    also asked: "the arena's round floor and curved walls, and the glass round walls even the top, are not smooth ...
+    small rectangles ... is it not possible to smoothen it out like real skate ramps?" Told: the look gets smooth
+    meshes in the art pass; the riding reads each flat panel (today's seam trouble), and could read the arena's exact
+    smooth shape instead. **Q73 (recommended): ticket the smooth riding now, built right after #289**, before #278 and
+    the republish.
 
 ## Roller Champions
 

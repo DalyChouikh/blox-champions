@@ -231,8 +231,8 @@ local function stickDirection(self: SkateController, stick: Vector2, up: Vector3
 	return right * stick.X + forward * stick.Y
 end
 
--- Along the feet, or toward the wall a falling skater left (#258): what that ray finds is trusted as it is, since the
--- filter guards the ground under the feet against seams.
+-- Along the feet, or toward the wall a skater left or touched, rising or falling (#258, #289): what that ray finds is
+-- trusted as it is, since the filter guards the ground under the feet against seams.
 local function castGround(self: SkateController, root: BasePart, skater: SkateMath.Skater)
 	local ground = self._ground
 	local direction, toWall = skater:groundRay()

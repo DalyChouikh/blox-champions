@@ -51,9 +51,14 @@ export type MovementConfig = {
 	-- ~75 km/h per s diving down; two thirds of the gravity since #279).
 	fallLineDeg: number,
 	-- A surface steeper than wallAngle (degrees from flat) is a wall. Gravity pulls along it at full strength, as
-	-- everywhere (the owner, #256: one gravity, real physics). A wall holds a skater at any speed; past straight up the
-	-- loop rule decides (A3).
+	-- everywhere (the owner, #256: one gravity, real physics). A wall holds a skater unless it bends away from them
+	-- more than it presses them on (#257); past straight up the loop rule decides (A3).
 	wallAngle: number,
+	-- A surface that holds presses the skates on at least this firmly (studs/s²) against a bend away from them, on it
+	-- or flying beside it after leaving or touching it (#289): gravity presses nothing onto an upright wall, so without
+	-- it the slightest drift round the middle glass's round ends let go. 38 holds a skater going round them (the root
+	-- 22.5 from their axis) slower than √(38 × 22.5) = 29 studs/s, 5 body lengths a second; faster flies off (Q71).
+	wallGrip: number,
 	-- On a wall the skates only roll (the owner, #239): no stride, no brake, and the stick turns the heading at most
 	-- this fast. A level line along upright glass needs g / wallTurnRate (131 studs/s at #279's gravity), past
 	-- hardCap, so every rider curves back down.
@@ -65,8 +70,9 @@ export type MovementConfig = {
 	-- 7, kept). Steeper, gravity slides them back.
 	crawlSpeed: number,
 	crawlLimitDeg: number,
-	-- How far back along the skater's path the curve of an overhang is measured (A3): a few of a lip's flat strips,
-	-- so a curve of strips reads as the arc it makes, yet short enough to follow a curve from where it starts.
+	-- How far back along the skater's path, in studs the way the surface bends (#289), its curve is measured (A3): a
+	-- few of a lip's flat strips, so a curve of strips reads as the arc it makes, yet short enough to follow a curve
+	-- from where it starts.
 	curvatureWindow: number,
 	pumpSlopeMultiplier: number,
 	pumpFlatAccel: number,
@@ -141,6 +147,7 @@ local defaults: MovementConfig = {
 	airUprightRate = 6,
 	fallLineDeg = 20,
 	wallAngle = 30,
+	wallGrip = 38,
 	wallTurnRate = 1,
 	crawlSpeed = 3.33,
 	crawlLimitDeg = 45,
@@ -197,6 +204,7 @@ local fields = Validate.record({
 	airUprightRate = positive,
 	fallLineDeg = quarterTurn,
 	wallAngle = angle,
+	wallGrip = nonNegative,
 	wallTurnRate = nonNegative,
 	crawlSpeed = positive,
 	crawlLimitDeg = quarterTurn,

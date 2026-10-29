@@ -216,6 +216,9 @@ describe("Config defaults", function()
 			-- A diver's way down (#241: RC's dive gained ~75 km/h per s).
 			fallLineDeg = 20,
 			wallAngle = 30,
+			-- Walls grip the skates against a bend away (#289, Q71): round the middle glass's round ends slower than
+			-- √(38 × 22.5) = 29 studs/s, 5 body lengths a second.
+			wallGrip = 38,
 			wallTurnRate = 1,
 			-- A crawl up any slope gentler than 45 deg while the stick points up it (#273, Q38: RC's 1-5 km/h).
 			crawlSpeed = 3.33,
@@ -992,6 +995,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { wallTurnRate = -1 } },
 				message = "Movement.wallTurnRate: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { Movement = { wallGrip = -1 } },
+				message = "Movement.wallGrip: must be >= 0 (got -1)",
 			},
 			{
 				overrides = { Movement = { turnRoundSeconds = 0 } },
