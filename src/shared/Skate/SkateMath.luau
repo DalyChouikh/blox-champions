@@ -243,11 +243,22 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	local stick = math.min(input.move.Magnitude, 1)
 	local wish = alongSurface(input.move, normal)
 	local wishDirection = Vector3.zero
+	-- How far the stick points back against the motion (Roller Champions, #266): that part pushes back like a
+	-- stride and only the rest turns, so a stick held straight back stops the skater before they go its way,
+	-- never carving a U-turn at speed.
+	local against = 0
 	if stick > 0 and wish.Magnitude > EPSILON then
 		wishDirection = wish.Unit
-		heading = if speed > EPSILON
-			then rotateToward(heading, wishDirection, turnRate(movement, speed, wall) * dt, normal)
-			else wishDirection
+		if speed > EPSILON then
+			against = math.max(-wishDirection:Dot(heading), 0)
+			local toward = wishDirection + heading * against
+			local share = toward.Magnitude
+			if share > EPSILON then
+				heading = rotateToward(heading, toward / share, turnRate(movement, speed, wall) * share * dt, normal)
+			end
+		else
+			heading = wishDirection
+		end
 	else
 		stick = 0
 	end
@@ -257,8 +268,12 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	if input.pump and not brake then
 		acceleration += heading * pumpPush(self, gravityAlong:Dot(heading))
 	end
-	if not wall and not brake and stick > 0 and speed < movement.cruiseSpeed then
-		acceleration += heading * (movement.strideAccel * stick * math.max(0, wishDirection:Dot(heading)))
+	if not wall and not brake and stick > 0 then
+		local push = if against > 0
+			then -against
+			elseif speed < movement.cruiseSpeed then math.max(0, wishDirection:Dot(heading))
+			else 0
+		acceleration += heading * (movement.strideAccel * stick * push)
 	end
 	local forwardPart = acceleration:Dot(heading)
 	if forwardPart > 0 and speed > movement.softCap then
