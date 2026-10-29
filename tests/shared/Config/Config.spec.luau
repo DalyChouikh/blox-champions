@@ -200,6 +200,9 @@ describe("Config defaults", function()
 			fallLineDeg = 20,
 			wallAngle = 30,
 			wallTurnRate = 1,
+			-- A crawl up any slope gentler than 45 deg while the stick points up it (#273, Q38: RC's 1-5 km/h).
+			crawlSpeed = 3.33,
+			crawlLimitDeg = 45,
 			curvatureWindow = 10,
 			pumpSlopeMultiplier = 1.6,
 			pumpFlatAccel = 8,
@@ -873,6 +876,22 @@ describe("Config.forMode", function()
 				message = "Movement: groundProbeLength must reach past hoverHeight",
 			},
 			{
+				overrides = { Movement = { crawlSpeed = 0 } },
+				message = "Movement.crawlSpeed: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { crawlLimitDeg = 0 } },
+				message = "Movement.crawlLimitDeg: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { crawlLimitDeg = 91 } },
+				message = "Movement.crawlLimitDeg: must be <= 90 (got 91)",
+			},
+			{
+				overrides = { Movement = { crawlSpeed = 46 } },
+				message = "Movement: crawlSpeed must stay below cruiseSpeed",
+			},
+			{
 				overrides = { Movement = { tiptoeSpeed = 70 } },
 				message = "Movement: tiptoeSpeed must not exceed cruiseSpeed",
 			},
@@ -977,6 +996,12 @@ describe("Config.forMode", function()
 				Fixtures.config(case.overrides)
 			end).toThrow(case.message)
 		end
+	end)
+
+	it("accepts a crawl just inside its limits", function()
+		local movement = Fixtures.config({ Movement = { crawlSpeed = 45.9, crawlLimitDeg = 90 } }).Movement
+		expect(movement.crawlSpeed).toBe(45.9)
+		expect(movement.crawlLimitDeg).toBe(90)
 	end)
 
 	it("rejects actions that contradict themselves", function()
