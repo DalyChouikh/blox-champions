@@ -5,19 +5,25 @@
 -- the action, refunds its cooldown and gives a refused throw's ball back; a push already given stays (the movement
 -- guard tolerates it), but a lunge eases back to the speed before over its recovery, and drops to it at once when its
 -- action stops early (#241). A throw let go while another action runs waits for it. The tackle key dives in the
--- Tackle's follow-up window (#240). Nothing starts while the skater is frozen for a kickoff, knocked down or diving: an
--- action with a landing (the Dive) holds the skater (SkateController.diving) until the server knocks them down at
--- their touchdown, and a knockdown stops the running action, as the server stops it.
+-- Tackle's follow-up window (#240). A Tackle, Dive or Uppercut homes (#277): it turns the skater at once toward the
+-- nearest opponent it may reach in its snap zone, else its cone, around the stick's way (else toward that way), and
+-- bends toward them while they stay in the cone, until its recovery; the server still judges every hit. Nothing
+-- starts while the skater is frozen for a kickoff, knocked down or diving: an action with a landing (the Dive) holds
+-- the skater (SkateController.diving) until the server knocks them down at their touchdown, and a knockdown stops the
+-- running action, as the server stops it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ActionRunner = require(ReplicatedStorage.Shared.Actions.ActionRunner)
 local Actions = require(ReplicatedStorage.Shared.Config.Actions)
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallCarrier = require(script.Parent.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
 local InputController = require(script.Parent.InputController)
+local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
+local Reach = require(ReplicatedStorage.Shared.Actions.Reach)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local SkateController = require(script.Parent.SkateController)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
@@ -62,6 +68,11 @@ export type ActionController = {
 	_lungeBefore: number,
 	_lungePeak: number?,
 	_lungeEase: number,
+	-- The running strike's target (#277): their root and team; nil when it homes onto nobody.
+	_target: BasePart?,
+	_targetTeam: string?,
+	-- The opponents a strike may reach, refilled at each press.
+	_candidates: { Reach.Candidate },
 }
 
 -- The action `key` starts: the first of Config.Input.actions[key] that may start now (ActionRunner.available: its
@@ -118,6 +129,13 @@ local function chosen(
 	return nil
 end
 
+-- Hands the skating a push, unless it is none.
+local function nudge(self: ActionController, change: Vector3, launch: boolean)
+	if change.Magnitude > Vectors.EPSILON then
+		self._skate:push(change, launch)
+	end
+end
+
 -- The push an action gives as it starts: a lunge along the facing up to its cap, a dodge along the stick (to the
 -- right without one), a leap straight up, a dive along the way (SkateMath). In the air the lunge, dodge and leap are
 -- the action's own airMultiplier, else Actions.airMultiplier, as strong; a dive's speed never is.
@@ -147,9 +165,7 @@ local function push(self: ActionController, skater: SkateMath.Skater, action: Co
 	if motion.diveSpeed ~= nil then
 		change += skater:diveChange(motion.diveSpeed)
 	end
-	if change.Magnitude > Vectors.EPSILON then
-		self._skate:push(change, launch)
-	end
+	nudge(self, change, launch)
 end
 
 -- A lunge eases back (#241): from its action's recovery the speed shown is held under a ceiling falling evenly from
@@ -180,9 +196,82 @@ local function easeLunge(self: ActionController, skater: SkateMath.Skater, dt: n
 		local recovery = self._config.Actions[lunging].phases.recovery
 		ceiling = peak + (ceiling - peak) * math.min(self._lungeEase / recovery, 1)
 	end
-	local change = skater:slowChange(ceiling)
-	if change.Magnitude > Vectors.EPSILON then
-		self._skate:push(change, false)
+	nudge(self, skater:slowChange(ceiling), false)
+end
+
+-- A homing strike's target is someone it may reach (Reach.strikable, the server's own rule) as this client sees them:
+-- their character still in the world, showing no KnockedDown and no dodge running.
+local function homeable(self: ActionController, root: BasePart, team: string?): boolean
+	local character = root.Parent
+	if character == nil then
+		return false
+	end
+	local action = Actions.nameOf(character:GetAttribute(Attributes.Action) :: string?)
+	local dodging = action ~= nil and self._config.Actions[action].effect == "Dodge"
+	local knockedDown = character:GetAttribute(Attributes.KnockedDown) ~= nil
+	return Reach.strikable(self._skate:team(), team, knockedDown, dodging)
+end
+
+-- The other skaters a strike may home onto, into the reused candidate list.
+local function opponents(self: ActionController, views: { SkateController.SkaterView }): { Reach.Candidate }
+	local list = self._candidates
+	local count = 0
+	for _, view in views do
+		if homeable(self, view.root, view.team) then
+			count += 1
+			Pickup.setCandidate(list, count, view.player, view.root.Position)
+		end
+	end
+	Pickup.trimCandidates(list, count)
+	return list
+end
+
+-- A homing strike (#277) looks along the stick's way, else the facing: the nearest opponent it may reach in its snap
+-- zone, else in its bend cone, becomes its target. The skater turns at once to face and move toward them, else the
+-- stick's way, keeping the speed, so the strike's own push goes that way.
+local function aimStrike(self: ActionController, skater: SkateMath.Skater, root: BasePart, seek: Config.Seek)
+	local skate = self._skate
+	local stick = skate.move
+	local way = if stick.Magnitude > Vectors.EPSILON then stick.Unit else skater.forward
+	local origin = root.Position
+	local views = skate:others()
+	local list = opponents(self, views)
+	local player = Reach.nearest(origin, way, skater.up, seek.snap, 0, list)
+		or Reach.nearest(origin, way, skater.up, seek.bend, 0, list)
+	local toward = stick
+	for _, view in views do
+		if view.player == player then
+			self._target = view.root
+			self._targetTeam = view.team
+			toward = view.root.Position - origin
+			break
+		end
+	end
+	skater:faceToward(toward, math.huge)
+	nudge(self, skater:turnChange(toward, math.huge), false)
+end
+
+-- While the strike runs, until its recovery, its motion bends toward its target at most turnDegPerSecond as long as
+-- they stay in its bend cone (#277). The target goes at the recovery, when the strike stops (its end, a refusal, a
+-- knockdown), or once they are down, dodging or gone.
+local function home(self: ActionController, skater: SkateMath.Skater, root: BasePart, dt: number)
+	local target = self._target
+	if target == nil then
+		return
+	end
+	local runner = self.runner
+	local running: Config.ActionName? = runner.action
+	if running == nil or runner.phase == "Recovery" or not homeable(self, target, self._targetTeam) then
+		self._target = nil
+		return
+	end
+	-- Only a strike with a seek takes a target (aimStrike).
+	local seek = self._config.Actions[running].seek :: Config.Seek
+	local offset = target.Position - root.Position
+	if Reach.inCone(offset, skater.forward, skater.up, seek.bend) then
+		local maxAngle = math.rad(seek.turnDegPerSecond) * dt
+		skater:faceToward(offset, maxAngle)
+		nudge(self, skater:homeChange(offset, maxAngle), false)
 	end
 end
 
@@ -210,7 +299,13 @@ local function request(
 	return payload
 end
 
-local function begin(self: ActionController, skater: SkateMath.Skater, name: Config.ActionName, hasBall: boolean)
+local function begin(
+	self: ActionController,
+	skater: SkateMath.Skater,
+	root: BasePart,
+	name: Config.ActionName,
+	hasBall: boolean
+)
 	local skate = self._skate
 	local context = self._context
 	context.hasBall = hasBall
@@ -232,6 +327,11 @@ local function begin(self: ActionController, skater: SkateMath.Skater, name: Con
 	self._lungeBefore = skater:shownSpeed()
 	self._lungePeak = nil
 	self._lungeEase = 0
+	self._target = nil
+	local seek = action.seek
+	if seek ~= nil then
+		aimStrike(self, skater, root, seek)
+	end
 	push(self, skater, action)
 	self._sendRequest(request(self, name, action, held))
 	if letsGoOfBall(action) then
@@ -259,6 +359,9 @@ local ActionController: ActionController = {
 	_lungeBefore = 0,
 	_lungePeak = nil,
 	_lungeEase = 0,
+	_target = nil,
+	_targetTeam = nil,
+	_candidates = nil :: any,
 
 	-- deps.Camera, deps.SendRequest and deps.LocalId replace the live game in tests.
 	init = function(self: ActionController, deps: { [string]: any })
@@ -280,6 +383,7 @@ local ActionController: ActionController = {
 		self._charge = nil
 		self._throwReady = false
 		self._lunge = nil
+		self._candidates = {}
 	end,
 
 	start = function(self: ActionController)
@@ -314,17 +418,20 @@ local ActionController: ActionController = {
 			self._lunge = nil
 			return
 		end
+		-- Bound with the skater.
+		local root = skate.root :: BasePart
 		self.runner:step(dt)
 		local running: Config.ActionName? = self.runner.action
 		if skate.knockedDown and running ~= nil then
 			self.runner:cancel(running, false)
 		end
+		home(self, skater, root, dt)
 		easeLunge(self, skater, dt)
 		self._input:readActions(keys)
 		local hasBall = holdsBall(self)
 		local name: Config.ActionName? = chosen(self, keys, hasBall, dt)
 		if name ~= nil then
-			begin(self, skater, name, hasBall)
+			begin(self, skater, root, name, hasBall)
 		end
 	end,
 

@@ -766,3 +766,37 @@ describe("ActionService", function()
 		expect(total / 600).toBeLessThan(0.0002)
 	end)
 end)
+
+describe("ActionService's front-half hits (#277)", function()
+	-- The owner (Q61): passing beside an opponent and striking must reach them.
+	it("strikes anyone in its front half within reach, beside too, and never behind", function()
+		local a, b, c = blue[1], orange[1], orange[2]
+		stand(a, Vector3.zero)
+		-- 6 studs away, 85 deg right of the facing; 4 studs behind, nearer.
+		stand(b, Vector3.new(6, 0, -0.5))
+		stand(c, Vector3.new(0, 0, 4))
+		ActionService:request(a, { action = "Tackle" })
+		expect(advance(0.7)).toEqual({ `{a}>{b}` })
+	end)
+
+	it("dives into anyone in its front half within its reach, beside too", function()
+		local a, b = blue[1], orange[1]
+		stand(a, AIR)
+		-- 10.5 studs away, 85 deg right of the facing: past the Tackle's reach, within the Dive's.
+		stand(b, AIR + Vector3.new(10.5, 0, -1))
+		dive(a)
+		expect(rejected(a)).toEqual({})
+		expect(advance(0.4)).toEqual({ `{a}>{b}` })
+	end)
+
+	-- The owner's note (RC's Uppercuts at Video 24's 119.6 and 153.8 s): a close Uppercut hits a skater on the ground.
+	it("uppercuts a close skater on the ground in its front half as the leap starts", function()
+		local a, b = blue[1], orange[1]
+		stand(a, Vector3.zero)
+		-- 5.1 studs away, level, 79 deg right of the facing.
+		stand(b, Vector3.new(5, 0, -1))
+		ActionService:request(a, { action = "Uppercut" })
+		expect(rejected(a)).toEqual({})
+		expect(advance(0.3)).toEqual({ `{a}>{b}` })
+	end)
+end)

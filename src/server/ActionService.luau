@@ -174,16 +174,13 @@ local function knockedDown(self: ActionService, player: PlayerId): boolean
 	return record ~= nil and record.knockdownLeft > 0
 end
 
--- A teammate who can catch a pass, or an opponent a strike can reach: on their feet and not dodging.
+-- A teammate who can catch a pass, or an opponent a strike can reach (Reach.strikable).
 local function reachable(self: ActionService, other: Holder, team: Team.Team?, teammates: boolean): boolean
 	local otherTeam: Team.Team? = self._teams:teamOf(other.player)
 	if teammates then
 		return otherTeam == team and other.canCatch
 	end
-	if otherTeam == nil or otherTeam == team then
-		return false
-	end
-	return not knockedDown(self, other.player) and not self:isImmune(other.player)
+	return Reach.strikable(team, otherTeam, knockedDown(self, other.player), self:isImmune(other.player))
 end
 
 -- Fills the reused candidate list with the other holders a player's action can reach (`reachable`).

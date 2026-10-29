@@ -141,6 +141,16 @@ afterEach(function()
 end)
 
 describe("SkateController", function()
+	it("hands out the other skaters it sees, the one list it skates beside, for the strikes' targets", function()
+		others = { { player = "Other", team = "Orange", root = rig.PrimaryPart :: BasePart } }
+		local seen = SkateController:others()
+		expect(seen == others).toBe(true)
+	end)
+
+	it("says the local player's team as the skating reads it, for the strikes' targets", function()
+		expect(SkateController:team()).toBe("Blue")
+	end)
+
 	it("takes over a character and drives its skater body from the stick", function()
 		expect((rig:FindFirstChildOfClass("Humanoid") :: Humanoid).EvaluateStateMachine).toBe(false)
 		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(0, 1))

@@ -802,6 +802,109 @@ about two thirds of a lap, swinging from wall to wall.
     **Q54**: "Approved, ship it". **Q55** (the ticket for the crosshair dot shown only while carrying the ball,
     from Q51): "leave it for now, we will take care of it after HUD and UI redesign and fixing": not filed; it
     belongs to the Presentation part's HUD work.
+  - **Q56, the magnet widened** (2026-10-29, session 42, while #277's RC study started; the owner's words, added to
+    Q42): "by the same way for tackling or diving, or uppercutting into the air when a player is above other play in
+    the air". Read as: the Dive and the Uppercut home onto an opponent in their direction the same way the Tackle
+    does, and in the air too, toward an opponent above (an Uppercut up at someone in the air). #277 widened to match.
+  - **Video 24** (2026-10-29, session 42, recorded on request for #277): `D:\Screenshots\Videos\Screen Recording
+    2026-10-29 163427.mp4` (RC Venice Beach vs AI, 2:51, 1918x1078, 30 fps): tackles from close, ~2 and ~4 body lengths
+    and to the side, tackle -> dives, Uppercuts under opponents in the air, air tackles and dives. Located so far: 23
+    "Dive" episodes (a Tackle press 0.1-0.2 s before each) and 10 airborne moments ("Air Pose" offered); three strikes
+    read at 10 fps (contact 0.1-0.3 s after the press; a see-through sphere bursts around the one hit; targets 1-3
+    body lengths ahead or to the side). Whether RC's lunge bends toward the target is not settled yet. RC also has a
+    "Magnetic Pass" (in the Jump row while carrying): a note for Ball & rules. Study log: the Feel ledger.
+  - **Video 24 read for #277** (2026-10-29, session 43; 5-10 frames a second, `claude-handoffs\s43\v24`): six hits
+    read (32.5, 34.6, 40.2, 57.8, 72.9, 89.4 s): targets 1-3 body lengths ahead, up to ~20-30 deg to the side, the
+    contact 0.1-0.3 s after the press, the one hit flung sideways inside a see-through sphere. An airborne opponent
+    flying over the owner (59.0-59.3) was not knocked. Not measurable: whether RC's lunge bends toward the target
+    (the camera follows the track and the owner's stick; at 72.6-72.8 the owner drifted toward the target, which the
+    stick could also explain), the reach's edges, and an Uppercut up at an airborne opponent.
+  - **Round 19, #277** (2026-10-29, session 43, AskUserQuestion with ASCII views, all recommended): **Q57 the strike
+    bends toward its target**: at the press it picks an opponent in its cone, the lunge points at them and keeps
+    turning toward them through the strike (Tackle 0.3 s, Dive 0.7 s), up to about a quarter-turn; someone who cuts
+    away hard can still slip out (not chosen: snap at the press; lock on). **Q58 reach 3 bodies, 45 deg** ("let's try
+    with the 3 bodies reach first": a playable trial): the Tackle looks up to 18 studs within 45 deg, the Dive up to
+    24, the Uppercut for an opponent above up to 31 studs (its leap) within 45 deg of straight up (not chosen: 2
+    bodies / 30 deg; 4 bodies / 60 deg). **Q59 the cone looks along the stick** (camera-relative), else the facing
+    (not chosen: always the facing; the camera's aim). **Q60 the nearest** in the cone, the rule today's hit uses
+    (not chosen: most in the direction, as passes pick). The owner added: **"about the uppercut, not only when the
+    user in the air, if the player comes really close to the player that is on the ground and click uppercut, he can
+    uppercut him, take a look at the vide, I were uppercutting players that were on the ground"** (Video 24).
+  - **Trial 277A played; round 20** (2026-10-29, session 43). Trial A (Studio copies only, a 2-player local test,
+    Player2 driven in a circle and jumping every 3 s): Q57-Q60 as answered, the Uppercut's hit the front half within 6
+    studs (+3). The owner: "first, make the duration of the tackle, dive, uppercut longer to stand up from, currently
+    it is almost instantly, and second, there is an issue where when I pass near the player and tackle/dive/uppercut,
+    it doesn't snap me to them, and I just continue on my way, like a tackle from distance, take a look at that,
+    other than that looks, good". Read: passing beside someone they leave the 45 deg cone in the last ~0.1 s, and the
+    server's hit counts only 50 deg around the facing. AskUserQuestion (recommended both): **Q61 snap when close**:
+    within 2 bodies (12 studs) anyone in the front half (up to 90 deg aside) counts; the strike turns the skater at
+    once to face and move at them (keeping the speed), then bends as tried; the hit counts anyone in the front half
+    within reach; farther, the 45 deg cone and the bend (not chosen: snap at any range; a wider cone only). **Q62 the
+    whole slide, every knockdown**: anyone knocked down (a Tackle, Dive or Uppercut hit, a hard landing, a posed
+    fall) stays down for the whole 1.5 s slide; the keys no longer get them up sooner (replaces Q14's 0.5 s; RC:
+    Video 4's tackled skater slid 50 -> 0 km/h in 1.5 s and pushed off as it stopped, Video 7's posed falls the
+    same); a diver's own belly slide unchanged (not chosen: strikes only; the keys from 1.0 s).
+  - **Trial 277B played; round 21** (2026-10-29, session 43). Trial B (A + Q61 + Q62) in a 2-player local test:
+    **Q63** "Keep it", then: "actually the diving still have same issue ... I dived, and it didn't snap to the user"
+    (**Video 25** `D:\Screenshots\Videos\Screen Recording 2026-10-29 174620.mp4`, ours, 0:34: "look at the video, I
+    dived, it don't snap, and the player falls"). Measured by a recorder on the owner's client (24 Tackle-key
+    presses): the Tackle was pressed with the opponent 17-27 studs away, 25-46 deg off the facing; at the failed Dive
+    presses (video 0:04-0:13, 0:33) the opponent was 10-19 studs away, 62-96 deg off the facing (beside, twice a
+    little behind), three times 9-10 studs up in a jump: outside the Dive's 12-stud front-half snap and its 24-stud
+    45 deg cone, so the Dive flew straight and ended on the belly. The owner: "I think the tackle is fine".
+    AskUserQuestion (recommended both): **Q64 the Dive snaps beside you**: to anyone within 4 bodies (24 studs) up to
+    120 deg from the facing (everywhere but the 60 deg behind), on the ground or in the air, turning the skater at
+    once (all 7 no-target Dive presses would have snapped; not chosen: all around within 3 bodies; the front half
+    within 4). **Q65 every dive still ends on the belly**, hit or miss (RC's way, #242; not chosen: only on a miss;
+    never).
+  - **Trials 277C/D; Videos 26-28** (2026-10-29, session 43). Trial C: the Dive's snap zone 24 studs up to 120 deg
+    (Q64). The owner, before playing it: "we forget a core functionality, a player can tackle/dive in all direction,
+    like he can look at a direction, and tackle with pressing D for example, he will tackle on the right, same for
+    the dive" (**Video 26** `D:\Screenshots\Videos\Screen Recording 2026-10-29 180502.mp4`, RC Zen Temple, 1:20:
+    the lunge's trail runs off to the left at 50.4 s and to the right at 53.7 s, 0.2-0.3 s after the press). Trial D:
+    a Tackle, Dive or Uppercut turns the skater at once toward its target, else the stick's way, keeping the speed,
+    then pushes that way. Playing D the owner's skater got stuck (no moving, no action, no error) after a Dive, and
+    again "tackling and pressing D": read in the code as an older bug (a dive ending already stopped is knocked
+    down for one server frame, the client can miss it and keeps its dive hold); its own bug ticket. The owner also:
+    **"RC players feels more loose and actual skate mechanics ... I only pressed W for a second or two I think or
+    less, and look how he kept skating and following momentum much longer than ours"** (**Video 27** RC
+    `D:\Screenshots\Videos\Screen Recording 2026-10-29 181831.mp4`, **Video 28** ours `...181748.mp4`): to measure
+    by time and body heights, then ask.
+  - **Trial 277E kept** (2026-10-29, session 43, Q66; the owner played it in a 2-player test: "Keep it"). Before
+    it the owner: "basically shortern its leap distance, and with that I think we should shorten the reach too" (the
+    Dive), and a new finding: "players don't stick their feet in the curved end of the middle glass wall like other
+    walls, he drops vertical to it and doesn't stick its feet, fix that too" (its own ticket). The stuck skater was
+    found by a client watchdog: after a Dive that ends already stopped the server's knockdown lasts one frame and the
+    client can miss it, keeping its dive hold (issue #286, older than #277). Trial E as kept: a Tackle, Dive or
+    Uppercut looks along the stick (else the facing); the nearest opponent in its snap zone (Tackle and Uppercut: 12
+    studs, the front half; Dive: 18 studs, up to 120 deg) or else in its cone (Tackle 18 studs / 45 deg, Dive 18 / 45,
+    Uppercut 31 studs within 45 deg of straight up) is its target; at the press the skater turns at once to face and
+    move toward the target, else the stick's way (keeping the speed), then pushes as before; while the target stays
+    in the cone the motion bends toward it (Tackle 300 deg/s, Dive 300, Uppercut 360; 3D in the air); hits count the
+    front half (Tackle 7, Dive 11, Uppercut 6 studs, +3); the Dive flies 0.3 s (was 0.7) then the belly as before;
+    knockdowns last the whole 1.5 s slide (Q62, its own ticket); #286's fix in.
+  - **Q67, coasting by real physics** (2026-10-29, session 43, after Videos 27-28). Measured by time: in RC (Video
+    27) after about 2 s of W the skater rolled ~11 s to a stop (a short bank near the end); ours (Video 28) stops
+    ~3-4 s after a short press, because pressing nothing adds coastDecel 7.5 studs/s^2 on top of rolling friction 4
+    and drag (#215, Q3's 5 s from 72 km/h, chosen before any RC numbers). The owner: **"don't depend your measurement
+    on the speedometer, just follow RC and real physics, there is a difference between coasting between the walls
+    right and left with no keys, we shouldn't be able to continue climbing the steep bumps and hills, but if we are
+    going in a straight line and not clicking anything we are going to have momentum and coast longer, just forget
+    the speedometer"**. Read: friction acts the same whether keys are pressed or not (no extra slowing for pressing
+    nothing), slopes cost speed by gravity as they do. Without coastDecel, from the stride's top speed on flat ground
+    our skater rolls ~10.4 s to a stop (RC ~11 s).
+  - **Q68 and Q69** (2026-10-29, session 43). **Q68** (AskUserQuestion, recommended): drop the extra brake for
+    pressing nothing (coastDecel, #215): the same rolling friction with or without keys (from the stride's top speed
+    ~10 s to a stop on flat ground; slopes still slow by gravity; swings between the walls fade by friction and
+    gravity only); a playable trial first. **Q69, the middle glass's rounded ends**, the owner's words: "the player
+    shouldn't stick to it like from the middle wall from the straight lanes to the curved round ends, I only meant to
+    stick to it by feet like the other walls, when the player come to it from the bottom or jump into it, just like
+    other walls": riding along the middle wall around its rounded end may still carry a skater off (#257's rule);
+    coming at a rounded end from the floor below or jumping into it must land them feet first as on other walls
+    (#258). Cause to trace in Studio.
+  - **Trial 288 kept** (2026-10-29, session 43, Q70; the owner played it: "Keep it"). Studio copy only: coastDecel
+    0 (the same friction with or without keys). Measured in Play: 2 s of W then nothing rolled 11.2 s to a stop over
+    100 studs (17 body lengths); RC's Video 27 ~11 s.
 
 ## Roller Champions
 

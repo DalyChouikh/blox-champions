@@ -75,6 +75,11 @@ export type SkateController = {
 	diving: boolean,
 	-- Set each step: attached, or right behind a teammate with no cooldown, so holding Attach would attach.
 	attachable: boolean,
+	-- Every other player's skater as this one sees them (a reused list): who the local player's strikes home onto
+	-- (#277).
+	others: (self: SkateController) -> { SkaterView },
+	-- The local player's team as the skating reads it (Attributes.Team), nil while spectating.
+	team: (self: SkateController) -> string?,
 	-- An action's push, written to the skater body at once; `launch` leaves the ground.
 	push: (self: SkateController, change: Vector3, launch: boolean) -> (),
 	_config: Config.GameConfig,
@@ -614,6 +619,14 @@ local SkateController: SkateController = {
 		apply(self, skater)
 		shareState(self)
 		askToGetUp(self)
+	end,
+
+	others = function(self: SkateController): { SkaterView }
+		return self._skaters()
+	end,
+
+	team = function(self: SkateController): string?
+		return self._team()
 	end,
 
 	push = function(self: SkateController, change: Vector3, launch: boolean)
