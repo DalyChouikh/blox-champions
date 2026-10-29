@@ -420,6 +420,138 @@ about two thirds of a lap, swinging from wall to wall.
     at 57 km/h with the Get Up prompt: a fall. Get Up prompts after wall excursions with an Air Pose offered: Video 10
     0:43, 0:48, 0:54, 0:59, 1:04, 1:54, 2:22, 2:34. Excursions over the wall top without a pose came back onto the
     wall or track riding (Video 10 0:29-0:31, 1:10-1:13).
+  - **The re-playtest of the published stack head 6bc040e** (2026-10-28, session 37, after #263 and #264), the
+    owner's words: (1) "when a player jumps next or more like into the wall, he bounce back from the wall" (Video 12,
+    ours), "like in recent videos, he doesn't bounce away from the wall" (RC); (2) "the camera issue, it is still
+    makes players dizzy ... i don't think the camera should be fixed on the player, it should be independant from the
+    player, like a spectate cam ... look how I can move the camera around the play in a 360 degree movement but I
+    still move with the player with the same keys, the player don't turn with the camera" (Video 13, RC); (3) "the
+    movement and players and camera, moves too fast, which I think what makes also users dizzy, it is always constant
+    speedy things, unlike RC, the player feels like they have actual weights when you move them, not instantly launch
+    in a speedy movement, and the camera too, not fast movement"; (4) "when a player moves close to an unpicked ball
+    next to it, player picks it up, the ball goes to him like a magnetic, not only needs to go into it" (Video 13,
+    under the ring).
+    - **Video 12 (ours, published 6bc040e)** `D:\Screenshots\Videos\Screen Recording 2026-10-28 215815.mp4` (0:14,
+      1918x1030, 30 fps): 2.3-2.7 s up the outer wall's curved foot 55 -> 15 km/h, Jump at 2.8 s: the readout (across
+      the ground) 64 km/h and the skater flies away from the wall out over the floor, landing at 3.4 s: our jump
+      pushes along the surface's normal, on a wall straight off it at jumpImpulse 60 studs/s. 9.4-10.6 s: a jump high
+      on the glass floats beside it (6 km/h), then the glass takes them back and they ride down at 73 km/h.
+    - **Video 13 (RC, Pinball Stadium)** `D:\Screenshots\Videos\Screen Recording 2026-10-28 220752.mp4` (1:45,
+      1918x1076, 30 fps): 0:00-0:14 the stadium intro and ball drop; the camera sits at very different angles to the
+      skater (0:32 high above, 0:40 low, 0:48 in front and to the side, 0:56-0:58 side-on) and stays where it is aimed:
+      at 0:48-0:49.75 it looks at the infield while the skater runs round the curved end across the screen at 41-43
+      km/h. Kickoff readout at 10 frames a second: 0 until 16.9 s, then an even 3 km/h every 0.1 s for 0.6 s (~30
+      km/h per s; ours from a stop ~31: strideAccel 30 - rollingFriction 4 studs/s^2), then 6-8 every 0.1 s down the
+      ring's ramp to 85. Steady skating on the flat: 50-57 km/h with the ball (1:04-1:34), 45-48 without it (0:46);
+      ours strides to 72. Ball pickup (1:36.8-1:37.2): the ball lands about one skater-height beside the skater and
+      flies into their hands in ~0.2 s (its trail bends toward them); 'Charge Throw' lit at 1:37.3. Ours: caught when
+      the root is within pickupRadius 5 studs of the ball's centre, snapped to the carry spot at once. Not yet found:
+      a jump into or along a wall in RC (Video 10 0:40.6-42.6 is a jump off the wall's top back into the arena).
+  - **Round 13, after the re-playtest** (2026-10-28, session 37, AskUserQuestion, all recommended): Q29 **steering is
+    skater-relative**: W pushes forward along the way the skater faces, S brakes, A/D steer left/right, and the mouse
+    orbits the camera 360 deg and never steers (ours: camera-relative keys, so swinging the camera turned the
+    skater); not chosen: camera-relative keys with a freer camera. Q30 **the stride's top speed drops to 55 km/h**,
+    like RC's 50-57 (cruiseSpeed 60 -> ~46 studs/s; slopes, pumps and dives still go faster, softCap/hardCap
+    unchanged; every measured number re-measured); not chosen: keep 72, lower more. Q31 **RC's magnet pickup comes in
+    the Ball & rules part** (measure RC's pull radius and time there); not chosen: now. Still to study before asking:
+    RC's jump on/into a wall (Videos 10-11), RC's camera distance, roll on walls and field of view with speed.
+  - **Video 14 and the map request** (2026-10-28, session 37, answering my request for an RC clip of five wall and
+    camera cases): Video 14 `D:\Screenshots\Videos\Screen Recording 2026-10-28 223430.mp4` (RC). The owner's words:
+    "take a thorough look, I think at the end of the video in step 5, I think the camera have some influence to the
+    player movement, anyways check it out, also it is not possible to spam jump, so we shouldn't have it, a player can
+    only jump once in the air unless he touches ground/wall again, also I want to do some adjustments to the map, look
+    at this screenshots: at the curved ends, look at how there is like a steep heel, more than ours, I want to have
+    that, I want to have exactly the map structure of RC, and at the straight ends, look more at the bump, it is more
+    up, and more steep than ours, and there is no complete straight floor in the bump, take a thorough look, for the
+    videos, have it more than 1 frame per second, so you can get more details". Four screenshots (RC 'Mexico Arena',
+    attached to the message, not saved as files): at the curved ends the wooden track floor is banked up toward the
+    outer wall all the way from the infield's edge (a bowl), the infield a raised red platform with a checkered rim;
+    on the straights the floor rises to the outer wall in one sweep. The owner's rule for the study: more than 1
+    frame a second on every video.
+  - **Video 14 studied** (session 38; RC 'Mexico Arena', 2:34, 1914x1078, 30 fps): the hint column and speed
+    readout at 5 frames a second over the whole video (`claude-handoffs\s38\v14\hints5`), 10 frames a second at
+    3.9-7.5, 55.2-57.6 and 146-153.5 s, 4 a second at 79.4-81.4 and 143-151 s, full frames for the map. The owner's
+    four RC screenshots are saved: `D:\Screenshots\Photos\Screenshot 2026-10-28 222934.png`, `...222948.png`,
+    `...223446.png`, `...223502.png` (all at a curved end). Seen:
+    - **Jump while riding up the wall** (4.0-7.4): up the outer wall's red foot onto the glass, 43 -> 33 km/h; Jump
+      at ~4.6: Air Pose offered (airborne) and the skater rose straight up ALONG the glass (vertical trail, readout
+      held at 33) for ~1.0 s; Pump/Brake/Jump back at 5.6-5.8 (on the glass again); a second Jump at 5.9 (the
+      press marker on Jump): airborne 6.2-7.0, readout 44 -> 59 -> 77 -> 91, down onto the wall's foot at 7.2 (37,
+      then 28 km/h). The first jump did not push them away from the glass.
+    - **From the floor, a jump straight at the wall** (55.2-57.6): at 59-60 km/h toward the outer wall; at the wall
+      the readout fell 59 -> 27 -> 17 -> 13 (55.8-56.1, the speed into it lost), then held 18 while the skater went
+      up the glass (vertical trail) with Air Pose offered the whole ~1.2 s (still in the air, not landed), and came
+      back onto it at 57.4 (23 -> 40 -> 52 -> 62 km/h on the way down).
+    - **Uppercut at the top of the wall's foot** (1:19.75, press marker on Uppercut, 4 km/h): straight up along the
+      glass ~1.2 s, the readout 3 the whole flight, Air Pose offered, back onto the wall at 1:21.4-1:21.6 (47 km/h),
+      104 by 1:22.4.
+    - **Repeated jumps riding the wall** (16-24 s): every jump was followed by 0.6-1.2 s in the air (Air Pose
+      offered) and a touch (Jump lit again) before the next; Jump was never offered in the air anywhere in the
+      video, and Uppercut was greyed in the air (as in Videos 10-11).
+    - **Riding up a high wall without the mouse** (4.0-5.8): the view rolled with the wall (by eye roughly 30-45 deg,
+      looking down the glass from above); not measured.
+    - **Step 5, the camera swung round** (2:26-2:33.4): the readout 51 -> 0 (2:27.6-2:28.6; the Brake hint reads
+      'Tiptoe' when slow), 0 -> 31 (2:28.7-2:29.8), 31 -> 0 (2:30.0-2:30.6), 0 -> 14 (2:30.8-2:31.6, an S-shaped
+      trail), 14 -> 0 (2:32.0-2:32.6), 0 -> 7 (2:32.8-2:33.4). The keys held cannot be read from the video; with W
+      alone held, steering by the skater's facing (Q29) would not have stopped the skater three times.
+    - Hints with the ball: Charge Throw, Pump, Brake, Jump, Magnetic Pass, Dodge, Roll Ball; while charging: Throw,
+      Cancel & Dodge, Roll Ball (1:41.0, 1:59.0). Speeds: striding on the flat 45-58 km/h; after pumps and slopes
+      100-130 (130 at 1:33.2).
+    - **The map (Mexico Arena)**, from the four screenshots and frames 0:01, 0:03, 0:17, 0:45, 1:02, 1:13: at a
+      curved end the middle is a broad raised red island (black rim, checkered edge, the goal's frame on it); the
+      wooden floor around it rises from the island's edge all the way to the outer wall with no flat lane, steeper
+      toward the wall (a bowl). On the straights the views show, across the track, a red bank with chevrons, the
+      wooden floor, a chevron-painted ramp, a grey lane with white stripes and the red foot of the outer wall under
+      the ad boards; their order and heights could not be fixed from these perspective views (no view straight
+      across a straight).
+  - **Round 14, after Video 14** (2026-10-28, session 38, AskUserQuestion): asked which keys were held at 2:26-2:33
+    (step 5), the owner: "I think I clicked other keys, not sure, but I think the camera can't affect the movement
+    when the player at high speed, but it is like slows him down if the camera in the ooposite of the player
+    direction, I recorded another video, this time only clicking W, check it": **Video 15** `D:\Screenshots\Videos\
+    Screen Recording 2026-10-28 231627.mp4` (RC, W only, the camera swung). Q32 **the jump on and into walls: RC's way**
+    (recommended): on a wall (steeper than 30 deg) Jump goes straight up along it, like the Uppercut; a skater still
+    rising who meets a wall slides up it in the air and only lands on it (getting Jump back) once falling; floors and
+    gentle banks keep today's jump. Not chosen: fix the direction only; keep ours (straight off the wall). Asked for a
+    cross-section clip of Mexico Arena (straight and curved end, looked at and crossed at a right angle), the owner:
+    "I recorded a video before this, if it is not enough, tell me to record again".
+  - **Video 15 studied** (session 38; RC 'Venice Beach Park', 0:32, 1918x1078, 30 fps; the owner held only W and
+    swung the camera): the hint column and readout at 5 frames a second over the whole clip, 4 a second overview, 10 a
+    second at 15.1-17.4 and 28.6-31.5 s, larger crops at 29.0-31.2 (`claude-handoffs\s38\v15`). Seen:
+    - Striding with the camera behind: 53-55 km/h (0-2.4 s); later on a straight 42-48 (17.8-21.0).
+    - **W follows the camera, slowly at speed:** at 16.6-17.4 the camera stayed on the curved end's island while the
+      skater, W only, at 55-67 km/h, came down off the outer bank and circled the island's rim, crossing the screen
+      sideways: they curved toward where the camera looked instead of going straight up the bank.
+    - **Against the motion it brakes, then turns:** 29.2-30.8, after a landing at 9-13 km/h the camera swung to look
+      down the straight while the skater moved the other way: 13 -> 10 -> 7 -> 3 -> 1 km/h in 0.5 s (~30 km/h per s),
+      1-4 km/h for 0.9 s while they turned round to face into the screen (their back to the camera at 30.0), then
+      4 -> 16 km/h in 0.3 s and 22 by 31.5, skating the way the camera looked. Read with Video 14 2:27-2:33 (51 -> 0
+      in ~1 s, 31 -> 0 in 0.6 s, 14 -> 0, each time back up again, an S-shaped trail): a stick held against the motion
+      brakes the skater to a stop, then they skate off the stick's way. The owner's words fit it: "the camera can't
+      affect the movement when the player at high speed, but it is like slows him down if the camera in the opposite
+      of the player direction". Not measured: RC's turn rate at each speed.
+    - Skating off ledges drops the skater into lower lanes (Air Pose offered in the air, 3.2-4.0, 9.8-10.2, 21.2-21.8,
+      25.8-26.0 s); each touchdown loses the speed into the floor (45 -> 22, 57 -> 25, 42 -> 17, 55 -> 22 km/h), then the
+      slope below speeds them up (to 107-115). A drop at 29.0 greyed every hint but Ball Focus for ~0.1-0.2 s (73 -> 7
+      km/h), no Get Up prompt.
+    - RC's own loading tip (Video 2, 3:36): "the Follow Camera option makes the camera turn to follow your skater":
+      by default RC's camera does not swing back behind the skater.
+  - **Round 14, after Video 15** (2026-10-28, session 38, AskUserQuestion): Q33 **steering: RC's way** (recommended;
+    REPLACES Q29): the keys push the way the camera looks, as before, with weight: holding a key against the motion
+    brakes the skater to a near stop, then they turn round and skate off that way; at speed they turn gently toward
+    it; the mouse orbits the camera freely (RC: Video 15 16.6-17.4 and 29.2-30.8, Video 14 2:27-2:33; ours: a key held
+    against the motion carved a U-turn at full speed, half a turn in ~1.1 s at 72 km/h). Not measured yet: RC's turn
+    rate at each speed. Not chosen: keep Q29 (W along the facing); keep today's. Asked for a Mexico Arena
+    cross-section clip, the owner recorded **Video 16** `D:\Screenshots\Videos\Screen Recording 2026-10-28
+    235206.mp4` ("take a thorough look").
+  - **Video 16 studied** (session 38; 1:15, 1918x1078, 30 fps; recorded for the cross-sections, but the match was on
+    **Pixel City**, not Mexico Arena): 2 frames a second over the whole clip and full frames at 1.0, 5.5, 8.0, 41.5,
+    44.0 and 47.5 s (`claude-handoffs\s38\v16`). A straight seen across from a stop (0-12 s): flat lanes (grey,
+    purple, a checkered strip) up to the green band rising to the middle's rim; crossing slowly (12-17 s, 3 -> 47
+    km/h) the skater rode up that green band. A curved end (34-48 s): a purple bowl, flat by the low grey oval island,
+    then curving up into the outer wall in one wide sweep with a white rim under the crowd; riding up it at 52.5-53.5
+    and 58.5-59.0 s the camera looked straight at the crowd. No view gives heights or angles in numbers (no known
+    size beside the surfaces but the skater). Mexico's shape (the owner's screenshots) still comes only from Video 14
+    and Video 3 frames.
 
 ## Roller Champions
 

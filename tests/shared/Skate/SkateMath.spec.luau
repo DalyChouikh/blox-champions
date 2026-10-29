@@ -70,9 +70,10 @@ describe("SkateMath on the ground", function()
 		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -58.73)) -- 60 − (4 + 7.5 + 1.2) × 0.1
 	end)
 
-	-- The owner (#215): a skater who presses nothing stops from cruise (72 km/h) in about 5 s on flat ground.
-	it("stops from cruise in about 5 s on flat ground with nothing pressed", function()
-		local s = skater(Vector3.new(0, 0, -movement.cruiseSpeed))
+	-- The owner (#215): a skater who presses nothing stops from 72 km/h in about 5 s on flat ground. The slowing is
+	-- the surface's, whatever the stride's top speed (#265).
+	it("stops from 72 km/h in about 5 s on flat ground with nothing pressed", function()
+		local s = skater(Vector3.new(0, 0, -60))
 		local steps = 0
 		while s.velocity.Magnitude > 0 and steps < 600 do
 			s:step(input(), ground(), 1 / 60)
@@ -84,17 +85,18 @@ describe("SkateMath on the ground", function()
 
 	it("strides only up to cruiseSpeed and settles there", function()
 		local forward = input({ move = -Vector3.zAxis })
-		local atCruise = skater(Vector3.new(0, 0, -60))
+		local atCruise = skater(Vector3.new(0, 0, -46))
 		atCruise:step(forward, ground(), 0.1)
-		Fixtures.expectNear(atCruise.velocity, Vector3.new(0, 0, -59.48)) -- no push at cruiseSpeed: it coasts
+		-- No push at cruiseSpeed (55 km/h, #265): it coasts, 46 − (4 + 0.02 × 46) × 0.1.
+		Fixtures.expectNear(atCruise.velocity, Vector3.new(0, 0, -45.508))
 		local s = skater(Vector3.zero)
 		for _ = 1, 600 do
 			s:step(forward, ground(), 1 / 60)
 		end
 		for _ = 1, 120 do
 			s:step(forward, ground(), 1 / 60)
-			-- The reference model stays between 59.91 and 60.41.
-			expect(s.velocity.Magnitude > 59.5 and s.velocity.Magnitude < 60.5).toBe(true)
+			-- The reference model stays between 45.92 and 46.42: 46 − (4 + 0.92) / 60 and 46 + (30 − 4.93) / 60.
+			expect(s.velocity.Magnitude > 45.5 and s.velocity.Magnitude < 46.5).toBe(true)
 		end
 	end)
 
@@ -560,7 +562,7 @@ describe("SkateMath lunges", function()
 	end
 
 	it("lunges along the facing, never past the ceiling: a faster skater slows to it", function()
-		-- From rest, at cruise (60 + 40 held at 60) and at 108 km/h (90, slowed to 60), all facing -Z.
+		-- From rest, at 72 km/h (60 + 40 held at 60) and at 108 km/h (90, slowed to 60), all facing -Z.
 		Fixtures.expectNear(skater(Vector3.zero):lungeChange(40, 60), Vector3.new(0, 0, -40))
 		Fixtures.expectNear(skater(Vector3.new(0, 0, -60)):lungeChange(40, 60), Vector3.zero)
 		Fixtures.expectNear(skater(Vector3.new(0, 0, -90)):lungeChange(40, 60), Vector3.new(0, 0, 30))

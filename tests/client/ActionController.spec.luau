@@ -185,7 +185,7 @@ describe("ActionController", function()
 		local striking = math.floor((phases.windup + phases.active) / DT) - 2
 		local easing = math.floor(phases.recovery / 2 / DT)
 		local ended = math.ceil(phases.recovery / DT)
-		-- From rest (+40), at cruise (60, held at 60) and at 108 km/h (90, slowed to 60).
+		-- From rest (+40), at 72 km/h (60, held at 60) and at 108 km/h (90, slowed to 60).
 		for _, case in { { before = 0, lunge = 40 }, { before = 60, lunge = 60 }, { before = 90, lunge = 60 } } do
 			ActionController.runner:reset()
 			skater().velocity = Vector3.new(0, 0, -case.before)
