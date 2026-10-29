@@ -109,7 +109,7 @@ local function rimTop(arena: ArenaConfig): number
 end
 
 -- The ring must hang inside the track's cross-section at the goal gate, judged by its real outline (its corners)
--- against the glass faces and the surface as built (the step half blended there, the wall's foot curve as strips),
+-- against the glass faces and the surface as built (the two sections blended halfway there, its curves as strips),
 -- and under its arm, whose beam must stay under the lips.
 local function checkFit(arena: ArenaConfig, corners: { Vector2 }, lateral: number, gateDistance: number)
 	if lateral - reach(corners, -Vector2.xAxis) < 0 or lateral + reach(corners, Vector2.xAxis) > arena.trackWidth then
@@ -251,9 +251,10 @@ function Features.gatePanels(arena: ArenaConfig): { Types.GatePanel }
 	return panels
 end
 
--- teamSize floor-level frames per team, teamSpawnSpacing apart on the lower floor, facing the travel direction.
+-- teamSize floor-level frames per team, teamSpawnSpacing apart in their straight's spawn room (flat, at the lowest
+-- floor's height), facing the travel direction.
 function Features.teamSpawns(arena: ArenaConfig, teamSize: number): Types.TeamSpawns
-	local lane = Profile.lowerFloorCenter(arena)
+	local lane = Profile.spawnLane(arena)
 	local spawns: Types.TeamSpawns = { Blue = {}, Orange = {} }
 	for _, team: Team in Team.list do
 		local middle = sectionMiddle(arena, SPAWN_SECTIONS[team])
@@ -265,14 +266,16 @@ function Features.teamSpawns(arena: ArenaConfig, teamSize: number): Types.TeamSp
 	return spawns
 end
 
--- ballSpawnHeight above the middle of the track at each curved end's apex: equally far from both teams' spawns.
+-- ballSpawnHeight above the surface as built across the middle of the track at each curved end's apex: equally far
+-- from both teams' spawns.
 function Features.ballSpawns(arena: ArenaConfig): { CFrame }
+	local middle = arena.trackWidth / 2
 	local spawns: { CFrame } = {}
 	for _, section in CURVED_ENDS do
-		table.insert(
-			spawns,
-			Centerline.at(arena, sectionMiddle(arena, section), arena.trackWidth / 2, arena.ballSpawnHeight)
-		)
+		local apex = sectionMiddle(arena, section)
+		-- The section runs from one glass face to the other, so it has a height across the middle.
+		local floor = Profile.heightAt(Surface.section(arena, apex), middle) :: number
+		table.insert(spawns, Centerline.at(arena, apex, middle, floor + arena.ballSpawnHeight))
 	end
 	return spawns
 end

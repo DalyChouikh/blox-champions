@@ -106,14 +106,14 @@ describe("Centerline", function()
 		expect(stations[52]).toBe(curve[2])
 	end)
 
-	it("blends the straights' step into the curves' flat floor around each corner", function()
-		expect(Centerline.stepBlend(arena, 100)).toBe(1)
-		expect(Centerline.stepBlend(arena, 200 + 30 * math.pi)).toBe(0)
-		expect(Centerline.stepBlend(arena, 200)).toBeCloseTo(0.5)
-		expect(Centerline.stepBlend(arena, 190)).toBeCloseTo(1)
-		expect(Centerline.stepBlend(arena, 210)).toBeCloseTo(0)
-		expect(Centerline.stepBlend(arena, 195)).toBeCloseTo((1 - math.cos(math.pi * 0.75)) / 2)
-		expect(Centerline.stepBlend(arena, Centerline.length(arena) - 5)).toBeCloseTo(
+	it("eases from a straight's cross-section (1) into a curved end's (0) around each corner", function()
+		expect(Centerline.straightness(arena, 100)).toBe(1)
+		expect(Centerline.straightness(arena, 200 + 30 * math.pi)).toBe(0)
+		expect(Centerline.straightness(arena, 200)).toBeCloseTo(0.5)
+		expect(Centerline.straightness(arena, 190)).toBeCloseTo(1)
+		expect(Centerline.straightness(arena, 210)).toBeCloseTo(0)
+		expect(Centerline.straightness(arena, 195)).toBeCloseTo((1 - math.cos(math.pi * 0.75)) / 2)
+		expect(Centerline.straightness(arena, Centerline.length(arena) - 5)).toBeCloseTo(
 			(1 - math.cos(math.pi * 0.25)) / 2
 		)
 	end)

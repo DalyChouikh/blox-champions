@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-25 (design approved in brainstorming); written 2026-10-26; **revised 2026-10-26** (session 21) after the owner's direction change; **amended 2026-10-27** after the owner's playtest
 - **Milestone:** [M1 - Foundation & Core Match](https://github.com/DalyChouikh/blox-champions/milestone/1)
-- **Status:** Revision approved by the owner (2026-10-26). The first version (d558a48, approved 2026-10-26) is built as Task 1 (#186, PR #192); this revision replaces its glass barrier, sizes, gate arches and reach check. The playtest's amendment (2026-10-27) changes the glass's look (R5) and turns the gate panels into walls (R18), only the next gate's showing; its later finding starts every streak at the goal's gate, so the first wall shows on the pickup (R18, §5.1; the M1 spec's §4.2).
+- **Status:** Revision approved by the owner (2026-10-26). The first version (d558a48, approved 2026-10-26) is built as Task 1 (#186, PR #192); this revision replaces its glass barrier, sizes, gate arches and reach check. The playtest's amendment (2026-10-27) changes the glass's look (R5) and turns the gate panels into walls (R18), only the next gate's showing; its later finding starts every streak at the goal's gate, so the first wall shows on the pickup (R18, §5.1; the M1 spec's §4.2). The Feel part's #268 (2026-10-29) gives the track Roller Champions' structure (§3.1–§3.3): a spawn room, a steep rise and an incline on the straights, a bowl at the curved ends, the solid outer wall to 40.
 - **Parent:** `docs/superpowers/specs/2026-10-21-m1-foundation-core-match-design.md`, decision A6 (the overhaul: Arena → Feel → Ball & rules → Presentation)
 - **Reference:** `docs/reference/2026-10-25-reference-games.md` (the videos, the observations, the owner's answers; "Video 3" is the 45-minute ranked video the revision rests on)
 
@@ -25,7 +25,7 @@ The owner's rule: **players and the ball never get out of the arena.** The top h
 
 1. The arena is built from `Config.Arena` alone:
    - the track 80 wide, the arena's outside 200 across (the curved ends' centerline radius 60), the straights 200 (a lap of about 777 studs);
-   - on the inner side a curved bank 16 high (8 until the Feel part's #217), on the outer side a curved solid wall 28 high;
+   - on the inner side a curved bank 16 high (8 until the Feel part's #217), on the outer side a curved solid wall 40 high (28 until the Feel part's #268);
    - **rideable glass** above both, up to **120**, each wall ending in a lip that curls inward;
    - the top of `Arena.top.kind`: a glass roof at 120 (Closed, the default) or an invisible ceiling at 140 (Open).
 2. Glass is a ride surface: skaters ride it and their rays find it; the ball bounces off it, and its flight ends there as on any surface.
@@ -100,6 +100,8 @@ The M1 spec's §9.1 (layout, dimensions, markers, goal placement), §9.2 (folder
 
    *Amended by the Feel part (#217, 2026-10-27): the bank is 16, so the lower floor is 20 wide.*
 
+   *Amended by #268 (2026-10-29): the step, the upper floor and the lower floor are gone (§3.1).*
+
    Cost if wrong: tuning values.
 2. **The lips are quarter circles of radius 12, in 4 strips each.** So the glass is vertical up to 108, and the top spans the 56 studs between the two lips' ends. Cost if wrong: two numbers.
 3. **The glass and the top are slabs `surfaceThickness` thick** (1), behind their faces, outside the track, like every ride surface; `barrier.thickness` goes. Cost if wrong: none.
@@ -109,51 +111,52 @@ The M1 spec's §9.1 (layout, dimensions, markers, goal placement), §9.2 (folder
 7. **A3's loop rule stays in `SkateMath`.** On an overhang, a skater stays on only while speed² × curvature reaches gravity's pull off the surface. That is real physics, and it is what the lips need (R15). What the Feel part changes is the walls' rule (`minWallSpeed`). Cost if wrong: one rule.
 8. **The top's height is one rule** (`Profile.topHeight`): `glass.top` when closed, `glass.top + top.ceilingAbove` when open. Gates are that tall, and `Bounds.inArena` ends there. Cost if wrong: none.
 9. **Every ray looks through the top** (RideSurfaces' `params` holds ride surfaces only, as Task 2's work has it). The camera stops in front of glass, as in front of any wall, but sees through the roof. Cost if wrong: a camera that, near the roof, could rise above it.
-10. **The gate wall follows the cross-section as built** (amended 2026-10-27). It runs from the solid section at the gate (the step half blended there) up to the walls' top outline (the lips' chords and 120). Its slices break at every point of either outline, so its edges lie on the surface's and the lips' own chords; equal slices would cut across the step and the foot curve. Breaks closer than Roblox's smallest part (0.001) merge into one. It is `gatePanel.depth` (0.2) thick, behind the gate's plane, and keeps the name "gate panel" in code. The goal hangs in gate 2's plane, centred on it, so the wall must be thinner than half the goal's thinnest part (§3.3, rule 7): at 0.5 the wall's back face lay in the rim's face plane and the rim flickered (seen 2026-10-27; clean at 0.2). Cost if wrong: none. *(2026-10-26: an opening of half an ellipse, `gatePanel.openingHeight` 60, in `gatePanel.segments` 16 slices, 2 deep.)*
-11. **The goal's arm comes from the outer glass.** A post rises from the rim's top up to `goal.arm.height` (40), then a beam runs out to the outer glass's face. That works on both kinds of top. Cost if wrong: none.
-12. **The beam covers the vertical outer glass**, from the solid wall's top (28) up to where the lip starts (108). Cost if wrong: none.
-13. **A lap at cruise speed takes about 13 s** (777 studs at 60), past the M1 spec's 10–12 s target. The Feel part tunes speeds. (The Feel part's #265 lowered cruise to 46 studs/s, 55 km/h: 16.9 s, computed.) Cost if wrong: longer laps until then.
-14. **The middle** keeps a floor slab (untagged, not rideable) at the lower floor's height, 38 wide between the inner glass slabs. Cost if wrong: one number.
+10. **The gate wall follows the cross-section as built** (amended 2026-10-27). It runs from the solid section at the gate (a straight's and a curved end's blended halfway there) up to the walls' top outline (the lips' chords and 120). Its slices break at every point of either outline, so its edges lie on the surface's and the lips' own chords; equal slices would cut across the rise and the foot curves. Breaks closer than Roblox's smallest part (0.001) merge into one. It is `gatePanel.depth` (0.2) thick, behind the gate's plane, and keeps the name "gate panel" in code. The goal hangs in gate 2's plane, centred on it, so the wall must be thinner than half the goal's thinnest part (§3.3, rule 8): at 0.5 the wall's back face lay in the rim's face plane and the rim flickered (seen 2026-10-27; clean at 0.2). Cost if wrong: none. *(2026-10-26: an opening of half an ellipse, `gatePanel.openingHeight` 60, in `gatePanel.segments` 16 slices, 2 deep.)*
+11. **The goal's arm comes from the outer glass.** A post rises from the rim's top up to `goal.arm.height` (51 since #268, was 40), then a beam runs out to the outer glass's face. That works on both kinds of top. Cost if wrong: none.
+12. **The beam covers the vertical outer glass**, from the solid wall's top (40 since #268, was 28) up to where the lip starts (108). Cost if wrong: none.
+13. **A lap at cruise speed takes about 13 s** (777 studs at 60), past the M1 spec's 10–12 s target. The Feel part tunes speeds. (The Feel part's #265 lowered cruise to 46 studs/s, 55 km/h: 16.9 s, computed. On #268's map a skater holding the stick along the spawn lane, u 27, 695 studs round, laps in 15.0 s, measured in Play.) Cost if wrong: longer laps until then.
+14. **The middle** keeps a floor slab (untagged, not rideable) at the lowest floor's height, 38 wide between the inner glass slabs. Cost if wrong: one number.
 
 ---
 
 ## 3. The shape (`Config/Arena`)
 
-### 3.1 The cross-section
+### 3.1 The cross-sections
 
-`u` is the distance across from the inner glass's face, `y` the height above the lower floor. A straight with its full step, on our closed map:
+*Amended by the Feel part's #268 (2026-10-29): the owner's pick after playing six trials in Studio (trial 6), like Roller Champions' straights (Video 21) and Mexico Arena's banked ends (the owner's screenshots, Videos 14 and 17). It replaces the step, the upper floor and the curved ends' flat floor.*
+
+`u` is the distance across from the inner glass's face, `y` the height above the lowest floor (a straight's spawn room, a curved end's bowl at the bank's foot). A straight, on our closed map:
 
 ```
  y
 120         .----------------- roof (Closed) -----------------.        Open: invisible ceiling at 140,
 108        ( lip r12                                    lip r12 )      strips up from the lips' ends
-           |                                                    |
-           | inner glass (rideable)        outer glass (rideable)|
-           |                                                    |
- 28        |                                                    |  outer wall's top (solid below)
- 22        |                                                   /   foot curve (r 18)
- 16        ╮ inner bank (r 16)                        ___----
-  4         ╲                       ____----------- upper floor
-  0          ╲__________/  step (18 wide, 4 high)
-           u 0       16          36     54    62            80
+           | inner glass (rideable)        outer glass (rideable) |
+ 40        |                                                    |  outer wall's top (solid below)
+ 34        |                                                   /   foot curve (r 22)
+ 16        ╮ inner bank (quarter ellipse 24 x 16)         __.-´
+ 12.8       ╲                                     __.--´          incline (14°)
+  8          ╲                            __.--´
+  0           `-.___________ room ___.-´  rise (steepest ~39°)
+           u 0             24    30     44                 63.3   80
 ```
 
-| Piece | From → to (u, y) on a straight | Folder |
-|---|---|---|
-| Inner lip: a quarter circle, centre (12, 108) | (12, 120) → (0, 108) | Glass |
-| Inner glass | (0, 108) → (0, 16) | Glass |
-| Inner bank: a quarter circle, centre (16, 16): vertical where the glass stands on it, flat where it meets the floor (#217; was r 8) | (0, 16) → (16, 0) | Surface |
-| Lower floor | (16, 0) → (36, 0) | Surface |
-| Step: a cosine rise | (36, 0) → (54, 4) | Surface |
-| Upper floor | (54, 4) → (62, 4) | Surface |
-| Outer foot curve: centre (62, 22) | (62, 4) → (80, 22) | Surface |
-| Outer wall | (80, 22) → (80, 28) | Surface |
-| Outer glass | (80, 28) → (80, 108) | Glass |
-| Outer lip: a quarter circle, centre (68, 108) | (80, 108) → (68, 120) | Glass |
-| Closed: the roof | (68, 120) → (12, 120) | Top |
-| Open: strip, ceiling, strip | (68, 120) → (68, 140) → (12, 140) → (12, 120) | Top |
+| Piece | On a straight (u, y) | At a curved end (u, y) | Folder |
+|---|---|---|---|
+| Inner lip: a quarter circle, centre (12, 108) | (12, 120) → (0, 108) | the same | Glass |
+| Inner glass | (0, 108) → (0, 16) | the same | Glass |
+| Inner bank: vertical where the glass stands on it, flat where it meets the floor | a quarter ellipse 24 wide, 16 high, centre (24, 16): (0, 16) → (24, 0) | a quarter circle r 16, centre (16, 16): (0, 16) → (16, 0) | Surface |
+| Spawn room / the bowl's first share | flat: (24, 0) → (30, 0) | the bowl y = 14 s², s = (u − 16) / 54.26: (16, 0) → (24.28, 0.33) | Surface |
+| Rise / the bowl's second share | a cubic Hermite curve, leaving the room flat and arriving at 14°: (30, 0) → (44, 8) | (24.28, 0.33) → (43.60, 3.62) | Surface |
+| Incline / the bowl's last share | 14°: (44, 8) → (63.32, 12.82) | (43.60, 3.62) → (70.26, 14), arriving at 27.3° | Surface |
+| Outer foot curve | r 22 from 14° to upright, centre (58, 34.16): (63.32, 12.82) → (80, 34.16) | r 18 from 27.3° to upright, centre (62, 30.00): (70.26, 14) → (80, 30.00) | Surface |
+| Outer wall | (80, 34.16) → (80, 40) | (80, 30.00) → (80, 40) | Surface |
+| Outer glass | (80, 40) → (80, 108) | the same | Glass |
+| Outer lip: a quarter circle, centre (68, 108) | (80, 108) → (68, 120) | the same | Glass |
+| Closed: the roof | (68, 120) → (12, 120) | the same | Top |
+| Open: strip, ceiling, strip | (68, 120) → (68, 140) → (12, 140) → (12, 120) | the same | Top |
 
-Every section runs the same way around the track's "O" (inner top, down, across the floors, up the outer side, back across the top), so every slab hangs behind its face, outside the track. The curved ends have no step: the solid profile blends point by point over `profileBlendLength`, as today. The glass, the lips and the top never change along the loop.
+Both sections have the same six solid pieces: a curved end's bowl splits where a straight's room and rise end, at the same shares of the floor (6 and 20 of the 39.32 studs from the bank's foot to the foot curve). So a section blends from one to the other point by point over `profileBlendLength` around each corner (`Centerline.straightness`: 1 on a straight, 0 at a curved end). A curved end's foot curve starts where the bowl arrives, at the angle where the bowl's slope and the foot curve's start agree (`Profile` finds it by halving a quarter turn). Each section has `stripsPerSection` (20) strips: every piece gets one and the rest are shared by how far each piece turns in the section where it turns more (6, 1, 5, 2, 5 and 1), so every crease between strips bends about as much. Every section runs the same way around the track's "O" (inner top, down, across the floors, up the outer side, back across the top), so every slab hangs behind its face, outside the track. The glass, the lips and the top never change along the loop.
 
 ### 3.2 Config changes
 
@@ -162,15 +165,18 @@ Every section runs the same way around the track's "O" (inner top, down, across 
 | `straightLength` | 200 | 200 |
 | `endRadius` | 70 | 60 |
 | `trackWidth` | 60 | 80 |
-| `outerWallHeight` / `innerBankHeight` | 28 / 8 | 28 / 8 (16 since #217) |
-| `wallCurveRadius` | 14 | 18 |
-| `stepHeight` / `stepWidth` / `upperFloorWidth` | 4 / 14 / 6 | 4 / 18 / 8 |
+| `outerWallHeight` / `innerBankHeight` | 28 / 8 | 40 (28 until #268) / 8 (16 since #217) |
+| `wallCurveRadius` | 14 | 18; since #268 `curvedEnd.footRadius` |
+| `stepHeight` / `stepWidth` / `upperFloorWidth` | 4 / 14 / 6 | 4 / 18 / 8; removed by #268 |
+| `straight` (#268) | — | `{ bankWidth = 24, roomEnd = 30, riseEnd = 44, riseHeight = 8, inclineDeg = 14, footRadius = 22 }` |
+| `curvedEnd` (#268) | — | `{ bowlHeight = 14, bowlPower = 2, footRadius = 18 }` |
 | `stripsPerSection` (the solid profile) | 20 | 20 |
 | `barrier` | `{ top = 85, thickness = 1, transparency = 0.7 }` | removed: `glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.85, material = Enum.Material.SmoothPlastic }` (2026-10-27: was 0.7 with the Glass material) |
 | `top` | — | `{ kind = "Closed", ceilingAbove = 20 }` (`kind` is `"Closed"` or `"Open"`; `ceilingAbove` is used by Open) |
 | `marker` | `{ width, height }` | removed: `gatePanel = { depth = 0.2 }` (2026-10-27: was `{ openingHeight = 60, depth = 2, segments = 16 }`) |
 | `goal.wallGap` | 1 | removed: `goal.across = 0.75` (the ring's centre, as a fraction of `trackWidth` from the inner glass) |
-| `goal.arm` | — | `{ thickness = 1, height = 40 }` (where the arm's beam runs, above the lower floor) |
+| `goal.heightAboveFloor` | 18 | 18; 29 since #268 (the floor under the ring rose; its rim stands 9.5 over it, was 8) |
+| `goal.arm` | — | `{ thickness = 1, height = 40 }` (where the arm's beam runs, above the lowest floor); height 51 since #268 |
 | `colors.marker` | (27, 42, 53) | removed (`colors.glass` colours the glass, the roof and the panels) |
 
 `Config.UI.arenaGlow` gains `beam = { width = 2, thickness = 0.5 }`. The beam shines in the carrier's team colour with `arenaGlow.material`, like the glowing goal and gate panel.
@@ -181,18 +187,20 @@ Every section runs the same way around the track's "O" (inner top, down, across 
 - sizes are above zero, and part sizes are within Roblox's part limits;
 - `top.kind` is `"Closed"` or `"Open"`; `glass.material` is a `Material`;
 - `glass.lipStrips` is a whole number of at least 1;
-- `goal.across` lies between 0 and 1; every transparency lies between 0 and 1.
+- `goal.across` lies between 0 and 1; every transparency lies between 0 and 1;
+- `straight.inclineDeg` is at least 0 and under 90 (a finite slope); `curvedEnd.bowlPower` is above 1, so the bowl leaves the bank's foot flat (#268).
 
 **Cross-field rules**, in order:
-1. `trackWidth` must fit the inner bank, the outer wall's foot curve, the step, the upper floor and a lower floor (unchanged).
-2. `endRadius` must leave room for the middle behind the inner glass: `endRadius − trackWidth/2 − surfaceThickness > 0`.
-3. The outer wall must rise above its foot curve and the step (unchanged).
-4. The glass must rise above both solid tops before its lip starts: `glass.top − glass.lipRadius > outerWallHeight` (and `> innerBankHeight`).
-5. The lips must leave the top open between them: `2 · glass.lipRadius < trackWidth`.
-6. `profileBlendLength` must fit within a straight and a curved end (unchanged).
-7. The gate panel must be thinner than half the goal's thinnest part: `gatePanel.depth < min(goal.rimThickness, goal.panelThickness, goal.arm.thickness) / 2`. The goal's parts are centred on gate 2's plane and the wall hangs behind it, so then no face of that wall lies in a face plane of the goal (2026-10-27).
+1. `trackWidth` must fit a straight's pieces in order: `bankWidth < roomEnd < riseEnd <` where its foot curve starts, `trackWidth − straight.footRadius · (1 − sin inclineDeg)` (#268; was: the inner bank, the outer wall's foot curve, the step, the upper floor and a lower floor).
+2. `trackWidth` must fit a curved end's inner bank, a bowl and its foot curve: `innerBankHeight + curvedEnd.footRadius < trackWidth` (#268).
+3. `endRadius` must leave room for the middle behind the inner glass: `endRadius − trackWidth/2 − surfaceThickness > 0`.
+4. The outer wall must rise above its foot curves (#268; was: above its foot curve and the step): above a straight's top, where the incline meets the foot curve plus `straight.footRadius · cos inclineDeg` (34.16), and above `curvedEnd.bowlHeight + curvedEnd.footRadius` (32), the most a curved end's can reach (its top, 30.00, needs the bowl's angle, which only `Arena/Geometry` solves).
+5. The glass must rise above both solid tops before its lip starts: `glass.top − glass.lipRadius > outerWallHeight` (and `> innerBankHeight`).
+6. The lips must leave the top open between them: `2 · glass.lipRadius < trackWidth`.
+7. `profileBlendLength` must fit within a straight and a curved end (unchanged).
+8. The gate panel must be thinner than half the goal's thinnest part: `gatePanel.depth < min(goal.rimThickness, goal.panelThickness, goal.arm.thickness) / 2`. The goal's parts are centred on gate 2's plane and the wall hangs behind it, so then no face of that wall lies in a face plane of the goal (2026-10-27).
 
-(2026-10-27: the gate panel's opening and its rule went with R18's amendment; rule 7 is new.)
+(2026-10-27: the gate panel's opening and its rule went with R18's amendment; the gate panel's thickness rule, rule 8 since #268 added rule 2, is new.)
 
 **Checked by `Arena/Geometry` against the arena as built:** the goal ring's fit and its arm (§5.3).
 
@@ -245,7 +253,7 @@ As today, a gate spans the track at the start of each section, facing the travel
 ### 5.2 Gate panels (replacing the corner markers)
 
 - **Shape (amended 2026-10-27):** in each gate's plane, a thin glass wall fills the track's whole cross-section (R18):
-  - its bottom follows the solid section at the gate (`Surface.section`): the inner bank from the inner glass's face, the floors, the step half blended there, the foot curve up to the outer glass's face;
+  - its bottom follows the solid section at the gate (`Surface.section`): a straight's and a curved end's blended halfway there, from the inner bank at the inner glass's face across the floors and the foot curve up to the outer glass's face;
   - its top follows the walls' top outline (`Profile.topOutline`): the inner lip, 120 between the lips' ends, the outer lip;
   - it is made of slices across the track that break at every point of either outline (§2.3, 10), each a quad in the gate's plane, `gatePanel.depth` thick behind it (a block when the quad is a rectangle, wedges otherwise, as the surface's quads).
 - **Parts:** each panel is a Model `GatePanel<g>` tagged `CornerMarker` with `GateIndex` g, its pivot at the wall's middle (u = `trackWidth`/2, halfway between the surface and the top there), facing the travel direction. Its parts have the glass look, with `CanCollide`, `CanQuery` and `CanTouch` false: nothing hits, sees or touches them, so skaters pass through.
@@ -255,7 +263,7 @@ As today, a gate spans the track at the start of each section, facing the travel
 
 ### 5.3 The hanging goal
 
-- **Placement:** the ring stands in gate 2's plane (`goalGateIndex`), its centre at u = `goal.across · trackWidth` (60) and `goal.heightAboveFloor` (18). Its front faces oncoming skaters, as today.
+- **Placement:** the ring stands in gate 2's plane (`goalGateIndex`), its centre at u = `goal.across · trackWidth` (60) and `goal.heightAboveFloor` (29 since #268, was 18). Its front faces oncoming skaters, as today.
 - **The rim and the panel** are built, tagged and glow as today. The panel slides up out of the ring when the goal opens.
 - **Fit check** (`Features.goal`, against the profile as built at the gate). Each failure names its rule:
   - the rim's outline must stay inside the two glass faces;
@@ -269,7 +277,7 @@ As today, a gate spans the track at the start of each section, facing the travel
 
 ### 5.4 The carrier's beam (`client/CarrierBeam`, new)
 
-- **What it is:** a tall thin glowing strip on the outer glass's inner face, from the solid wall's top (28) up to where the lip starts (108), beside the ball while someone carries it. It takes the possessing team's colour, which is the carrier's, and hides when no one carries the ball.
+- **What it is:** a tall thin glowing strip on the outer glass's inner face, from the solid wall's top (40 since #268, was 28) up to where the lip starts (108), beside the ball while someone carries it. It takes the possessing team's colour, which is the carrier's, and hides when no one carries the ball.
 - **Where it is:** at the carried ball's distance along the track (`Centerline.distanceOf`), on the outer glass. It is placed with `Centerline.pose`, which gives the point (a Vector3) and the heading (an angle), neither of which allocates.
 - **The part:** client-only (each client draws its own), built at `start`, Neon, with `CanCollide`, `CanQuery` and `CanTouch` false and no shadow: a skater riding the glass passes through it, and no ray sees it.
 - **Each frame,** stepped by FrameController after ArenaGlow:
@@ -280,9 +288,9 @@ As today, a gate spans the track at the start of each section, facing the travel
 
 ### 5.5 Spawns and the middle
 
-- **Team spawns:** on the lower floor's middle lane (u 22; u 26 since #217's 16-stud bank), as today.
-- **Ball spawns:** on the track's middle at each curved end's apex, as today.
-- **The middle:** a floor slab `surfaceThickness` thick, its top at the lower floor's height, out to the inner glass slab's back: a block between the straights and a fan of prisms under each curved end, as today. It is not a ride surface.
+- **Team spawns:** on the lower floor's middle lane (u 22; u 26 since #217's 16-stud bank; since #268 the middle of a straight's spawn room, u 27, `Profile.spawnLane`).
+- **Ball spawns:** on the track's middle at each curved end's apex, `ballSpawnHeight` above the surface as built there (since #268: 2.74 + 6 over the bowl).
+- **The middle:** a floor slab `surfaceThickness` thick, its top at the lowest floor's height, out to the inner glass slab's back: a block between the straights and a fan of prisms under each curved end, as today. It is not a ride surface.
 
 ---
 
@@ -295,7 +303,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 | Module | Change |
 |---|---|
 | `Geometry/Profile` | The solid section as today with the new sizes; new `innerGlass`, `outerGlass` and `top` sections (§3.1), `topHeight`, and `topOutline` (the walls' top across the track, as points; `heightAt` reads a height on it). |
-| `Geometry/Surface` | `build` sweeps the solid section; `rings` and `sweep` sweep the others. `section(arena, distance)` names the solid section at a distance (the step blended there), which the sweep, the goal's fit check and the gate walls share. |
+| `Geometry/Surface` | `build` sweeps the solid section; `rings` and `sweep` sweep the others. `section(arena, distance)` names the solid section at a distance (blended by `Centerline.straightness` there, #268), which the sweep, the goal's fit check, the gate walls and the ball's spawns share. |
 | `Geometry/Features` | `glass` and `top` (swept sections) replace `barriers`; `gatePanels` replaces `markers`; `gates` as tall as the top; the new `goal` with its arm and fit check; the middle behind the inner glass slab. |
 | `Geometry/Reach` | Removed (§2.3, 6). |
 | `Geometry/init` | `build(config)` returns `surface`, `glass`, `top`, `infield`, `gates`, `goal` (with `arm`), `gatePanels`, `teamSpawns`, `ballSpawns`. Gravity is no longer needed. |
@@ -326,7 +334,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 
 **Unit (pure):**
 - **Profile:** the solid section's points and strip counts with the new sizes; the glass sections (the lip's ends, its centre, `lipStrips`); the top section of each kind; `topHeight` of each kind; the walls' top outline.
-- **Surface:** `section` at a distance, the step blended there.
+- **Surface:** `section` at a distance, blended by how straight the track is there (#268).
 - **Features:**
   - glass: vertical up to the lip, the lip's end, one block per side along a straight for the vertical glass, slabs behind the faces;
   - top: closed at `glass.top` between the lips' ends; open with its strips and ceiling at `glass.top + ceilingAbove`;

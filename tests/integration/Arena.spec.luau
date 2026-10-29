@@ -40,15 +40,20 @@ describe("The generated arena", function()
 		expect(buildSeconds).toBeLessThan(1)
 	end)
 
+	-- The heights below are worked out independently of the code: on the top straight u = -z - 20; around the left
+	-- curved end u is the distance from (-100, 0) less 20, and between two stations the built surface is the plane
+	-- through the two strips' chords.
 	it("puts the riding surface where the profile says, including the blend at a corner", function()
 		local floors: { { any } } = {
-			{ Vector3.new(30, 60, -42), 0 }, -- top straight, lower floor
-			{ Vector3.new(30, 60, -78), 4 }, -- top straight, upper floor
-			{ Vector3.new(30, 60, -65), 2 }, -- top straight, middle of the step
-			{ Vector3.new(-100, 60, -65), 1 }, -- Gate 2: the step is half blended away
-			-- Left curved end, flat floor: a stud past the apex, whose station is a seam a ray exactly on misses.
-			{ Vector3.new(-160, 60, 1), 0 },
-			{ Vector3.new(0, 60, 0), 0 }, -- the infield, at the lower floor's height
+			{ Vector3.new(30, 60, -47), 0 }, -- top straight, the spawn room (u 27)
+			{ Vector3.new(30, 60, -74), 10.493 }, -- top straight, the incline (u 54): 8 + 10 tan 14°
+			-- Top straight, the rise's third strip (u 35.6 to 38.4, 2.481 to 4.681 high), halfway across.
+			{ Vector3.new(30, 60, -57), 3.581 },
+			-- Gate 2, halfway between the two sections: u 45 on the chord from (43.798, 5.811) to (55.293, 9.187).
+			{ Vector3.new(-100, 60, -65), 6.164 },
+			-- Left curved end, the bowl: a stud past the apex, whose station is a seam a ray exactly on misses.
+			{ Vector3.new(-160, 60, 1), 2.752 },
+			{ Vector3.new(0, 60, 0), 0 }, -- the infield, at the lowest floor's height
 			-- The infield under the left curved end, a stud off the station line at 135° (another seam).
 			{ Vector3.new(-110, 60, 11), 0 },
 		}
@@ -57,34 +62,34 @@ describe("The generated arena", function()
 			expect(hit).never.toBeNil()
 			expect(hit.Position.Y).toBeCloseTo(case[2], 2)
 		end
-		-- Inside a step strip, not on a seam: a ray exactly on a seam may report the neighboring slab's side face.
+		-- Inside a rise strip, not on a seam: a ray exactly on a seam may report the neighboring slab's side face.
 		expect(cast(Vector3.new(30, 60, -61.4), Vector3.new(0, -100, 0)).Normal.Z).toBeGreaterThan(0)
 	end)
 
 	-- Between stations and between profile points, where only correctly oriented wedges cover the surface.
-	it("covers the curved ends and the step's blend without holes", function()
+	it("covers the curved ends and the blend at a corner without holes", function()
 		local function floorAt(distance: number, lateral: number): number?
 			local hit: RaycastResult? =
 				cast(Centerline.at(config.Arena, distance, lateral, 60).Position, Vector3.new(0, -100, 0))
 			return if hit then hit.Position.Y else nil
 		end
-		-- The left curved end's flat floor, mid-way between two stations (48 of them, 3.927 studs apart, from 200),
-		-- across every floor strip: the lower floor, the step's five and the upper floor.
-		for _, lateral in { 22, 37.8, 41.4, 45, 48.6, 52.2, 58 } do
-			expect(floorAt(241.2, lateral)).toBeCloseTo(0, 2)
+		-- The left curved end's bowl, mid-way between two stations (48 of them, 3.927 studs apart, from 200), across
+		-- its strips: each on the plane through its two chords.
+		local bowl = { { 20, 0.158 }, { 28, 0.69 }, { 36, 1.911 }, { 44, 3.765 }, { 52, 6.373 }, { 60, 9.377 } }
+		for _, case in bowl do
+			expect(floorAt(241.2, case[1])).toBeCloseTo(case[2], 2)
 		end
-		-- The middle of the step's third strip (43.2 to 46.8) just before and just after Gate 2 (distance 200): between
-		-- the heights of the strip's corners on the neighboring stations (the step there is 3.18 and 2 high, then 2
-		-- and 0.84).
-		local before = floorAt(198, 45) :: number
-		expect(before > 0.69 and before < 2.08).toBe(true)
-		local after = floorAt(202, 45) :: number
-		expect(after > 0.28 and after < 1.31).toBe(true)
+		-- u 45 just before and just after Gate 2 (distance 200), where the section is blending: on the triangles
+		-- between the neighboring stations' strips (the incline's first, from 44 to 53.7 on a straight and 43.6 to 56.9
+		-- at a curved end, blended 0.794, 0.5 and 0.211 at 196, 200 and 203.9).
+		expect(floorAt(198, 45)).toBeCloseTo(6.79, 2)
+		expect(floorAt(202, 45)).toBeCloseTo(5.584, 2)
 	end)
 
 	it("stands the walls, the glass and the roof where the profile says", function()
 		local glass, top = arena:FindFirstChild("Glass"), arena:FindFirstChild("Top")
-		local outer = cast(Vector3.new(30, 25, -60), Vector3.new(0, 0, -100))
+		-- The upright wall, above the straights' foot curve (34.16) and under its top (40).
+		local outer = cast(Vector3.new(30, 37, -60), Vector3.new(0, 0, -100))
 		expect(outer.Position.Z).toBeCloseTo(-100, 2)
 		expect(outer.Instance.Parent == arena:FindFirstChild("Surface")).toBe(true)
 		local outerGlass = cast(Vector3.new(30, 60, -60), Vector3.new(0, 0, -100))

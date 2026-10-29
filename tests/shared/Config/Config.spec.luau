@@ -484,13 +484,24 @@ describe("Config defaults", function()
 		expect(a.straightLength).toBe(200)
 		expect(a.endRadius).toBe(60)
 		expect(a.trackWidth).toBe(80)
-		expect(a.outerWallHeight).toBe(28)
+		-- The owner's pick (#268, trial 6): the straights' foot curve tops out at 34.2, so the wall rises to 40.
+		expect(a.outerWallHeight).toBe(40)
 		-- The owner (#217): twice the first 8, like Roller Champions' wide ramp into the middle of Pixel City.
 		expect(a.innerBankHeight).toBe(16)
-		expect(a.wallCurveRadius).toBe(18)
-		expect(a.stepHeight).toBe(4)
-		expect(a.stepWidth).toBe(18)
-		expect(a.upperFloorWidth).toBe(8)
+		-- The owner's pick (#268, trial 6): a wider bank, a flat spawn room, a steep rise onto a gentle incline and a
+		-- wide foot curve on the straights; a bowl rising to the foot curve at the curved ends.
+		expect(a.straight).toEqual({
+			bankWidth = 24,
+			roomEnd = 30,
+			riseEnd = 44,
+			riseHeight = 8,
+			inclineDeg = 14,
+			footRadius = 22,
+		})
+		expect(a.curvedEnd).toEqual({ bowlHeight = 14, bowlPower = 2, footRadius = 18 })
+		for _, gone in { "wallCurveRadius", "stepHeight", "stepWidth", "upperFloorWidth" } do
+			expect((a :: any)[gone]).toBeNil()
+		end
 		expect(a.profileBlendLength).toBe(20)
 		expect(a.segmentLength).toBe(4)
 		expect(a.stripsPerSection).toBe(20)
@@ -506,13 +517,14 @@ describe("Config defaults", function()
 		expect(a.goalGateIndex).toBe(2)
 		expect(a.goal).toEqual({
 			ringRadius = 7,
-			heightAboveFloor = 18,
+			-- Trial 6's: the floor under the ring rose with #268's sections; the arm's post stays 14 long.
+			heightAboveFloor = 29,
 			panelThickness = 0.5,
 			panelTransparency = 0.3,
 			rimThickness = 1,
 			rimSegments = 16,
 			across = 0.75,
-			arm = { thickness = 1, height = 40 },
+			arm = { thickness = 1, height = 51 },
 		})
 		expect((a.goal :: any).wallGap).toBeNil()
 		expect(a.gatePanel).toEqual({ depth = 0.2 })
@@ -633,12 +645,25 @@ describe("Config.forMode", function()
 	it("rejects arena sizes that cannot be built", function()
 		local WALL_THICKNESS = "Arena: the gate panel must be thinner than half the goal's thinnest part, so its faces "
 			.. "never meet the goal's"
+		local STRAIGHTS = "Arena: trackWidth must fit the straights' pieces in order: the inner bank, the spawn room, "
+			.. "the rise, the incline and the outer wall's foot curve"
+		local CURVED_ENDS =
+			"Arena: trackWidth must fit the curved ends' inner bank, a bowl and the outer wall's foot curve"
+		local OUTER_WALL = "Arena: the outer wall must rise above its foot curves"
 		local cases: { { overrides: { [string]: any }, message: string } } = {
-			{
-				overrides = { trackWidth = 52 },
-				message = "Arena: trackWidth must fit the inner bank, the outer wall's foot curve, the step, the upper "
-					.. "floor and a lower floor",
-			},
+			-- On the straights the bank ends at 24, the room at 30 and the rise at 44; the foot curve (22, leaving the
+			-- 14° incline) starts at 80 − 22 (1 − sin 14°) = 63.32, or at 43.32 across a 60-stud track.
+			{ overrides = { straight = { roomEnd = 24 } }, message = STRAIGHTS },
+			{ overrides = { straight = { riseEnd = 30 } }, message = STRAIGHTS },
+			{ overrides = { straight = { riseEnd = 63.4 } }, message = STRAIGHTS },
+			{ overrides = { trackWidth = 60 }, message = STRAIGHTS },
+			-- At the curved ends the bowl runs from the bank's foot (16) to past trackWidth − footRadius.
+			{ overrides = { curvedEnd = { footRadius = 64 } }, message = CURVED_ENDS },
+			{ overrides = { innerBankHeight = 62 }, message = CURVED_ENDS },
+			-- The straights' foot curve tops out at 12.82 + 22 cos 14° = 34.16; the curved ends' at most bowlHeight +
+			-- footRadius (28 + 18 cos 43.77° = 41.00 with this bowl).
+			{ overrides = { outerWallHeight = 34 }, message = OUTER_WALL },
+			{ overrides = { curvedEnd = { bowlHeight = 28 } }, message = OUTER_WALL },
 			{
 				overrides = { endRadius = 30 },
 				message = "Arena: endRadius must leave room for the infield behind the inner glass",
@@ -649,17 +674,13 @@ describe("Config.forMode", function()
 				message = "Arena: endRadius must leave room for the infield behind the inner glass",
 			},
 			{
-				overrides = { wallCurveRadius = 25 },
-				message = "Arena: the outer wall must rise above its foot curve and the step",
-			},
-			{
-				-- The lip (12) would start at the outer wall's top (28).
+				-- The lip (12) would start at 28, under the outer wall's top (40).
 				overrides = { glass = { top = 40 } },
 				message = "Arena: the glass must rise above the inner bank's and the outer wall's tops before its lip",
 			},
 			{
-				-- Its lip would start over the outer wall (28), under a bank of 30.
-				overrides = { innerBankHeight = 30, glass = { top = 41 } },
+				-- Its lip would start over the outer wall (40), under a bank of 50.
+				overrides = { innerBankHeight = 50, glass = { top = 61 } },
 				message = "Arena: the glass must rise above the inner bank's and the outer wall's tops before its lip",
 			},
 			{
@@ -677,6 +698,21 @@ describe("Config.forMode", function()
 			{ overrides = { goal = { across = -0.1 } }, message = "Arena.goal.across: must be >= 0 (got -0.1)" },
 			{ overrides = { goal = { arm = { height = 0 } } }, message = "Arena.goal.arm.height: must be > 0 (got 0)" },
 			{ overrides = { stripsPerSection = 5 }, message = "Arena.stripsPerSection: must be >= 6 (got 5)" },
+			{
+				overrides = { straight = { bankWidth = 0 } },
+				message = "Arena.straight.bankWidth: must be > 0 (got 0)",
+			},
+			-- The incline's slope must stay finite.
+			{
+				overrides = { straight = { inclineDeg = -1 } },
+				message = "Arena.straight.inclineDeg: must be >= 0 (got -1)",
+			},
+			{ overrides = { straight = { inclineDeg = 90 } }, message = "Arena.straight.inclineDeg: must be < 90" },
+			-- The bowl must leave the bank's foot flat, where the bank meets it.
+			{
+				overrides = { curvedEnd = { bowlPower = 1 } },
+				message = "Arena.curvedEnd.bowlPower: must be > 1 (got 1)",
+			},
 			{ overrides = { goalGateIndex = 5 }, message = "Arena.goalGateIndex: must be <= 4 (got 5)" },
 			{ overrides = { glass = { lipStrips = 0 } }, message = "Arena.glass.lipStrips: must be >= 1 (got 0)" },
 			-- Counts of parts and gates are whole numbers.
@@ -713,6 +749,23 @@ describe("Config.forMode", function()
 			expect(function()
 				Fixtures.config({ Arena = case.overrides })
 			end).toThrow(case.message)
+		end
+	end)
+
+	-- Each just inside the limit the rejections above cross: the incline ending at 63.3, before the straights' foot
+	-- curve starts (63.32); the wall at 34.2, over that curve's top (34.16); a curved end's bowl at 21.9, its bound
+	-- (+ 18) under the wall's 40; a bank of 61.9, leaving its bowl room before 80 − 18.
+	it("accepts arena shapes just inside the limits of the straights, the curved ends and the outer wall", function()
+		local shapes: { { [string]: any } } = {
+			{ straight = { riseEnd = 63.3 } },
+			{ outerWallHeight = 34.2 },
+			{ curvedEnd = { bowlHeight = 21.9 } },
+			{ innerBankHeight = 61.9 },
+		}
+		for _, overrides in shapes do
+			expect(function()
+				Fixtures.config({ Arena = overrides })
+			end).never.toThrow()
 		end
 	end)
 

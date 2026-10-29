@@ -52,7 +52,7 @@ M1 does include the **registries** (ball skin, skate skin) holding one default e
 | Q8 | Character | **Own Roblox avatar + skates**, one fixed collider for everyone. |
 | Q9 | Arena art | **Graybox now**, art later. |
 | Q10 | Goal placement | **Upright raised ring at a corner gate (Gate 2) on the outer wall**, on the carrier's right shoulder; track runs **counter-clockwise**. *The placement is superseded by the Arena spec's R7 (2026-10-26): the ring hangs over the track at Gate 2 from an arm (§9.1). The gate and the direction stay.* |
-| Q11 | Ground shape | Straights: walls both sides, **lower floor by the infield, one smooth wavy step up to a higher floor by the outer wall** (pump down it for speed). Curved ends: **normal floor curving up into the walls (U/J)**. |
+| Q11 | Ground shape | Straights: walls both sides, **lower floor by the infield, one smooth wavy step up to a higher floor by the outer wall** (pump down it for speed). Curved ends: **normal floor curving up into the walls (U/J)**. *Superseded by the Feel part's #268 (2026-10-29): Roller Champions' structure, the owner's pick after playing six trials (§9.1, Arena spec §3.1).* |
 | A1 | Movement approach | **Custom skate controller** on physics constraints (not Humanoid, not ControllerManager). |
 | A2 | Enclosed arena (2026-10-22) | **The track is a closed tube**: a roof spans the track (half-circle, radius `trackWidth / 2`, top at 50 studs), and both walls rise to **28 studs** (`infieldWallHeight` 20 → 28). The skater's pump on a bank can no longer carry them out of the arena. *Superseded by A7 (2026-10-26).* |
 | A3 | Riding the roof (2026-10-22) | **Walls by speed, roof by loop physics.** Walls keep `minWallSpeed`. Past straight up, a skater stays on only while `speed² × curvature ≥ gravity's pull off the surface`. A flat ceiling never holds, at any speed. *The loop rule stays: it is the real-physics rule for the glass's lips (A7; Arena spec 2.3, 7). The walls' rule (`minWallSpeed`) is the Feel part's. **Replaced (#216):** walls hold at any speed and gravity pulls along them at a third of its strength (§7.2 Wall riding); the loop rule is unchanged. **Then (#256):** full gravity on walls. **Generalised (#257):** the loop rule is the contact rule on every surface, so a wall bending away and a crest at speed let go too (§7.2 Wall riding).* |
@@ -362,8 +362,8 @@ The arena follows the M1 overhaul's Arena spec (`docs/superpowers/specs/2026-10-
 - `trackDirection = "CounterClockwise"` (outer wall on the skater's right).
 - Gates numbered in track order: Gate 1 top-right, Gate 2 top-left, Gate 3 bottom-left, Gate 4 bottom-right.
 - **The goal (R7):** `goalGateIndex = 2`. The upright ring hangs over the track in Gate 2's plane:
-  - its centre is `goal.across` (0.75) of the way from the inner glass to the outer glass, `goal.heightAboveFloor` (18) up, and its front faces oncoming skaters;
-  - it hangs from a decorative arm: a post from the rim's top up to `goal.arm.height` (40), then a beam out to the outer glass;
+  - its centre is `goal.across` (0.75) of the way from the inner glass to the outer glass, `goal.heightAboveFloor` (29; 18 until #268) up, and its front faces oncoming skaters;
+  - it hangs from a decorative arm: a post from the rim's top up to `goal.arm.height` (51; 40 until #268), then a beam out to the outer glass;
   - when open, its panel slides away and the ring glows in the possessing team's color.
 - **Gate panels (R6, R18, amended after the playtest):** they replace the flat corner markers.
   - At every gate a thin glass wall (`gatePanel.depth` 0.2) fills the track's whole cross-section, from the surface up to the walls' top, and skaters pass through it.
@@ -371,17 +371,17 @@ The arena follows the M1 overhaul's Arena spec (`docs/superpowers/specs/2026-10-
 - **The carrier's beam (R6):** a glowing strip on the outer glass travels beside the carried ball, in the possessing team's color (`client/CarrierBeam`).
 - **Team spawns** on opposite straights, mirrored across the arena's long axis (Blue on the top straight, Orange on the bottom). **Ball spawns** on the long axis, equidistant from both team spawns (one in each curved end). Both teams score in the same goal, so fairness comes from the mirrored spawns and the random ball spawn, not from distance to the goal.
 - **Cross-sections** (Arena spec §3.1):
-  - **The enclosure (A7):** the floor, the inner bank (8 high) and the outer wall (28 high) are opaque. They rise into **rideable glass** up to `glass.top` (120), clear plastic at 85% see-through (R5's look: Roblox's Glass material hides every see-through part behind it), and each wall ends in a **lip** curling inward (a quarter circle of `glass.lipRadius`, 12). A **per-map top** closes the arena: a glass roof at 120 (`top.kind = "Closed"`, our map) or an invisible ceiling 20 higher (`"Open"`). The top stops skaters and the ball and is not ridden.
-  - **Straights:** a **lower floor** next to the inner bank, one **smooth step** up to an **upper floor** next to the outer wall's foot curve (skating down the step is a pump spot).
-  - **Curved ends:** the floor curves up into the walls, with no step.
-  - Between straight and end, the profile **blends smoothly** over `profileBlendLength`.
+  - **The enclosure (A7):** the floor, the inner bank (16 high) and the outer wall (40 high) are opaque. They rise into **rideable glass** up to `glass.top` (120), clear plastic at 85% see-through (R5's look: Roblox's Glass material hides every see-through part behind it), and each wall ends in a **lip** curling inward (a quarter circle of `glass.lipRadius`, 12). A **per-map top** closes the arena: a glass roof at 120 (`top.kind = "Closed"`, our map) or an invisible ceiling 20 higher (`"Open"`). The top stops skaters and the ball and is not ridden.
+  - **Straights** (#268): from the inner glass, a wide bank (a quarter ellipse 24 wide, 16 high), a flat **spawn room** (u 24–30), a steep **rise** (steepest ~39°) to 8 high at u 44, a 14° **incline** and a wide foot curve (r 22) up into the outer wall.
+  - **Curved ends** (#268): the bank (a quarter circle r 16), then a **bowl** rising 14 · s² from the bank's foot to the outer wall's foot curve (r 18), steeper toward the wall: no flat lane.
+  - Between straight and end, the profile **blends point by point** over `profileBlendLength` (both have the same six pieces).
   - **The middle** (40 wide) is closed off behind the inner glass: a floor slab that is not a ride surface.
 - **Dimensions (studs):**
   - the loop: `straightLength = 200`, `endRadius = 60` (centerline), `trackWidth = 80`, so the arena is 200 across;
-  - the solid profile: `outerWallHeight = 28`, `innerBankHeight = 8`, `wallCurveRadius = 18`, `stepHeight = 4`, `stepWidth = 18`, `upperFloorWidth = 8`, `profileBlendLength = 20`, `segmentLength = 4`, `stripsPerSection = 20`;
+  - the solid profile: `outerWallHeight = 40`, `innerBankHeight = 16`, `straight = { bankWidth = 24, roomEnd = 30, riseEnd = 44, riseHeight = 8, inclineDeg = 14, footRadius = 22 }`, `curvedEnd = { bowlHeight = 14, bowlPower = 2, footRadius = 18 }`, `profileBlendLength = 20`, `segmentLength = 4`, `stripsPerSection = 20`;
   - the enclosure: `glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.85, material = SmoothPlastic }`, `top = { kind = "Closed", ceilingAbove = 20 }`;
-  - the features: `gatePanel = { depth = 0.2 }`, `goal = { ringRadius = 7, heightAboveFloor = 18, across = 0.75, arm = { thickness = 1, height = 40 } }`.
-- **The lap:** the centerline loop is 2·200 + 2π·60 ≈ 777 studs. A skater holding the stick laps in 12.7–12.8 s (measured 2026-10-26), past the 10–12 s target until the Feel part tunes speeds (Arena spec 2.3, 13).
+  - the features: `gatePanel = { depth = 0.2 }`, `goal = { ringRadius = 7, heightAboveFloor = 29, across = 0.75, arm = { thickness = 1, height = 51 } }`.
+- **The lap:** the centerline loop is 2·200 + 2π·60 ≈ 777 studs. A skater holding the stick laps in 12.7–12.8 s (measured 2026-10-26), past the 10–12 s target until the Feel part tunes speeds (Arena spec 2.3, 13). On #268's map, along the spawn lane (u 27, 695 studs round) at the 55 km/h stride: 15.0 s (measured in Play, 2026-10-29).
 
 ### 9.2 Arena generation
 
