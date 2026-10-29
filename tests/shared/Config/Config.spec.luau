@@ -164,9 +164,9 @@ describe("Config defaults", function()
 			softCap = 90,
 			hardCap = 121,
 			overSpeedBleed = 5,
-			-- Halved (#266, Q34): ~1.5 rad/s at the 55 km/h stride, near Roller Champions' by eye.
-			turnRateLow = 2.0,
-			turnRateHigh = 0.75,
+			-- Back to the earlier rates (#272, Q37): RC's skaters circle with W, A, S, D pressed in turn (Video 19).
+			turnRateLow = 4.0,
+			turnRateHigh = 1.5,
 			-- A half-turn of the facing, never a snap (#246: RC turned round over ~0.3 s), and how near the way back
 			-- the stick and the facing keep a skater riding backwards.
 			turnRoundSeconds = 0.3,

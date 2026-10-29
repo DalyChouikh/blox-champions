@@ -33,13 +33,14 @@ export type MovementConfig = {
 	-- On the ground, speed past softCap bleeds off at this rate per second: each step loses 1 − e^(−rate × dt) of
 	-- the excess, so the further over, the faster (RC: whipped to 144 km/h, back near 110 within a second).
 	overSpeedBleed: number,
-	-- Turn rate at rest and at hardCap: turns widen with speed. Halved (the owner, #266): ~1.5 rad/s at the
-	-- 55 km/h stride, near Roller Champions' (~1.3 by eye); a stick held back brakes instead of turning.
+	-- Turn rate at rest and at hardCap: turns widen with speed; a stick held back brakes instead of turning (#266).
+	-- Halved once (Q34), back to these (the owner, #272, Q37): Roller Champions' skaters circle with W, A, S, D in
+	-- turn at 14-45 km/h (Video 19), where the halved rates stopped ours; ~3 rad/s at the 55 km/h stride.
 	turnRateLow: number,
 	turnRateHigh: number,
 	-- The skater's facing turns toward the way they move at most a half-turn in this many seconds, so it never snaps
 	-- (the owner, #246: RC turned round over ~0.3 s, Video 7): π / 0.3 = 10.5 rad/s, so the facing keeps up with
-	-- steering (at most turnRateLow, 2 rad/s).
+	-- steering (at most turnRateLow, 4 rad/s).
 	turnRoundSeconds: number,
 	-- A skater carried back against their facing (down a bank or a wall they climbed) rides backwards while the stick
 	-- points within this many degrees of the way they roll, and their facing within it of the way back (the owner,
@@ -126,8 +127,8 @@ local defaults: MovementConfig = {
 	softCap = 90,
 	hardCap = 121,
 	overSpeedBleed = 5,
-	turnRateLow = 2.0,
-	turnRateHigh = 0.75,
+	turnRateLow = 4.0,
+	turnRateHigh = 1.5,
 	turnRoundSeconds = 0.3,
 	backwardsConeDeg = 30,
 	airTurnRate = 1,
