@@ -157,8 +157,7 @@ end
 -- Keeps the character's Action attribute on the running action until its recovery, as the player's own pose shows it,
 -- writing it only when it changes.
 local function show(self: ActionService, player: PlayerId, record: Record)
-	local runner = record.runner
-	local action: Config.ActionName? = if runner.phase == "Recovery" then nil else runner.action
+	local action: Config.ActionName? = record.runner:striking()
 	if action ~= record.shown then
 		record.shown = action
 		setAttribute(self, player, Attributes.Action, action)
@@ -288,10 +287,9 @@ local function lookDown(self: ActionService, holder: Holder)
 		return
 	end
 	local landing: Config.ActionName? = record.landing
-	local runner = record.runner
 	if touchdown == "Hard" or (touchdown == "Soft" and posing(root)) then
 		knockDown(self, nil, player, "Fall", movement.hardLanding.knockdownSeconds)
-	elseif landing ~= nil and (runner.action ~= landing or runner.phase == "Recovery") then
+	elseif landing ~= nil and record.runner:striking() ~= landing then
 		local settings = self._config.Actions[landing].landing :: Config.Landing
 		knockDown(self, nil, player, "Dive", settings.knockdownSeconds, settings.stopSpeed)
 	end

@@ -194,6 +194,20 @@ describe("ActionController", function()
 		expect(ActionController:pose()).toBe("Lunge")
 	end)
 
+	it("poses a strike until its recovery", function()
+		setup()
+		frame()
+		press("Tackle")
+		actionsOnly()
+		expect(ActionController:pose()).toBe("Lunge")
+		local phases = config.Actions.Tackle.phases
+		for _ = 1, math.ceil((phases.windup + phases.active) / DT) + 1 do
+			actionsOnly()
+		end
+		expect(ActionController.runner.phase).toBe("Recovery")
+		expect(ActionController:pose()).toBe("None")
+	end)
+
 	it("dodges with the ball, sideways along the stick", function()
 		setup()
 		BallCarrier:set(LOCAL_ID)
@@ -378,6 +392,44 @@ describe("ActionController", function()
 		press("Tackle")
 		frame()
 		expect(requests).toEqual({ { action = "Tackle" }, { action = "Dive" }, { action = "Tackle" } })
+	end)
+
+	-- #286: the server's knockdown at a touchdown already slower than stopSpeed lasts one of its frames, and can come
+	-- and go between two of this client's steps (a dive that stops at once, into a slope or a wall).
+	it("ends a dive hold its knockdown never showed: strike over, on the ground, slower than stopSpeed", function()
+		setup()
+		frame()
+		skater().velocity = Vector3.new(0, 0, -30)
+		dive(actionsOnly)
+		expect(SkateController.diving).toBe(true)
+		local stopSpeed = (config.Actions.Dive.landing :: Config.Landing).stopSpeed
+		local function sliding(speed: number)
+			skater().velocity = Vector3.new(0, 0, -speed)
+			actionsOnly()
+		end
+		-- Slower than stopSpeed on the ground, but the dive still strikes.
+		sliding(stopSpeed - 0.5)
+		expect(SkateController.diving).toBe(true)
+		-- Faster through the rest of its strike.
+		skater().velocity = Vector3.new(0, 0, -(stopSpeed + 0.5))
+		local phases = config.Actions.Dive.phases
+		for _ = 1, math.ceil((phases.windup + phases.active) / DT) do
+			actionsOnly()
+		end
+		expect(ActionController.runner:striking()).toBeNil()
+		-- Its strike over: still faster, then exactly at stopSpeed (the server's rule is strictly slower).
+		sliding(stopSpeed + 0.5)
+		expect(SkateController.diving).toBe(true)
+		sliding(stopSpeed)
+		expect(SkateController.diving).toBe(true)
+		-- Slower, but still in the air.
+		skater().mode = "Airborne"
+		sliding(stopSpeed - 0.5)
+		expect(SkateController.diving).toBe(true)
+		-- On the ground: the hold ends.
+		skater().mode = "Grounded"
+		sliding(stopSpeed - 0.5)
+		expect(SkateController.diving).toBe(false)
 	end)
 
 	it("frees a diver the server refused", function()

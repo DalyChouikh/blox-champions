@@ -9,8 +9,8 @@
 -- nearest opponent it may reach in its snap zone, else its cone, around the stick's way (else toward that way), and
 -- bends toward them while they stay in the cone, until its recovery; the server still judges every hit. Nothing
 -- starts while the skater is frozen for a kickoff, knocked down or diving: an action with a landing (the Dive) holds
--- the skater (SkateController.diving) until the server knocks them down at their touchdown, and a knockdown stops the
--- running action, as the server stops it.
+-- the skater (SkateController.diving) until the server knocks them down at their touchdown, or until the server's
+-- rule for that knockdown's end holds here (#286), and a knockdown stops the running action, as the server stops it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -68,6 +68,8 @@ export type ActionController = {
 	_lungeBefore: number,
 	_lungePeak: number?,
 	_lungeEase: number,
+	-- The action holding the skater in a dive (one with a landing), from its start.
+	_landing: Config.ActionName?,
 	-- The running strike's target (#277): their root and team; nil when it homes onto nobody.
 	_target: BasePart?,
 	_targetTeam: string?,
@@ -259,19 +261,36 @@ local function home(self: ActionController, skater: SkateMath.Skater, root: Base
 	if target == nil then
 		return
 	end
-	local runner = self.runner
-	local running: Config.ActionName? = runner.action
-	if running == nil or runner.phase == "Recovery" or not homeable(self, target, self._targetTeam) then
+	local striking: Config.ActionName? = self.runner:striking()
+	if striking == nil or not homeable(self, target, self._targetTeam) then
 		self._target = nil
 		return
 	end
 	-- Only a strike with a seek takes a target (aimStrike).
-	local seek = self._config.Actions[running].seek :: Config.Seek
+	local seek = self._config.Actions[striking].seek :: Config.Seek
 	local offset = target.Position - root.Position
 	if Reach.inCone(offset, skater.forward, skater.up, seek.bend) then
 		local maxAngle = math.rad(seek.turnDegPerSecond) * dt
 		skater:faceToward(offset, maxAngle)
 		nudge(self, skater:homeChange(offset, maxAngle), false)
+	end
+end
+
+-- A dive's hold also ends by the server's own rule (#286): once its strike is over and the skater is on the ground,
+-- sliding slower than its landing's stopSpeed. The server's knockdown at that touchdown ends it too, but a dive that
+-- stops at once (into a slope or a wall) is down for one server frame, which can come and go between two steps here.
+local function settle(self: ActionController, skater: SkateMath.Skater)
+	local skate = self._skate
+	if not skate.diving then
+		return
+	end
+	-- Set with the hold (begin).
+	local landing = self._landing :: Config.ActionName
+	if self.runner:striking() == landing or skater.mode ~= "Grounded" then
+		return
+	end
+	if skater:shownSpeed() < (self._config.Actions[landing].landing :: Config.Landing).stopSpeed then
+		skate.diving = false
 	end
 end
 
@@ -321,6 +340,7 @@ local function begin(
 	local action = self._config.Actions[name]
 	if action.landing ~= nil then
 		skate.diving = true
+		self._landing = name
 	end
 	local motion = action.motion
 	self._lunge = if motion ~= nil and motion.lungeCap ~= nil then name else nil
@@ -359,6 +379,7 @@ local ActionController: ActionController = {
 	_lungeBefore = 0,
 	_lungePeak = nil,
 	_lungeEase = 0,
+	_landing = nil,
 	_target = nil,
 	_targetTeam = nil,
 	_candidates = nil :: any,
@@ -393,12 +414,11 @@ local ActionController: ActionController = {
 	end,
 
 	pose = function(self: ActionController): Config.PoseName
-		local runner = self.runner
-		local running: Config.ActionName? = runner.action
-		if running == nil or runner.phase == "Recovery" then
+		local striking: Config.ActionName? = self.runner:striking()
+		if striking == nil then
 			return "None"
 		end
-		return self._config.Actions[running].pose
+		return self._config.Actions[striking].pose
 	end,
 
 	keyAction = function(self: ActionController, key: Config.ActionKey): Config.ActionName?
@@ -425,6 +445,7 @@ local ActionController: ActionController = {
 		if skate.knockedDown and running ~= nil then
 			self.runner:cancel(running, false)
 		end
+		settle(self, skater)
 		home(self, skater, root, dt)
 		easeLunge(self, skater, dt)
 		self._input:readActions(keys)

@@ -202,6 +202,12 @@ function ActionRunner.step(self: Runner, dt: number)
 	end
 end
 
+-- The running action while it strikes (its windup or active phase); nil in its recovery or when none runs: what a
+-- character shows (Attributes.Action) and how it poses, while a strike homes, and when a dive's touchdown counts.
+function ActionRunner.striking(self: Runner): Actions.ActionName?
+	return if self.phase == "Recovery" then nil else self.action
+end
+
 function ActionRunner.cooldownLeft(self: Runner, name: Actions.ActionName): number
 	return self._cooldowns[name]
 end

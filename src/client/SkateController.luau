@@ -70,8 +70,9 @@ export type SkateController = {
 	promptsGetUp: boolean,
 	frozen: boolean,
 	-- Set by ActionController when a dive (an action with a landing) starts: the skater does nothing more until the
-	-- server's knockdown at their touchdown, which ends it, as do a freeze and a new character. Meanwhile they glide,
-	-- slowed by friction and drag only (#242), and in the air fly down the fall line (SkateMath, #241).
+	-- server's knockdown at their touchdown, which ends it, as do a freeze, a new character and ActionController once
+	-- the server's rule for that knockdown's end holds (#286). Meanwhile they glide, slowed by friction and drag only
+	-- (#242), and in the air fly down the fall line (SkateMath, #241).
 	diving: boolean,
 	-- Set each step: attached, or right behind a teammate with no cooldown, so holding Attach would attach.
 	attachable: boolean,
