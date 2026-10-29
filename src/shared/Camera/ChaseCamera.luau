@@ -186,6 +186,34 @@ function ChaseCamera.lookVector(self: ChaseCamera): Vector3
 	return self.forward * math.cos(self.pitch) + self.up * math.sin(self.pitch)
 end
 
+-- How far behind its focus the camera sits at `pitch` radians, and how far above the root that focus sits (below it
+-- when negative): the framing's points joined by straight lines, held past the first and the last.
+function ChaseCamera.framing(camera: Config.CameraConfig, pitch: number): (number, number)
+	local points = camera.framing
+	local degrees = math.deg(pitch)
+	local below = points[1]
+	if degrees <= below.pitchDeg then
+		return below.distance, below.height
+	end
+	for index = 2, #points do
+		local above = points[index]
+		if degrees <= above.pitchDeg then
+			local share = (degrees - below.pitchDeg) / (above.pitchDeg - below.pitchDeg)
+			return below.distance + (above.distance - below.distance) * share,
+				below.height + (above.height - below.height) * share
+		end
+		below = above
+	end
+	return below.distance, below.height
+end
+
+-- How see-through the skater is with the camera `distance` behind its focus: 0 (whole) at fade.seen or farther, 1
+-- (gone) at fade.gone or nearer, straight between.
+function ChaseCamera.fade(camera: Config.CameraConfig, distance: number): number
+	local fade = camera.fade
+	return math.clamp((fade.seen - distance) / (fade.seen - fade.gone), 0, 1)
+end
+
 -- The field of view for a speed: fovBase at rest, widening to fovMax at hardCap.
 function ChaseCamera.targetFov(camera: Config.CameraConfig, speed: number, hardCap: number): number
 	return camera.fovBase + (camera.fovMax - camera.fovBase) * math.clamp(speed / hardCap, 0, 1)

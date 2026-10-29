@@ -748,6 +748,60 @@ about two thirds of a lap, swinging from wall to wall.
     middle too). Checked before: from a standstill in the spawn room, the stick toward the outer wall crawled over the
     rise and up the incline (u 27 -> 54 in 8 s). Q40's quarter (#274) is dropped; tickets follow (gravity + heights
     new; #273's crawl to 45 deg).
+  - **Video 18 measured for #276** (2026-10-29, session 41; 10 frames a second at 1.8-5.2 s, 5 a second at 6-16 s, 12
+    key frames with a 10% grid, `claude-handoffs\s41\v18`): the skater's height on screen, head to skates, as a share of
+    the frame's: 0.58 at 1.8 s (view slightly down), 0.60 at 2.2 s; at 2.4-2.5 s the camera is near the skater's level
+    and the skates leave the frame; the skater fades from 2.6 s (a ghost to 3.0 s) and is gone by 3.1 s, the view then
+    looking up at the roof; fading back in 6.6-7.4 s; 0.49 at 9.4 s; looking down 0.30 at 10.0 s, 0.20 at 11.0 s, 0.12 at
+    12.0 s (from above), almost straight down by 13.4 s. The skater's head stays near the screen's middle (0.3-0.55).
+    RC's field of view is not measurable, so distances are relative: at our 70 deg they read ~1.2 body heights at
+    1.8 s, ~1.5 at 9.4 s, ~2.4 at 10.0 s, ~3.6 at 11.0 s (steep views foreshorten the body); ours is 2.05 body heights
+    (12 studs) at every pitch. Pitches judged by eye only (~-10 to +35 deg up, to ~-80 down).
+  - **Q47, the camera's trial** (2026-10-29, session 41, AskUserQuestion with an ASCII side view, recommended): **build
+    trial A as drawn**: RC as measured, the body's foreshortening taken out and our 70 deg field of view assumed: ~8
+    studs out looking slightly down (today 12), ~6 level, farther looking down (13 at 20 deg down, 17 at 35, 20 at 55),
+    and looking up closing in to the skater's feet (3 out at 15 deg up, fading; at the feet by 30, the skater gone).
+    Coupled, said first: the view still widens with speed (70 -> 90 deg) and the camera still stops in front of walls
+    and the floor. Not chosen: trial B (the same shape scaled to keep 12 at the slightly-down view); only the fade and
+    the close-in looking up.
+  - **Trial A played; Q48 and Q49** (2026-10-29, session 42). Trial A in Studio (Studio's CameraController copy only:
+    pitch -> distance, focus height above the root: -55 20 3, -35 17 3, -20 13 3, -10 8 3, 0 6 3, +15 3 0.5, +30 1
+    -1.5, linear between; the skater fading from 4 studs out to gone at 1.5). The owner: "just bring the camera back a
+    little, too close to the player, for example if he hold the balls and try to aim to shoot, the camera is almost
+    attached to the player, it is not like that in RC, and what about camera sensitivity? did we do it and not yet?
+    because I still feel the camera sensitivity is too fast". Told: #275 already halved it (1,440 px a full turn, their
+    Roblox setting 1). **Q48** (AskUserQuestion with ASCII side views, recommended): **trial A2, 1.5x back**: slightly
+    down 12 (today's), level 10, 15 deg up 8, 30 up 4 and starting to fade, at the feet and gone by 45 up; looking
+    down 14 at 20 deg, 17 at 35, 20 at 55. Aiming at the ring (~29 up) from 60 studs away is ~24 deg up, from 30 ~41.
+    Not chosen: 1.25x back; today's 12 with the close-in only past 30 up. **Q49** (not the recommended third): **the
+    mouse at a quarter of Roblox's scale**: 0.125 deg per pixel, 2,880 px a full turn (twice slower than #275's half),
+    up/down by the same share. Not chosen: a third (2,160 px); keep the half.
+  - **Trial A2 played; Q50-Q52** (2026-10-29, session 42). Trial A2 (pitch -> distance, focus height: -55 20 3, -35
+    17 3, -20 14 3, -10 12 3, 0 10 3, +15 8 3, +30 4 0.5, +45 1 -1.5) with the mouse at a quarter (2,880 px a turn).
+    The owner: "increase the FOV again, still feels close, even the crosshair dot is like on top of the player's head,
+    and also still decrease the camera sensitivity by a little bit more". Asked (AskUserQuestion, recommended first):
+    **Q50** the field of view: "didn't mean FOV then, just mmeant to bring the camera back again from the player a
+    little more" (the view stays 70 -> 90 deg). **Q51** the crosshair dot (it marks the screen's centre, where the
+    camera's focus is; A2's focus was the head's top): "well first, it shouldn't be visible when the player don't have
+    a ball, but if it is going to help us for now, use your recommendation" (the focus 1.5 studs above the head, 5
+    above the hips; the dot hidden unless carrying becomes its own ticket). **Q52** the mouse: 3,600 px a full turn
+    (0.1 deg per pixel, up/down by the same share). Trial A3 built from these: about 1.2x A2's distances (level 12,
+    the old camera's), focus 5 above the hips.
+  - **Trial A3 kept** (2026-10-29, session 42, Q53; the owner played it: "Keep A3"). Studio copies only: pitch ->
+    distance, focus height above the hips (the root, 2.5 above the floor): -55 22 5, -35 19 5, -20 16 5, -10 14 5, 0
+    12 5, +15 10 5, +30 5 1.5, +45 1 -1.5, linear between, held past the ends (pitch limits -70 / +60); a negative
+    height reaches down toward the feet and the floor stops it as walls stop the camera; the local skater fades as the
+    camera comes within 4 studs of the focus, gone at 1.5 (this client only). Measured in Play: level 12 back, 5 up;
+    +15 deg 9.7 back; +24 6.6; +30 4.4; fading from ~33 deg up, gone by ~44 at the feet; -10 13.8 back 7.4 up, -20 15.0
+    / 10.3, -35 15.6 / 15.7, -55 12.7 / 22.9. Mouse 0.1 deg per pixel across, 0.077 up/down (3,600 px a full turn).
+    The field of view stays 70 -> 90 deg. Tickets: #276 builds the camera; #275's PR takes the mouse; the dot shown
+    only while carrying the ball is a new ticket (Q51).
+  - **#276 approved; Q54 and Q55** (2026-10-29, session 42). The built camera (real code, not the trial) on a
+    private page beside Video 18 (https://claude.ai/artifact/SPSUaNggfDYCmEG4fzFhcT: RC 1.8 / 2.5 / 2.6 / 2.8 / 3.5 /
+    10.0 / 12.0 s beside ours at 10 down, level, 15 up, 38 up (42% see-through), 50 up (gone), 20 down, 55 down).
+    **Q54**: "Approved, ship it". **Q55** (the ticket for the crosshair dot shown only while carrying the ball,
+    from Q51): "leave it for now, we will take care of it after HUD and UI redesign and fixing": not filed; it
+    belongs to the Presentation part's HUD work.
 
 ## Roller Champions
 
