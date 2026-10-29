@@ -129,8 +129,10 @@ local INSTANT: Phases = { windup = 0, active = 0, recovery = 0 }
 local defaults: ActionsConfig = {
 	airMultiplier = 0.8,
 	callPassWindow = 3,
-	-- The owner (#220): any movement key gets a skater up, not before 0.5 s; RC's knockdown lasted under 1.8 s.
-	getUpAfter = 0.5,
+	-- Any movement key asks to get a knocked-down skater up (#220), never before this: the owner (#287, Q62) keeps
+	-- them down the whole 1.5 s slide, as RC's tackled skater slid 1.5 s and pushed off as it stopped (Video 4) and
+	-- its posed falls the same (Video 7); was 0.5.
+	getUpAfter = 1.5,
 	-- On the ground and in the air. Roller Champions' tackle key (the owner, #240; Video 4): "Dive" replaces "Tackle"
 	-- 0.1-0.2 s after the press for 0.7-0.8 s, and "Tackle" is back 0.9-1.0 s after it. Its lunge adds 48 km/h but
 	-- never past 72 km/h, and eases back over the recovery (the owner, #241: RC's peaked at 65-75 km/h whatever the

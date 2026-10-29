@@ -3,8 +3,9 @@
 -- client.
 
 -- What KnockedDown holds: why the character is down. A strike's ("Hit") and a fall's ("Fall": a hard landing, or
--- touching down still posing, #245) knockdowns end early once the skater moves (Get Up, #220); a diver's own
--- touchdown ("Dive") ends when the slide stops (#242).
+-- touching down still posing, #245) knockdowns end once the skater has asked to get up (Get Up, #220) and
+-- Actions.getUpAfter has passed, else after their seconds; a diver's own touchdown ("Dive") ends when the slide
+-- stops (#242).
 export type Knockdown = "Hit" | "Fall" | "Dive"
 
 return table.freeze({
