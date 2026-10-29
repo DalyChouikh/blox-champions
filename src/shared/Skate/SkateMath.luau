@@ -287,17 +287,13 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	velocity = heading * speed + acceleration * dt
 	speed = velocity.Magnitude
 	local direction = if speed > EPSILON then velocity / speed else heading
-	-- A knocked-down skater slides for their knockdown's time (#252); anyone else loses friction and drag, with more
-	-- slowing on top for one pressing nothing (#215), while a diver glides (#242).
+	-- A knocked-down skater slides for their knockdown's time (#252); anyone else, a gliding diver too (#242), loses
+	-- friction and drag, the same whether keys are pressed or not (the owner, #288: real physics, Q67-Q70).
 	local knockdown: Attributes.Knockdown? = input.knockdown
 	if knockdown ~= nil then
 		speed = slide(self, knockdown, speed, dt)
 	else
-		local extra = if input.diving
-			then 0
-			elseif stick == 0 and not input.pump and not brake then movement.coastDecel
-			else 0
-		speed = math.max(0, speed - (movement.rollingFriction + extra + movement.airDrag * speed) * dt)
+		speed = math.max(0, speed - (movement.rollingFriction + movement.airDrag * speed) * dt)
 	end
 	-- Holding the stick up a slope gentler than crawlLimitDeg, and steeper than flat, a skater never slows below
 	-- crawlSpeed along their heading, walls under the limit included, so they creep up to the outer wall (the owner,
