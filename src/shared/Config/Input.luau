@@ -99,9 +99,12 @@ local defaults: InputConfig = {
 	uppercut = { Enum.KeyCode.Q, Enum.KeyCode.ButtonB },
 	pass = { Enum.KeyCode.R, Enum.KeyCode.ButtonY },
 	throw = { Enum.KeyCode.MouseLeftButton, Enum.KeyCode.ButtonL2 },
-	-- Roblox's own camera scales.
+	-- Degrees per pixel (the mouse, touch) and per second at full tilt (the stick). The mouse at half Roblox's own
+	-- scale (the owner, #275, Q35: in RC "I need to do more drag movement to do a 360", Video 18): 1,440 px a full
+	-- turn at Roblox's default sensitivity, which players still scale in Roblox's settings. The stick and touch are
+	-- Roblox's own.
 	look = {
-		mouse = { key = Enum.KeyCode.MouseDelta, degPerUnit = Vector2.new(0.5, 0.385), responseCurve = 1 },
+		mouse = { key = Enum.KeyCode.MouseDelta, degPerUnit = Vector2.new(0.25, 0.1925), responseCurve = 1 },
 		stick = { key = Enum.KeyCode.Thumbstick2, degPerUnit = Vector2.new(240, -185), responseCurve = 2 },
 		touch = { key = Enum.KeyCode.TouchDelta, degPerUnit = Vector2.new(1, 0.66), responseCurve = 1 },
 	},

@@ -291,9 +291,10 @@ describe("Config defaults", function()
 		expect(input.uppercut).toEqual({ Enum.KeyCode.Q, Enum.KeyCode.ButtonB })
 		expect(input.pass).toEqual({ Enum.KeyCode.R, Enum.KeyCode.ButtonY })
 		expect(input.throw).toEqual({ Enum.KeyCode.MouseLeftButton, Enum.KeyCode.ButtonL2 })
-		-- Roblox's own camera scales (degrees per pixel, per second at full tilt, per pixel).
+		-- Degrees per pixel, per second at full tilt, per pixel: the mouse at half Roblox's own (#275, Q35), the stick
+		-- and touch at Roblox's own.
 		expect(input.look).toEqual({
-			mouse = { key = Enum.KeyCode.MouseDelta, degPerUnit = Vector2.new(0.5, 0.385), responseCurve = 1 },
+			mouse = { key = Enum.KeyCode.MouseDelta, degPerUnit = Vector2.new(0.25, 0.1925), responseCurve = 1 },
 			stick = { key = Enum.KeyCode.Thumbstick2, degPerUnit = Vector2.new(240, -185), responseCurve = 2 },
 			touch = { key = Enum.KeyCode.TouchDelta, degPerUnit = Vector2.new(1, 0.66), responseCurve = 1 },
 		})
