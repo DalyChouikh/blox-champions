@@ -65,6 +65,28 @@ describe("Config defaults", function()
 		})
 	end)
 
+	-- Roller Champions' gravity, timed by frames and read in body heights, no speedometer (the owner, #279, Q44-Q46).
+	it("pull with two thirds of Roblox's default gravity", function()
+		expect(Config.defaults().World).toEqual({ gravity = 130.8 })
+	end)
+
+	it("leap the jump, the Air Pose and the Uppercut as high as at Roblox's gravity, hanging longer", function()
+		local d = Config.defaults()
+		local gravity = d.World.gravity
+		local leapImpulse = assert(d.Actions.Uppercut.motion).leapImpulse :: number
+		-- Each impulse, the height it rose at 196.2 and how long it now hangs (at 196.2: 0.612, 0.428 and 1.121 s).
+		local cases = {
+			{ d.Movement.jumpImpulse, 9.174, 0.749 },
+			{ d.Movement.airPoseImpulse, 4.495, 0.524 },
+			{ leapImpulse, 30.836, 1.373 },
+		}
+		for _, case in cases do
+			local impulse, height, hang = case[1], case[2], case[3]
+			expect(impulse ^ 2 / (2 * gravity)).toBeCloseTo(height, 2)
+			expect(2 * impulse / gravity).toBeCloseTo(hang, 3)
+		end
+	end)
+
 	it("match the spec's actions, plus this phase's", function()
 		local requires = function(ball: string, grounded: string?): any
 			return { ball = ball, grounded = grounded or "any", notKnockedDown = true }
@@ -114,7 +136,8 @@ describe("Config defaults", function()
 				effect = "Knockdown",
 				pose = "None",
 				hit = { range = 6, coneDeg = 60, aimUpDeg = 30, knockdownSeconds = 1.5 },
-				motion = { leapImpulse = 110 },
+				-- √(2/3) of 110: as high at two thirds of the gravity (#279).
+				motion = { leapImpulse = 89.81 },
 			},
 			ChargeThrow = {
 				phases = { windup = 0, active = 0, recovery = 0 },
@@ -183,9 +206,10 @@ describe("Config defaults", function()
 			pumpFlatSlopeDeg = 3,
 			brakeDecel = 120,
 			tiptoeSpeed = 12,
-			jumpImpulse = 60,
+			-- √(2/3) of 60 and 42: as high at two thirds of the gravity (#279).
+			jumpImpulse = 48.99,
 			jumpSpeedCost = 0.1,
-			airPoseImpulse = 42,
+			airPoseImpulse = 34.29,
 			-- A touchdown on the belly from the air keeps this much of the speed (#245: RC kept 59-73%).
 			bellyLandingKeep = 0.65,
 			-- A sharper turn of the ground's normal is a corner (or a seam's side face); the body eases where the
@@ -556,6 +580,13 @@ describe("Config defaults", function()
 		expect(#Config.schema(d, "")).toBe(0)
 		expect(table.isfrozen(d)).toBe(true)
 		expect(table.isfrozen(d.Match.lastChance)).toBe(true)
+	end)
+end)
+
+describe("Config.gravity", function()
+	it("points the world's pull straight down", function()
+		Fixtures.expectNear(Config.gravity(Config.defaults()), Vector3.new(0, -130.8, 0))
+		Fixtures.expectNear(Config.gravity(Fixtures.config({ World = { gravity = 50 } })), Vector3.new(0, -50, 0))
 	end)
 end)
 
@@ -1029,6 +1060,15 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Network = { posedLandingTolerance = -0.1 } })
 		end).toThrow("Network.posedLandingTolerance: must be >= 0 (got -0.1)")
+	end)
+
+	it("rejects a world with no gravity or gravity pulling up, and takes any pull down", function()
+		for _, gravity in { 0, -130.8 } do
+			expect(function()
+				Fixtures.config({ World = { gravity = gravity } })
+			end).toThrow(`World.gravity: must be > 0 (got {gravity})`)
+		end
+		expect(Fixtures.config({ World = { gravity = 0.001 } }).World.gravity).toBe(0.001)
 	end)
 
 	it("rejects a knockdown pose that snaps, bends past half a turn or sinks upward", function()

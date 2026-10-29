@@ -292,11 +292,11 @@ describe("SkateMath off the ground and on walls", function()
 		local flat = skater(Vector3.new(0, 0, -30))
 		flat:step(input({ jump = true }), ground(), 1 / 60)
 		expect(flat.mode).toBe("Airborne")
-		-- (0, 60, −27), then a 1/60 s step of gravity and drag
-		Fixtures.expectNear(flat.velocity, Vector3.new(0, 56.7111, -26.991))
+		-- (0, jumpImpulse 48.99, −27), then a 1/60 s step of gravity and drag
+		Fixtures.expectNear(flat.velocity, Vector3.new(0, 45.7048, -26.991))
 		local wall = skater(Vector3.new(0, 0, -50))
 		wall:step(input({ jump = true }), ground(Vector3.xAxis), 1 / 60)
-		Fixtures.expectNear(wall.velocity, Vector3.new(0, 56.7111, -44.985)) -- (0, 60, −45), then the step
+		Fixtures.expectNear(wall.velocity, Vector3.new(0, 45.7048, -44.985)) -- (0, 48.99, −45), then the step
 	end)
 
 	-- The owner (#218): one more press in the air, once until landing, is an Air Pose: a small hop of about half a
@@ -308,11 +308,11 @@ describe("SkateMath off the ground and on walls", function()
 		falling:step(input({ jump = true }), inAir, 0.1)
 		expect(falling.airPosing).toBe(true)
 		expect(falling.airPoseReady).toBe(false)
-		-- The fall cancelled: (0, 0 + airPoseImpulse 42, −40 × 0.9), then a 0.1 s step of gravity and drag
-		Fixtures.expectNear(falling.velocity, Vector3.new(0, 22.3352, -35.928))
+		-- The fall cancelled: (0, 0 + airPoseImpulse 34.29, −40 × 0.9), then a 0.1 s step of gravity and drag
+		Fixtures.expectNear(falling.velocity, Vector3.new(0, 14.6407, -35.928))
 		-- A third press is only the air: gravity and drag.
 		falling:step(input({ jump = true }), inAir, 0.1)
-		Fixtures.expectNear(falling.velocity, Vector3.new(0, 2.7098, -35.8561))
+		Fixtures.expectNear(falling.velocity, Vector3.new(0, -4.9694, -35.8561))
 		-- Landing ends the pose and re-arms it.
 		falling.velocity = Vector3.new(0, -10, -30)
 		falling:step(input(), ground(FLAT, movement.hoverHeight - 0.1), 0.1)

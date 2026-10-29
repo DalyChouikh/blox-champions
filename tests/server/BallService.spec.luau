@@ -343,9 +343,10 @@ describe("BallService", function()
 		expect(flyingFlat()).toBe(false)
 		BallService:pass("A", Vector3.new(0, 0, -90), nil)
 		expect(flyingFlat()).toBe(true)
-		-- As strong as the free ball's weight, upward, at its center (a welded massless part weighs 0 by GetMass).
+		-- As strong as the free ball's weight in the world's gravity (#279), upward, at its center (a welded massless
+		-- part weighs 0 by GetMass).
 		local lift = BallService.part:FindFirstChildOfClass("VectorForce") :: VectorForce
-		Fixtures.expectNear(lift.Force, Vector3.new(0, BallService.part:GetMass() * workspace.Gravity, 0))
+		Fixtures.expectNear(lift.Force, Vector3.new(0, BallService.part:GetMass() * config.World.gravity, 0))
 		expect(lift.RelativeTo).toBe(Enum.ActuatorRelativeTo.World)
 		expect(lift.ApplyAtCenterOfMass).toBe(true)
 		BallService:step(1 / 60, { holder("A", a) })

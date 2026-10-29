@@ -343,7 +343,7 @@ local BallService: BallService = {
 	end,
 	_frame = nil :: any,
 
-	-- deps.Random makes the spawn choice repeatable in tests; deps.Gravity replaces the world's.
+	-- deps.Random makes the spawn choice repeatable in tests.
 	init = function(self: BallService, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -355,7 +355,7 @@ local BallService: BallService = {
 		self._homingAccel = (config.Actions.Pass.pass :: Config.PassSettings).homingAccel
 		self._speedLimit = MovementCheck.speedLimit(config.Movement, config.Network)
 		self._passTarget = nil
-		self._gravity = deps.Gravity or Vector3.new(0, -workspace.Gravity, 0)
+		self._gravity = Config.gravity(config)
 		self.state = BallState.new(config.Ball.rethrowPickupDelay)
 		self._canPickUp = function(player: PlayerId): boolean
 			return self._catchers[player] == true and self.state:canPickUp(player)

@@ -58,7 +58,6 @@ local function setup()
 		SkateController = skate,
 		BallCarrier = BallCarrier,
 		ActionController = actions,
-		Gravity = Fixtures.GRAVITY.Magnitude,
 		PlayerIdOf = function(character: Model): string?
 			return playerIds[character.Name]
 		end,
@@ -153,8 +152,9 @@ describe("PoseController", function()
 		root.AssemblyLinearVelocity = Vector3.new(30 * math.sin(1 / 60), 0, -30 * math.cos(1 / 60))
 		PoseController:step(1 / 60)
 		local _, _, roll = jointOf(turner, "Root").Transform:ToEulerAnglesXYZ()
-		-- The target lean is 8.6935°, reached by 1 - e^(-10/60) of the gap in one frame.
-		expect(math.abs(math.deg(roll))).toBeCloseTo(1.3347, 3)
+		-- The target lean is atan(30 × 1 / 130.8) = 12.9178° at the world's gravity, reached by 1 - e^(-10/60) of
+		-- the gap in one frame.
+		expect(math.abs(math.deg(roll))).toBeCloseTo(1.9831, 3)
 	end)
 
 	-- The owner (#246): riding backwards, the body faces against its way round the turn, so it leans its other side
@@ -172,7 +172,7 @@ describe("PoseController", function()
 			return math.deg(roll)
 		end
 		local ahead = rolled("Ahead", CFrame.identity)
-		expect(math.abs(ahead)).toBeCloseTo(1.3347, 3)
+		expect(math.abs(ahead)).toBeCloseTo(1.9831, 3)
 		expect(rolled("Backwards", CFrame.Angles(0, math.pi, 0))).toBeCloseTo(-ahead, 3)
 	end)
 

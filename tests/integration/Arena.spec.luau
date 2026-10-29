@@ -122,7 +122,7 @@ describe("The generated arena", function()
 
 	it("lets the rules count a lap around the generated track and score through its goal", function()
 		local tagged = TaggedLayout.read(arena)
-		local engine = MatchEngine.new({ config = config, arena = tagged.layout, gravity = Fixtures.GRAVITY })
+		local engine = MatchEngine.new({ config = config, arena = tagged.layout })
 		engine:addPlayer("B1", "Blue")
 		engine:start()
 		engine:tick(3)

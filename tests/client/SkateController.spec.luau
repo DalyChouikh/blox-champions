@@ -97,7 +97,6 @@ local function setup(overrides: { [string]: any }?)
 		SendGetUp = function()
 			getUps += 1
 		end,
-		Gravity = Fixtures.GRAVITY,
 		Team = function(): string?
 			return "Blue"
 		end,
@@ -499,7 +498,8 @@ describe("SkateController", function()
 		rig:PivotTo(CFrame.new(1000, 50, 1000))
 		SkateController:step(0.1)
 		expect((SkateController.skater :: any).mode).toBe("Airborne")
-		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, -19.5808, 0))
+		-- 0.1 s of the world's gravity (130.8), less air drag.
+		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, -13.0538, 0))
 	end)
 
 	-- The skater body's velocity has no force limit, so a skater flying into a wall pressed its collider through the
@@ -509,7 +509,7 @@ describe("SkateController", function()
 		local dt = 1 / 60
 		-- A wall facing -X at x = 2.5, high above the floor.
 		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40))
-		local fall = Fixtures.GRAVITY * dt * (1 - movement.airDrag * dt)
+		local fall = Config.gravity(config) * dt * (1 - movement.airDrag * dt)
 		-- 1.5 studs short of the wall, then 0.5 into it.
 		for _, x in { 0, 2 } do
 			flying(Vector3.new(x, 20, 0), Vector3.new(120, 0, 0))
@@ -836,13 +836,14 @@ describe("SkateController over an overhang", function()
 		return true
 	end
 
-	it("holds a skater over the top of the arc at 70 studs/s and drops one at 60, as the loop rule says", function()
-		expect(holdsOverTheTop(70)).toBe(true)
-		expect(holdsOverTheTop(60)).toBe(false)
+	-- At the top the curve must hold the whole pull: √(130.8 × 22) = 53.6 studs/s.
+	it("holds a skater over the top of the arc at 57 studs/s and drops one at 49, as the loop rule says", function()
+		expect(holdsOverTheTop(57)).toBe(true)
+		expect(holdsOverTheTop(49)).toBe(false)
 	end)
 
 	it("does the same over an arc of 21 flat strips, through its own normal filter", function()
-		expect(holdsOverTheTop(70, 21)).toBe(true)
-		expect(holdsOverTheTop(60, 21)).toBe(false)
+		expect(holdsOverTheTop(57, 21)).toBe(true)
+		expect(holdsOverTheTop(49, 21)).toBe(false)
 	end)
 end)

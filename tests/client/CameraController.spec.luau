@@ -119,7 +119,6 @@ beforeEach(function()
 			return {}
 		end,
 		SendSkateState = function() end,
-		Gravity = Fixtures.GRAVITY,
 		Team = function(): string?
 			return "Blue"
 		end,

@@ -27,7 +27,8 @@ export type Menu = { MenuOpened: Signal.Signal<>, MenuClosed: Signal.Signal<>, M
 -- Roblox's 58 px top bar.
 export type Screen = { hud: Rect, controls: Rect }
 
--- Roblox's default workspace.Gravity, pointing down.
+-- A round gravity for the pure math that takes gravity as an argument (skating, the ball's path, saves): Roblox's
+-- default 196.2, pointing down. The game itself pulls with the config's World.gravity (#279).
 Fixtures.GRAVITY = Vector3.new(0, -196.2, 0)
 
 -- The gates in a lap, one at each corner of the arena (spec §4.2): every fixture's gates and markers.
@@ -371,7 +372,6 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 		end,
 		SendSkateState = function() end,
 		SendGetUp = function() end,
-		Gravity = Fixtures.GRAVITY,
 		Team = function(): string?
 			return "Blue"
 		end,

@@ -234,13 +234,13 @@ local PoseController: PoseController = {
 	_input = nil :: any,
 	_out = {} :: Pose.Frame,
 
-	-- deps.PlayerIdOf and deps.Gravity replace the live game in tests: a test rig has no Player.
+	-- deps.PlayerIdOf replaces the live game in tests: a test rig has no Player.
 	init = function(self: PoseController, deps: { [string]: any })
 		self._config = deps.Config
 		self._skate = deps.SkateController
 		self._carrier = deps.BallCarrier
 		self._actions = deps.ActionController
-		self._gravity = deps.Gravity or workspace.Gravity
+		self._gravity = deps.Config.World.gravity
 		self._playerIdOf = deps.PlayerIdOf
 			or function(character: Model): PlayerId?
 				local player = Players:GetPlayerFromCharacter(character)
