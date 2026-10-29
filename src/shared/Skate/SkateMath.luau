@@ -456,15 +456,32 @@ local function liftOff(self: Skater)
 	self.mode = "Airborne"
 end
 
+local function ascending(self: Skater): boolean
+	return self.velocity:Dot(self._worldUp) > 0
+end
+
 -- Falling beside the wall they left: they look for it to come back onto (#258).
 local function catching(self: Skater): boolean
-	return self._leftWall ~= nil and self.velocity:Dot(self._worldUp) <= 0
+	return self._leftWall ~= nil and not ascending(self)
 end
 
 -- Whether a touchdown onto `normal` lands them: onto a surface that holds, and never while they rise off the wall they
--- left, since a leap up the glass is a flight with every air action until they fall (#258, Q28).
+-- left, since a leap up the glass is a flight with every air action until they fall (#258, Q28), or into any wall,
+-- which they slide up instead (#267, RC Video 14).
 local function landsOn(self: Skater, normal: Vector3): boolean
-	return holds(self, normal) and (self._leftWall == nil or catching(self))
+	return holds(self, normal) and (not ascending(self) or (self._leftWall == nil and not isWall(self, normal)))
+end
+
+-- The way a jump pushes: along a floor's normal, but up along a wall, never off it (#267, RC Video 14: a jump riding
+-- up the glass rose along it). Straight under a ceiling there is no way up along it.
+local function jumpWay(self: Skater, normal: Vector3): Vector3
+	if isWall(self, normal) then
+		local up = alongSurface(self._worldUp, normal)
+		if up.Magnitude > EPSILON then
+			return up.Unit
+		end
+	end
+	return normal
 end
 
 -- Down from the air. A touchdown on the belly, diving or still posing, keeps bellyLandingKeep of the speed (#245); a
@@ -495,9 +512,10 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 	local movement = self._movement
 	if self.mode == "Grounded" then
 		if ground.hit and input.jump then
-			-- A jump keeps 1 − jumpSpeedCost of the speed along the surface (#218).
-			self.velocity -= alongSurface(self.velocity, ground.normal) * movement.jumpSpeedCost
-			self.velocity += ground.normal * movement.jumpImpulse
+			-- A jump keeps 1 − jumpSpeedCost of the speed along the surface (#218), and only that: the hover's pull is
+			-- no momentum, so a jump up a wall is caught by it once falling (#258, #267).
+			self.velocity = alongSurface(self.velocity, ground.normal) * (1 - movement.jumpSpeedCost)
+				+ jumpWay(self, ground.normal) * movement.jumpImpulse
 			liftOff(self)
 		elseif not ground.hit or letsGo(self, ground.normal, travel, turn) then
 			-- No ground, or the surface can no longer push the skater round their path's curve (#257).
@@ -635,14 +653,19 @@ end
 
 -- A surface the collider meets in the air (the controller finds it, #258): a ride surface they land on (landsOn) takes
 -- them feet first, as any touchdown (a diver's on the belly); anything else, or on the ground, only blocks, so a leap
--- up the glass slides up it. Says whether anything was lost.
+-- up the glass slides up it. A surface that holds but does not land them (they are still rising, landsOn) is the one
+-- that catches them once they fall (#267). Says whether anything was lost.
 function SkateMath.touch(self: Skater, normal: Vector3, input: Types.SkateInput): boolean
 	if not self:block(normal) then
 		return false
 	end
-	if self.mode == "Airborne" and landsOn(self, normal) then
-		touchDown(self, input)
-		self.up = normal
+	if self.mode == "Airborne" then
+		if landsOn(self, normal) then
+			touchDown(self, input)
+			self.up = normal
+		elseif holds(self, normal) then
+			self._leftWall = normal
+		end
 	end
 	return true
 end

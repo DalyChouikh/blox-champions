@@ -636,8 +636,10 @@ describe("SkateController", function()
 
 	it("reports a pose held into a wall that a step flies into", function()
 		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40))
-		flying(Vector3.new(0, 20, 0), Vector3.new(120, 10, 0))
+		-- Falling into it, facing it: a skater still rising only slides up a wall (#267).
+		flying(Vector3.new(0, 20, 0), Vector3.new(120, -10, 0))
 		local skater = SkateController.skater :: any
+		skater.forward = Vector3.xAxis
 		skater.airPosing = true
 		skater.airPoseReady = false
 		Fixtures.scriptedBinding(InputController.context, "Jump"):Fire(true)
