@@ -939,6 +939,25 @@ about two thirds of a lap, swinging from wall to wall.
     meshes in the art pass; the riding reads each flat panel (today's seam trouble), and could read the arena's exact
     smooth shape instead. **Q73 (recommended): ticket the smooth riding now, built right after #289**, before #278 and
     the republish.
+  - **Trial 294 kept; Q74** (2026-10-29, session 46). Trial 294 (Studio copies only): the skating reads the arena's
+    own smooth shape instead of each flat strip. Every ride surface is one closed cross-section (inner glass, the solid
+    section, outer glass, top) swept round the stations; Profile gives each strip's direction at its two ends from the
+    shape's own pieces (arcs, lines, the rise, the bowl), and a point reads them interpolated along its strip and
+    between the two stations round it, turned with the centerline, so every seam is continuous and the middle glass's
+    round ends are a true cylinder to the skates (measured: 0.000003 deg off radial; the lips within 0.08 deg of their
+    circle, the straight's elliptic bank within 0.7 deg). The look is unchanged until the art pass. The owner played it:
+    **Q74 "Keep it"** (build it test-first as trialled).
+  - **#294 Studio battery; Q75** (2026-10-30, session 47). The smooth shape built test-first, then Studio Play
+    (the real code, A/B against the flat strips' normals): every Jump and Uppercut on the outer wall, the middle glass
+    and the round ends caught back on the wall feet first (at most 4 studs off it); rides along the middle bank into a
+    round end carried 10-29 deg round, then down to the floor (Q71 holds); a steered lap turned the ground's direction
+    in steps of at most 0.47 deg (the flat strips: 5.3, and 42 back-and-forth flips against 1); riding up into a round
+    end 10 deg off its axis at riding speed now stays on the glass (it flew off with the flat strips), as Q71 asks
+    (within ~10-15 deg of head-on). Asked (AskUserQuestion): the NormalFilter (a sharp turn of the ground's direction
+    is trusted only when the next ray agrees; there for rays that hit a seam's side face) has nothing left to guard,
+    and its only effect left is ignoring the first ray of new ground after a flight (a touchdown that same step would
+    use the last surface's direction). The owner: "remove it, but can you explain it more clearly and simply again";
+    re-asked in plain words with a picture: **Q75 "Remove it"**.
 
 ## Roller Champions
 

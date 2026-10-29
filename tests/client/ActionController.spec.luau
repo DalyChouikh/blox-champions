@@ -89,6 +89,7 @@ local function setup(surfaces: { BasePart }?)
 		Config = config,
 		InputController = InputController,
 		RideSurfaces = RideSurfaces,
+		SmoothNormal = Fixtures.faceNormal,
 		Camera = CAMERA,
 		Skaters = function(): { any }
 			return others

@@ -140,6 +140,7 @@ beforeEach(function()
 		Config = config,
 		InputController = InputController,
 		RideSurfaces = RideSurfaces,
+		SmoothNormal = Fixtures.faceNormal,
 		Camera = { CFrame = CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)) },
 		Skaters = function(): { any }
 			return {}

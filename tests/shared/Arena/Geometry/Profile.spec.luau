@@ -107,6 +107,75 @@ describe("Profile", function()
 
 	-- Each glass section runs the profile's way (down the inner side, up the outer one), its lip a quarter circle of
 	-- radius 12 in four strips, evenly spaced by angle, from vertical at 108 to horizontal at 120 (R15).
+	-- #294: the skating reads the shape itself, so each strip's direction at its two ends is the shape's own (the
+	-- pieces' derivatives, worked out above): the bank leaves the glass straight down and meets the floor flat (its
+	-- middle at 225°: (0.8321, −0.5547)), the rise leaves the room flat and arrives along the incline, the foot curve
+	-- leaves the incline along it and turns upright at the wall.
+	it("runs each strip the way the shape itself runs at its two ends, so every smooth join reads one way", function()
+		local starts, ends = Profile.directions(arena, 1)
+		expect(#starts).toBe(#straight - 1)
+		expect(#ends).toBe(#straight - 1)
+		local incline = Vector2.new(math.cos(math.rad(14)), math.sin(math.rad(14)))
+		local expected: { [string]: { [number]: Vector2 } } = {
+			starts = {
+				[1] = Vector2.new(0, -1),
+				[7] = Vector2.xAxis,
+				[8] = Vector2.xAxis,
+				[13] = incline,
+				[15] = incline,
+				[20] = Vector2.yAxis,
+			},
+			ends = {
+				[3] = Vector2.new(0.8321, -0.5547),
+				[6] = Vector2.xAxis,
+				[8] = Vector2.new(0.902, 0.4318),
+				[9] = Vector2.new(0.8027, 0.5964),
+				[12] = incline,
+				[14] = incline,
+				[15] = Vector2.new(0.8729, 0.4879),
+				[19] = Vector2.yAxis,
+			},
+		}
+		for index, direction in expected.starts do
+			near(starts[index], direction)
+		end
+		for index, direction in expected.ends do
+			near(ends[index], direction)
+		end
+		-- The arena is one smooth surface across the track (the header's pieces meet without a kink), on a straight and
+		-- at a curved end: the strip ending at a point and the next one agree there.
+		for _, straightness in { 1, 0 } do
+			local from, to = Profile.directions(arena, straightness)
+			for strip = 1, #from do
+				expect(from[strip].Magnitude).toBeCloseTo(1, 5)
+				expect(to[strip].Magnitude).toBeCloseTo(1, 5)
+				if strip < #from then
+					near(to[strip], from[strip + 1])
+				end
+			end
+		end
+	end)
+
+	-- #294: up the outer glass's face, then round its lip's circle (r 12, from upright to flat, 22.5° a strip); the
+	-- inner glass runs the outer one mirrored across the track and backwards, from the top's inner end down its face.
+	it("runs the glass up its face and round its lip as the lip's circle does, the inner glass mirrored", function()
+		local strips = arena.glass.lipStrips
+		local starts, ends = Profile.outerGlassDirections(arena)
+		expect(#starts).toBe(#Profile.outerGlass(arena) - 1)
+		expect(#ends).toBe(#starts)
+		near(starts[1], Vector2.yAxis)
+		near(ends[1], Vector2.yAxis)
+		near(starts[2], Vector2.yAxis)
+		near(starts[3], Vector2.new(-0.3827, 0.9239))
+		near(ends[1 + strips], Vector2.new(-1, 0))
+		local innerStarts, innerEnds = Profile.innerGlassDirections(arena)
+		expect(#innerStarts).toBe(#Profile.innerGlass(arena) - 1)
+		near(innerStarts[1], Vector2.new(-1, 0))
+		near(innerEnds[2], Vector2.new(-0.7071, -0.7071))
+		near(innerStarts[1 + strips], Vector2.new(0, -1))
+		near(innerEnds[1 + strips], Vector2.new(0, -1))
+	end)
+
 	it("curls each glass wall into a lip at the top, ending where the top begins", function()
 		local outer = Profile.outerGlass(arena)
 		local expected = {

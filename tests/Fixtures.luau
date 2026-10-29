@@ -348,6 +348,12 @@ function Fixtures.floor(folder: Instance): Part
 	return floor
 end
 
+-- A ride surface's normal read as the face its ray met (SmoothNormals.reader's shape): for specs whose slabs are
+-- not the arena (#294).
+function Fixtures.faceNormal(_position: Vector3, face: Vector3): Vector3
+	return face
+end
+
 -- Starts the local player's skating and actions as the client does, with fakes for the live game (a camera looking
 -- along -Z, nothing sent): InputController (its context in `folder`), BallCarrier, RideSurfaces, SkateController and
 -- ActionController, for the local player `localId`. Ride surfaces must be in place first, as RideSurfaces reads them
@@ -366,6 +372,7 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 		Config = config,
 		InputController = InputController,
 		RideSurfaces = RideSurfaces,
+		SmoothNormal = Fixtures.faceNormal,
 		Camera = { CFrame = CFrame.new() },
 		Skaters = function(): { any }
 			return {}

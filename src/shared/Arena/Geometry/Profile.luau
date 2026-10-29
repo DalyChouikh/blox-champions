@@ -19,6 +19,9 @@ type Piece = (t: number) -> Vector2
 local TURN_SEGMENTS = 64
 -- Halvings of a quarter turn that pin the angle a curved end's bowl arrives at, past the points' float precision.
 local ANGLE_HALVINGS = 50
+-- The step (in a piece's t) its direction is read over: the second-order differences' error stays under 0.03° on
+-- every piece, while Vector2's float32 points read over 1e-4 put the bowl's arrival 0.08° off (measured, #294).
+local DIRECTION_STEP = 1e-3
 
 local Profile = {}
 
@@ -202,22 +205,59 @@ function Profile.stripCounts(arena: ArenaConfig): { number }
 	return stripCountsOf(arena, straight, curvedEndPieces(arena, shares))
 end
 
--- stripsPerSection + 1 points: a curved end's section blended toward a straight's by `straightness` (0 at a curved end,
--- 1 on a straight), each piece's points spaced evenly within it (by angle on the arcs, across the floors) and shared
--- where pieces meet.
-function Profile.points(arena: ArenaConfig, straightness: number): { Vector2 }
+-- The way a piece runs at `t` (unit): its derivative, read over steps that stay inside it (second-order differences,
+-- one-sided at its ends, so where two pieces meet both read their own end exactly).
+local function heading(piece: Piece, t: number): Vector2
+	local step = DIRECTION_STEP
+	if t - step < 0 then
+		return (piece(t + step) * 4 - piece(t) * 3 - piece(t + 2 * step)).Unit
+	elseif t + step > 1 then
+		return (piece(t) * 3 - piece(t - step) * 4 + piece(t - 2 * step)).Unit
+	end
+	return (piece(t + step) - piece(t - step)).Unit
+end
+
+-- Each strip of a curved end's section blended toward a straight's by `straightness` (0 at a curved end, 1 on a
+-- straight), in running order: `visit` gets the strip's blended piece and the piece's t at the strip's two ends.
+-- Each piece's strips are spaced evenly within it (by angle on the arcs, across the floors).
+local function eachStrip(
+	arena: ArenaConfig,
+	straightness: number,
+	visit: (piece: Piece, from: number, to: number) -> ()
+)
 	local straight, shares = straightPieces(arena)
 	local curvedEnd = curvedEndPieces(arena, shares)
-	local function at(index: number, t: number): Vector2
-		return curvedEnd[index](t):Lerp(straight[index](t), straightness)
-	end
-	local points = { at(1, 0) }
 	for index, count in stripCountsOf(arena, straight, curvedEnd) do
+		local function piece(t: number): Vector2
+			return curvedEnd[index](t):Lerp(straight[index](t), straightness)
+		end
 		for strip = 1, count do
-			table.insert(points, at(index, strip / count))
+			visit(piece, (strip - 1) / count, strip / count)
 		end
 	end
+end
+
+-- stripsPerSection + 1 points: the strips' ends (eachStrip), shared where pieces meet.
+function Profile.points(arena: ArenaConfig, straightness: number): { Vector2 }
+	local points: { Vector2 } = {}
+	eachStrip(arena, straightness, function(piece: Piece, from: number, to: number)
+		if #points == 0 then
+			table.insert(points, piece(from))
+		end
+		table.insert(points, piece(to))
+	end)
 	return points
+end
+
+-- Each strip's direction at its start and at its end (unit, the section's running way): the smooth shape's own, read
+-- from its pieces, so where two pieces meet smoothly they agree and at a real corner they do not (#294).
+function Profile.directions(arena: ArenaConfig, straightness: number): ({ Vector2 }, { Vector2 })
+	local starts: { Vector2 }, ends: { Vector2 } = {}, {}
+	eachStrip(arena, straightness, function(piece: Piece, from: number, to: number)
+		table.insert(starts, heading(piece, from))
+		table.insert(ends, heading(piece, to))
+	end)
+	return starts, ends
 end
 
 -- The middle of a straight's spawn room: the lane the team spawns line up on.
@@ -253,6 +293,31 @@ function Profile.outerGlass(arena: ArenaConfig): { Vector2 }
 		table.insert(points, point)
 	end
 	return points
+end
+
+-- The outer glass's strips' directions at their starts and ends (unit, Profile.outerGlass's way): up its face, then
+-- along the lip's circle, which leaves the face upright (#294).
+function Profile.outerGlassDirections(arena: ArenaConfig): ({ Vector2 }, { Vector2 })
+	local strips = arena.glass.lipStrips
+	local starts: { Vector2 }, ends: { Vector2 } = { Vector2.yAxis }, { Vector2.yAxis }
+	for strip = 1, strips do
+		local from, to = (math.pi / 2) * (strip - 1) / strips, (math.pi / 2) * strip / strips
+		table.insert(starts, Vector2.new(-math.sin(from), math.cos(from)))
+		table.insert(ends, Vector2.new(-math.sin(to), math.cos(to)))
+	end
+	return starts, ends
+end
+
+-- The inner glass's strips' directions (Profile.innerGlass's way): the outer glass's mirrored across the track and
+-- run backwards, so each strip's start is the mirrored strip's end.
+function Profile.innerGlassDirections(arena: ArenaConfig): ({ Vector2 }, { Vector2 })
+	local outerStarts, outerEnds = Profile.outerGlassDirections(arena)
+	local starts: { Vector2 }, ends: { Vector2 } = {}, {}
+	for index = #outerStarts, 1, -1 do
+		table.insert(starts, Vector2.new(outerEnds[index].X, -outerEnds[index].Y))
+		table.insert(ends, Vector2.new(outerStarts[index].X, -outerStarts[index].Y))
+	end
+	return starts, ends
 end
 
 -- The inner glass, the outer one mirrored across the track and run down the profile's way: from where the top

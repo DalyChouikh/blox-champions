@@ -10,9 +10,11 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 local ActionService = require(ServerScriptService.Server.ActionService)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallService = require(ServerScriptService.Server.BallService)
+local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local CharacterService = require(ServerScriptService.Server.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 local TeamService = require(ServerScriptService.Server.TeamService)
@@ -51,6 +53,10 @@ local fakeNet = {
 	end,
 }
 
+-- The ride surfaces' direction at a point a ray found: the floor slab's own face unless a test gives it a shape
+-- (#294).
+local smoothNormal: (Vector3, Vector3) -> Vector3 = Fixtures.faceNormal
+
 -- Its ride surfaces: a floor under the track spot, set for each test.
 local fakeArena = {
 	arena = { ballSpawns = SPAWNS, teamSpawns = { Blue = {}, Orange = {} }, rideSurfaces = {} :: { Instance } },
@@ -74,6 +80,7 @@ beforeEach(function()
 	table.clear(rigs)
 	table.clear(stubs)
 	blue, orange = {}, {}
+	smoothNormal = Fixtures.faceNormal
 	-- Its top at y 0: a root standing on the track spot is 3 studs above it.
 	local floor = Instance.new("Folder")
 	floor.Name = "Floor"
@@ -99,6 +106,9 @@ beforeEach(function()
 		TeamService = TeamService,
 		CharacterService = CharacterService,
 		ArenaService = fakeArena,
+		SmoothNormal = function(position: Vector3, face: Vector3): Vector3
+			return smoothNormal(position, face)
+		end,
 	})
 	-- Teams take turns, with a random first pick: sort the six seated players by the team they got.
 	for index = 1, 6 do
@@ -575,6 +585,48 @@ describe("ActionService", function()
 		-- From just under the drop: no knockdown.
 		stand(a, above(hard.drop - 0.5))
 		glide(a, Vector3.zero)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+	end)
+
+	-- #294: the server judges a landing by the ground's smooth shape, as the skating rides it: a fall onto ground its
+	-- ray finds flat, where the shape is steeper than wallAngle, is no hard landing.
+	it("judges a landing by the ground's smooth shape at the point its ray finds", function()
+		local a = blue[1]
+		local steep = math.rad(config.Movement.wallAngle + 5)
+		local asked: { Vector3 } = {}
+		smoothNormal = function(position: Vector3, _face: Vector3): Vector3
+			table.insert(asked, position)
+			return Vector3.new(0, math.cos(steep), math.sin(steep))
+		end
+		stand(a, above(config.Movement.hardLanding.drop + 5))
+		glide(a, Vector3.zero)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+		Fixtures.expectNear(asked[#asked], Vector3.new(ON_TRACK.X, 0, ON_TRACK.Z))
+	end)
+
+	-- By default the server reads the arena's own shape (SmoothNormals.reader), as the skating does: 5 studs out from
+	-- the inner glass a straight's bank is over 40° steep, so a 45-stud fall onto a flat slab there is no hard
+	-- landing.
+	it("reads the arena's own smooth shape by default", function()
+		ActionService:init({
+			Config = config,
+			NetService = fakeNet,
+			BallService = BallService,
+			TeamService = TeamService,
+			CharacterService = CharacterService,
+			ArenaService = fakeArena,
+		})
+		local arena = config.Arena
+		local bank = Centerline.pose(arena, 50, 5, Profile.heightAt(Profile.points(arena, 1), 5) :: number)
+		local slab = Instance.new("Part")
+		slab.Anchored = true
+		slab.Size = Vector3.new(4, 1, 4)
+		slab.CFrame = CFrame.new(bank - Vector3.new(0, 0.5, 0))
+		slab.Parent = fakeArena.arena.rideSurfaces[1]
+		local a = blue[1]
+		local rest = bank + Vector3.new(0, config.Movement.hoverHeight, 0) - ON_TRACK
+		stand(a, rest + Vector3.new(0, config.Movement.hardLanding.drop + 5, 0))
+		glide(a, rest)
 		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 	end)
 

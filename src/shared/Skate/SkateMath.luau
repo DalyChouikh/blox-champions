@@ -15,9 +15,10 @@ local rotateToward = Vectors.rotateToward
 -- How many past steps on a surface the curvature window can reach back over: at hardCap a window of ten studs spans
 -- five, and at a crawl the window simply covers less road, where the contact rule's speed² makes the curve irrelevant.
 local HISTORY = 32
--- A ground normal turning less than this in a step (radians) has not turned: float noise on a flat surface. Measured
--- on the arena (#257): neighbouring rays on one face differ by up to 1.5e-4, and where it really turns by 8.5e-3 or
--- more.
+-- A ground normal turning less than this in a step (radians) has not turned: float noise. Rays on one flat face
+-- differed by up to 1.5e-4 (measured, #257); the arena's smooth shape reads within 2.2e-5 of exact (#294). A smooth
+-- curve turns a step by its speed x dt / radius: round the round glass (a path of radius 22.5) a drift slower than
+-- 1.35 studs/s reads no turn, far inside what its grip holds (#289).
 local TURN_EPSILON = 1e-3
 -- The contact rule's slack for float noise, as a share of gravity: the arena's built glass reads up to 6.5e-5 past
 -- vertical (measured, #234), so a face leaning less than this past straight up still holds like a wall. The lips'
@@ -230,8 +231,7 @@ local function slide(self: Skater, knockdown: Attributes.Knockdown, speed: numbe
 	return if left > dt then speed * (1 - dt / left) else 0
 end
 
--- Whether a surface's normal turning from `last` to `normal` is a curve's small turn (the arena's strips stand for
--- curves), not a corner (cornerDeg, #255).
+-- Whether a surface's normal turning from `last` to `normal` is a curve's small turn, not a corner (cornerDeg, #255).
 local function curving(self: Skater, last: Vector3, normal: Vector3): boolean
 	return last:Dot(normal) >= self._cornerCos
 end
@@ -418,11 +418,11 @@ local function measure(self: Skater, normal: Vector3, dt: number): (number, numb
 end
 
 -- How sharply the surface bends around the skater, 1/radius (negative where it bends away), from the turns over the
--- last curvatureWindow studs of path the way it bends (#289). Across a lip's flat strips the ground turns only at each
--- strip's edge, so the curve is the turning between the oldest and the newest turn in the window over the road between
--- them: one strip's angle per strip's width, the arc they make. On a smooth curve every step turns, and this is the
--- turn per stud. With fewer than two turns in the window it is the turning over the window's road. Zero until a step
--- has measured a turn.
+-- last curvatureWindow studs of path the way it bends (#289). Across flat strips the ground turns only at each strip's
+-- edge, so the curve is the turning between the oldest and the newest turn in the window over the road between them:
+-- one strip's angle per strip's width, the arc they make. On a smooth curve (the arena's, #294) every step turns, and
+-- this is the turn per stud. With fewer than two turns in the window it is the turning over the window's road. Zero
+-- until a step has measured a turn.
 local function curvature(self: Skater, travel: number, turn: number): number
 	local window = self._movement.curvatureWindow
 	-- Walking back from now, a step's turn happened where that step ended: `behind` studs ago.
@@ -802,14 +802,10 @@ function SkateMath.touch(self: Skater, normal: Vector3, input: Types.SkateInput)
 end
 
 -- The way the controller's ground ray looks (a unit direction): along the feet, or toward the wall they left or
--- touched while they fly beside it, rising (its grip keeps them by it, #289) or falling (it catches them, #258). Says
--- which: what that ray finds is no seam under the feet.
-function SkateMath.groundRay(self: Skater): (Vector3, boolean)
+-- touched while they fly beside it, rising (its grip keeps them by it, #289) or falling (it catches them, #258).
+function SkateMath.groundRay(self: Skater): Vector3
 	local wall = self._leftWall
-	if wall ~= nil then
-		return -wall, true
-	end
-	return -self.up, false
+	return if wall ~= nil then -wall else -self.up
 end
 
 -- Still and on the ground: the kickoff freeze and a fresh character start from rest.
