@@ -33,8 +33,12 @@ local function actionRequest(): Validate.Validator
 end
 
 return table.freeze({
-	-- Whether the sender is pumping and braking, sent whenever either changes.
-	SkateState = Validate.record({ pump = Validate.boolean(), brake = Validate.boolean() }),
+	-- Whether the sender is pumping, braking and striking the Air Pose, sent whenever any of them changes.
+	SkateState = Validate.record({
+		pump = Validate.boolean(),
+		brake = Validate.boolean(),
+		airPose = Validate.boolean(),
+	}),
 	-- An action the sender started.
 	ActionRequest = actionRequest(),
 })

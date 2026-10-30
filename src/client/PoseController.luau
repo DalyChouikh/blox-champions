@@ -1,10 +1,10 @@
 --!strict
 -- Poses every character this client can see (spec §7.1, plan decision 10), each physics step after the actions
 -- (FrameController): the lean into a turn, a crouch while pumping, a lean back while braking, a tuck in the air, the
--- arm that carries the ball, a lunge and a knockdown. The local skater's state comes from SkateController and its lunge
--- from ActionController, at once; everyone else's from their character's attributes and the ground under them. The
--- carrier comes from BallCarrier. The joints it writes are local to this client: the server never sees them, and every
--- client poses its own view.
+-- arm that carries the ball, a lunge, a knockdown and the Air Pose. The local skater's state comes from SkateController
+-- and its lunge from ActionController, at once; everyone else's from their character's attributes and the ground under
+-- them. The carrier comes from BallCarrier. The joints it writes are local to this client: the server never sees them,
+-- and every client poses its own view.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -166,11 +166,14 @@ local function poseOne(self: PoseController, tracked: Tracked, dt: number)
 		input.pumping = skate.pumping
 		input.braking = skate.braking
 		input.lunging = self._actions:pose() == "Lunge"
+		local skater = skate.skater
+		input.airPosing = skater ~= nil and skater.airPosing
 	else
 		input.pumping = character:GetAttribute(Attributes.Pumping) == true
 		input.braking = character:GetAttribute(Attributes.Braking) == true
 		local action = Actions.nameOf(character:GetAttribute(Attributes.Action) :: string?)
 		input.lunging = action ~= nil and self._config.Actions[action].pose == "Lunge"
+		input.airPosing = character:GetAttribute(Attributes.AirPosing) == true
 	end
 	input.knockedDown = character:GetAttribute(Attributes.KnockedDown) == true
 	local playerId = tracked.playerId
@@ -238,6 +241,7 @@ local PoseController: PoseController = {
 			braking = false,
 			carrying = false,
 			lunging = false,
+			airPosing = false,
 			knockedDown = false,
 			bodyOffset = 0,
 		}

@@ -40,8 +40,8 @@ export type CharacterService = {
 	placeAll: (self: CharacterService, frozen: boolean) -> (),
 	freezeAll: (self: CharacterService, frozen: boolean) -> (),
 	holders: (self: CharacterService) -> { BallService.Holder },
-	-- A seated player's pump and brake, shown on their character for every client to pose.
-	setSkateState: (self: CharacterService, player: PlayerId, pump: boolean, brake: boolean) -> (),
+	-- A seated player's pump, brake and Air Pose, shown on their character for every client to pose.
+	setSkateState: (self: CharacterService, player: PlayerId, pump: boolean, brake: boolean, airPose: boolean) -> (),
 	-- A registered character that died or was destroyed.
 	characterRemoved: Signal.Signal<PlayerId>,
 	-- The server moved a character to its spawn: a jump the movement guard must not judge.
@@ -139,7 +139,7 @@ local CharacterService: CharacterService = {
 			Schemas.SkateState,
 			self._config.Network.maxSkateStatesPerSecond,
 			function(player: PlayerId, payload: any)
-				self:setSkateState(player, payload.pump, payload.brake)
+				self:setSkateState(player, payload.pump, payload.brake, payload.airPose)
 			end
 		)
 	end,
@@ -260,11 +260,12 @@ local CharacterService: CharacterService = {
 		end
 	end,
 
-	setSkateState = function(self: CharacterService, player: PlayerId, pump: boolean, brake: boolean)
+	setSkateState = function(self: CharacterService, player: PlayerId, pump: boolean, brake: boolean, airPose: boolean)
 		local character: Model? = self._characters[player]
 		if character ~= nil and self._teams:teamOf(player) ~= nil then
 			character:SetAttribute(Attributes.Pumping, pump)
 			character:SetAttribute(Attributes.Braking, brake)
+			character:SetAttribute(Attributes.AirPosing, airPose)
 		end
 	end,
 

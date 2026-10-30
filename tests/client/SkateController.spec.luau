@@ -76,8 +76,8 @@ local function setup(overrides: { [string]: any }?)
 		Skaters = function(): { any }
 			return others
 		end,
-		SendSkateState = function(pump: boolean, brake: boolean)
-			table.insert(sent, { pump, brake })
+		SendSkateState = function(pump: boolean, brake: boolean, airPose: boolean)
+			table.insert(sent, { pump, brake, airPose })
 		end,
 		Gravity = Fixtures.GRAVITY,
 		Team = function(): string?
@@ -292,7 +292,25 @@ describe("SkateController", function()
 		Fixtures.root(rig).Anchored = true
 		Fixtures.scriptedBinding(InputController.context, "Pump"):Fire(true)
 		SkateController:step(1 / 60)
-		expect(sent).toEqual({ { true, false } })
+		expect(sent).toEqual({ { true, false, false } })
+	end)
+
+	-- Everyone else poses the Air Pose from the server's attribute (#218).
+	it("tells the server when the Air Pose starts and ends", function()
+		local skater = SkateController.skater :: any
+		skater.mode = "Airborne"
+		skater.velocity = Vector3.new(0, 30, 0)
+		Fixtures.scriptedBinding(InputController.context, "Jump"):Fire(true)
+		-- The press arrives with the deferred events.
+		task.wait()
+		SkateController:step(1 / 60)
+		expect(sent).toEqual({ { false, false, true } })
+		-- It comes back down onto the floor, and the pose ends.
+		for _ = 1, 60 do
+			SkateController:step(1 / 60)
+		end
+		expect(skater.mode).toBe("Grounded")
+		expect(sent).toEqual({ { false, false, true }, { false, false, false } })
 	end)
 
 	it("drops a jump pressed while it had no character", function()
@@ -437,10 +455,10 @@ describe("SkateController", function()
 		for _ = 1, 3 do
 			SkateController:step(1 / 60)
 		end
-		expect(sent).toEqual({ { true, false } })
+		expect(sent).toEqual({ { true, false, false } })
 		pump:Fire(false)
 		SkateController:step(1 / 60)
-		expect(sent).toEqual({ { true, false }, { false, false } })
+		expect(sent).toEqual({ { true, false, false }, { false, false, false } })
 	end)
 
 	-- The server drops states beyond its rate limit, and nothing resends one: the client keeps to the same limit and
@@ -461,11 +479,11 @@ describe("SkateController", function()
 			SkateController:step(1 / 60)
 		end
 		expect(#sent).toBe(perSecond)
-		expect(sent[perSecond]).toEqual({ false, false })
+		expect(sent[perSecond]).toEqual({ false, false, false })
 		now = 1
 		SkateController:step(1 / 60)
 		expect(#sent).toBe(perSecond + 1)
-		expect(sent[perSecond + 1]).toEqual({ true, false })
+		expect(sent[perSecond + 1]).toEqual({ true, false, false })
 	end)
 
 	it("ignores one seam ray's side face, so the skater's up holds", function()

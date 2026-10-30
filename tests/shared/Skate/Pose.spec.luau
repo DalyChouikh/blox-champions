@@ -19,6 +19,7 @@ local function still(): Pose.PoseInput
 		braking = false,
 		carrying = false,
 		lunging = false,
+		airPosing = false,
 		knockedDown = false,
 		bodyOffset = 0,
 	}
@@ -73,6 +74,27 @@ describe("Pose", function()
 		expect(math.abs(anglesOf(out, "rightHip")[1])).toBeCloseTo(60, 4)
 		expect(math.abs(anglesOf(out, "leftKnee")[1])).toBeCloseTo(60, 4)
 		expect(math.abs(anglesOf(out, "rightKnee")[1])).toBeCloseTo(60, 4)
+	end)
+
+	-- Roller Champions' Air Pose (#218): a superman stretch.
+	it("strikes the Air Pose: tipped forward, legs stretched straight, the free arm reaching ahead", function()
+		local out = {} :: Pose.Frame
+		local input = still()
+		input.airborne = true
+		input.airPosing = true
+		Pose.compute(pose, input, out)
+		expect(out.root.LookVector.Y).toBeCloseTo(-math.sin(math.rad(70)), 6)
+		expect(anglesOf(out, "leftHip")[1]).toBeCloseTo(0, 4)
+		expect(anglesOf(out, "rightKnee")[1]).toBeCloseTo(0, 4)
+		expect(anglesOf(out, "rightShoulder")[1]).toBeCloseTo(150, 4)
+		-- A carrier keeps the ball's arm up.
+		input.carrying = true
+		Pose.compute(pose, input, out)
+		expect(math.abs(anglesOf(out, "rightShoulder")[3])).toBeCloseTo(75, 4)
+		-- A lunge in the air (a dive) tips the body as a lunge does.
+		input.lunging = true
+		Pose.compute(pose, input, out)
+		expect(out.root.LookVector.Y).toBeCloseTo(-math.sin(math.rad(pose.lungeDeg)), 6)
 	end)
 
 	it("raises the right arm while carrying", function()

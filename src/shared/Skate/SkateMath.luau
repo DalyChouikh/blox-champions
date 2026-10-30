@@ -36,6 +36,9 @@ type Fields = {
 	up: Vector3,
 	-- The way the skater faces; kept while stopped.
 	forward: Vector3,
+	-- Whether a press in the air would strike the Air Pose (once until landing), and whether it is struck now.
+	airPoseReady: boolean,
+	airPosing: boolean,
 	_movement: Config.MovementConfig,
 	_gravity: Vector3,
 	_worldUp: Vector3,
@@ -61,6 +64,8 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		mode = "Grounded",
 		up = -gravity.Unit,
 		forward = -Vector3.zAxis,
+		airPoseReady = true,
+		airPosing = false,
 		_movement = movement,
 		_gravity = gravity,
 		_worldUp = -gravity.Unit,
@@ -287,11 +292,31 @@ function SkateMath.isSteep(self: Skater, normal: Vector3): boolean
 	return normal:Dot(self._worldUp) < self._wallCos
 end
 
+-- On the ground again: the Air Pose ends and is ready for the next time in the air.
+local function land(self: Skater)
+	self.mode = "Grounded"
+	self.airPoseReady = true
+	self.airPosing = false
+end
+
+-- The Air Pose's hop (#218): the fall cancelled, airPoseImpulse straight up, and jumpSpeedCost of the speed across.
+local function airPose(self: Skater)
+	local movement = self._movement
+	local worldUp = self._worldUp
+	local rising = self.velocity:Dot(worldUp)
+	local across = self.velocity - worldUp * rising
+	self.velocity = across * (1 - movement.jumpSpeedCost) + worldUp * (math.max(rising, 0) + movement.airPoseImpulse)
+	self.airPoseReady = false
+	self.airPosing = true
+end
+
 -- The mode changes first, so a jump or a fall is stepped in the air at once.
 local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.Ground, travel: number, turn: number)
 	local movement = self._movement
 	if self.mode == "Grounded" then
 		if ground.hit and input.jump then
+			-- A jump keeps 1 − jumpSpeedCost of the speed along the surface (#218).
+			self.velocity -= alongSurface(self.velocity, ground.normal) * movement.jumpSpeedCost
 			self.velocity += ground.normal * movement.jumpImpulse
 			self.mode = "Airborne"
 		elseif not ground.hit or loopBreaks(self, ground.normal, travel, turn) then
@@ -299,7 +324,9 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 			self.mode = "Airborne"
 		end
 	elseif ground.hit and ground.distance <= movement.hoverHeight and self.velocity:Dot(ground.normal) <= 0 then
-		self.mode = "Grounded"
+		land(self)
+	elseif input.jump and self.airPoseReady then
+		airPose(self)
 	end
 end
 
@@ -368,7 +395,7 @@ end
 -- Still and on the ground: the kickoff freeze and a fresh character start from rest.
 function SkateMath.stop(self: Skater)
 	self.velocity = Vector3.zero
-	self.mode = "Grounded"
+	land(self)
 	forget(self)
 end
 

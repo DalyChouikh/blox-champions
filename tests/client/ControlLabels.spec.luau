@@ -67,8 +67,11 @@ describe("ControlLabels", function()
 		expect(now("pass")).toBe(labels.Pass)
 		expect(now("throw")).toBe(labels.ChargeThrow)
 
+		-- In the air the jump button strikes the Air Pose, once until landing (#218).
 		local skater = SkateController.skater :: any
 		skater.mode = "Airborne"
+		expect(now("jump")).toBe(labels.AirPose)
+		skater.airPoseReady = false
 		expect(now("jump")).toBeNil()
 
 		SkateController.attachable = true

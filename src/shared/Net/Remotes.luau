@@ -3,7 +3,7 @@
 --   RuleEvents     server → clients  { frame, events }: a frame's rule events, in order (a batch per frame with any)
 --   MatchSnapshot  server → clients  { frame, match, names }: after each batch, on each seat change, and to a joiner
 --   BallCarrier    server → clients  { carrier = PlayerId? } whenever the ball changes hands
---   SkateState     client → server   { pump, brake } whenever either changes (Net/Schemas checks it)
+--   SkateState     client → server   { pump, brake, airPose } whenever one changes (Net/Schemas checks it)
 --   ActionRequest  client → server   { action, aim?, charge? } when a player starts an action (Net/Schemas)
 --   ActionRejected server → client   { action } when the server refuses it, so the client cancels it
 

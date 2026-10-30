@@ -53,6 +53,11 @@ export type MovementConfig = {
 	brakeDecel: number,
 	tiptoeSpeed: number,
 	jumpImpulse: number,
+	-- A jump, and an Air Pose, costs this share of the speed (the owner, #218: 10%, so jumping is no free move).
+	jumpSpeedCost: number,
+	-- The Air Pose (a press in the air, once until landing) cancels any fall and adds this speed straight up: a hop
+	-- of 42² / (2 × 196.2) = 4.5 studs, about half a jump's 9.2 (the owner, #218).
+	airPoseImpulse: number,
 	-- A ground normal turning more than maxTurnDeg is trusted only once a second ray agrees; smaller turns are
 	-- smoothed at this rate (per second).
 	normalFilter: { maxTurnDeg: number, smoothing: number },
@@ -100,6 +105,8 @@ local defaults: MovementConfig = {
 	brakeDecel = 120,
 	tiptoeSpeed = 12,
 	jumpImpulse = 60,
+	jumpSpeedCost = 0.1,
+	airPoseImpulse = 42,
 	normalFilter = { maxTurnDeg = 30, smoothing = 30 },
 	draftRange = 18,
 	draftConeDeg = 30,
@@ -147,6 +154,8 @@ local fields = Validate.record({
 	brakeDecel = positive,
 	tiptoeSpeed = nonNegative,
 	jumpImpulse = nonNegative,
+	jumpSpeedCost = Validate.number({ min = 0, max = 1 }),
+	airPoseImpulse = nonNegative,
 	normalFilter = Validate.record({ maxTurnDeg = angle, smoothing = positive }),
 	draftRange = positive,
 	draftConeDeg = angle,

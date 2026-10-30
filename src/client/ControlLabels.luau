@@ -1,9 +1,10 @@
 --!strict
 -- What each control does now (spec §11.1), named once for the touch buttons and the HUD's hints: the controls in the
 -- order both show them, each one's label from Config.UI.controlLabels (nil while it would do nothing), and the keys
--- that work it. Nothing works without a skater. Jump needs the ground (SkateMath jumps only from it), Attach a
--- teammate right ahead (SkateController.attachable), and an action key the action it would start now
--- (ActionController:keyAction). The throw's control works Ball Focus while it would start no throw: without the ball.
+-- that work it. Nothing works without a skater. Jump jumps on the ground and strikes the Air Pose in the air, once
+-- until landing (SkateMath), Attach needs a teammate right ahead (SkateController.attachable), and an action key the
+-- action it would start now (ActionController:keyAction). The throw's control works Ball Focus while it would start
+-- no throw: without the ball.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -37,7 +38,10 @@ function ControlLabels.label(
 	end
 	local labels = config.UI.controlLabels
 	if control == "jump" then
-		return if skater.mode == "Grounded" then labels.Jump else nil
+		if skater.mode == "Grounded" then
+			return labels.Jump
+		end
+		return if skater.mode == "Airborne" and skater.airPoseReady then labels.AirPose else nil
 	elseif control == "pump" then
 		return labels.Pump
 	elseif control == "brake" then

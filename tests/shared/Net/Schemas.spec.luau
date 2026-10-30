@@ -8,11 +8,13 @@ local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 
 describe("Schemas", function()
 	it("accepts a skate state and rejects malformed ones", function()
-		expect(#Schemas.SkateState({ pump = true, brake = false }, "SkateState")).toBe(0)
+		expect(#Schemas.SkateState({ pump = true, brake = false, airPose = true }, "SkateState")).toBe(0)
 		local malformed: { any } = {
-			{ pump = "yes", brake = false },
+			{ pump = "yes", brake = false, airPose = false },
 			{ pump = true },
-			{ pump = true, brake = false, speed = 999 },
+			{ pump = true, brake = false },
+			{ pump = true, brake = false, airPose = "yes" },
+			{ pump = true, brake = false, airPose = false, speed = 999 },
 			"x",
 		}
 		for _, payload in malformed do

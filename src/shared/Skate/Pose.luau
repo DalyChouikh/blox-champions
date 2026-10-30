@@ -1,9 +1,9 @@
 --!strict
 -- One skater's body pose (spec §7.1): how far each joint turns, from the lean, the pump, the brake, the air, the
--- carried ball, the lunge and the knockdown. Pure: it writes into a table the caller reuses, so a pose allocates only
--- the CFrames it returns. Every turn is in body axes (x right, y up, -z forward), which R15 joint frames match;
--- PoseController turns them into each joint's own frame. A positive turn about x tips the torso back and swings a
--- hanging limb forward.
+-- carried ball, the lunge, the knockdown and the Air Pose. Pure: it writes into a table the caller reuses, so a pose
+-- allocates only the CFrames it returns. Every turn is in body axes (x right, y up, -z forward), which R15 joint frames
+-- match; PoseController turns them into each joint's own frame. A positive turn about x tips the torso back and swings
+-- a hanging limb forward.
 
 local Config = require(script.Parent.Parent.Config)
 
@@ -29,6 +29,8 @@ export type PoseInput = {
 	carrying: boolean,
 	-- A tackle or dive in its windup or active phase.
 	lunging: boolean,
+	-- Striking the Air Pose (SkateMath.airPosing).
+	airPosing: boolean,
 	knockedDown: boolean,
 	-- How far the root joint lifts the body so the avatar's feet meet the ground.
 	bodyOffset: number,
@@ -41,13 +43,15 @@ function Pose.leanDeg(pose: Config.PoseConfig, speed: number, turnRate: number, 
 	return math.clamp(math.deg(math.atan(speed * turnRate / gravity)), -pose.maxLeanDeg, pose.maxLeanDeg)
 end
 
--- How far the body tips forward (negative) or back (positive): knocked down first, then a lunge, then the pump's
--- crouch or the brake's lean.
+-- How far the body tips forward (negative) or back (positive): knocked down first, then a lunge, then the Air Pose,
+-- then the pump's crouch or the brake's lean.
 local function pitchDeg(pose: Config.PoseConfig, input: PoseInput): number
 	if input.knockedDown then
 		return pose.knockdownTiltDeg
 	elseif input.lunging then
 		return -pose.lungeDeg
+	elseif input.airPosing then
+		return -pose.airPoseDeg
 	elseif input.pumping then
 		return -pose.crouchDeg / 2
 	elseif input.braking then
@@ -68,9 +72,11 @@ function Pose.compute(pose: Config.PoseConfig, input: PoseInput, out: Frame)
 	out.root = CFrame.new(0, input.bodyOffset, 0, cr, -sr, 0, cp * sr, cp * cr, -sp, sp * sr, sp * cr, cp)
 	out.waist = if pumping then CFrame.Angles(math.rad(-crouch / 2), 0, 0) else CFrame.identity
 
-	-- The thighs come forward and the shins fold back, in a crouch and in the air's tuck alike.
-	local hip = if pumping then crouch elseif airborne then pose.tuckDeg else 0
-	local knee = if pumping then -2 * crouch elseif airborne then -pose.tuckDeg else 0
+	-- The thighs come forward and the shins fold back, in a crouch and in the air's tuck alike; the Air Pose stretches
+	-- them straight.
+	local tucked = airborne and not input.airPosing
+	local hip = if pumping then crouch elseif tucked then pose.tuckDeg else 0
+	local knee = if pumping then -2 * crouch elseif tucked then -pose.tuckDeg else 0
 	local hipTurn = CFrame.Angles(math.rad(hip), 0, 0)
 	local kneeTurn = CFrame.Angles(math.rad(knee), 0, 0)
 	out.leftHip = hipTurn
@@ -78,7 +84,10 @@ function Pose.compute(pose: Config.PoseConfig, input: PoseInput, out: Frame)
 	out.leftKnee = kneeTurn
 	out.rightKnee = kneeTurn
 
-	out.rightShoulder = if input.carrying then CFrame.Angles(0, 0, math.rad(pose.carryArmDeg)) else CFrame.identity
+	out.rightShoulder = if input.carrying
+		then CFrame.Angles(0, 0, math.rad(pose.carryArmDeg))
+		elseif input.airPosing then CFrame.Angles(math.rad(pose.airPoseArmDeg), 0, 0)
+		else CFrame.identity
 end
 
 return Pose
