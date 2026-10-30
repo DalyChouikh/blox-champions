@@ -135,11 +135,43 @@ describe("SkateMath on the ground", function()
 			s:step(input({ move = Vector3.xAxis }), ground(), 0.1)
 			return math.atan2(s.velocity.X, -s.velocity.Z)
 		end
-		expect(turned(70)).toBeCloseTo(0.2554, 4) -- lerp(4.0, 1.5, 70/121) × 0.1
-		expect(turned(121)).toBeCloseTo(0.15, 4)
+		expect(turned(70)).toBeCloseTo(0.1277, 4) -- lerp(2.0, 0.75, 70/121) × 0.1
+		expect(turned(121)).toBeCloseTo(0.075, 4)
 		local still = skater(Vector3.zero)
 		still:step(input({ move = Vector3.xAxis }), ground(), 0.1)
 		Fixtures.expectNear(still.velocity, Vector3.new(2.594, 0, 0)) -- from rest it faces the stick at once
+	end)
+
+	-- Roller Champions (#266, Videos 14-15): a stick held against the motion brakes the skater to a stop before
+	-- they go its way (RC: 30-60 km/h per s), never carving a U-turn at speed. Its part back pushes like a stride.
+	it("brakes against a stick held straight back, then skates its way, never carving round", function()
+		local back = input({ move = Vector3.zAxis })
+		local s = skater(Vector3.new(0, 0, -46))
+		s:step(back, ground(), 0.1)
+		-- 46 − 30 × 0.1 = 43, then 43 − (4 + 0.02 × 43) × 0.1
+		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -42.514))
+		local held = skater(Vector3.new(0, 0, -46))
+		local steps = 0
+		while held.velocity.Z < 0 and steps < 600 do
+			held:step(back, ground(), 1 / 60)
+			expect(math.abs(held.velocity.X) < 1e-6).toBe(true)
+			steps += 1
+		end
+		-- dv/dt = −(30 + 4 + 0.02 v) from 46: 50 × ln(34.92 / 34) = 1.335 s, the 81st step at 60 a second
+		expect(steps / 60).toBeCloseTo(1.35, 1)
+		for _ = 1, 30 do
+			held:step(back, ground(), 1 / 60)
+		end
+		-- Then it strides the stick's way, 13.30 studs/s half a second later.
+		expect(held.velocity.Z).toBeCloseTo(13.30, 1)
+	end)
+
+	it("brakes with the part of the stick against the motion and turns only with the part across", function()
+		local s = skater(Vector3.new(0, 0, -46))
+		s:step(input({ move = Vector3.new(-1, 0, 1).Unit }), ground(), 0.1)
+		-- 135° off: back 0.7071 brakes 30 × 0.7071; across 0.7071 turns 0.7071 × lerp(2.0, 0.75, 46/121) × 0.1 =
+		-- 0.10782 rad toward −X; 46 − 2.1213 = 43.8787, then 43.8787 − (4 + 0.8776) × 0.1 = 43.3909 along it.
+		Fixtures.expectNear(s.velocity, Vector3.new(-4.6693, 0, -43.1390))
 	end)
 
 	it("brakes to a stop without reversing", function()
@@ -321,8 +353,15 @@ describe("SkateMath off the ground and on walls", function()
 	it("steers on a wall no faster than wallTurnRate", function()
 		local s = skater(Vector3.new(0, 0, -30))
 		s:step(input({ move = Vector3.yAxis }), ground(Vector3.xAxis), 0.1)
-		-- Turned 1 × 0.1 rad up (the floor's rate at 30 is 3.38), plus (0, −19.62, 0), then friction and drag
+		-- Turned 1 × 0.1 rad up (the floor's rate at 30 is 1.69), plus (0, −19.62, 0), then friction and drag
 		Fixtures.expectNear(s.velocity, Vector3.new(0, -16.3971, -29.441))
+	end)
+
+	it("neither brakes nor turns on a wall with the stick held back: the skates only roll", function()
+		local s = skater(Vector3.new(0, 0, -20))
+		s:step(input({ move = Vector3.zAxis }), ground(Vector3.xAxis), 0.1)
+		-- As with the stick held along the way: (0, −19.62, −20), then |28.0169| − (4 + 0.5603) × 0.1 along it
+		Fixtures.expectNear(s.velocity, Vector3.new(0, -19.3006, -19.6745))
 	end)
 
 	it("ignores the brake on a wall: no standing still on it, no tiptoeing up it", function()

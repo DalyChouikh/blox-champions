@@ -552,6 +552,10 @@ about two thirds of a lap, swinging from wall to wall.
     and 58.5-59.0 s the camera looked straight at the crowd. No view gives heights or angles in numbers (no known
     size beside the surfaces but the skater). Mexico's shape (the owner's screenshots) still comes only from Video 14
     and Video 3 frames.
+  - **Q34, while building #266** (2026-10-29, session 38, AskUserQuestion, recommended): **turn rates halved**:
+    `turnRateLow` 4.0 -> 2.0 and `turnRateHigh` 1.5 -> 0.75 rad/s, so at the 55 km/h stride ~1.5 rad/s (90 deg in ~1 s,
+    a circle ~60 studs across). RC judged by eye only (Video 15 16.6-17.4: ~1.3 rad/s at 55-67 km/h, a circle ~75
+    across); ours was 3.0 rad/s at 55 km/h. Not chosen: two-thirds (3.0 -> 1.0); keep today's.
 
 ## Roller Champions
 
