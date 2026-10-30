@@ -159,7 +159,8 @@ describe("Config defaults", function()
 			rollingFriction = 4,
 			airDrag = 0.02,
 			coastDecel = 7.5,
-			cruiseSpeed = 60,
+			-- Roller Champions' stride on the flat: 55 km/h (#265).
+			cruiseSpeed = 46,
 			softCap = 90,
 			hardCap = 121,
 			overSpeedBleed = 5,
