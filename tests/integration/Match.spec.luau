@@ -244,20 +244,26 @@ local function lineUp(attacker: Model, victim: Model, gap: number): CFrame
 end
 
 describe("A match on the generated arena", function()
+	-- The owner (Q92): everyone is placed on their spawn, free to skate and act through the count.
 	it(
-		"starts once a player is seated, keeps the ball hidden through the countdown, then drops it at a ball spawn",
+		"starts once a player is seated, free through the count with the ball hidden, then drops it at a ball spawn",
 		function()
 			setup()
-			local rigs = seat(1)
+			local rigs = seat(2)
 			frames(FRAME)
 			expect(events()).toEqual({ "MatchStarted", "KickoffStarted" })
 			expect(ballAt()).toBe("ServerStorage")
-			expect(Fixtures.root(rigs[1]).Anchored).toBe(true)
+			expect(Fixtures.root(rigs[1]).Anchored).toBe(false)
+			expect(rigs[1]:GetAttribute(Attributes.Placed)).toBe(1)
+			lineUp(rigs[1], rigs[2], 4)
+			ActionService:request("1", { action = "Tackle" })
+			frames(0.2)
+			expect(eventsNamed("TackleKnockdown")).toEqual({})
+			expect(rigs[2]:GetAttribute(Attributes.KnockedDown)).toBe("Hit")
 			frames(config.Match.kickoffCountdownSeconds + 0.05)
 			expect(table.find(events(), "KickoffEnded")).never.toBeNil()
 			expect(ballAt()).toBe("Workspace")
 			expect(BallService.state.status).toBe("Loose")
-			expect(Fixtures.root(rigs[1]).Anchored).toBe(false)
 		end
 	)
 

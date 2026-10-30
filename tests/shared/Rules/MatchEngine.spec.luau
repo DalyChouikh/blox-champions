@@ -12,6 +12,7 @@ local ZERO = Vector3.zero
 local ON_TARGET_POSITION, ON_TARGET_VELOCITY = Vector3.new(190, 15, 0), Vector3.new(100, 0, 0)
 local DEFAULTS = Fixtures.config()
 local DURATION, OVERTIME = DEFAULTS.Match.durationSeconds, DEFAULTS.Match.overtimeSeconds
+local KICKOFF, CELEBRATION = DEFAULTS.Match.kickoffCountdownSeconds, DEFAULTS.Match.celebrationSeconds
 -- Every streak starts at the goal's gate (spec §4.2), so a lap runs from it round to the gate before it.
 local GOAL_GATE = DEFAULTS.Arena.goalGateIndex
 local GATE_COUNT = Fixtures.GATE_COUNT
@@ -35,7 +36,7 @@ end
 local function liveEngine(overrides: { [string]: any }?): MatchEngine.MatchEngine
 	local engine = newEngine(overrides)
 	engine:start()
-	engine:tick(3)
+	engine:tick(KICKOFF)
 	engine:drainEvents()
 	return engine
 end
@@ -71,8 +72,8 @@ local function scoreGoal(engine: MatchEngine.MatchEngine, player: string)
 end
 
 local function resumePlay(engine: MatchEngine.MatchEngine)
-	engine:tick(3) -- celebration
-	engine:tick(3) -- kickoff countdown
+	engine:tick(CELEBRATION)
+	engine:tick(KICKOFF)
 end
 
 -- Orange leads 1-0, Blue has the ball, and the clock has just hit 0:00.
@@ -127,7 +128,7 @@ describe("MatchEngine options", function()
 		local engine = MatchEngine.new({ config = Fixtures.config(), arena = arena })
 		engine:addPlayer("B1", "Blue")
 		engine:start()
-		engine:tick(3)
+		engine:tick(KICKOFF)
 		table.insert(arena.gates, Fixtures.gate(500))
 		arena.gates[1] = Fixtures.gate(9999)
 		expect(table.isfrozen(arena.gates)).toBe(false)
@@ -144,9 +145,9 @@ describe("MatchEngine flow", function()
 		engine:start()
 		expectEvents(engine, {
 			{ name = "MatchStarted" },
-			{ name = "KickoffStarted", countdownSeconds = 3 },
+			{ name = "KickoffStarted", countdownSeconds = KICKOFF },
 		})
-		engine:tick(2.5)
+		engine:tick(KICKOFF - 0.5)
 		expectEvents(engine, {})
 		engine:tick(0.5)
 		expectEvents(engine, { { name = "KickoffEnded" } })
@@ -181,7 +182,7 @@ describe("MatchEngine flow", function()
 		local engine = newEngine()
 		engine:start()
 		engine:tick(1)
-		expect(engine:snapshot()).toMatchObject({ state = "Kickoff", phaseSecondsLeft = 2 })
+		expect(engine:snapshot()).toMatchObject({ state = "Kickoff", phaseSecondsLeft = KICKOFF - 1 })
 		local lastChance = lastChanceEngine()
 		expect(lastChance:snapshot()).toMatchObject({
 			period = "LastChance",
@@ -412,10 +413,10 @@ describe("MatchEngine goals and points", function()
 		scoreGoal(engine, "B1")
 		engine:drainEvents()
 		engine:pickedUp("O1", ZERO, ZERO)
-		engine:tick(2.5)
+		engine:tick(CELEBRATION - 0.5)
 		expectEvents(engine, {})
 		engine:tick(0.5)
-		expectEvents(engine, { { name = "KickoffStarted", countdownSeconds = 3 } })
+		expectEvents(engine, { { name = "KickoffStarted", countdownSeconds = KICKOFF } })
 		local snapshot = engine:snapshot()
 		expect(snapshot.state).toBe("Kickoff")
 		expect(snapshot.possessingTeam).toBeNil()
@@ -620,7 +621,7 @@ describe("MatchEngine clock", function()
 	it("runs the clock only during live play by default", function()
 		local engine = newEngine()
 		engine:start()
-		engine:tick(3)
+		engine:tick(KICKOFF)
 		expect(engine:snapshot().secondsLeft).toBe(DURATION)
 		engine:tick(10)
 		scoreGoal(engine, "B1")
@@ -771,9 +772,10 @@ describe("MatchEngine end of regulation", function()
 		local engine = liveEngine({
 			Match = { clockPausesDuringKickoff = false },
 		})
-		engine:tick(DURATION - 7) -- liveEngine's kickoff already used 3 s: 4 s left
+		-- liveEngine's kickoff already ran the clock: a celebration from here ends with 1 s left.
+		engine:tick(DURATION - KICKOFF - CELEBRATION - 1)
 		scoreGoal(engine, "O1")
-		engine:tick(3) -- celebration ends with 1 s left
+		engine:tick(CELEBRATION)
 		engine:drainEvents()
 		engine:tick(1)
 		local events = engine:drainEvents()
@@ -793,10 +795,11 @@ describe("MatchEngine 0:00 outside live play", function()
 			resumePlay(engine)
 			scoreGoal(engine, "O1")
 			resumePlay(engine)
-			engine:tick(DURATION - 16) -- liveEngine's kickoff and two celebration + kickoff pairs used 15 s: 1 s left
+			-- liveEngine's kickoff and two celebration + kickoff pairs ran the clock: 1 s left.
+			engine:tick(DURATION - KICKOFF - 2 * (CELEBRATION + KICKOFF) - 1)
 			scoreGoal(engine, "B1")
 			engine:drainEvents()
-			engine:tick(3) -- 0:00 during Blue's celebration
+			engine:tick(CELEBRATION) -- 0:00 during Blue's celebration
 			local events = engine:drainEvents()
 			expect(names(events)).toEqual({ "MatchEnded" })
 			expect(events[1]).toMatchObject({ winner = "Orange" })

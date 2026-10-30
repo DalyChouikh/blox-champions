@@ -3,7 +3,7 @@
 -- (strikes, knockdowns and their drops), then the movement guard (its moves of skaters and carriers), then the ball,
 -- then reports the ball's movement, a throw, a catch, a body touch and each knockdown to the rules engine in the order
 -- the engine documents, ticks it, reacts to its events — hiding and spawning the ball, clearing every action, knockdown
--- and call at a kickoff, placing and freezing characters, opening and closing the goal — and sends them to clients,
+-- and call at a kickoff, placing characters on their spawns, opening and closing the goal — and sends them to clients,
 -- each frame's batch followed by the match's snapshot, which clients draw from, both marked with the frame's number. A
 -- snapshot also goes to everyone whenever a seat changes, and to each player who joins, marked with the last frame's
 -- number; it names every player in the server and each who left during the match, so the score tab can name them. It
@@ -113,10 +113,9 @@ local function react(self: MatchService, event: Types.Event)
 	if name == "KickoffStarted" then
 		self._ball:hide()
 		self._actions:reset()
-		self._characters:placeAll(true)
+		self._characters:placeAll()
 	elseif name == "KickoffEnded" then
 		self._ball:spawn()
-		self._characters:freezeAll(false)
 	elseif name == "GoalOpened" then
 		setGoalOpen(self, true)
 	elseif name == "GoalClosed" then

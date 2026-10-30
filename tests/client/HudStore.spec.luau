@@ -10,7 +10,7 @@ local HudStore = require(game:GetService("StarterPlayer").StarterPlayerScripts.C
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 beforeEach(function()
-	HudStore:init({ Config = Fixtures.config() })
+	HudStore:init({ Config = Fixtures.config(), LocalId = "1" })
 end)
 
 describe("HudStore", function()
@@ -32,6 +32,13 @@ describe("HudStore", function()
 		HudStore:onEvents(Fixtures.ruleEvents(goal, 6))
 		local banner = HudStore.state.banner
 		expect(banner and banner.kind).toBe("Goal")
+	end)
+
+	-- The kickoff's count is the local player's team's (the owner, Q110): Ana, "1", plays for Blue.
+	it("shows the kickoff's count for the local player's team", function()
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 5 }))
+		local banner = HudStore.state.banner
+		expect(banner and banner.team).toBe("Blue")
 	end)
 
 	it("counts the HUD's clocks on each step", function()

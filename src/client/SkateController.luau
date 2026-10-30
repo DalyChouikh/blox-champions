@@ -5,9 +5,11 @@
 -- - works out the draft and the attach;
 -- - steps SkateMath, slides the skater along any ride surface in its way, and writes the result into the skater body
 --   the server built, whose up eases toward the skating's (#255).
--- It holds the skater still during the kickoff freeze and until the arena has reached this client. A knocked-down
--- skater (the server's KnockedDown attribute) lets go of any attach and only slides; knocked down by a strike or a
--- fall, they ask the server to get up (GetUp) once per knockdown, as soon as the stick moves: the server decides when.
+-- Whenever the server places the character (each kickoff: everyone back on their spawn, free to skate through the
+-- count), it starts the skater over from rest there; it holds the skater still while its root is anchored and until
+-- the arena has reached this client. A knocked-down skater (the server's KnockedDown attribute) lets go of any attach
+-- and only slides; knocked down by a strike or a fall, they ask the server to get up (GetUp) once per knockdown, as
+-- soon as the stick moves: the server decides when.
 -- A diver's own knockdown ends when the slide stops (the server sees it, #242). A diver (`diving`) lets go of any
 -- attach too and glides until that knockdown. While Roblox's menu holds the keys the skater lets go of any attach too,
 -- with no release boost. Actions push the skater through `push`. Pump, brake and the Air Pose go to the server
@@ -65,8 +67,8 @@ export type SkateController = {
 	move: Vector3,
 	-- Read each step: the character's KnockedDown attribute (why they are down, nil on their feet), whether they are
 	-- down, whether moving asks to get them up (the Get Up prompt: not after a dive, #242), and whether the skater is
-	-- held still: the root anchored (the kickoff freeze), or no arena on this client yet (RideSurfaces.ready), where
-	-- the skater would fall through the floor to come (#177).
+	-- held still this step: the root anchored, no arena on this client yet (RideSurfaces.ready), where the skater
+	-- would fall through the floor to come (#177), or the step the server placed it (Attributes.Placed).
 	knockdown: Attributes.Knockdown?,
 	knockedDown: boolean,
 	promptsGetUp: boolean,
@@ -114,6 +116,8 @@ export type SkateController = {
 	-- tests.
 	_smoothNormal: SmoothNormals.Reader,
 	_character: Model?,
+	-- The character's placement count (Attributes.Placed) last seen: a new one means the server placed it.
+	_placed: number?,
 	_velocity: LinearVelocity?,
 	_align: AlignOrientation?,
 	-- The skater body's up: the skating's, eased (Movement.bodyUpSmoothing), since the skating's up turns at once
@@ -380,10 +384,10 @@ local function askToGetUp(self: SkateController)
 	end
 end
 
--- The kickoff freeze (the server anchors every root while it places them), and the wait for the arena: the skater
--- starts from rest, upright and facing where the server put them, with no attach held over, no dive and no jump pressed
--- during the countdown. Pump and brake are still shared, so other players see what this one holds.
-local function freeze(self: SkateController, root: BasePart, skater: SkateMath.Skater)
+-- A placement by the server (each kickoff), an anchored root and the wait for the arena: the skater starts from rest,
+-- upright and facing where it was put, with no attach held over, no dive and no jump pressed before it. Pump and brake
+-- are still shared, so other players see what this one holds.
+local function startOver(self: SkateController, root: BasePart, skater: SkateMath.Skater)
 	self._inputController:read(self._keys)
 	skater:stop()
 	self.diving = false
@@ -447,6 +451,7 @@ local SkateController: SkateController = {
 		return face
 	end,
 	_character = nil,
+	_placed = nil,
 	root = nil,
 	_velocity = nil,
 	_align = nil,
@@ -521,6 +526,7 @@ local SkateController: SkateController = {
 		self._views = {}
 		self.skater = nil
 		self._character = nil
+		self._placed = nil
 		self.root = nil
 		self.pumping = false
 		self.braking = false
@@ -557,6 +563,8 @@ local SkateController: SkateController = {
 		skater.forward = root.CFrame.LookVector
 		self.skater = skater
 		self._character = character
+		-- A fresh skater already starts from rest.
+		self._placed = character:GetAttribute(Attributes.Placed) :: number?
 		self.root = root
 		self._velocity = velocity
 		self._align = align
@@ -593,9 +601,12 @@ local SkateController: SkateController = {
 		if self.knockedDown then
 			self.diving = false
 		end
-		self.frozen = root.Anchored or not self._surfaces.ready
+		local placed: number? = character:GetAttribute(Attributes.Placed) :: number?
+		local wasPlaced = placed ~= self._placed
+		self._placed = placed
+		self.frozen = root.Anchored or not self._surfaces.ready or wasPlaced
 		if self.frozen then
-			freeze(self, root, skater)
+			startOver(self, root, skater)
 			return
 		end
 

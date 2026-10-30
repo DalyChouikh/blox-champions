@@ -153,7 +153,8 @@ blox-champions/
 ### 4.5 Points and kickoff reset
 
 - A goal adds its `points` (§4.3) to its team's score; the first team to `Match.pointsToWin` (5) or more wins at once (§5.2), so a +5 goal from 0 ends the match (RC: "first team to 5 points wins instantly").
-- After any point: celebration (`Match.celebrationSeconds` = 3), then **kickoff reset**: both streaks → 0, goal closed, possession neutral, all players respawn at their team's spawn points, movement frozen for `Match.kickoffCountdownSeconds` = 3, ball spawns at a **uniformly random** point from the arena's `BallSpawn` set (positioned on the line equidistant from both team spawns, §9.1).
+- After any point: celebration (`Match.celebrationSeconds` = 3), then **kickoff reset**: both streaks → 0, goal closed, possession neutral, all players placed on their team's spawn points, then the **kickoff count**: `Match.kickoffCountdownSeconds` = 5, "5, 4, 3, 2, 1" one a second, during which **everyone is free** to skate, jump and use every action (there is no ball yet) and the clock holds; at **GO** the ball spawns at a **uniformly random** point from the arena's `BallSpawn` set (positioned on the line equidistant from both team spawns, §9.1) and the clock starts. *The owner (Q92, #307): Roller Champions' count (Videos 4, 13, 31); was 3 s with everyone frozen.*
+- **Placement:** the server stands each character on its spawn and counts the placement on it (`Attributes.Placed`); its client starts the skater over from rest there, upright and facing the spawn's way, nothing held or going before carried over. Nothing anchors a character any more.
 
 ### 4.6 `MatchEngine`
 
@@ -466,7 +467,7 @@ Samples each character every `Network.guardSampleSeconds = 0.25`. If the upward 
 React Luau (Roblox's `roblox/react` 17.3.13 + `roblox/react-roblox` 17.3.13, A5) components rendered from a client `HudStore` that applies `MatchSnapshot` and `RuleEvents`.
 
 - **Scoreboard (top center):** Blue score | timer | Orange score; `Match.pointsToWin` pips per team; ball-carrier name; **lap bar** for the possessing team — 4 segments per lap, "Lap n/4" until the goal opens, then "Streak n/12"; glows while the goal is open.
-- **Banners (center):** kickoff 3-2-1, GOAL!, DENIED! (on a save), 60/30 SECONDS, LAST CHANCE, OVERTIME.
+- **Banners (center):** the kickoff's 5-4-3-2-1 inside a ring (`UI.hud.countdown`), then GO <TEAM> TEAM! (`UI.text.go`), both in the player's own team colour (the owner, Q108-Q110, #307: RC's count is on the screen, not in the goal ring), GOAL!, DENIED! (on a save), 60/30 SECONDS, LAST CHANCE, OVERTIME.
 - **Event feed (bottom center):** possession changes, laps, goal open, scores.
 - **World UI:** ball indicator (§9.4), next-gate arrow for the carrier, call-pass hand over teammates, team-colored name tags.
 - **Control hints (right):** generated from `Config/Input`, filtered by context (with/without ball, airborne, just after a Tackle, near teammate) and by the current input device's glyphs.

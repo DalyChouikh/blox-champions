@@ -1,12 +1,13 @@
 --!strict
 -- What the HUD shows (spec §11.1), kept from the server's match snapshots and rule events. It never touches an
 -- Instance. A snapshot replaces the match; between snapshots the clock counts on by the engine's own rule
--- (MatchClock.runs), and each ClockWarning sets it. Events raise banners (the kickoff's 3-2-1 while the countdown
--- lasts, the others for UI.hud.bannerSeconds of play, held through a celebration so GOAL! lasts until the 3-2-1; a new
+-- (MatchClock.runs), and each ClockWarning sets it. Events raise banners (the kickoff's count while it lasts, then GO
+-- and the others for UI.hud.bannerSeconds of play, held through a celebration so GOAL! lasts until the count; a new
 -- one replaces the last) and add feed entries (each for UI.hud.feedSeconds, at most UI.hud.feedMaxEntries, oldest
--- first). The end of a match shows from MatchEnded, or from a snapshot of the ended match for a player who joins then,
--- until the next match's first snapshot. `version` grows whenever anything it shows changes, but not as the clocks
--- count, so the HUD redraws only then; stepping allocates nothing.
+-- first). The kickoff's count and GO are the viewer's team's. The end of a match shows from MatchEnded, or from a
+-- snapshot of the ended match for a player who joins then, until the next match's first snapshot. `version` grows
+-- whenever anything it shows changes, but not as the clocks count, so the HUD redraws only then; stepping allocates
+-- nothing.
 
 local Config = require(script.Parent.Parent.Config)
 local MatchClock = require(script.Parent.Parent.Rules.MatchClock)
@@ -18,8 +19,9 @@ local Types = require(script.Parent.Parent.Rules.Types)
 type Team = Team.Team
 type PlayerId = Types.PlayerId
 
-export type BannerKind = "Countdown" | "Goal" | "Denied" | "ClockWarning" | "LastChance" | "Overtime"
--- `value`: the countdown's digit, or the seconds a clock warning marks.
+export type BannerKind = "Countdown" | "Go" | "Goal" | "Denied" | "ClockWarning" | "LastChance" | "Overtime"
+-- `team`: whose colour it shows (the viewer's for the kickoff's count and GO); `value`: the count's digit, or the
+-- seconds a clock warning marks.
 export type Banner = { kind: BannerKind, team: Team?, value: number? }
 export type FeedKind = "Possession" | "Lap" | "GoalOpen" | "Goal"
 -- `id`: a running number, the entry's stable key; `value`: a completed lap's streak.
@@ -39,6 +41,8 @@ type Fields = {
 	ended: Ended?,
 	version: number,
 	_config: Config.GameConfig,
+	-- The player this HUD belongs to: the kickoff's count and GO are their team's.
+	_viewer: PlayerId,
 	-- How long the banner still shows outside celebrations (not the countdown's, which lasts while the kickoff does).
 	_bannerLeft: number,
 	_lastId: number,
@@ -46,7 +50,7 @@ type Fields = {
 
 export type HudState = typeof(setmetatable({} :: Fields, HudState))
 
-function HudState.new(config: Config.GameConfig): HudState
+function HudState.new(config: Config.GameConfig, viewer: PlayerId): HudState
 	return setmetatable(
 		{
 			match = nil,
@@ -56,6 +60,7 @@ function HudState.new(config: Config.GameConfig): HudState
 			ended = nil,
 			version = 0,
 			_config = config,
+			_viewer = viewer,
 			_bannerLeft = 0,
 			_lastId = 0,
 		} :: Fields,
@@ -63,7 +68,7 @@ function HudState.new(config: Config.GameConfig): HudState
 	)
 end
 
--- The countdown's digit: 3, 2, 1, never 0 while the kickoff waits for the server to end it.
+-- The count's digit: 5, 4, 3, 2, 1, never 0 while the kickoff waits for the server to end it.
 local function digit(secondsLeft: number): number
 	return math.max(math.ceil(secondsLeft), 1)
 end
@@ -106,6 +111,16 @@ function HudState.teamOf(match: MatchEngine.Snapshot?, player: PlayerId): Team?
 	return nil
 end
 
+-- The viewer's team in the current match, nil while it does not list them.
+local function viewerTeam(self: HudState): Team?
+	return HudState.teamOf(self.match, self._viewer)
+end
+
+-- The kickoff's count at `secondsLeft`, in the viewer's team's colour (the owner, Q110).
+local function countdown(self: HudState, secondsLeft: number): Banner
+	return { kind = "Countdown", team = viewerTeam(self), value = digit(secondsLeft) }
+end
+
 function HudState.applySnapshot(self: HudState, payload: Payloads.MatchSnapshot)
 	local match = payload.match
 	self.match = match
@@ -114,8 +129,9 @@ function HudState.applySnapshot(self: HudState, payload: Payloads.MatchSnapshot)
 	local banner = self.banner
 	if match.state == "Kickoff" then
 		if banner == nil or banner.kind ~= "Countdown" then
-			self.banner = { kind = "Countdown", value = digit(match.phaseSecondsLeft) }
+			self.banner = countdown(self, match.phaseSecondsLeft)
 		else
+			banner.team = viewerTeam(self)
 			banner.value = digit(match.phaseSecondsLeft)
 		end
 	elseif banner ~= nil and banner.kind == "Countdown" then
@@ -129,11 +145,17 @@ function HudState.applyEvents(self: HudState, events: { Types.Event })
 	for _, event in events do
 		local shown = true
 		if event.name == "KickoffStarted" then
-			self.banner = { kind = "Countdown", value = digit(event.countdownSeconds) }
+			self.banner = countdown(self, event.countdownSeconds)
 		elseif event.name == "KickoffEnded" then
-			local banner = self.banner
-			if banner ~= nil and banner.kind == "Countdown" then
-				self.banner = nil
+			-- GO <their team> TEAM! as the ball comes into play (the owner, Q109); none for a viewer with no team.
+			local team: Team? = viewerTeam(self)
+			if team ~= nil then
+				showBanner(self, "Go", team, nil)
+			else
+				local banner = self.banner
+				if banner ~= nil and banner.kind == "Countdown" then
+					self.banner = nil
+				end
 			end
 		elseif event.name == "PossessionChanged" then
 			addEntry(self, "Possession", event.team, event.player, nil)

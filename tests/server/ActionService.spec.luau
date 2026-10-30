@@ -394,7 +394,7 @@ describe("ActionService", function()
 	end)
 
 	it("rejects what the player cannot do now, and tells them", function()
-		local a, d = blue[1], blue[2]
+		local a = blue[1]
 		local b, c = orange[1], orange[2]
 		stand(a, Vector3.zero)
 		stand(b, Vector3.new(0, 0, -3))
@@ -413,11 +413,6 @@ describe("ActionService", function()
 		expect(advance(0.2)).toEqual({ `{a}>{b}` })
 		ActionService:request(b, { action = "Tackle" })
 		expect(rejected(b)).toEqual({ "Tackle" })
-
-		Fixtures.root(rigs[d]).Anchored = true
-		ActionService:request(d, { action = "CallPass" })
-		expect(rejected(d)).toEqual({ "CallPass" })
-		expect(attribute(d, Attributes.CallingPass)).toBeNil()
 
 		-- The first tackle ended at 0.65 s; its cooldown runs to 1 s.
 		advance(0.47)
