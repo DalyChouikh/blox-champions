@@ -312,6 +312,13 @@ about two thirds of a lap, swinging from wall to wall.
     past a stop) while holding the stick the way they move (S), the skater keeps facing and rides backwards; letting go
     of S or steering elsewhere turns them round smoothly in ~0.3 s; never a snap. Its own ticket now; finer animation in
     the art milestone. Q10–Q12 fold into #241/#242; Q13–Q14 one new Air Pose ticket, Q15 one new ticket, after #243.
+  - **Round 5, while building #241** (2026-10-28, session 32, AskUserQuestion, all recommended): Q16 after a Tackle's
+    lunge the speed **eases back** to the speed before over the Tackle's 0.35 s recovery, no jolt (RC's readout falls back
+    in ~0.3 s: 75 → 33, 71 → 46, 73 → 50 km/h, Video 4); not chosen: a drop at the strike's end. Q17 **the air Tackle
+    matches RC**: it adds 16 studs/s (19 km/h), 0.4 of the ground's 48 km/h (RC: 27 → 42 km/h, Video 5; 18 → 37, Video
+    6); the air dodge and uppercut keep 0.8; not chosen: 0.8 (38 km/h added). Q18 the air Tackle's ceiling is the
+    ground's **72 km/h** (one rule everywhere; RC's air tackles never came near a ceiling, so the videos can't tell);
+    not chosen: 0.8 of it (58 km/h).
 
 ## Roller Champions
 

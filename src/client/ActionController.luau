@@ -2,12 +2,12 @@
 -- The local player's actions (spec §3.3, §8.1–8.3). Each physics step, after the skating (FrameController), it reads
 -- the action keys and starts at most one action at once in its own ActionRunner: it pushes the skater, then asks the
 -- server, which checks the action again. A throw or pass predicts the ball leaving. A refusal (ActionRejected) stops
--- the action, refunds its cooldown and gives a refused throw's ball back; a push already given stays, which the
--- movement guard tolerates. A throw let go while another action runs waits for it. The tackle key dives in the
+-- the action, refunds its cooldown and gives a refused throw's ball back; a push already given stays (the movement
+-- guard tolerates it), but a lunge eases back to the speed before over its recovery, and drops to it at once when its
+-- action stops early (#241). A throw let go while another action runs waits for it. The tackle key dives in the
 -- Tackle's follow-up window (#240). Nothing starts while the skater is frozen for a kickoff, knocked down or diving: an
--- action with a landing (the Dive) holds the skater
--- (SkateController.diving) until the server knocks them down at their touchdown, and a knockdown stops the running
--- action, as the server stops it.
+-- action with a landing (the Dive) holds the skater (SkateController.diving) until the server knocks them down at
+-- their touchdown, and a knockdown stops the running action, as the server stops it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -56,6 +56,12 @@ export type ActionController = {
 	_charge: number?,
 	-- The throw key was seen up while the player held the ball, so holding it now charges a throw.
 	_throwReady: boolean,
+	-- The running action whose lunge eases back (one with a lungeCap, #241), the speed shown before it, and from its
+	-- recovery's start the speed shown then and the seconds since.
+	_lunge: Config.ActionName?,
+	_lungeBefore: number,
+	_lungePeak: number?,
+	_lungeEase: number,
 }
 
 -- The action `key` starts: the first of Config.Input.actions[key] that may start now (ActionRunner.available: its
@@ -112,36 +118,72 @@ local function chosen(
 	return nil
 end
 
--- The push an action gives as it starts: a lunge along the facing, a dodge along the stick (to the right without one),
--- a leap straight up. In the air it is airMultiplier as strong, unless the action ends on the belly (the dive).
+-- The push an action gives as it starts: a lunge along the facing up to its cap, a dodge along the stick (to the
+-- right without one), a leap straight up, a dive along the way (SkateMath). In the air the lunge, dodge and leap are
+-- the action's own airMultiplier, else Actions.airMultiplier, as strong; a dive's speed never is.
 local function push(self: ActionController, skater: SkateMath.Skater, action: Config.ActionConfig)
 	local motion = action.motion
 	if motion == nil then
 		return
 	end
+	local strength = if skater.mode == "Airborne" then action.airMultiplier or self._config.Actions.airMultiplier else 1
 	local change = Vector3.zero
 	local launch = false
 	if motion.lungeSpeed ~= nil then
-		change += skater.forward * motion.lungeSpeed
+		-- The schema gives every lunge its cap.
+		change += skater:lungeChange(motion.lungeSpeed * strength, motion.lungeCap :: number)
 	end
 	if motion.sideSpeed ~= nil then
 		local stick = self._skate.move
 		local side = if stick.Magnitude > Vectors.EPSILON then stick else skater.forward:Cross(skater.up)
 		if side.Magnitude > Vectors.EPSILON then
-			change += side.Unit * motion.sideSpeed
+			change += side.Unit * (motion.sideSpeed * strength)
 		end
 	end
 	if motion.leapImpulse ~= nil then
-		change += Vector3.yAxis * motion.leapImpulse
+		change += Vector3.yAxis * (motion.leapImpulse * strength)
 		launch = true
 	end
-	if change.Magnitude <= Vectors.EPSILON then
+	if motion.diveSpeed ~= nil then
+		change += skater:diveChange(motion.diveSpeed)
+	end
+	if change.Magnitude > Vectors.EPSILON then
+		self._skate:push(change, launch)
+	end
+end
+
+-- A lunge eases back (#241): from its action's recovery the speed shown is held under a ceiling falling evenly from
+-- what it was then to the speed before the lunge, and once the action stops (its end, a refusal, a knockdown) at the
+-- speed before. A skater the lunge left no faster than before has nothing to give back. A follow-up that replaces the
+-- action (the Dive) sets its own speed: `begin` lets go of the lunge.
+local function easeLunge(self: ActionController, skater: SkateMath.Skater, dt: number)
+	local lunging = self._lunge
+	if lunging == nil then
 		return
 	end
-	if skater.mode == "Airborne" and action.landing == nil then
-		change *= self._config.Actions.airMultiplier
+	local runner = self.runner
+	local ceiling = self._lungeBefore
+	if runner.action ~= lunging then
+		self._lunge = nil
+	elseif runner.phase ~= "Recovery" then
+		return
+	else
+		local peak = self._lungePeak or skater:shownSpeed()
+		if self._lungePeak == nil then
+			if peak <= ceiling then
+				self._lunge = nil
+				return
+			end
+			self._lungePeak = peak
+		end
+		self._lungeEase += dt
+		local recovery = self._config.Actions[lunging].phases.recovery
+		ceiling = peak + (ceiling - peak) * math.min(self._lungeEase / recovery, 1)
 	end
-	self._skate:push(change, launch)
+	local change = skater:slowChange(ceiling)
+	if change.Magnitude > Vectors.EPSILON then
+		self._skate:push(change, false)
+	end
 end
 
 -- A throw or a pass: the ball leaves the player's hands.
@@ -185,6 +227,11 @@ local function begin(self: ActionController, skater: SkateMath.Skater, name: Con
 	if action.landing ~= nil then
 		skate.diving = true
 	end
+	local motion = action.motion
+	self._lunge = if motion ~= nil and motion.lungeCap ~= nil then name else nil
+	self._lungeBefore = skater:shownSpeed()
+	self._lungePeak = nil
+	self._lungeEase = 0
 	push(self, skater, action)
 	self._sendRequest(request(self, name, action, held))
 	if letsGoOfBall(action) then
@@ -208,6 +255,10 @@ local ActionController: ActionController = {
 	_keyContext = nil :: any,
 	_charge = nil,
 	_throwReady = false,
+	_lunge = nil,
+	_lungeBefore = 0,
+	_lungePeak = nil,
+	_lungeEase = 0,
 
 	-- deps.Camera, deps.SendRequest and deps.LocalId replace the live game in tests.
 	init = function(self: ActionController, deps: { [string]: any })
@@ -228,6 +279,7 @@ local ActionController: ActionController = {
 		self._keyContext = { hasBall = false, airborne = false, knockedDown = false }
 		self._charge = nil
 		self._throwReady = false
+		self._lunge = nil
 	end,
 
 	start = function(self: ActionController)
@@ -259,6 +311,7 @@ local ActionController: ActionController = {
 			self.runner:reset()
 			self._charge = nil
 			self._throwReady = false
+			self._lunge = nil
 			return
 		end
 		self.runner:step(dt)
@@ -266,6 +319,7 @@ local ActionController: ActionController = {
 		if skate.knockedDown and running ~= nil then
 			self.runner:cancel(running, false)
 		end
+		easeLunge(self, skater, dt)
 		self._input:readActions(keys)
 		local hasBall = holdsBall(self)
 		local name: Config.ActionName? = chosen(self, keys, hasBall, dt)

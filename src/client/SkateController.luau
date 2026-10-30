@@ -65,7 +65,8 @@ export type SkateController = {
 	frozen: boolean,
 	-- Set by ActionController when a dive (an action with a landing) starts: the skater does nothing more until the
 	-- server's knockdown at their touchdown, which ends it, as do a freeze and a new character. Meanwhile the input
-	-- locks as a knockdown's does, so the belly slide starts the moment they touch down.
+	-- locks as a knockdown's does, so the belly slide starts the moment they touch down, and in the air they fly down
+	-- the fall line (SkateMath, #241).
 	diving: boolean,
 	-- Set each step: attached, or right behind a teammate with no cooldown, so holding Attach would attach.
 	attachable: boolean,
@@ -443,8 +444,15 @@ local SkateController: SkateController = {
 		self._surfaces = deps.RideSurfaces
 		self._stepSeconds = 0
 		self._keys = InputController.newKeys()
-		self._input =
-			{ move = Vector3.zero, pump = false, brake = false, jump = false, draftAccel = 0, knockedDown = false }
+		self._input = {
+			move = Vector3.zero,
+			pump = false,
+			brake = false,
+			jump = false,
+			draftAccel = 0,
+			knockedDown = false,
+			diving = false,
+		}
 		self._ground = { hit = false, normal = worldUp(self), distance = 0 }
 		self._sources = {}
 		self._teammates = {}
@@ -531,6 +539,7 @@ local SkateController: SkateController = {
 		input.brake = keys.brake
 		input.jump = keys.jump
 		input.knockedDown = self.knockedDown or self.diving
+		input.diving = self.diving
 		self.move = input.move
 		castGround(self, root, skater, dt)
 		gatherOthers(self)

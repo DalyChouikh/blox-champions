@@ -80,7 +80,9 @@ describe("Config defaults", function()
 				effect = "Knockdown",
 				pose = "Lunge",
 				hit = { range = 7, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
-				motion = { lungeSpeed = 40 },
+				-- 48 km/h more, never past 72 km/h; in the air 0.4 as much (#241: RC's 27 -> 42 km/h).
+				motion = { lungeSpeed = 40, lungeCap = 60 },
+				airMultiplier = 0.4,
 				followUp = { action = "Dive", from = 0.1, to = 1 },
 			},
 			-- Only as the Tackle's follow-up, ending on the belly at the first touch of the ground (#221, #240).
@@ -91,7 +93,8 @@ describe("Config defaults", function()
 				effect = "Knockdown",
 				pose = "Lunge",
 				hit = { range = 11, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
-				motion = { lungeSpeed = 60 },
+				-- 72 km/h along the way, or a faster skater's own speed (#241).
+				motion = { diveSpeed = 60 },
 				landing = { knockdownSeconds = 1.5 },
 			},
 			Dodge = {
@@ -162,6 +165,8 @@ describe("Config defaults", function()
 			turnRateHigh = 1.5,
 			airTurnRate = 1,
 			airUprightRate = 6,
+			-- A diver's way down (#241: RC's dive gained ~75 km/h per s).
+			fallLineDeg = 20,
 			wallAngle = 30,
 			wallGravityScale = 1 / 3,
 			wallTurnRate = 1,
@@ -813,6 +818,15 @@ describe("Config.forMode", function()
 				overrides = { Movement = { wallTurnRate = -1 } },
 				message = "Movement.wallTurnRate: must be >= 0 (got -1)",
 			},
+			-- The fall line (#241): below the facing, at most straight down.
+			{
+				overrides = { Movement = { fallLineDeg = 0 } },
+				message = "Movement.fallLineDeg: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { fallLineDeg = 91 } },
+				message = "Movement.fallLineDeg: must be <= 90 (got 91)",
+			},
 		}
 		for _, case in cases do
 			expect(function()
@@ -859,6 +873,23 @@ describe("Config.forMode", function()
 			{
 				overrides = { Uppercut = { motion = { leapImpulse = 0 } } },
 				message = "Actions.Uppercut.motion.leapImpulse: must be > 0 (got 0)",
+			},
+			-- The lunges (#241): a tackle's ceiling and air strength, a dive's speed.
+			{
+				overrides = { Tackle = { motion = { lungeCap = 0 } } },
+				message = "Actions.Tackle.motion.lungeCap: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Tackle = { airMultiplier = 1.5 } },
+				message = "Actions.Tackle.airMultiplier: must be <= 1 (got 1.5)",
+			},
+			{
+				overrides = { Dodge = { airMultiplier = 0.5 } },
+				message = "Actions.Dodge.airMultiplier: unknown key",
+			},
+			{
+				overrides = { Dive = { motion = { diveSpeed = 0 } } },
+				message = "Actions.Dive.motion.diveSpeed: must be > 0 (got 0)",
 			},
 		}
 		for _, case in cases do

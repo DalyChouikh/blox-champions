@@ -22,6 +22,7 @@ export type ActionName = Actions.ActionName
 export type Effect = Actions.Effect
 export type PoseName = Actions.PoseName
 export type Hit = Actions.Hit
+export type Motion = Actions.Motion
 export type Landing = Actions.Landing
 export type FollowUp = Actions.FollowUp
 export type ThrowSettings = Actions.ThrowSettings
