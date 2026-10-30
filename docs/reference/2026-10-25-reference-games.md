@@ -208,6 +208,12 @@ about two thirds of a lap, swinging from wall to wall.
   with no input).
 - Process (the owner, 2026-10-27): no more spec and plan documents for a part; it is planned by these questions and
   written as GitHub issues (#214 to #224), then built issue by issue, test-first.
+- **Where the light wall gravity starts** (asked while building it, #216, with measurements): **from a 30° tilt**, not
+  the 60° first planned. Our outer wall rises from an 18-stud curved foot, and below 60° a skater lost most of its
+  speed there at full gravity; Roller Champions' glass rises almost straight from a low foot. Measured in Studio, a
+  skater sent straight at the outer glass from the middle lane, nothing pressed: from 60°, a 108 km/h ride climbed 30
+  studs, a whip release 44 and 145 km/h 42; from 45°, 40, 49 and 49; from 30°, 46, 61 and 55. The pump step (19° at
+  its steepest) keeps full gravity.
 
 ## Roller Champions
 

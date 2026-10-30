@@ -39,8 +39,8 @@ type Fields = {
 	_movement: Config.MovementConfig,
 	_gravity: Vector3,
 	_worldUp: Vector3,
-	-- A surface whose normal is closer to world up than this cosine is not steep (maxStickAngle).
-	_stickCos: number,
+	-- A surface whose normal is closer to world up than this cosine is not a wall (wallAngle).
+	_wallCos: number,
 	-- Gravity's pull along a surface no steeper than pumpFlatSlopeDeg: pumping there counts as on the flat.
 	_flatPull: number,
 	-- The ground normal the last grounded step rode on, nil in the air: each step's turn is measured from it (A3).
@@ -64,7 +64,7 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_movement = movement,
 		_gravity = gravity,
 		_worldUp = -gravity.Unit,
-		_stickCos = math.cos(math.rad(movement.maxStickAngle)),
+		_wallCos = math.cos(math.rad(movement.wallAngle)),
 		_flatPull = gravity.Magnitude * math.sin(math.rad(movement.pumpFlatSlopeDeg)),
 		_lastNormal = nil,
 		_steps = table.create(HISTORY, 0),
@@ -126,7 +126,11 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 		stick = 0
 	end
 
+	-- On a wall gravity pulls along it at wallGravityScale of its strength (#216); in the air it stays full.
 	local gravityAlong = alongSurface(self._gravity, normal)
+	if self:isSteep(normal) then
+		gravityAlong *= movement.wallGravityScale
+	end
 	local acceleration = gravityAlong + heading * input.draftAccel
 	if input.pump and not input.brake then
 		acceleration += heading * pumpPush(self, gravityAlong:Dot(heading))
@@ -278,14 +282,9 @@ local function forget(self: Skater)
 	self._historyCount = 0
 end
 
--- Steeper than maxStickAngle: a wall, which holds only a skater fast enough along it.
+-- Steeper than wallAngle: a wall, where gravity pulls along the surface at wallGravityScale.
 function SkateMath.isSteep(self: Skater, normal: Vector3): boolean
-	return normal:Dot(self._worldUp) < self._stickCos
-end
-
--- A steep surface holds only a skater moving at least minWallSpeed along it.
-local function tooSlowOnWall(self: Skater, normal: Vector3): boolean
-	return self:isSteep(normal) and alongSurface(self.velocity, normal).Magnitude < self._movement.minWallSpeed
+	return normal:Dot(self._worldUp) < self._wallCos
 end
 
 -- The mode changes first, so a jump or a fall is stepped in the air at once.
@@ -295,12 +294,8 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 		if ground.hit and input.jump then
 			self.velocity += ground.normal * movement.jumpImpulse
 			self.mode = "Airborne"
-		elseif
-			not ground.hit
-			or tooSlowOnWall(self, ground.normal)
-			-- Past straight up, the curve of the surface must hold the skater (A3).
-			or loopBreaks(self, ground.normal, travel, turn)
-		then
+		elseif not ground.hit or loopBreaks(self, ground.normal, travel, turn) then
+			-- No ground, or past straight up the surface's curve no longer holds the skater (A3).
 			self.mode = "Airborne"
 		end
 	elseif ground.hit and ground.distance <= movement.hoverHeight and self.velocity:Dot(ground.normal) <= 0 then

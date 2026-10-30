@@ -157,8 +157,8 @@ describe("Config defaults", function()
 			turnRateHigh = 1.5,
 			airTurnRate = 1,
 			airUprightRate = 6,
-			minWallSpeed = 35,
-			maxStickAngle = 60,
+			wallAngle = 30,
+			wallGravityScale = 1 / 3,
 			curvatureWindow = 10,
 			pumpSlopeMultiplier = 1.6,
 			pumpFlatAccel = 8,
@@ -763,6 +763,14 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { coastDecel = -1 } },
 				message = "Movement.coastDecel: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { Movement = { wallGravityScale = 0 } },
+				message = "Movement.wallGravityScale: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { wallGravityScale = 1.5 } },
+				message = "Movement.wallGravityScale: must be <= 1 (got 1.5)",
 			},
 		}
 		for _, case in cases do
