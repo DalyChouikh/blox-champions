@@ -101,10 +101,12 @@ local function facingOn(self: Skater, normal: Vector3): Vector3
 	return normal:Cross(Vector3.zAxis).Unit
 end
 
--- Turns widen with speed: turnRateLow at rest down to turnRateHigh at hardCap.
-local function turnRate(movement: Config.MovementConfig, speed: number): number
+-- Turns widen with speed: turnRateLow at rest down to turnRateHigh at hardCap, and never faster than wallTurnRate on a
+-- wall (#239).
+local function turnRate(movement: Config.MovementConfig, speed: number, wall: boolean): number
 	local fraction = math.min(speed / movement.hardCap, 1)
-	return movement.turnRateLow + (movement.turnRateHigh - movement.turnRateLow) * fraction
+	local rate = movement.turnRateLow + (movement.turnRateHigh - movement.turnRateLow) * fraction
+	return if wall then math.min(rate, movement.wallTurnRate) else rate
 end
 
 -- Pumping multiplies the pull downhill, gives a small push on the flat and nothing uphill.
@@ -129,6 +131,10 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	local velocity = alongSurface(self.velocity, normal)
 	local speed = velocity.Magnitude
 	local heading = if speed > EPSILON then velocity / speed else facingOn(self, normal)
+	-- On a wall the skates only roll (#239): the stick steers at most wallTurnRate and never strides, the brake does
+	-- nothing, and gravity pulls along it at wallGravityScale of its strength (#216); in the air it stays full.
+	local wall = isWall(self, normal)
+	local brake = input.brake and not wall
 
 	local stick = math.min(input.move.Magnitude, 1)
 	local wish = alongSurface(input.move, normal)
@@ -136,22 +142,21 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	if stick > 0 and wish.Magnitude > EPSILON then
 		wishDirection = wish.Unit
 		heading = if speed > EPSILON
-			then rotateToward(heading, wishDirection, turnRate(movement, speed) * dt, normal)
+			then rotateToward(heading, wishDirection, turnRate(movement, speed, wall) * dt, normal)
 			else wishDirection
 	else
 		stick = 0
 	end
 
-	-- On a wall gravity pulls along it at wallGravityScale of its strength (#216); in the air it stays full.
 	local gravityAlong = alongSurface(self._gravity, normal)
-	if isWall(self, normal) then
+	if wall then
 		gravityAlong *= movement.wallGravityScale
 	end
 	local acceleration = gravityAlong + heading * input.draftAccel
-	if input.pump and not input.brake then
+	if input.pump and not brake then
 		acceleration += heading * pumpPush(self, gravityAlong:Dot(heading))
 	end
-	if not input.brake and stick > 0 and speed < movement.cruiseSpeed then
+	if not wall and not brake and stick > 0 and speed < movement.cruiseSpeed then
 		acceleration += heading * (movement.strideAccel * stick * math.max(0, wishDirection:Dot(heading)))
 	end
 	local forwardPart = acceleration:Dot(heading)
@@ -166,10 +171,10 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	-- Friction and drag, with more slowing on top for a knocked-down skater or one pressing nothing (#215).
 	local extra = if input.knockedDown
 		then movement.knockdownDecel
-		elseif stick == 0 and not input.pump and not input.brake then movement.coastDecel
+		elseif stick == 0 and not input.pump and not brake then movement.coastDecel
 		else 0
 	speed = math.max(0, speed - (movement.rollingFriction + extra + movement.airDrag * speed) * dt)
-	if input.brake then
+	if brake then
 		local tiptoe = movement.tiptoeSpeed * stick
 		if speed > tiptoe then
 			speed = math.max(tiptoe, speed - movement.brakeDecel * dt)
