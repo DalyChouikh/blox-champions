@@ -148,10 +148,12 @@ function ScoreKeeper.stats(self: ScoreKeeper): Types.MatchStats
 	return { scores = self:teamScores(), players = players }
 end
 
-function ScoreKeeper.mvp(self: ScoreKeeper, team: Team.Team): Types.PlayerId?
+-- The best present player of the winning `team`, or of both teams after a draw (nil: ruling, #306).
+function ScoreKeeper.mvp(self: ScoreKeeper, team: Team.Team?): Types.PlayerId?
 	local best: PlayerStats? = nil
 	for _, stats in self._players do
-		if stats.present and stats.team == team and (best == nil or ranksAbove(stats, best)) then
+		local counts = stats.present and (team == nil or stats.team == team)
+		if counts and (best == nil or ranksAbove(stats, best)) then
 			best = stats
 		end
 	end

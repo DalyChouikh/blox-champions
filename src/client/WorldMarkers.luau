@@ -22,6 +22,7 @@ local HudStore = require(script.Parent.HudStore)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local RideSurfaces = require(script.Parent.RideSurfaces)
 local ScreenMarker = require(ReplicatedStorage.Shared.Hud.ScreenMarker)
+local Style = require(script.Parent.Hud.Style)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
@@ -326,9 +327,7 @@ local WorldMarkers: WorldMarkers = {
 
 	step = function(self: WorldMarkers, _dt: number)
 		local match = self._store.state.match
-		local team = if match ~= nil then match.possessingTeam else nil
-		local ui = self._config.UI
-		paint(self, if team ~= nil then ui.teamColors[team] else ui.hud.textColor)
+		paint(self, Style.teamColor(self._config, if match ~= nil then match.possessingTeam else nil))
 		placeBall(self, self._ballPart:get())
 		placeGate(self, if match ~= nil then match.nextGate else nil)
 	end,

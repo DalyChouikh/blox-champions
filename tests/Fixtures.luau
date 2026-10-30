@@ -179,7 +179,6 @@ function Fixtures.matchSnapshot(overrides: { [string]: any }?, frame: number?): 
 		period = "Regulation",
 		phaseSecondsLeft = 0,
 		secondsLeft = 120,
-		overtimeSeconds = 0,
 		scores = { Blue = 0, Orange = 0 },
 		streak = 0,
 		lapProgress = 0,
