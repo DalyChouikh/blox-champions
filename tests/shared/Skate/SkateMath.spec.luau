@@ -135,8 +135,8 @@ describe("SkateMath on the ground", function()
 			s:step(input({ move = Vector3.xAxis }), ground(), 0.1)
 			return math.atan2(s.velocity.X, -s.velocity.Z)
 		end
-		expect(turned(70)).toBeCloseTo(0.1277, 4) -- lerp(2.0, 0.75, 70/121) × 0.1
-		expect(turned(121)).toBeCloseTo(0.075, 4)
+		expect(turned(70)).toBeCloseTo(0.2554, 4) -- lerp(4.0, 1.5, 70/121) × 0.1
+		expect(turned(121)).toBeCloseTo(0.15, 4)
 		local still = skater(Vector3.zero)
 		still:step(input({ move = Vector3.xAxis }), ground(), 0.1)
 		Fixtures.expectNear(still.velocity, Vector3.new(2.594, 0, 0)) -- from rest it faces the stick at once
@@ -169,9 +169,9 @@ describe("SkateMath on the ground", function()
 	it("brakes with the part of the stick against the motion and turns only with the part across", function()
 		local s = skater(Vector3.new(0, 0, -46))
 		s:step(input({ move = Vector3.new(-1, 0, 1).Unit }), ground(), 0.1)
-		-- 135° off: back 0.7071 brakes 30 × 0.7071; across 0.7071 turns 0.7071 × lerp(2.0, 0.75, 46/121) × 0.1 =
-		-- 0.10782 rad toward −X; 46 − 2.1213 = 43.8787, then 43.8787 − (4 + 0.8776) × 0.1 = 43.3909 along it.
-		Fixtures.expectNear(s.velocity, Vector3.new(-4.6693, 0, -43.1390))
+		-- 135° off: back 0.7071 brakes 30 × 0.7071; across 0.7071 turns 0.7071 × lerp(4.0, 1.5, 46/121) × 0.1 =
+		-- 0.21564 rad toward −X; 46 − 2.1213 = 43.8787, then 43.8787 − (4 + 0.8776) × 0.1 = 43.3909 along it.
+		Fixtures.expectNear(s.velocity, Vector3.new(-9.2844, 0, -42.3860))
 	end)
 
 	it("brakes to a stop without reversing", function()
@@ -354,7 +354,7 @@ describe("SkateMath off the ground and on walls", function()
 	it("steers on a wall no faster than wallTurnRate", function()
 		local s = skater(Vector3.new(0, 0, -30))
 		s:step(input({ move = Vector3.yAxis }), ground(Vector3.xAxis), 0.1)
-		-- Turned 1 × 0.1 rad up (the floor's rate at 30 is 1.69), plus (0, −19.62, 0), then friction and drag
+		-- Turned 1 × 0.1 rad up (the floor's rate at 30 is 3.38), plus (0, −19.62, 0), then friction and drag
 		Fixtures.expectNear(s.velocity, Vector3.new(0, -16.3971, -29.441))
 	end)
 
