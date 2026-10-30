@@ -195,7 +195,7 @@ local function pumpPush(self: Skater, downhillPull: number): number
 	return 0
 end
 
--- Steeper than wallAngle: a wall, where gravity pulls along the surface at wallGravityScale.
+-- Steeper than wallAngle: a wall, where the skates only roll (#239).
 local function isWall(self: Skater, normal: Vector3): boolean
 	return normal:Dot(self._worldUp) < self._wallCos
 end
@@ -224,8 +224,8 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 		speed = kept
 	end
 	local heading = if speed > EPSILON then velocity / speed else facingOn(self, normal)
-	-- On a wall the skates only roll (#239): the stick steers at most wallTurnRate and never strides, the brake does
-	-- nothing, and gravity pulls along it at wallGravityScale of its strength (#216); in the air it stays full.
+	-- On a wall the skates only roll (#239): the stick steers at most wallTurnRate and never strides, and the brake
+	-- does nothing. Gravity pulls along every surface at full strength (#256).
 	local wall = isWall(self, normal)
 	local brake = input.brake and not wall
 
@@ -242,9 +242,6 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	end
 
 	local gravityAlong = alongSurface(self._gravity, normal)
-	if wall then
-		gravityAlong *= movement.wallGravityScale
-	end
 	local acceleration = gravityAlong + heading * input.draftAccel
 	if input.pump and not brake then
 		acceleration += heading * pumpPush(self, gravityAlong:Dot(heading))
