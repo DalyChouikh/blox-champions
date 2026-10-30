@@ -1,7 +1,8 @@
 --!strict
 -- The server's side of actions (spec §3.3, §8.1, §13). Every request a client sends is checked again in that player's
--- own ActionRunner and applied here, or refused with ActionRejected. Throws and passes go through BallService. Strikes
--- are judged each frame against the server's positions and knock down the nearest opponent they reach; every strike
+-- own ActionRunner and applied here, or refused with ActionRejected: a follow-up (the Tackle's Dive) only inside its
+-- window after a Tackle the server itself started. Throws and passes go through BallService. Strikes are judged each
+-- frame against the server's positions and knock down the nearest opponent they reach; every strike
 -- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns, the
 -- running action (until its recovery) and calls for a pass show as character attributes every client reads. A
 -- knocked-down player whose client asks to get up (GetUp, sent when they move) is up once Actions.getUpAfter has passed

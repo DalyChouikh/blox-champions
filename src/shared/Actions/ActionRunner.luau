@@ -26,6 +26,12 @@ type Fields = {
 	_phaseLeft: number,
 	-- Seconds until each action may start again.
 	_cooldowns: { [string]: number },
+	-- The action started last and the seconds since: follow-up windows count from it. Nil before any, or once it was
+	-- refused or the runner reset.
+	_lastStarted: Actions.ActionName?,
+	_sinceStart: number,
+	-- Each action named as another's follow-up (the Dive), by the action it follows (the Tackle).
+	_followUpOf: { [string]: Actions.ActionName },
 }
 
 export type Runner = typeof(setmetatable({} :: Fields, ActionRunner))
@@ -99,8 +105,13 @@ end
 
 function ActionRunner.new(actions: Actions.ActionsConfig): Runner
 	local cooldowns: { [string]: number } = {}
-	for _, name in Actions.names do
+	local followUpOf: { [string]: Actions.ActionName } = {}
+	for _, name: Actions.ActionName in Actions.names do
 		cooldowns[name] = 0
+		local followUp = actions[name].followUp
+		if followUp ~= nil then
+			followUpOf[followUp.action] = name
+		end
 	end
 	local self: Fields = {
 		action = nil,
@@ -110,21 +121,41 @@ function ActionRunner.new(actions: Actions.ActionsConfig): Runner
 		_phaseIndex = 0,
 		_phaseLeft = 0,
 		_cooldowns = cooldowns,
+		_lastStarted = nil,
+		_sinceStart = 0,
+		_followUpOf = followUpOf,
 	}
 	return setmetatable(self, ActionRunner)
 end
 
--- Starts `name` when the context allows it, nothing else runs and its cooldown is over. `tolerance` (the server's
--- allowance for network jitter) moves each of those edges by that many seconds: a cooldown or a running action that
--- ends within it counts as over. Anything but "Started" changes nothing.
+-- Whether `name` may start as far as the context and, for a follow-up, its window go (not its cooldown, nor what
+-- runs): the action it follows started last, between its window's `from` and `to` seconds ago, each edge moved by
+-- `tolerance`. What an action key would start now (ActionController).
+function ActionRunner.available(self: Runner, name: Actions.ActionName, context: Context, tolerance: number?): boolean
+	if not ActionRunner.allows(self._actions[name].requires, context) then
+		return false
+	end
+	local source: Actions.ActionName? = self._followUpOf[name]
+	if source == nil then
+		return true
+	end
+	local window = self._actions[source].followUp :: Actions.FollowUp
+	local slack, since = tolerance or 0, self._sinceStart
+	return self._lastStarted == source and since >= window.from - slack and since <= window.to + slack
+end
+
+-- Starts `name` when it is available, nothing else runs (a follow-up replaces the action it follows) and its cooldown
+-- is over. `tolerance` (the server's allowance for network jitter) moves each of those edges by that many seconds: a
+-- window, a cooldown or a running action that ends within it counts as open or over. Anything but "Started" changes
+-- nothing.
 function ActionRunner.start(self: Runner, name: Actions.ActionName, context: Context, tolerance: number?): Verdict
 	local config = self._actions[name]
-	if not ActionRunner.allows(config.requires, context) then
+	if not ActionRunner.available(self, name, context, tolerance) then
 		return "NotAllowed"
 	end
 	local slack = tolerance or 0
 	local running: Actions.ActionName? = self.action
-	if running ~= nil then
+	if running ~= nil and self._followUpOf[name] ~= running then
 		local phases = self._actions[running].phases
 		if elapsed(self, phases) < phaseStart(phases, #PHASES + 1) - slack then
 			return "Busy"
@@ -135,12 +166,16 @@ function ActionRunner.start(self: Runner, name: Actions.ActionName, context: Con
 	end
 	self._cooldowns[name] = config.cooldown
 	self.action = name
+	self._lastStarted = name
+	self._sinceStart = 0
 	advance(self, name, 1, 0)
 	return "Started"
 end
 
--- Advances the running action's phase, carrying leftover time into the next one, and every cooldown.
+-- Advances the running action's phase, carrying leftover time into the next one, every cooldown and the time since
+-- the last start.
 function ActionRunner.step(self: Runner, dt: number)
+	self._sinceStart += dt
 	local cooldowns = self._cooldowns
 	for _, name in Actions.names do
 		local left = cooldowns[name]
@@ -171,8 +206,8 @@ function ActionRunner.cooldownLeft(self: Runner, name: Actions.ActionName): numb
 	return self._cooldowns[name]
 end
 
--- Stops `name` if it is the running action and, with `refund`, clears its cooldown (the server refused it). An
--- instant action never stays running, so only its cooldown can be refunded.
+-- Stops `name` if it is the running action and, with `refund`, clears its cooldown and any follow-up window it
+-- opened (the server refused it). An instant action never stays running, so only its cooldown can be refunded.
 function ActionRunner.cancel(self: Runner, name: Actions.ActionName, refund: boolean)
 	if self.action == name then
 		stop(self)
@@ -182,13 +217,17 @@ function ActionRunner.cancel(self: Runner, name: Actions.ActionName, refund: boo
 	end
 	if refund then
 		self._cooldowns[name] = 0
+		if self._lastStarted == name then
+			self._lastStarted = nil
+		end
 	end
 end
 
--- No action runs and every cooldown is over (the kickoff).
+-- No action runs, every cooldown is over and no follow-up window is open (the kickoff).
 function ActionRunner.reset(self: Runner)
 	stop(self)
 	self.lastActive = nil
+	self._lastStarted = nil
 	local cooldowns = self._cooldowns
 	for _, name in Actions.names do
 		cooldowns[name] = 0

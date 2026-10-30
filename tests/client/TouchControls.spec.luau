@@ -197,10 +197,13 @@ describe("TouchControls", function()
 		expect(button("throw").Text).toBe(labels.ChargeThrow)
 		expect(button("uppercut").Visible).toBe(false)
 
-		-- In the air, without the ball, the button dives (#221).
+		-- In the air, without the ball, the button tackles, then dives in the tackle's follow-up window (#240).
 		BallCarrier:set(nil)
 		local skater = SkateController.skater :: any
 		skater.mode = "Airborne"
+		TouchControls:step(DT)
+		expect(button("tackle").Text).toBe(labels.Tackle)
+		Fixtures.intoDiveWindow(config)
 		TouchControls:step(DT)
 		expect(button("tackle").Text).toBe(labels.Dive)
 

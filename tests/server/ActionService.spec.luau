@@ -18,6 +18,8 @@ local TeamService = require(ServerScriptService.Server.TeamService)
 
 local config = Fixtures.config()
 local throwSettings = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
+-- The Tackle's Dive (#240).
+local FOLLOW_UP = config.Actions.Tackle.followUp :: Config.FollowUp
 local DT = 1 / 60
 local SPAWNS = { CFrame.new(0, 500, 0) }
 -- Far from each other and from every test's play, until a test moves them.
@@ -179,6 +181,13 @@ local function tackled(attacker: string, victim: string)
 		end
 	end
 	error(`{attacker}'s tackle never reached {victim}`)
+end
+
+-- Roller Champions' tackle key (#240): `id` tackles, then dives as soon as the tackle's follow-up window opens.
+local function dive(id: string)
+	ActionService:request(id, { action = "Tackle" })
+	advance(FOLLOW_UP.from + 0.02)
+	ActionService:request(id, { action = "Dive" })
 end
 
 -- A validated GetUp from `id`, as its client sends one when it moves while knocked down.
@@ -401,7 +410,7 @@ describe("ActionService", function()
 		expect(rejected(d)).toEqual({ "CallPass" })
 		expect(attribute(d, Attributes.CallingPass)).toBeNil()
 
-		-- The first tackle ended at 0.65 s; its cooldown runs to 0.8 s.
+		-- The first tackle ended at 0.65 s; its cooldown runs to 1 s.
 		advance(0.47)
 		ActionService:request(a, { action = "Tackle" })
 		expect(rejected(a)).toEqual({ "ChargeThrow", "Tackle" })
@@ -410,12 +419,14 @@ describe("ActionService", function()
 
 	it("accepts an action that arrives up to actionTimingTolerance early, and rejects one earlier", function()
 		local a, b = blue[1], orange[1]
+		local early = config.Actions.Tackle.cooldown - config.Network.actionTimingTolerance
 		stand(a, Vector3.zero)
 		stand(b, Vector3.new(50, 0, 0))
 		ActionService:request(a, { action = "Tackle" })
 		ActionService:request(b, { action = "Tackle" })
-		-- A: 0.75 s in, 0.05 s of cooldown left. B: 0.68 s in, 0.12 s left (after the tackle's 0.65 s).
-		advance(0.68)
+		-- Both past the tackle's phases: B asks 0.02 s before the tolerance allows (0.88 s of the 1 s cooldown), A
+		-- 0.05 s after (0.95 s).
+		advance(early - 0.02)
 		ActionService:request(b, { action = "Tackle" })
 		advance(0.07)
 		ActionService:request(a, { action = "Tackle" })
@@ -462,13 +473,38 @@ describe("ActionService", function()
 		expect(advance(0.4, 0.4)).toEqual({ `{a}>{b}` })
 	end)
 
+	-- The owner (#240): RC's dive is the Tackle's follow-up, on the ground or in the air.
+	it("refuses a dive with no tackle before it, or past the tackle's follow-up window", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		ActionService:request(a, { action = "Dive" })
+		expect(rejected(a)).toEqual({ "Dive" })
+		ActionService:request(a, { action = "Tackle" })
+		advance(FOLLOW_UP.to + config.Network.actionTimingTolerance + 0.05)
+		ActionService:request(a, { action = "Dive" })
+		expect(rejected(a)).toEqual({ "Dive", "Dive" })
+	end)
+
+	it("dives on the ground after a tackle, ending on the belly once the dive's active phase is over", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		dive(a)
+		expect(rejected(a)).toEqual({})
+		expect(attribute(a, Attributes.Action)).toBe("Dive")
+		local phases = config.Actions.Dive.phases
+		advance(phases.windup + phases.active - 0.05)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+		advance(0.1)
+		expect(attribute(a, Attributes.KnockedDown)).toBe(true)
+	end)
+
 	-- The server can't tell when a client left the ground (its view lags), so it takes the client's dive (#221).
 	it("dives: strikes an opponent within the dive's reach", function()
 		local a, b = blue[1], orange[1]
 		stand(a, AIR)
 		-- Inside a dive's reach (11 + the lag tolerance), outside a tackle's.
 		stand(b, AIR + Vector3.new(0, 0, -12))
-		ActionService:request(a, { action = "Dive" })
+		dive(a)
 		expect(rejected(a)).toEqual({})
 		expect(attribute(a, Attributes.Action)).toBe("Dive")
 		expect(advance(0.4)).toEqual({ `{a}>{b}` })
@@ -479,7 +515,7 @@ describe("ActionService", function()
 		local a = blue[1]
 		local landing = config.Actions.Dive.landing :: Config.Landing
 		stand(a, AIR)
-		ActionService:request(a, { action = "Dive" })
+		dive(a)
 		ActionService:request(a, { action = "Uppercut" })
 		expect(rejected(a)).toEqual({ "Uppercut" })
 		-- On the floor during the active phase (0.35 s): not yet.
@@ -511,7 +547,7 @@ describe("ActionService", function()
 	it("looks for no touchdown under a diver whose character has died", function()
 		local a = blue[1]
 		stand(a, AIR)
-		ActionService:request(a, { action = "Dive" })
+		dive(a)
 		stand(a, Vector3.zero)
 		local humanoid = rigs[a]:FindFirstChildOfClass("Humanoid") :: Humanoid
 		humanoid.Health = 0
@@ -555,7 +591,7 @@ describe("ActionService", function()
 	it("ends a dive at a kickoff", function()
 		local a = blue[1]
 		stand(a, AIR)
-		ActionService:request(a, { action = "Dive" })
+		dive(a)
 		ActionService:reset()
 		ActionService:request(a, { action = "Uppercut" })
 		expect(rejected(a)).toEqual({})
@@ -593,7 +629,7 @@ describe("ActionService", function()
 		expect(attribute(a, Attributes.Action)).toBeNil()
 		-- A dive, high in the air: shown through its active phase (0.35 s), not its recovery.
 		stand(b, AIR + Vector3.new(50, 0, 0))
-		ActionService:request(b, { action = "Dive" })
+		dive(b)
 		advance(0.3)
 		expect(attribute(b, Attributes.Action)).toBe("Dive")
 		advance(0.1)
