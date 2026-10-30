@@ -286,8 +286,9 @@ describe("SkateMath off the ground and on walls", function()
 		end
 	end)
 
-	-- The owner (#218): each jump costs 10% of the speed, so jumping is no free way around.
-	it("jumps along the surface's normal, off walls too, keeping 90% of its speed along the surface", function()
+	-- The owner (#218): each jump costs 10% of the speed, so jumping is no free way around. On a wall it goes up along
+	-- it, never off it (#267, RC Video 14: a jump riding up the glass rose along it).
+	it("jumps along a floor's normal and up along a wall, keeping 90% of its speed along the surface", function()
 		local flat = skater(Vector3.new(0, 0, -30))
 		flat:step(input({ jump = true }), ground(), 1 / 60)
 		expect(flat.mode).toBe("Airborne")
@@ -295,7 +296,7 @@ describe("SkateMath off the ground and on walls", function()
 		Fixtures.expectNear(flat.velocity, Vector3.new(0, 56.7111, -26.991))
 		local wall = skater(Vector3.new(0, 0, -50))
 		wall:step(input({ jump = true }), ground(Vector3.xAxis), 1 / 60)
-		Fixtures.expectNear(wall.velocity, Vector3.new(59.98, -3.2689, -44.985)) -- (60, 0, −45), then the step
+		Fixtures.expectNear(wall.velocity, Vector3.new(0, 56.7111, -44.985)) -- (0, 60, −45), then the step
 	end)
 
 	-- The owner (#218): one more press in the air, once until landing, is an Air Pose: a small hop of about half a
@@ -837,6 +838,12 @@ describe("SkateMath landing on what they touch", function()
 		local under = flyer(Vector3.new(20, 0, 0))
 		under:touch(lip, input())
 		expect(under.mode).toBe("Airborne")
+		-- One met still rising never catches them: falling, they look along the feet (#267).
+		local rising = flyer(Vector3.new(20, 20, 0))
+		rising:touch(lip, input())
+		expect(rising.velocity.Y).toBeGreaterThan(0)
+		rising.velocity = Vector3.new(0, -5, 0)
+		Fixtures.expectNear(rising:groundRay(), -rising.up)
 		local riding = skater(Vector3.new(30, 0, 0))
 		riding:touch(WALL, input())
 		expect(riding.mode).toBe("Grounded")
@@ -901,6 +908,51 @@ describe("SkateMath landing on what they touch", function()
 		Fixtures.expectNear(s.up, WALL)
 	end)
 
+	-- RC (#267, Video 14, 4.0-7.4 s): Jump while riding up the glass rose along it and the glass took them back.
+	it("jumps up a wall it rides without the hover's push off it, and the wall catches it once falling", function()
+		local s = skater(Vector3.new(0, 0, -20))
+		s:step(input(), ground(WALL, movement.hoverHeight - 0.08), DT)
+		expect(s.velocity:Dot(WALL)).toBeGreaterThan(1)
+		s:step(input({ jump = true }), ground(WALL, movement.hoverHeight - 0.08), DT)
+		expect(s.mode).toBe("Airborne")
+		expect(math.abs(s.velocity:Dot(WALL))).toBeLessThan(1e-6)
+		local frames = 0
+		while s.mode == "Airborne" and frames < 120 do
+			s:step(input(), ground(WALL), DT)
+			frames += 1
+		end
+		expect(s.mode).toBe("Grounded")
+		Fixtures.expectNear(s.up, WALL)
+	end)
+
+	-- RC (#267, Video 14, 55.2-57.6 s): jumping from the floor straight at the wall, the speed into it was lost and
+	-- the skater went up the glass still in the air, back onto it ~1.2 s later; Jump only came back then.
+	it("slides up a wall it meets while rising, and lands on it only once falling", function()
+		local s = flyer(Vector3.new(30, 40, 0))
+		s.airPoseReady = false
+		expect(s:touch(WALL, input())).toBe(true)
+		expect(s.mode).toBe("Airborne")
+		Fixtures.expectNear(s.velocity, Vector3.new(0, 40, 0))
+		local frames = 0
+		while s.mode == "Airborne" and frames < 120 do
+			local _, toWall = s:groundRay()
+			s:step(input(), if toWall then ground(WALL, 1) else ground(FLAT, 0, false), DT)
+			frames += 1
+		end
+		-- Rising for 40 / 196.2 = 0.204 s first: 12 frames.
+		expect(frames).toBeGreaterThanOrEqual(12)
+		expect(s.mode).toBe("Grounded")
+		Fixtures.expectNear(s.up, WALL)
+		expect(s.airPoseReady).toBe(true)
+		-- Its feet finding a wall on the way up do not land it either; a gentle bank met rising still does.
+		local feet = flyer(Vector3.new(0, 20, 0))
+		feet:step(input(), ground(WALL), DT)
+		expect(feet.mode).toBe("Airborne")
+		local bank = flyer(Vector3.new(0, 5, 40))
+		expect(bank:touch(SLOPE, input())).toBe(true)
+		expect(bank.mode).toBe("Grounded")
+	end)
+
 	it("keeps the velocity off the surface in every push but a launch off the ground", function()
 		-- A lunge on the ground keeps the hover's pull: the pushes keep the velocity off their plane.
 		local riding = skater(Vector3.new(0, 0, -30))
@@ -959,16 +1011,17 @@ describe("SkateMath landing on what they touch", function()
 	end)
 
 	it("never catches a skater moving away from the wall they left, or out of its reach", function()
-		-- A jump off it leaves at jumpImpulse, already falling.
-		local jumper = skater(Vector3.new(0, -5, 0))
-		jumper:step(input(), ground(WALL), DT)
-		jumper:step(input({ jump = true }), ground(WALL), DT)
-		expect(jumper.mode).toBe("Airborne")
-		Fixtures.expectNear(jumper:groundRay(), -WALL)
-		jumper:step(input(), ground(WALL, 4), DT)
-		expect(jumper.mode).toBe("Airborne")
+		-- Off it with nothing in reach, then moving away from it at 20 studs/s (a lunge, say), already falling.
+		local leaver = skater(Vector3.new(0, -5, 0))
+		leaver:step(input(), ground(WALL), DT)
+		leaver:step(input(), ground(WALL, 0, false), DT)
+		expect(leaver.mode).toBe("Airborne")
+		leaver.velocity += WALL * 20
+		Fixtures.expectNear(leaver:groundRay(), -WALL)
+		leaver:step(input(), ground(WALL, 4), DT)
+		expect(leaver.mode).toBe("Airborne")
 		-- It no longer looks for the wall.
-		Fixtures.expectNear(jumper:groundRay(), -jumper.up)
+		Fixtures.expectNear(leaver:groundRay(), -leaver.up)
 		-- Falling beside it with nothing in reach.
 		local beside = skater(Vector3.new(0, -5, 0))
 		beside:step(input(), ground(WALL), DT)
