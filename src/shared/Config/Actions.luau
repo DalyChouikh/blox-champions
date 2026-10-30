@@ -66,6 +66,9 @@ export type ActionsConfig = {
 	airMultiplier: number,
 	-- A call for a pass lasts this long.
 	callPassWindow: number,
+	-- A knocked-down skater who moves gets up this long after the knockdown, or at once if it is later; one who never
+	-- moves gets up at the end of their hit's knockdownSeconds.
+	getUpAfter: number,
 	Tackle: ActionConfig,
 	Dive: ActionConfig,
 	Dodge: ActionConfig,
@@ -104,6 +107,8 @@ local INSTANT: Phases = { windup = 0, active = 0, recovery = 0 }
 local defaults: ActionsConfig = {
 	airMultiplier = 0.8,
 	callPassWindow = 3,
+	-- The owner (#220): any movement key gets a skater up, not before 0.5 s; RC's knockdown lasted under 1.8 s.
+	getUpAfter = 0.5,
 	Tackle = {
 		phases = { windup = 0.05, active = 0.25, recovery = 0.35 },
 		cooldown = 0.8,
@@ -242,6 +247,7 @@ end
 local schema = Validate.record({
 	airMultiplier = fraction,
 	callPassWindow = positive,
+	getUpAfter = positive,
 	Tackle = action(defaults.Tackle, {
 		hit = hit,
 		motion = Validate.record({ lungeSpeed = positive }),

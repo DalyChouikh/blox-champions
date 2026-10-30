@@ -1,13 +1,14 @@
 --!strict
 -- The whole HUD as one React element: a full-screen frame, "Root", that holds every part of the HUD. The banner, the
--- feed, the score tab and the end screen sit in its frame "Stage", the HUD's stage (the Hud's binding): on touch the
--- part of the HUD's area left of the touch buttons, so they centre and fit there, clear of the buttons. The stage draws
--- over the other parts. The scoreboard shows from the first snapshot on; the hints wherever the Hud gives their keys;
--- the score tab while it is open. Once the match is over the end screen shows until the next match in place of the
--- scoreboard, holding the final score. Off touch it holds its own score tab too, so an open one shows no other; on
--- touch it is compact (the owner's choice) and the score tab opens over it, from its button, shown on touch throughout,
--- or a held key. The reticle, drawn in the full-screen gui the Hud gives (a portal), hides while the score tab or the
--- end screen shows. A plain function of its props.
+-- feed, the Get Up prompt, the score tab and the end screen sit in its frame "Stage", the HUD's stage (the Hud's
+-- binding): on touch the part of the HUD's area left of the touch buttons, so they centre there, clear of the buttons,
+-- and all but the small prompt shrink to fit it. The stage draws over the other parts. The scoreboard shows from the
+-- first snapshot on; the hints and the Get Up prompt wherever the Hud gives their keys; the score tab while it is open.
+-- Once the match is over the end screen shows until the next match in place of the scoreboard, holding the final
+-- score. Off touch it holds its own score tab too, so an open one shows no other; on touch it is compact (the owner's
+-- choice) and the score tab opens over it, from its button, shown on touch throughout, or a held key. The reticle,
+-- drawn in the full-screen gui the Hud gives (a portal), hides while the score tab or the end screen shows. A plain
+-- function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -16,6 +17,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local ControlHints = require(script.Parent.ControlHints)
 local EndScreen = require(script.Parent.EndScreen)
 local Feed = require(script.Parent.Feed)
+local GetUp = require(script.Parent.GetUp)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local React = require(ReplicatedStorage.Packages.React)
@@ -51,6 +53,8 @@ export type AppProps = {
 	hasSkater: boolean,
 	-- Each hint's key on this device; nil where no hints show.
 	keys: ControlHints.HintKeys?,
+	-- The movement keys on this device while the local skater is knocked down; nil otherwise.
+	getUpKeys: { Style.KeyView }?,
 	-- Its key held, or its touch button toggled on.
 	scoreTabOpen: boolean,
 	onScoreButton: () -> (),
@@ -106,6 +110,9 @@ local function App(props: AppProps): React.ReactElement
 					Feed,
 					{ config = config, text = text, feed = state.feed, names = state.names, area = bindings.stage }
 				),
+				GetUp = if props.getUpKeys ~= nil
+					then React.createElement(GetUp, { config = config, keys = props.getUpKeys })
+					else nil,
 				ScoreTab = if scoreTab and match ~= nil
 					then React.createElement(ScoreTab, {
 						config = config,

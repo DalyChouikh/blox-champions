@@ -7,7 +7,8 @@
 local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
 
--- One label per action, plus the controls that start none (Ball Focus and the skating buttons).
+-- One label per action, plus the controls that start none (Ball Focus and the skating buttons) and the movement keys'
+-- while knocked down.
 export type ControlLabels = {
 	Jump: string,
 	-- The jump button in the air (#218).
@@ -23,6 +24,8 @@ export type ControlLabels = {
 	Pass: string,
 	CallPass: string,
 	BallFocus: string,
+	-- The movement keys while knocked down: moving gets the skater up sooner (#220).
+	GetUp: string,
 }
 
 -- How the touch controls look: the stick's ring and the buttons on `background`, the knob and the labels in
@@ -76,6 +79,8 @@ export type UIText = {
 	unknownPlayer: string,
 	-- Over a teammate calling for the ball.
 	callPass: string,
+	-- The Get Up prompt's key on touch, where the stick has none.
+	touchMove: string,
 }
 
 export type Place = { position: UDim2, size: UDim2 }
@@ -95,6 +100,8 @@ export type HudLayout = {
 	-- The touch button that opens the score tab.
 	scoreButton: Place,
 	endScreen: Place,
+	-- The Get Up prompt: position is its bottom centre's; its keys are as tall as it is.
+	getUp: Place,
 }
 
 -- How the HUD looks and how long its messages last. dimTransparency fades an empty pip or a departed player's row;
@@ -191,6 +198,7 @@ local defaults: UIConfig = {
 		Pass = "Pass",
 		CallPass = "Call",
 		BallFocus = "Focus",
+		GetUp = "Get Up",
 	},
 	-- Roblox's GetStringForKeyCode gives these "" (or " " for Space).
 	keyNames = {
@@ -244,6 +252,7 @@ local defaults: UIConfig = {
 		unknownPlayer = "Player",
 		-- A raised hand.
 		callPass = "\u{270B}",
+		touchMove = "Move",
 	},
 	-- The HUD's graybox look; the art pass restyles it.
 	hud = {
@@ -285,6 +294,8 @@ local defaults: UIConfig = {
 			},
 			scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
 			endScreen = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(720, 520) },
+			-- At the bottom centre like Roller Champions' prompt (Video 5 at 0:18), 8 px above the feed's 140 px.
+			getUp = { position = UDim2.new(0.5, 0, 1, -172), size = UDim2.fromOffset(320, 40) },
 		},
 	},
 	markers = {
@@ -412,6 +423,7 @@ local fields = Validate.record({
 		Pass = label,
 		CallPass = label,
 		BallFocus = label,
+		GetUp = label,
 	}),
 	keyNames = keyNames,
 	touchStyle = Validate.record({
@@ -454,6 +466,7 @@ local fields = Validate.record({
 		}),
 		unknownPlayer = label,
 		callPass = label,
+		touchMove = label,
 	}),
 	hud = Validate.record({
 		font = Validate.enumItem(Enum.Font),
@@ -483,6 +496,7 @@ local fields = Validate.record({
 			scoreTab = columns,
 			scoreButton = place,
 			endScreen = place,
+			getUp = place,
 		}),
 	}),
 	markers = Validate.record({
@@ -516,6 +530,13 @@ local schema = Validate.checkAll(fields, {
 	{
 		message = "the score tab's number columns must leave room for names, in the tab and the end screen",
 		holds = namesFit,
+	},
+	-- Its keys fill its height inside Style.padding (GetUp).
+	{
+		message = "the Get Up prompt must be taller than its padding (2 × hud.spacing)",
+		holds = function(ui: UIConfig): boolean
+			return ui.hud.layout.getUp.size.Y.Offset > 2 * ui.hud.spacing
+		end,
 	},
 })
 

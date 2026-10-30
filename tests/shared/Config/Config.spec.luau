@@ -60,6 +60,7 @@ describe("Config defaults", function()
 			maxActionsPerSecond = 15,
 			hitLagToleranceStuds = 3,
 			actionTimingTolerance = 0.1,
+			maxGetUpsPerSecond = 2,
 		})
 	end)
 
@@ -70,6 +71,7 @@ describe("Config defaults", function()
 		expect(Config.defaults().Actions).toEqual({
 			airMultiplier = 0.8,
 			callPassWindow = 3,
+			getUpAfter = 0.5,
 			Tackle = {
 				phases = { windup = 0.05, active = 0.25, recovery = 0.35 },
 				cooldown = 0.8,
@@ -321,6 +323,7 @@ describe("Config defaults", function()
 			Pass = "Pass",
 			CallPass = "Call",
 			BallFocus = "Focus",
+			GetUp = "Get Up",
 		})
 		-- Roblox's own touch thumbstick colors.
 		expect(ui.touchStyle).toEqual({
@@ -375,6 +378,7 @@ describe("Config defaults", function()
 			unknownPlayer = "Player",
 			-- A raised hand.
 			callPass = "\u{270B}",
+			touchMove = "Move",
 		})
 		expect(ui.hud).toEqual({
 			font = Enum.Font.BuilderSansBold,
@@ -413,6 +417,7 @@ describe("Config defaults", function()
 				},
 				scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
 				endScreen = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(720, 520) },
+				getUp = { position = UDim2.new(0.5, 0, 1, -172), size = UDim2.fromOffset(320, 40) },
 			},
 		})
 		expect(ui.markers).toEqual({
@@ -827,6 +832,15 @@ describe("Config.forMode", function()
 		end
 	end)
 
+	it("rejects getting up with no wait, or with no requests to get up let through", function()
+		expect(function()
+			Fixtures.config({ Actions = { getUpAfter = 0 } })
+		end).toThrow("Actions.getUpAfter: must be > 0 (got 0)")
+		expect(function()
+			Fixtures.config({ Network = { maxGetUpsPerSecond = 0 } })
+		end).toThrow("Network.maxGetUpsPerSecond: must be > 0 (got 0)")
+	end)
+
 	it("rejects a key bound to two actions", function()
 		expect(function()
 			Fixtures.config({ Input = { pump = { Enum.KeyCode.Space } } })
@@ -930,6 +944,20 @@ describe("Config.forMode", function()
 			},
 			{ overrides = { UI = { hud = { screenMargin = -1 } } }, message = "UI.hud.screenMargin: must be >= 0" },
 			{ overrides = { UI = { keyNames = { Banana = "B" } } }, message = "UI.keyNames: Banana must name a key" },
+			{
+				overrides = { UI = { controlLabels = { GetUp = "" } } },
+				message = "UI.controlLabels.GetUp: must not be empty",
+			},
+			{ overrides = { UI = { text = { touchMove = "" } } }, message = "UI.text.touchMove: must not be empty" },
+			{
+				overrides = { UI = { hud = { layout = { getUp = { size = UDim2.fromScale(0.5, 0.1) } } } } },
+				message = "UI.hud.layout.getUp.size: must be in pixels (scales 0, offsets > 0)",
+			},
+			-- 12 px is all padding at the default spacing (6 px at the top and the bottom): no room for its keys.
+			{
+				overrides = { UI = { hud = { layout = { getUp = { size = UDim2.fromOffset(320, 12) } } } } },
+				message = "UI: the Get Up prompt must be taller than its padding (2 × hud.spacing)",
+			},
 			-- The HUD fits its parts by their sizes in pixels.
 			{
 				overrides = { UI = { hud = { layout = { banner = { size = UDim2.fromScale(0.5, 0.2) } } } } },

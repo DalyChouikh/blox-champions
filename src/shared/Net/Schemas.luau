@@ -41,4 +41,6 @@ return table.freeze({
 	}),
 	-- An action the sender started.
 	ActionRequest = actionRequest(),
+	-- The knocked-down sender moved: nothing else, as the server judges when they are up.
+	GetUp = Validate.record({}),
 })

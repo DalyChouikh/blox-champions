@@ -6,6 +6,7 @@
 --   SkateState     client → server   { pump, brake, airPose } whenever one changes (Net/Schemas checks it)
 --   ActionRequest  client → server   { action, aim?, charge? } when a player starts an action (Net/Schemas)
 --   ActionRejected server → client   { action } when the server refuses it, so the client cancels it
+--   GetUp          client → server   {} once per knockdown, when the knocked-down player moves (Net/Schemas)
 
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 
@@ -21,6 +22,7 @@ local names: { [string]: string } = {
 	SkateState = "SkateState",
 	ActionRequest = "ActionRequest",
 	ActionRejected = "ActionRejected",
+	GetUp = "GetUp",
 }
 Remotes.names = Freeze.deep(names)
 

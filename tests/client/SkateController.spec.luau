@@ -28,6 +28,8 @@ local menu: Fixtures.Menu
 local floor: Folder
 local rig: Model
 local sent: { { boolean } }
+-- How many times the client asked the server to get the skater up.
+local getUps: number
 local others: { any }
 
 local function velocityOf(model: Model): Vector3
@@ -79,6 +81,9 @@ local function setup(overrides: { [string]: any }?)
 		SendSkateState = function(pump: boolean, brake: boolean, airPose: boolean)
 			table.insert(sent, { pump, brake, airPose })
 		end,
+		SendGetUp = function()
+			getUps += 1
+		end,
 		Gravity = Fixtures.GRAVITY,
 		Team = function(): string?
 			return "Blue"
@@ -106,6 +111,7 @@ beforeEach(function()
 	floor.Parent = folder
 	floor:AddTag(Tags.RideSurface)
 	sent = {}
+	getUps = 0
 	others = {}
 	menu = Fixtures.menu()
 	InputController:init({ Config = config, Parent = folder, GuiService = menu })
@@ -223,6 +229,26 @@ describe("SkateController", function()
 		rig:SetAttribute(Attributes.KnockedDown, nil)
 		SkateController:step(1 / 60)
 		expect(velocityOf(rig).Magnitude).toBeLessThan(movement.attachBoostSpeed)
+	end)
+
+	-- Roller Champions' Get Up (#220): the server decides when the skater is up (ActionService).
+	it("asks the server to get up once per knockdown, as soon as the knocked-down skater moves", function()
+		local stick = Fixtures.scriptedBinding(InputController.context, "Move")
+		rig:SetAttribute(Attributes.KnockedDown, true)
+		SkateController:step(1 / 60)
+		expect(getUps).toBe(0)
+		stick:Fire(Vector2.new(0, 1))
+		for _ = 1, 3 do
+			SkateController:step(1 / 60)
+		end
+		expect(getUps).toBe(1)
+		-- Up and moving: nothing more. Down again with the stick still held: it asks at once.
+		rig:SetAttribute(Attributes.KnockedDown, nil)
+		SkateController:step(1 / 60)
+		expect(getUps).toBe(1)
+		rig:SetAttribute(Attributes.KnockedDown, true)
+		SkateController:step(1 / 60)
+		expect(getUps).toBe(2)
 	end)
 
 	it("knows when a teammate is close enough to attach behind", function()

@@ -3,13 +3,15 @@
 -- the ScreenGui "Hud", below Roblox's own top bar; the reticle sits in "HudCentre", which spans the whole screen, so
 -- its centre is where the camera aims (App draws it there through a portal). Before each frame is drawn
 -- (FrameController), after HudStore has counted the clocks, the Hud renders App again only when something App shows has
--- changed: the HUD state's version, the device, the carrier, whether the local player has a skater, or whether the
--- score tab is open. What changes every frame (the clock, the speed, what each control does now) goes through bindings
--- instead, each set only when its text changes; the texts come from caches and the config, so a quiet frame allocates
--- nothing. Hints name each key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the player's own
--- keyboard layout gives it, else Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the
--- buttons carry the labels. The score tab shows while its key is held; on touch a button toggles it, and the toggle
--- clears once the device is not touch and whenever the end screen appears or goes, so the tab never pops open unasked.
+-- changed: the HUD state's version, the device, the carrier, whether the local player has a skater, whether it is
+-- knocked down, or whether the score tab is open. What changes every frame (the clock, the speed, what each control
+-- does now) goes through bindings instead, each set only when its text changes; the texts come from caches and the
+-- config, so a quiet frame allocates nothing. Hints name each key as the device shows it: on a gamepad Roblox's glyph,
+-- otherwise the name the player's own keyboard layout gives it, else Config.UI.keyNames, else the KeyCode's name.
+-- There are none on touch, where the buttons carry the labels. A knocked-down skater's Get Up prompt names the
+-- movement keys the same way: the first composite's four keys, the gamepad's stick, or on touch Config.UI.text's name
+-- for the stick. The score tab shows while its key is held; on touch a button toggles it, and the toggle clears once
+-- the device is not touch and whenever the end screen appears or goes, so the tab never pops open unasked.
 -- The banner, the feed, the score tab and the end screen centre and fit in the HUD's stage, a binding: on touch the
 -- part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that GuiService gives),
 -- elsewhere the whole of it. It is measured again when the screen's size changes (from start on) and when the device
@@ -33,6 +35,7 @@ local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local React = require(ReplicatedStorage.Packages.React)
 local ReactRoblox = require(ReplicatedStorage.Packages.ReactRoblox)
 local SkateController = require(script.Parent.SkateController)
+local Style = require(script.Style)
 local TouchArea = require(ReplicatedStorage.Shared.Input.TouchArea)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
@@ -92,6 +95,7 @@ export type Hud = {
 	_device: Enum.PreferredInput?,
 	_shownCarrier: PlayerId?,
 	_hasSkater: boolean,
+	_knockedDown: boolean,
 	_scoreTabOpen: boolean,
 }
 
@@ -120,7 +124,7 @@ local function measure(self: Hud, device: Enum.PreferredInput)
 end
 
 -- The first of `codes` the device has: on a gamepad the first with a glyph; otherwise the first without one, named.
-local function keyView(self: Hud, codes: { Enum.KeyCode }, gamepad: boolean): ControlHints.KeyView
+local function keyView(self: Hud, codes: { Enum.KeyCode }, gamepad: boolean): Style.KeyView
 	for _, code in codes do
 		local image = self._keyImage(code)
 		if gamepad and image ~= "" then
@@ -131,6 +135,26 @@ local function keyView(self: Hud, codes: { Enum.KeyCode }, gamepad: boolean): Co
 		end
 	end
 	return {}
+end
+
+-- The movement keys the Get Up prompt shows on `device`: a keyboard's first composite (up, left, down, right, as
+-- Roller Champions lists them), a gamepad's stick, or the touch stick's name.
+local function moveKeys(self: Hud, device: Enum.PreferredInput): { Style.KeyView }
+	local move = self._config.Input.move
+	if device == Enum.PreferredInput.Touch then
+		return { { text = self._config.UI.text.touchMove } }
+	elseif device == Enum.PreferredInput.Gamepad then
+		return { keyView(self, move.sticks, true) }
+	end
+	local composite = move.composites[1]
+	if composite == nil then
+		return {}
+	end
+	local views: { Style.KeyView } = {}
+	for _, code in { composite.up, composite.left, composite.down, composite.right } do
+		table.insert(views, keyView(self, { code }, false))
+	end
+	return views
 end
 
 -- Each hint's key on `device`; nil where no hints show: on touch, or without a skater.
@@ -186,6 +210,7 @@ local Hud: Hud = {
 	_device = nil,
 	_shownCarrier = nil,
 	_hasSkater = false,
+	_knockedDown = false,
 	_scoreTabOpen = false,
 
 	-- deps.Parent keeps the guis out of the local player's PlayerGui in tests; deps.PreferredInput, deps.LocalId,
@@ -221,6 +246,7 @@ local Hud: Hud = {
 		self._device = nil
 		self._shownCarrier = nil
 		self._hasSkater = false
+		self._knockedDown = false
 		self._scoreTabOpen = false
 		self._touchToggled = false
 		self._over = false
@@ -288,6 +314,8 @@ local Hud: Hud = {
 		local carrier = self._carrier.carrier
 		local skate = self._skate
 		local hasSkater = skate:hasSkater()
+		-- SkateController keeps its last reading once the skater is gone.
+		local knockedDown = hasSkater and skate.knockedDown
 		if device ~= self._device then
 			measure(self, device)
 		end
@@ -302,12 +330,14 @@ local Hud: Hud = {
 			or device ~= self._device
 			or carrier ~= self._shownCarrier
 			or hasSkater ~= self._hasSkater
+			or knockedDown ~= self._knockedDown
 			or scoreTabOpen ~= self._scoreTabOpen
 		then
 			self._version = state.version
 			self._device = device
 			self._shownCarrier = carrier
 			self._hasSkater = hasSkater
+			self._knockedDown = knockedDown
 			self._scoreTabOpen = scoreTabOpen
 			self.renders += 1
 			self._root:render(React.createElement(App, {
@@ -319,6 +349,7 @@ local Hud: Hud = {
 				carrier = carrier,
 				hasSkater = hasSkater,
 				keys = hintKeys(self, device, hasSkater),
+				getUpKeys = if knockedDown then moveKeys(self, device) else nil,
 				scoreTabOpen = scoreTabOpen,
 				onScoreButton = self._onScoreButton,
 				bindings = self._bindings,

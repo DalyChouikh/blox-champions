@@ -11,6 +11,7 @@ local ControlHints = require(Client.Hud.ControlHints)
 local ControlLabels = require(Client.ControlLabels)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local React = require(ReplicatedStorage.Packages.React)
+local Style = require(Client.Hud.Style)
 
 local config = Fixtures.config()
 local GLYPH = "rbxasset://textures/ui/Controls/DefaultController/ButtonX@2x.png"
@@ -19,7 +20,7 @@ local folder: Folder
 local setters: { [string]: (string) -> () }
 
 -- Hints for every control, each reading its own name, with `keys` for their keys (an "X" key otherwise).
-local function hints(keys: { [string]: ControlHints.KeyView }): React.ReactElement
+local function hints(keys: { [string]: Style.KeyView }): React.ReactElement
 	local views: ControlHints.HintKeys = {}
 	local labels: ControlHints.HintLabels = {}
 	setters = {}

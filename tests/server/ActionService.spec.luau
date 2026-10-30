@@ -13,6 +13,7 @@ local CharacterService = require(ServerScriptService.Server.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 local TeamService = require(ServerScriptService.Server.TeamService)
 
 local config = Fixtures.config()
@@ -29,9 +30,12 @@ type Sent = { to: string, name: string, payload: any }
 -- Records what ActionService listens to and sends.
 local fakeNet = {
 	handlers = {} :: { [string]: (player: string, payload: any) -> () },
+	-- The shape and rate limit NetService would hold each remote's messages to.
+	limits = {} :: { [string]: { schema: any, perSecond: number } },
 	sent = {} :: { Sent },
-	listen = function(self: any, name: string, _schema: any, _perSecond: number, handler: (string, any) -> ())
+	listen = function(self: any, name: string, schema: any, perSecond: number, handler: (string, any) -> ())
 		self.handlers[name] = handler
+		self.limits[name] = { schema = schema, perSecond = perSecond }
 	end,
 	fireTo = function(self: any, to: string, name: string, payload: any)
 		table.insert(self.sent, { to = to, name = name, payload = payload })
@@ -55,6 +59,7 @@ beforeEach(function()
 	folder.Name = "ActionServiceTest"
 	folder.Parent = workspace
 	table.clear(fakeNet.handlers)
+	table.clear(fakeNet.limits)
 	table.clear(fakeNet.sent)
 	table.clear(rigs)
 	table.clear(stubs)
@@ -116,6 +121,24 @@ local function advance(seconds: number, dt: number?): { string }
 		end
 	end
 	return knockdowns
+end
+
+-- `attacker` tackles `victim` from 5 studs behind, stepping until the strike lands: the victim's first frame down.
+local function tackled(attacker: string, victim: string)
+	stand(attacker, Vector3.zero)
+	stand(victim, Vector3.new(0, 0, -5))
+	ActionService:request(attacker, { action = "Tackle" })
+	for _ = 1, 30 do
+		if #advance(DT) > 0 then
+			return
+		end
+	end
+	error(`{attacker}'s tackle never reached {victim}`)
+end
+
+-- A validated GetUp from `id`, as its client sends one when it moves while knocked down.
+local function getUp(id: string)
+	fakeNet.handlers[Remotes.names.GetUp](id, {})
 end
 
 -- The actions refused to `id`, by name.
@@ -222,6 +245,43 @@ describe("ActionService", function()
 		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
 		advance(0.3)
 		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
+	end)
+
+	-- Roller Champions' Get Up (#220): moving gets a knocked-down skater up sooner, the server deciding when.
+	it("gets a knocked-down skater up once they move, never before getUpAfter", function()
+		local b = orange[1]
+		-- Moving from their first frame down: down until getUpAfter, then up.
+		tackled(blue[1], b)
+		getUp(b)
+		advance(config.Actions.getUpAfter - 0.05)
+		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
+		advance(0.1)
+		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
+		-- Moving late in a knockdown: up on the next frame.
+		tackled(blue[2], b)
+		advance(1)
+		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
+		getUp(b)
+		advance(DT)
+		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
+	end)
+
+	it("forgets a request to get up made on their feet", function()
+		local b = orange[1]
+		local hit = config.Actions.Tackle.hit :: Config.Hit
+		tackled(blue[1], b)
+		advance(hit.knockdownSeconds + 0.05)
+		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
+		getUp(b)
+		tackled(blue[2], b)
+		advance(config.Actions.getUpAfter + 0.1)
+		expect(attribute(b, Attributes.KnockedDown)).toBe(true)
+	end)
+
+	it("takes requests to get up in their own shape, within their own rate limit", function()
+		local limits = fakeNet.limits[Remotes.names.GetUp]
+		expect(limits.schema == Schemas.GetUp).toBe(true)
+		expect(limits.perSecond).toBe(config.Network.maxGetUpsPerSecond)
 	end)
 
 	it("drops the ball of a knocked-down carrier with their momentum", function()
