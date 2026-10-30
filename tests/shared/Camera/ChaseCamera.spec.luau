@@ -155,6 +155,48 @@ describe("ChaseCamera", function()
 		expect(chase.fov).toBeCloseTo(70 + 20 * (1 - math.exp(-0.6)), 3)
 	end)
 
+	-- The owner's trial A3 (#276, Q53): farther and higher looking down, closer looking up, down to the feet; the
+	-- rows worked out independently (model276.py).
+	it("frames by its pitch: how far behind its focus, and the focus's height above the root", function()
+		local rows: { { number } } = {
+			{ -70, 22, 5 },
+			{ -55, 22, 5 },
+			{ -35, 19, 5 },
+			{ -15, 15, 5 },
+			{ 0, 12, 5 },
+			{ 2, 11.733333, 5 },
+			{ 10, 10.666667, 5 },
+			{ 22.5, 7.5, 3.25 },
+			-- Where the skater starts to fade (fade.seen, 4).
+			{ 33.75, 4, 0.75 },
+			{ 40, 2.333333, -0.5 },
+			{ 45, 1, -1.5 },
+			{ 60, 1, -1.5 },
+		}
+		for _, row in rows do
+			local distance, height = ChaseCamera.framing(config, math.rad(row[1]))
+			expect(distance).toBeCloseTo(row[2], 5)
+			expect(height).toBeCloseTo(row[3], 5)
+		end
+		-- One point holds at every pitch.
+		local one = Fixtures.config({ Camera = { framing = { { pitchDeg = 10, distance = 9, height = 2 } } } }).Camera
+		for _, degrees in { -70, 10, 60 } do
+			local distance, height = ChaseCamera.framing(one, math.rad(degrees))
+			expect(distance).toBe(9)
+			expect(height).toBe(2)
+		end
+	end)
+
+	-- Roller Champions' skater turns see-through and vanishes as its camera slides in (Video 18); the owner's trial
+	-- A3 (#276, Q53).
+	it("fades the skater as the camera closes in on its focus: whole at fade.seen, gone at fade.gone", function()
+		local rows: { { number } } =
+			{ { 12, 0 }, { 4, 0 }, { 3, 0.4 }, { 2.75, 0.5 }, { 2, 0.8 }, { 1.5, 1 }, { 0, 1 } }
+		for _, row in rows do
+			expect(ChaseCamera.fade(config, row[1])).toBeCloseTo(row[2], 5)
+		end
+	end)
+
 	it("pulls in in front of a hit, never past it", function()
 		expect(ChaseCamera.pullIn(config, 12, nil)).toBe(12)
 		expect(ChaseCamera.pullIn(config, 12, 8)).toBe(7.5)

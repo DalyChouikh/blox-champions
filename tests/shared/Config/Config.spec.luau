@@ -334,8 +334,18 @@ describe("Config defaults", function()
 
 	it("set the camera of spec §8.4, plus this phase's", function()
 		expect(Config.defaults().Camera).toEqual({
-			distance = 12,
-			height = 4,
+			-- The owner's trial A3 (#276, Q53).
+			framing = {
+				{ pitchDeg = -55, distance = 22, height = 5 },
+				{ pitchDeg = -35, distance = 19, height = 5 },
+				{ pitchDeg = -20, distance = 16, height = 5 },
+				{ pitchDeg = -10, distance = 14, height = 5 },
+				{ pitchDeg = 0, distance = 12, height = 5 },
+				{ pitchDeg = 15, distance = 10, height = 5 },
+				{ pitchDeg = 30, distance = 5, height = 1.5 },
+				{ pitchDeg = 45, distance = 1, height = -1.5 },
+			},
+			fade = { seen = 4, gone = 1.5 },
 			collisionMargin = 0.5,
 			fovBase = 70,
 			fovMax = 90,
@@ -1147,6 +1157,57 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Camera = { maxTiltDeg = 90 } })
 		end).toThrow("Camera.maxTiltDeg: must be <= 89 (got 90)")
+	end)
+
+	it("rejects a camera framing that is empty, out of order, past the pitch limits or not behind its focus", function()
+		local function point(pitchDeg: number, distance: number): { [string]: number }
+			return { pitchDeg = pitchDeg, distance = distance, height = 5 }
+		end
+		local ORDER = "Camera: framing must rise in pitchDeg, each point above the one before"
+		local LIMITS = "Camera: framing's pitchDeg must lie within minPitchDeg and maxPitchDeg"
+		local cases: { { framing: { { [string]: number } }, message: string } } = {
+			{ framing = {}, message = "Camera.framing: must not be empty" },
+			{ framing = { point(0, 12), point(-10, 14) }, message = ORDER },
+			{ framing = { point(0, 12), point(0, 10) }, message = ORDER },
+			{ framing = { point(-71, 22), point(0, 12) }, message = LIMITS },
+			{ framing = { point(0, 12), point(61, 1) }, message = LIMITS },
+			{ framing = { point(0, 12), point(45, 0) }, message = "Camera.framing[2].distance: must be > 0 (got 0)" },
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config({ Camera = { framing = case.framing } })
+			end).toThrow(case.message)
+		end
+	end)
+
+	it("rejects a skater fade that ends past the focus, or starts no farther out than it ends", function()
+		expect(function()
+			Fixtures.config({ Camera = { fade = { gone = -1 } } })
+		end).toThrow("Camera.fade.gone: must be >= 0 (got -1)")
+		expect(function()
+			Fixtures.config({ Camera = { fade = { seen = 1.5 } } })
+		end).toThrow("Camera: fade.seen must be above fade.gone")
+	end)
+
+	-- Each just inside a limit the rejections above cross: the pitch limits themselves, points a hair apart, a
+	-- distance a hair out, a focus below the root, a fade a hair wide ending at the focus; one point holds at every
+	-- pitch.
+	it("accepts a camera framing and fade just inside their limits", function()
+		expect(function()
+			Fixtures.config({
+				Camera = {
+					framing = {
+						{ pitchDeg = -70, distance = 30, height = 6 },
+						{ pitchDeg = -69.99, distance = 0.01, height = -3 },
+						{ pitchDeg = 60, distance = 1, height = 0 },
+					},
+					fade = { seen = 0.01, gone = 0 },
+				},
+			})
+		end).never.toThrow()
+		expect(function()
+			Fixtures.config({ Camera = { framing = { { pitchDeg = 0, distance = 12, height = 5 } } } })
+		end).never.toThrow()
 	end)
 
 	it("rejects a camera or touch layout that contradicts itself", function()

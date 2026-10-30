@@ -9,6 +9,7 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 local Client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 local BallCarrier = require(Client.BallCarrier)
 local CameraController = require(Client.CameraController)
+local ChaseCamera = require(ReplicatedStorage.Shared.Camera.ChaseCamera)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(Client.InputController)
@@ -45,9 +46,34 @@ local function skater(): any
 	return SkateController.skater
 end
 
--- Where the camera looks past: the root, `height` up along the camera's up.
+-- Where the camera looks past: the root, its framing's height for its pitch up along its up.
 local function focus(): Vector3
-	return Fixtures.root(rig).Position + CameraController.chase.up * config.Camera.height
+	local chase = CameraController.chase
+	local _, height = ChaseCamera.framing(config.Camera, chase.pitch)
+	return Fixtures.root(rig).Position + chase.up * height
+end
+
+-- How see-through every part and decal of `model` is (LocalTransparencyModifier), or -1 if they differ.
+local function fadeOf(model: Model): number
+	local shown: number? = nil
+	for _, item in model:GetDescendants() do
+		if item:IsA("BasePart") or item:IsA("Decal") then
+			local modifier: number = (item :: any).LocalTransparencyModifier
+			if shown == nil then
+				shown = modifier
+			elseif math.abs(modifier - shown) > 1e-6 then
+				return -1
+			end
+		end
+	end
+	return shown or -1
+end
+
+-- Tips the camera `degrees` up (down when negative) in one step.
+local function tipUp(look: InputBinding, degrees: number)
+	look:Fire(Vector2.new(0, -math.rad(degrees) / DT))
+	CameraController:step(DT)
+	look:Fire(Vector2.zero)
 end
 
 -- A ball part at `position`, which the controller sees as the ball.
@@ -137,7 +163,8 @@ describe("CameraController", function()
 	it("takes over the camera: behind and above the skater, level", function()
 		CameraController:step(DT)
 		expect(camera.CameraType).toBe(Enum.CameraType.Scriptable)
-		Fixtures.expectNear(camera.CFrame.Position, Fixtures.root(rig).Position + Vector3.new(0, 4, 12))
+		-- The level view (the owner's trial A3, #276): 12 behind a focus 5 up, 1.65 above the head.
+		Fixtures.expectNear(camera.CFrame.Position, Fixtures.root(rig).Position + Vector3.new(0, 5, 12))
 		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1))
 		expect(camera.FieldOfView).toBeCloseTo(70, 3)
 	end)
@@ -147,6 +174,122 @@ describe("CameraController", function()
 		look:Fire(Vector2.new((math.pi / 2) / DT, 0))
 		CameraController:step(DT)
 		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(1, 0, 0))
+	end)
+
+	-- The owner's trial A3 (#276, Q53); positions worked out independently (model276.py).
+	it("backs out above the skater looking down, and closes in toward the feet looking up", function()
+		local look = Fixtures.scriptedBinding(InputController.context, "Look")
+		local root = Fixtures.root(rig).Position
+		-- 35° down: 19 behind a focus 5 up.
+		look:Fire(Vector2.new(0, math.rad(35) / DT))
+		CameraController:step(DT)
+		Fixtures.expectNear(camera.CFrame.Position, root + Vector3.new(0, 15.897952, 15.563889))
+		-- 22.5° up: 7.5 behind a focus 3.25 up.
+		look:Fire(Vector2.new(0, -math.rad(57.5) / DT))
+		CameraController:step(DT)
+		Fixtures.expectNear(camera.CFrame.Position, root + Vector3.new(0, 0.379874, 6.929096))
+		-- 60° up, the limit: a stud behind a focus 1.5 below the root, by the feet (the floor, 2.5 below, is out of
+		-- either ray's reach).
+		look:Fire(Vector2.new(0, -math.rad(37.5) / DT))
+		CameraController:step(DT)
+		Fixtures.expectNear(camera.CFrame.Position, root + Vector3.new(0, -2.366025, 0.5))
+	end)
+
+	-- Roller Champions' skater turns see-through and vanishes as its camera slides in to the feet (Video 18); the
+	-- owner's trial A3 (#276, Q53). This client only: LocalTransparencyModifier.
+	it("fades the skater as the camera closes in on its focus, and shows them whole as it backs out", function()
+		local face = Instance.new("Decal")
+		face.Parent = Fixtures.root(rig)
+		local look = Fixtures.scriptedBinding(InputController.context, "Look")
+		CameraController:step(DT)
+		expect(fadeOf(rig)).toBe(0)
+		-- 37.5° up: 3 behind its focus, 0.4 see-through; 45° up: a stud, gone.
+		tipUp(look, 37.5)
+		expect(fadeOf(rig)).toBeCloseTo(0.4, 5)
+		expect(face.LocalTransparencyModifier).toBeCloseTo(0.4, 5)
+		tipUp(look, 7.5)
+		expect(fadeOf(rig)).toBe(1)
+		tipUp(look, -45)
+		expect(fadeOf(rig)).toBe(0)
+	end)
+
+	it("fades the skater when a wall behind them pulls the camera in", function()
+		CameraController:step(DT)
+		-- Its near face 3.25 behind the focus: the camera stops 2.75 from it, half faded.
+		local wall = Instance.new("Part")
+		wall.Anchored = true
+		wall.Size = Vector3.new(40, 40, 1)
+		wall.CFrame = CFrame.new(focus() + Vector3.new(0, 0, 3.75))
+		wall.Parent = folder
+		wall:AddTag(Tags.RideSurface)
+		RideSurfaces:refresh()
+		CameraController:step(DT)
+		expect((camera.CFrame.Position - focus()).Magnitude).toBeCloseTo(2.75, 3)
+		expect(fadeOf(rig)).toBeCloseTo(0.5, 5)
+	end)
+
+	it("fades parts the skater gains, and shows whole any part they lose or a skater it no longer follows", function()
+		local look = Fixtures.scriptedBinding(InputController.context, "Look")
+		tipUp(look, 45)
+		expect(fadeOf(rig)).toBe(1)
+		-- An accessory loading late fades with the rest; a part leaving the skater shows whole.
+		local handle = Instance.new("Part")
+		handle.Parent = rig
+		local dropped = rig:FindFirstChild("RightHand") :: BasePart
+		dropped.Parent = folder
+		task.wait() -- DescendantAdded and DescendantRemoving are deferred
+		expect(handle.LocalTransparencyModifier).toBe(1)
+		expect(dropped.LocalTransparencyModifier).toBe(0)
+		-- Backing out shows the skater whole again, but leaves the lost part alone.
+		dropped.LocalTransparencyModifier = 0.3
+		tipUp(look, -45)
+		expect(fadeOf(rig)).toBe(0)
+		expect(dropped.LocalTransparencyModifier).toBeCloseTo(0.3, 5)
+
+		-- A new character: the old one shows whole, the new one starts whole behind its facing.
+		tipUp(look, 45)
+		local first = rig
+		local second = skaterAt("Second", Vector3.new(30, 0, 0), Vector3.xAxis)
+		SkateController:bind(second)
+		rig = second
+		CameraController:step(DT)
+		expect(fadeOf(first)).toBe(0)
+		expect(fadeOf(second)).toBe(0)
+		tipUp(look, 45)
+		expect(fadeOf(second)).toBe(1)
+		expect(fadeOf(first)).toBe(0)
+		-- Nothing of the old one fades any more, even a part it gains now.
+		local late = Instance.new("Part")
+		late.Parent = first
+		task.wait()
+		expect(late.LocalTransparencyModifier).toBe(0)
+		tipUp(look, -45)
+		tipUp(look, 45)
+		expect(fadeOf(first)).toBe(0)
+
+		-- No character to follow (a spectator now): the last one shows whole.
+		ballAt(Vector3.new(0, 10, 0))
+		SkateController.skater = nil
+		SkateController.root = nil
+		CameraController:step(DT)
+		expect(fadeOf(second)).toBe(0)
+	end)
+
+	it("reaches its focus down toward the feet only as far as a surface below the skater allows", function()
+		local root = Fixtures.root(rig).Position
+		local raised = Instance.new("Part")
+		raised.Anchored = true
+		raised.Size = Vector3.new(40, 1, 40)
+		-- Its top 1 stud below the root.
+		raised.CFrame = CFrame.new(root - Vector3.new(0, 1.5, 0))
+		raised.Parent = folder
+		raised:AddTag(Tags.RideSurface)
+		RideSurfaces:refresh()
+		Fixtures.scriptedBinding(InputController.context, "Look"):Fire(Vector2.new(0, -math.rad(60) / DT))
+		CameraController:step(DT)
+		-- The focus stops collisionMargin above the top (0.5 below the root, not 1.5); the camera, a stud back along
+		-- the view, meets the top after 0.577 and stops collisionMargin before it.
+		Fixtures.expectNear(camera.CFrame.Position, root + Vector3.new(0, -0.566987, 0.038675))
 	end)
 
 	it(
@@ -207,7 +350,8 @@ describe("CameraController", function()
 		barrier:AddTag(Tags.Barrier)
 		RideSurfaces:refresh()
 		CameraController:step(DT)
-		expect((camera.CFrame.Position - focus()).Magnitude).toBeCloseTo(config.Camera.distance, 3)
+		-- The level view's distance (the owner's trial A3, #276).
+		expect((camera.CFrame.Position - focus()).Magnitude).toBeCloseTo(12, 3)
 	end)
 
 	it("keeps its focus inside the arena, under a roof just above the skater", function()
@@ -215,7 +359,7 @@ describe("CameraController", function()
 		local roof = Instance.new("Part")
 		roof.Anchored = true
 		roof.Size = Vector3.new(400, 1, 400)
-		-- Its underside 2 studs above the root: the focus, 4 up, would be past it.
+		-- Its underside 2 studs above the root: the focus, 5 up, would be past it.
 		roof.CFrame = CFrame.new(root.Position + Vector3.new(0, 2.5, 0))
 		roof.Parent = folder
 		roof:AddTag(Tags.RideSurface)
@@ -292,8 +436,8 @@ describe("CameraController", function()
 		local look = Fixtures.scriptedBinding(InputController.context, "Look")
 		local total = 0
 		for step = 1, 600 do
-			-- The look held for the first half, then still.
-			look:Fire(if step <= 300 then Vector2.new(1, 0) else Vector2.zero)
+			-- The look held for the first half, turning and tipping up to the limit (the skater fading), then still.
+			look:Fire(if step <= 300 then Vector2.new(1, -0.5) else Vector2.zero)
 			local started = os.clock()
 			CameraController:step(DT)
 			total += os.clock() - started
