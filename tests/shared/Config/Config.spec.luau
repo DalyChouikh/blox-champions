@@ -187,7 +187,10 @@ describe("Config defaults", function()
 			airPoseImpulse = 42,
 			-- A touchdown on the belly from the air keeps this much of the speed (#245: RC kept 59-73%).
 			bellyLandingKeep = 0.65,
-			normalFilter = { maxTurnDeg = 30, smoothing = 30 },
+			-- A sharper turn of the ground's normal is a corner (or a seam's side face); the body eases where the
+			-- skating turns at once (#255: smoothing the skating's normal added energy on curved walls).
+			cornerDeg = 30,
+			bodyUpSmoothing = 30,
 			draftRange = 18,
 			draftConeDeg = 30,
 			draftMaxAccel = 20,
@@ -835,6 +838,19 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { hardLanding = { knockdownSeconds = 0 } } },
 				message = "Movement.hardLanding.knockdownSeconds: must be > 0 (got 0)",
+			},
+			-- A corner and the body's easing (#255).
+			{
+				overrides = { Movement = { cornerDeg = 0 } },
+				message = "Movement.cornerDeg: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { cornerDeg = 91 } },
+				message = "Movement.cornerDeg: must be <= 90 (got 91)",
+			},
+			{
+				overrides = { Movement = { bodyUpSmoothing = 0 } },
+				message = "Movement.bodyUpSmoothing: must be > 0 (got 0)",
 			},
 			-- A slide's time (#252): every kind must stop in some time.
 			{

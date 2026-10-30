@@ -4,7 +4,7 @@
 -- - filters the ray's normal;
 -- - works out the draft and the attach;
 -- - steps SkateMath, slides the skater along any ride surface in its way, and writes the result into the skater body
---   the server built.
+--   the server built, whose up eases toward the skating's (#255).
 -- It holds the skater still during the kickoff freeze and until the arena has reached this client. A knocked-down
 -- skater (the server's KnockedDown attribute) lets go of any attach and only slides; knocked down by a strike or a
 -- fall, they ask the server to get up (GetUp) once per knockdown, as soon as the stick moves: the server decides when.
@@ -104,6 +104,9 @@ export type SkateController = {
 	_velocity: LinearVelocity?,
 	_align: AlignOrientation?,
 	_filter: NormalFilter.NormalFilter,
+	-- The skater body's up: the skating's, eased (Movement.bodyUpSmoothing), since the skating turns at once at each
+	-- strip of a curve (#255).
+	_shownUp: Vector3,
 	_attach: Attach.Attach,
 	-- The ride surfaces every ray goes through.
 	_surfaces: RideSurfaces.RideSurfaces,
@@ -222,7 +225,7 @@ local function stickDirection(self: SkateController, stick: Vector2, up: Vector3
 	return right * stick.X + forward * stick.Y
 end
 
-local function castGround(self: SkateController, root: BasePart, skater: SkateMath.Skater, dt: number)
+local function castGround(self: SkateController, root: BasePart, skater: SkateMath.Skater)
 	local ground = self._ground
 	local direction = -skater.up * self._config.Movement.groundProbeLength
 	local result = self._raycast(root.Position, direction, self._surfaces.params)
@@ -231,7 +234,7 @@ local function castGround(self: SkateController, root: BasePart, skater: SkateMa
 		return
 	end
 	ground.hit = true
-	ground.normal = self._filter:update(result.Normal, dt)
+	ground.normal = self._filter:update(result.Normal)
 	ground.distance = result.Distance
 end
 
@@ -297,14 +300,22 @@ local function collide(self: SkateController, root: BasePart, skater: SkateMath.
 	end
 end
 
+-- Each step closes 1 − e^(−bodyUpSmoothing × dt) of the turn between the body's up and the skating's.
+local function easeBody(self: SkateController, skater: SkateMath.Skater, dt: number)
+	local shown = self._shownUp
+	local turn = Vectors.angleBetween(shown, skater.up) * (1 - math.exp(-self._config.Movement.bodyUpSmoothing * dt))
+	self._shownUp = Vectors.rotateToward(shown, skater.up, turn, skater.forward)
+end
+
 local function apply(self: SkateController, skater: SkateMath.Skater)
 	(self._velocity :: LinearVelocity).VectorVelocity = skater.velocity
 	-- A facing along the up vector (flying straight off a wall) has no right: keep the last orientation.
-	local right = skater.forward:Cross(skater.up)
+	local up = self._shownUp
+	local right = skater.forward:Cross(up)
 	if right.Magnitude > Vectors.EPSILON then
 		local align = self._align :: AlignOrientation
 		align.PrimaryAxis = right.Unit
-		align.SecondaryAxis = skater.up
+		align.SecondaryAxis = up
 	end
 end
 
@@ -346,6 +357,7 @@ local function freeze(self: SkateController, root: BasePart, skater: SkateMath.S
 	self._posedLandingLeft = 0
 	local up = worldUp(self)
 	skater.up = up
+	self._shownUp = up
 	local facing = Vectors.alongSurface(root.CFrame.LookVector, up)
 	if facing.Magnitude > Vectors.EPSILON then
 		skater.forward = facing.Unit
@@ -403,6 +415,7 @@ local SkateController: SkateController = {
 	_velocity = nil,
 	_align = nil,
 	_filter = nil :: any,
+	_shownUp = Vector3.yAxis,
 	_attach = nil :: any,
 	_surfaces = nil :: any,
 	_stepSeconds = 0,
@@ -452,7 +465,7 @@ local SkateController: SkateController = {
 			or function(origin: Vector3, radius: number, direction: Vector3, params: RaycastParams): RaycastResult?
 				return workspace:Spherecast(origin, radius, direction, params)
 			end
-		self._filter = NormalFilter.new(config.Movement.normalFilter, worldUp(self))
+		self._filter = NormalFilter.new(config.Movement.cornerDeg, worldUp(self))
 		self._attach = Attach.new(config.Movement)
 		self._surfaces = deps.RideSurfaces
 		self._stepSeconds = 0
@@ -513,6 +526,7 @@ local SkateController: SkateController = {
 		self._velocity = velocity
 		self._align = align
 		self._filter:reset(worldUp(self))
+		self._shownUp = worldUp(self)
 		self._attach = Attach.new(self._config.Movement)
 		-- Jump presses made while there was no character to jump are spent here, not on the new one.
 		self._inputController:read(self._keys)
@@ -562,7 +576,7 @@ local SkateController: SkateController = {
 		input.knockdown = knockdown
 		input.diving = self.diving
 		self.move = input.move
-		castGround(self, root, skater, dt)
+		castGround(self, root, skater)
 		gatherOthers(self)
 		input.draftAccel = Draft.accel(self._config.Movement, root.Position, self._sources)
 		moveSkater(self, root, skater, dt)
@@ -572,6 +586,7 @@ local SkateController: SkateController = {
 			else math.max(0, self._posedLandingLeft - dt)
 		self._stepSeconds = dt
 		collide(self, root, skater, dt)
+		easeBody(self, skater, dt)
 		apply(self, skater)
 		shareState(self)
 		askToGetUp(self)

@@ -73,6 +73,8 @@ type Fields = {
 	_flatPull: number,
 	-- Gravity's pull off a face leaning OVERHANG_EPSILON past vertical: up to it the face holds like a wall.
 	_overhangPull: number,
+	-- The cosine of cornerDeg: the ground turning less than that since the last step is a curve (#255).
+	_cornerCos: number,
 	-- The fall line (fallLineDeg below the facing): its angle's cosine and sine, and gravity's pull along it.
 	_lineCos: number,
 	_lineSin: number,
@@ -112,6 +114,7 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_wallCos = math.cos(math.rad(movement.wallAngle)),
 		_flatPull = gravity.Magnitude * math.sin(math.rad(movement.pumpFlatSlopeDeg)),
 		_overhangPull = gravity.Magnitude * OVERHANG_EPSILON,
+		_cornerCos = math.cos(math.rad(movement.cornerDeg)),
 		_lineCos = math.cos(line),
 		_lineSin = math.sin(line),
 		_linePull = gravity.Magnitude * math.sin(line),
@@ -212,6 +215,14 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	local normal = ground.normal
 	local velocity = alongSurface(self.velocity, normal)
 	local speed = velocity.Magnitude
+	-- Through a curve's small turn (the arena's strips stand for curves) the ground does no work, so the speed along
+	-- it turns with it (#255); at a corner, or touching down, the speed into the new face is lost.
+	local last = self._lastNormal
+	if last ~= nil and last:Dot(normal) >= self._cornerCos and speed > EPSILON then
+		local kept = alongSurface(self.velocity, last).Magnitude
+		velocity *= kept / speed
+		speed = kept
+	end
 	local heading = if speed > EPSILON then velocity / speed else facingOn(self, normal)
 	-- On a wall the skates only roll (#239): the stick steers at most wallTurnRate and never strides, the brake does
 	-- nothing, and gravity pulls along it at wallGravityScale of its strength (#216); in the air it stays full.
@@ -472,8 +483,9 @@ function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Gro
 	end
 	resolveMode(self, controls, ground, travel, turn)
 	if self.mode == "Grounded" then
-		remember(self, ground.normal, travel, turn)
+		-- The grounded step turns the speed from the last step's ground; then this one's is kept.
 		stepGrounded(self, controls, ground, dt)
+		remember(self, ground.normal, travel, turn)
 	else
 		forget(self)
 		stepAirborne(self, controls, dt)

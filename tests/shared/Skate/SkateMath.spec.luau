@@ -687,6 +687,77 @@ describe("SkateMath knockdown slides", function()
 	end)
 end)
 
+-- The owner's re-playtest (#255): the arena's curves are flat strips. The ground does no work on a skater, so the speed
+-- along it turns with each strip's small turn, as on the curve the strips stand for; only a sharper turn, a corner,
+-- takes the speed into its new face. Projecting the speed onto each strip lost ~12% of it per wall visit.
+describe("SkateMath on curves", function()
+	local DT = 1 / 60
+	local lossless = table.clone(movement)
+	lossless.rollingFriction = 0
+	lossless.airDrag = 0
+	lossless.coastDecel = 0
+
+	-- A face tilted `deg` about X: rising toward +Z for a positive angle.
+	local function face(deg: number): Vector3
+		return Vector3.new(0, math.cos(math.rad(deg)), -math.sin(math.rad(deg)))
+	end
+
+	it("keeps its speed through a strip of a curve, and loses the speed into a corner", function()
+		local s = SkateMath.new(lossless, Fixtures.GRAVITY)
+		s.velocity = Vector3.new(0, 0, 60)
+		s:step(input(), ground(), DT)
+		s:step(input(), ground(face(15)), DT)
+		-- 60 − 196.2 × sin 15° / 60 (projected onto the strip it would have been 60 × cos 15° = 57.96 first).
+		expect(s.velocity.Magnitude).toBeCloseTo(59.154, 2)
+		-- Down a face falling 20°, then up one rising 20°: a 40° corner. One step down: 60 + 196.2 × sin 20° / 60 =
+		-- 61.118; then 61.118 × cos 40° − 1.118 up the new face.
+		local cornered = SkateMath.new(lossless, Fixtures.GRAVITY)
+		cornered.velocity = Vector3.new(0, -math.sin(math.rad(20)), math.cos(math.rad(20))) * 60
+		cornered:step(input(), ground(face(-20)), DT)
+		cornered:step(input(), ground(face(20)), DT)
+		expect(cornered.velocity.Magnitude).toBeCloseTo(45.701, 2)
+	end)
+
+	-- A bank of radius 16 in six 15° strips (like the middle's inner bank) between the floor and an upright wall.
+	local RADIUS = 16
+	local STRIP = math.rad(15)
+	local function bank(p: Vector3): Types.Ground
+		if p.Z <= 0 then
+			return ground(FLAT, p.Y)
+		end
+		local around = math.atan2(p.Z, RADIUS - p.Y)
+		if around >= math.pi / 2 then
+			return ground(Vector3.new(0, 0, -1), RADIUS - p.Z)
+		end
+		local k = math.clamp(math.floor(around / STRIP), 0, 5)
+		local middle = (k + 0.5) * STRIP
+		local normal = Vector3.new(0, math.cos(middle), -math.sin(middle))
+		local start = Vector3.new(p.X, RADIUS - RADIUS * math.cos(k * STRIP), RADIUS * math.sin(k * STRIP))
+		return ground(normal, (p - start):Dot(normal))
+	end
+
+	it("comes back from a bank of strips at the speed it left with, nothing slowing it", function()
+		local s = SkateMath.new(lossless, Fixtures.GRAVITY)
+		local p = Vector3.new(0, lossless.hoverHeight, -30)
+		s.velocity = Vector3.new(0, 0, 60)
+		s.forward = Vector3.zAxis
+		local top = 0
+		for _ = 1, 600 do
+			s:step(input(), bank(p), DT)
+			p += s.velocity * DT
+			top = math.max(top, p.Y)
+			if p.Z < -30 then
+				break
+			end
+		end
+		-- Well up the strips, and back on the floor.
+		expect(s.mode).toBe("Grounded")
+		expect(top).toBeGreaterThan(RADIUS / 2)
+		expect(p.Z < -30).toBe(true)
+		expect(s.velocity.Magnitude).toBeCloseTo(60, 0)
+	end)
+end)
+
 -- The owner (#246): RC's skater rode back down a bank still facing up it, then turned round over ~0.3 s, never in a
 -- snap (Video 7, 16.9-17.9 s).
 describe("SkateMath facing", function()
