@@ -75,9 +75,10 @@ describe("Surface.build", function()
 			end
 		end
 		-- Measured, not derived: the straights keep one block per constant strip; the curves' wedges follow their
-		-- strip counts.
+		-- strip counts. The 16-stud bank (#217) took 96 wedges off the 8-stud one's 8016: the two strips it moved from
+		-- the foot curve stopped changing in the blends, 2 quads of 4 wedges in each of the 12 blend segments.
 		expect(blocks).toBe(136)
-		expect(wedges).toBe(8016)
+		expect(wedges).toBe(7920)
 	end)
 
 	-- Fewer parts, and no seams across a straight for a rolling ball to bump on.
@@ -89,7 +90,7 @@ describe("Surface.build", function()
 			if piece.shape == "Block" then
 				if math.abs(piece.size.Z - 200) < 1e-3 then
 					whole += 1
-					if (piece.cframe.Position - Vector3.new(0, -0.5, -42)).Magnitude < 1e-3 then
+					if (piece.cframe.Position - Vector3.new(0, -0.5, -46)).Magnitude < 1e-3 then
 						lowerFloor = piece
 					end
 				elseif math.abs(piece.size.Z - 176) < 1e-3 then
@@ -97,12 +98,13 @@ describe("Surface.build", function()
 				end
 			end
 		end
-		-- The bank's four strips and the lower floor never change along a straight. The step's five, the upper
-		-- floor, the foot curve's eight and the outer wall change in the 20-stud blend at each corner, so they run
-		-- 176 studs, between the first and last stations past the blends (12 and 188).
-		expect(whole).toBe(2 * 5)
-		expect(between).toBe(2 * 15)
+		-- The bank's six strips and the lower floor never change along a straight. The step's five, the upper floor,
+		-- the foot curve's six and the outer wall change in the 20-stud blend at each corner, so they run 176 studs,
+		-- between the first and last stations past the blends (12 and 188). The lower floor runs from the bank's
+		-- foot (16) to the step (36): 20 wide, its middle 20 + 26 = 46 from the long axis.
+		expect(whole).toBe(2 * 7)
+		expect(between).toBe(2 * 13)
 		expect(lowerFloor).never.toBeNil()
-		expect(((lowerFloor :: Types.Piece).size - Vector3.new(28, 1, 200)).Magnitude).toBeLessThan(1e-3)
+		expect(((lowerFloor :: Types.Piece).size - Vector3.new(20, 1, 200)).Magnitude).toBeLessThan(1e-3)
 	end)
 end)

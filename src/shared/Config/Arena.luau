@@ -16,7 +16,8 @@ export type ArenaConfig = {
 	endRadius: number,
 	trackWidth: number,
 	outerWallHeight: number,
-	-- The inner bank: a quarter circle this high and this wide, from its top down to the lower floor.
+	-- The inner bank: a quarter circle this high and this wide, from its top down to the lower floor. The owner (#217):
+	-- 16, a wide ramp up into the middle glass like Roller Champions' Pixel City (was 8).
 	innerBankHeight: number,
 	-- Radius of the floor's curve up into the outer wall.
 	wallCurveRadius: number,
@@ -78,7 +79,7 @@ local defaults: ArenaConfig = {
 	endRadius = 60,
 	trackWidth = 80,
 	outerWallHeight = 28,
-	innerBankHeight = 8,
+	innerBankHeight = 16,
 	wallCurveRadius = 18,
 	stepHeight = 4,
 	stepWidth = 18,
