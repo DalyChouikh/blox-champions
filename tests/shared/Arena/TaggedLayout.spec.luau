@@ -142,6 +142,22 @@ describe("TaggedLayout.read", function()
 		surfaceFolder:Destroy()
 	end)
 
+	-- #308: a ball resting on any other part of the arena (the goal's rim) is stranded.
+	it("says whether a part is a ride surface, by its folder's RideSurface tag", function()
+		local surfaceFolder = Instance.new("Folder")
+		surfaceFolder:AddTag(Tags.RideSurface)
+		local floor = Instance.new("Part")
+		floor.Parent = surfaceFolder
+		local goal = Instance.new("Folder")
+		local rim = Instance.new("Part")
+		rim.Parent = goal
+		expect(TaggedLayout.isRideSurface(floor)).toBe(true)
+		expect(TaggedLayout.isRideSurface(rim)).toBe(false)
+		expect(TaggedLayout.isRideSurface(Instance.new("Part"))).toBe(false)
+		surfaceFolder:Destroy()
+		goal:Destroy()
+	end)
+
 	-- The review (#303): the client's skating and the server's look-down read a ground ray alike, in one place.
 	it(
 		"reads a ground ray's result into a ground: the smooth normal at its point, its distance, glass by its part",

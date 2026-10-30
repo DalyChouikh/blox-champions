@@ -208,10 +208,21 @@ function TaggedLayout.read(root: Instance): TaggedArena
 	return Freeze.deep(arena)
 end
 
+-- Whether a part's folder carries `tag`: the arena tags its surfaces by folder (Tags.RideSurface, Tags.Glass).
+local function inFolderTagged(part: Instance, tag: string): boolean
+	local folder = part.Parent
+	return folder ~= nil and folder:HasTag(tag)
+end
+
 -- Whether a ride surface's part is glass, by its folder's tag (#299: no climb holds on the glass).
 function TaggedLayout.isGlass(part: Instance): boolean
-	local folder = part.Parent
-	return folder ~= nil and folder:HasTag(Tags.Glass)
+	return inFolderTagged(part, Tags.Glass)
+end
+
+-- Whether a part of the arena is a ride surface, by its folder's tag (#308: a loose ball resting on any other part, the
+-- goal's rim, is stranded).
+function TaggedLayout.isRideSurface(part: Instance): boolean
+	return inFolderTagged(part, Tags.RideSurface)
 end
 
 -- What a skater's ground ray found, into `ground`: the ride surface's direction at the point from the arena's smooth

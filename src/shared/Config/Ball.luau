@@ -14,8 +14,11 @@ export type BallConfig = {
 	pickupRadius: number,
 	-- How long a thrower must wait before catching their own throw.
 	rethrowPickupDelay: number,
-	-- A ball nobody has held for this long respawns at a ball spawn.
-	ballIdleResetSeconds: number,
+	-- A loose ball resting this long on something nobody skates (any part of the arena but a ride surface: the goal's
+	-- rim) respawns at a ball spawn; anywhere else it stays until someone picks it up.
+	strandedSeconds: number,
+	-- Slower than this (studs/s), a loose ball is at rest.
+	restSpeed: number,
 	-- How far past either glass, below the floor or over the top (Bounds.inArena) the ball's center may go before it is
 	-- out.
 	outOfBoundsMargin: number,
@@ -31,12 +34,16 @@ local defaults: BallConfig = {
 	elasticity = 0.5,
 	pickupRadius = 5,
 	rethrowPickupDelay = 0.4,
-	ballIdleResetSeconds = 15,
+	-- The owner (Q93, #308): no idle respawn; only a ball resting 5 s on something nobody skates respawns.
+	strandedSeconds = 5,
+	-- A ruling (#308): a sixth of a body length a second; a ball rolling or rocking faster is not at rest.
+	restSpeed = 1,
 	outOfBoundsMargin = 2,
 	carryOffset = Vector3.new(2.5, 0, -0.5),
 }
 
 local nonNegative = Validate.number({ min = 0 })
+local positive = Validate.number({ above = 0 })
 
 -- Physics ranges are the ones Roblox clamps PhysicalProperties to, so a configured value is never silently changed.
 local schema = Validate.record({
@@ -44,9 +51,10 @@ local schema = Validate.record({
 	density = Validate.number({ min = 0.0001, max = 100 }),
 	friction = Validate.number({ min = 0, max = 2 }),
 	elasticity = Validate.number({ min = 0, max = 1 }),
-	pickupRadius = Validate.number({ above = 0 }),
+	pickupRadius = positive,
 	rethrowPickupDelay = nonNegative,
-	ballIdleResetSeconds = Validate.number({ above = 0 }),
+	strandedSeconds = positive,
+	restSpeed = positive,
 	outOfBoundsMargin = nonNegative,
 	carryOffset = Validate.check(Validate.datatype("Vector3"), Finite.vector, "must be finite"),
 })

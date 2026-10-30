@@ -20,8 +20,6 @@ BallState.__index = BallState
 type Fields = {
 	status: Status,
 	carrier: PlayerId?,
-	-- Time since the ball last left a player's control (released, thrown, dropped or respawned) while free.
-	looseSeconds: number,
 	-- Time the carrier has held the ball since the catch; 0 while nobody does.
 	heldSeconds: number,
 	_rethrowPickupDelay: number,
@@ -38,11 +36,10 @@ local function expectStatus(self: BallState, action: string, allowed: { [Status]
 	end
 end
 
--- The ball leaves a player's control: free, the idle count restarting.
+-- The ball leaves a player's control: free.
 local function free(self: BallState, status: Status)
 	self.status = status
 	self.carrier = nil
-	self.looseSeconds = 0
 	self.heldSeconds = 0
 end
 
@@ -51,7 +48,6 @@ function BallState.new(rethrowPickupDelay: number): BallState
 		{
 			status = "Dead",
 			carrier = nil,
-			looseSeconds = 0,
 			heldSeconds = 0,
 			_rethrowPickupDelay = rethrowPickupDelay,
 			_thrower = nil,
@@ -70,7 +66,6 @@ function BallState.pickUp(self: BallState, player: PlayerId)
 	expectStatus(self, "pickUp", FREE)
 	self.status = "Carried"
 	self.carrier = player
-	self.looseSeconds = 0
 	self.heldSeconds = 0
 	self._thrower = nil
 end
@@ -104,9 +99,7 @@ function BallState.kill(self: BallState)
 end
 
 function BallState.tick(self: BallState, dt: number)
-	if FREE[self.status] then
-		self.looseSeconds += dt
-	elseif CARRIED[self.status] then
+	if CARRIED[self.status] then
 		self.heldSeconds += dt
 	end
 	if self._thrower ~= nil then
