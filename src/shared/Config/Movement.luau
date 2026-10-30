@@ -61,6 +61,13 @@ export type MovementConfig = {
 	-- this fast. A level line along upright glass needs g / wallTurnRate (131 studs/s at #279's gravity), past
 	-- hardCap, so every rider curves back down.
 	wallTurnRate: number,
+	-- Holding the stick up a slope gentler than crawlLimitDeg (degrees from flat), walls under it included, the skater
+	-- never slows below crawlSpeed up it (the owner, #273, Q38: Roller Champions' skater crept up a bank at 1-5 km/h
+	-- with W held, Video 20; ours stopped short of the outer wall's foot). 3.33 studs/s is 4 km/h; 45 takes in the
+	-- straights' rise, ~39 at its steepest (#268), so W from a stop in the spawn room reaches the outer wall (trial
+	-- 7, kept). Steeper, gravity slides them back.
+	crawlSpeed: number,
+	crawlLimitDeg: number,
 	-- How far back along the skater's path the curve of an overhang is measured (A3): a few of a lip's flat strips,
 	-- so a curve of strips reads as the arc it makes, yet short enough to follow a curve from where it starts.
 	curvatureWindow: number,
@@ -139,6 +146,8 @@ local defaults: MovementConfig = {
 	fallLineDeg = 20,
 	wallAngle = 30,
 	wallTurnRate = 1,
+	crawlSpeed = 3.33,
+	crawlLimitDeg = 45,
 	curvatureWindow = 10,
 	pumpSlopeMultiplier = 1.6,
 	pumpFlatAccel = 8,
@@ -194,6 +203,8 @@ local fields = Validate.record({
 	fallLineDeg = quarterTurn,
 	wallAngle = angle,
 	wallTurnRate = nonNegative,
+	crawlSpeed = positive,
+	crawlLimitDeg = quarterTurn,
 	curvatureWindow = positive,
 	pumpSlopeMultiplier = Validate.number({ min = 1 }),
 	pumpFlatAccel = nonNegative,
@@ -240,6 +251,13 @@ local rules: { Validate.Rule } = {
 		message = "groundProbeLength must reach past hoverHeight",
 		holds = function(movement: MovementConfig): boolean
 			return movement.groundProbeLength > movement.hoverHeight
+		end,
+	},
+	{
+		-- A crawl is no stride: the owner did not choose striding uphill at full speed (Q38).
+		message = "crawlSpeed must stay below cruiseSpeed",
+		holds = function(movement: MovementConfig): boolean
+			return movement.crawlSpeed < movement.cruiseSpeed
 		end,
 	},
 	{
