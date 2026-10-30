@@ -98,6 +98,9 @@ describe("Builder.build", function()
 		local glassFolder = folder(arena, "Glass")
 		expect(glassFolder:HasTag(Tags.RideSurface)).toBe(true)
 		expect(glassFolder:HasTag(Tags.Barrier)).toBe(false)
+		-- Only the glass is Glass: no climb holds on it (#299).
+		expect(glassFolder:HasTag(Tags.Glass)).toBe(true)
+		expect(folder(arena, "Surface"):HasTag(Tags.Glass)).toBe(false)
 		for _, part in glassFolder:GetChildren() do
 			local glass = part :: BasePart
 			if

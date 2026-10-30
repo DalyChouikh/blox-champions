@@ -64,13 +64,14 @@ export type MovementConfig = {
 	-- this fast. A level line along upright glass needs g / wallTurnRate (131 studs/s at #279's gravity), past
 	-- hardCap, so every rider curves back down.
 	wallTurnRate: number,
-	-- Holding the stick up a slope gentler than crawlLimitDeg (degrees from flat), walls under it included, the skater
-	-- never slows below crawlSpeed up it (the owner, #273, Q38: Roller Champions' skater crept up a bank at 1-5 km/h
-	-- with W held, Video 20; ours stopped short of the outer wall's foot). 3.33 studs/s is 4 km/h; 45 takes in the
-	-- straights' rise, ~39 at its steepest (#268), so W from a stop in the spawn room reaches the outer wall (trial
-	-- 7, kept). Steeper, gravity slides them back.
-	crawlSpeed: number,
-	crawlLimitDeg: number,
+	-- Holding the stick up any solid ride surface, however steep (the floors' slopes, the banks, the walls up to
+	-- their glass), the skater gains speed along their heading at climbAccel (studs/s²) whatever the slope, up to
+	-- climbSpeed; never on the glass, where the skates only roll (#239). The owner (#299, Q79-Q85: "I want the
+	-- player to be able to climb all walls, just till they reach the glass then they start dropping"), trial S4
+	-- kept: 1.5x the stride's push, up to 6.8 body lengths a second (the flat's top is 7.9). It replaced #273's
+	-- crawl (3.33 studs/s up slopes under 45°), where a W-only start in the spawn room topped the rise in 4.8 s.
+	climbSpeed: number,
+	climbAccel: number,
 	-- How far back along the skater's path, in studs the way the surface bends (#289), its curve is measured (A3): a
 	-- few of a lip's flat strips, so a curve of strips reads as the arc it makes, yet short enough to follow a curve
 	-- from where it starts.
@@ -152,8 +153,8 @@ local defaults: MovementConfig = {
 	wallAngle = 30,
 	wallGrip = 38,
 	wallTurnRate = 1,
-	crawlSpeed = 3.33,
-	crawlLimitDeg = 45,
+	climbSpeed = 40,
+	climbAccel = 45,
 	curvatureWindow = 10,
 	pumpSlopeMultiplier = 1.6,
 	pumpFlatAccel = 8,
@@ -209,8 +210,8 @@ local fields = Validate.record({
 	wallAngle = angle,
 	wallGrip = nonNegative,
 	wallTurnRate = nonNegative,
-	crawlSpeed = positive,
-	crawlLimitDeg = quarterTurn,
+	climbSpeed = positive,
+	climbAccel = positive,
 	curvatureWindow = positive,
 	pumpSlopeMultiplier = Validate.number({ min = 1 }),
 	pumpFlatAccel = nonNegative,
@@ -260,10 +261,10 @@ local rules: { Validate.Rule } = {
 		end,
 	},
 	{
-		-- A crawl is no stride: the owner did not choose striding uphill at full speed (Q38).
-		message = "crawlSpeed must stay below cruiseSpeed",
+		-- A climb is almost the flat's stride, "but almost not quite" (the owner, #299, Q82).
+		message = "climbSpeed must stay below cruiseSpeed",
 		holds = function(movement: MovementConfig): boolean
-			return movement.crawlSpeed < movement.cruiseSpeed
+			return movement.climbSpeed < movement.cruiseSpeed
 		end,
 	},
 	{

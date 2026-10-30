@@ -124,6 +124,23 @@ describe("TaggedLayout.read", function()
 		expect(markers[3]:GetPivot().Position).toEqual(Vector3.new(300, 20, 0))
 	end)
 
+	-- #299: the climb holds on every ride surface but the glass.
+	it("says whether a ride surface's part is glass, by its folder's Glass tag", function()
+		local glassFolder = Instance.new("Folder")
+		glassFolder:AddTag(Tags.Glass)
+		local pane = Instance.new("Part")
+		pane.Parent = glassFolder
+		local surfaceFolder = Instance.new("Folder")
+		surfaceFolder:AddTag(Tags.RideSurface)
+		local floor = Instance.new("Part")
+		floor.Parent = surfaceFolder
+		expect(TaggedLayout.isGlass(pane)).toBe(true)
+		expect(TaggedLayout.isGlass(floor)).toBe(false)
+		expect(TaggedLayout.isGlass(Instance.new("Part"))).toBe(false)
+		glassFolder:Destroy()
+		surfaceFolder:Destroy()
+	end)
+
 	it("ignores tagged instances outside the root", function()
 		local root = arenaRoot()
 		local stray = Instance.new("Folder")

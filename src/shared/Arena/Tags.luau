@@ -17,6 +17,8 @@ local Tags = {
 	-- On the folder of the arena's top (A7): skaters and the ball bounce off it, and only a skater's collider sweep
 	-- sees it; every ray looks through it.
 	Barrier = "Barrier",
+	-- On the folder of the glass, a ride surface too: the skates only roll on it, so no climb holds there (#299).
+	Glass = "Glass",
 	-- On the ball's part, so clients find the ball the server built.
 	Ball = "Ball",
 	Attribute = {
