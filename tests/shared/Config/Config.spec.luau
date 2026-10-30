@@ -286,6 +286,7 @@ describe("Config defaults", function()
 			minPitchDeg = -70,
 			maxPitchDeg = 60,
 			rollResponse = 8,
+			maxTiltDeg = 30,
 			recenterDelay = 0.5,
 			recenterResponse = 2.5,
 			recenterMinSpeed = 10,
@@ -878,6 +879,15 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Input = { ballFocus = { Enum.KeyCode.MouseLeftButton, Enum.KeyCode.ButtonL2 } } })
 		end).never.toThrow()
+	end)
+
+	it("rejects a camera that would not lean with the surface, or would lean all the way onto a wall", function()
+		expect(function()
+			Fixtures.config({ Camera = { maxTiltDeg = 0 } })
+		end).toThrow("Camera.maxTiltDeg: must be > 0 (got 0)")
+		expect(function()
+			Fixtures.config({ Camera = { maxTiltDeg = 90 } })
+		end).toThrow("Camera.maxTiltDeg: must be <= 89 (got 90)")
 	end)
 
 	it("rejects a camera or touch layout that contradicts itself", function()

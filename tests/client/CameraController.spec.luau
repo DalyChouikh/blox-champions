@@ -230,11 +230,12 @@ describe("CameraController", function()
 		)
 	end)
 
-	it("rolls with the skater riding a wall", function()
+	it("rolls with the skater riding a wall, leaning the view no further than Camera.maxTiltDeg", function()
 		CameraController:step(DT)
 		skater().up = Vector3.xAxis
 		CameraController:step(10)
-		Fixtures.expectNear(camera.CFrame.UpVector, Vector3.new(1, 0, 0))
+		-- World up leaned the limit (30°) toward the wall's up: (sin 30°, cos 30°, 0).
+		Fixtures.expectNear(camera.CFrame.UpVector, Vector3.new(0.5, math.sqrt(3) / 2, 0))
 	end)
 
 	it("swings behind the travel on a gamepad but not with a mouse", function()

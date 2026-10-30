@@ -1,13 +1,17 @@
 --!strict
 -- The chase camera's state (spec §8.4), stepped each frame: which way is up, the heading on the plane that up defines,
--- the pitch above or below it, and the field of view. Up rolls toward the surface the skater rides, so on a wall the
--- view tilts and over an overhang it loops (owner, 2026-10-23); the heading rides along with the roll. The look input
--- turns and tips it. Ball Focus turns it toward the ball; otherwise, on a device that allows it, it swings back behind
--- the skater's travel once the look input has rested. Every response closes 1 − e^(−rate × dt) of its gap. Vector3
--- math only: a step allocates nothing.
+-- the pitch above or below it, and the field of view. Up rolls toward the surface the skater rides, but leans at most
+-- maxTiltDeg from world up (the owner, #223; it used to roll all the way and loop over overhangs), so on a wall the
+-- view tilts part of the way; the heading rides along with the roll. The look input turns and tips it. Ball Focus
+-- turns it toward the ball; otherwise, on a device that allows it, it swings back behind the skater's travel once the
+-- look input has rested. Every response closes 1 − e^(−rate × dt) of its gap. Vector3 math only: a step allocates
+-- nothing.
 
 local Config = require(script.Parent.Parent.Config)
 local Vectors = require(script.Parent.Parent.Util.Vectors)
+
+-- The up the camera leans from, and starts at.
+local WORLD_UP = Vector3.yAxis
 
 -- One frame's input.
 export type Target = {
@@ -42,6 +46,8 @@ type Fields = {
 	_hardCap: number,
 	_minPitch: number,
 	_maxPitch: number,
+	-- Radians: maxTiltDeg.
+	_maxTilt: number,
 }
 
 export type ChaseCamera = typeof(setmetatable({} :: Fields, ChaseCamera))
@@ -69,19 +75,35 @@ local function turnToward(self: ChaseCamera, direction: Vector3, share: number)
 	self.forward = onPlane(turned, self.up, self.forward)
 end
 
--- Rolls up toward `toward` by its share of the angle, carrying the heading by the same rotation. Turned exactly
--- upside down, it rolls about the camera's right, as over the top of a loop.
+-- The up the camera may take for a surface whose up is the unit `up`: leaned toward it at most maxTiltDeg from world
+-- up, or nil for a surface facing straight down, where no side is nearer than another.
+local function withinTilt(self: ChaseCamera, up: Vector3): Vector3?
+	if Vectors.angleBetween(WORLD_UP, up) <= self._maxTilt then
+		return up
+	end
+	local axis = WORLD_UP:Cross(up)
+	if axis.Magnitude <= Vectors.EPSILON then
+		return nil
+	end
+	return Vectors.rotateAbout(WORLD_UP, axis.Unit, self._maxTilt)
+end
+
+-- Rolls up toward `toward` leaned within maxTiltDeg, by its share of the angle, carrying the heading by the same
+-- rotation; facing straight down, it keeps its lean. Up and its goal are both within the limit, under 90° from world
+-- up, so they are never opposite and the roll always has an axis.
 local function roll(self: ChaseCamera, toward: Vector3, dt: number)
 	if toward.Magnitude <= Vectors.EPSILON then
 		return
 	end
-	local goal = toward.Unit
+	local goal = withinTilt(self, toward.Unit)
+	if goal == nil then
+		return
+	end
 	local angle = Vectors.angleBetween(self.up, goal)
 	if angle <= Vectors.EPSILON then
 		return
 	end
-	local axis = self.up:Cross(goal)
-	axis = if axis.Magnitude > Vectors.EPSILON then axis.Unit else self.forward:Cross(self.up).Unit
+	local axis = self.up:Cross(goal).Unit
 	local turn = angle * closed(self._camera.rollResponse, dt)
 	self.up = Vectors.rotateAbout(self.up, axis, turn).Unit
 	self.forward = onPlane(Vectors.rotateAbout(self.forward, axis, turn), self.up, self.forward)
@@ -109,7 +131,7 @@ end
 
 function ChaseCamera.new(camera: Config.CameraConfig, hardCap: number, up: Vector3, forward: Vector3): ChaseCamera
 	local self: Fields = {
-		up = Vector3.yAxis,
+		up = WORLD_UP,
 		forward = -Vector3.zAxis,
 		pitch = 0,
 		fov = camera.fovBase,
@@ -118,15 +140,18 @@ function ChaseCamera.new(camera: Config.CameraConfig, hardCap: number, up: Vecto
 		_hardCap = hardCap,
 		_minPitch = math.rad(camera.minPitchDeg),
 		_maxPitch = math.rad(camera.maxPitchDeg),
+		_maxTilt = math.rad(camera.maxTiltDeg),
 	}
 	local chase = setmetatable(self, ChaseCamera)
 	chase:reset(up, forward)
 	return chase
 end
 
--- Behind `forward` on `up`, level, at the resting field of view, as at a kickoff or for a new character.
+-- Behind `forward` on `up` (leaned within maxTiltDeg; world up for a surface facing straight down), level, at the
+-- resting field of view, as at a kickoff or for a new character.
 function ChaseCamera.reset(self: ChaseCamera, up: Vector3, forward: Vector3)
-	self.up = up.Unit
+	local leaned = withinTilt(self, up.Unit)
+	self.up = if leaned ~= nil then leaned else WORLD_UP
 	self.forward = onPlane(forward, self.up, perpendicular(self.up))
 	self.pitch = 0
 	self.idle = 0

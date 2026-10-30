@@ -56,21 +56,57 @@ describe("ChaseCamera", function()
 		expect(chase.pitch).toBeCloseTo(math.rad(60), 5)
 	end)
 
-	it("rolls toward the surface it rides, keeping its heading on that surface", function()
+	-- The owner (#223): the view leans with the surface only up to maxTiltDeg from world up, 30°, picked from
+	-- screenshots, so a wall never stands the floor up on screen.
+	it("rolls toward the surface it rides up to maxTiltDeg, keeping its heading on the plane of its up", function()
 		local chase = camera()
 		chase:step(target({ up = Vector3.xAxis }), 0.1)
-		local rolled = 90 * (1 - math.exp(-0.8))
+		-- Toward the limit, not the wall: 30° × (1 − e^(−8 × 0.1)) = 16.52°.
+		local rolled = 30 * (1 - math.exp(-0.8))
 		expect(chase.up:Dot(Vector3.yAxis)).toBeCloseTo(math.cos(math.rad(rolled)), 3)
 		chase:step(target({ up = Vector3.xAxis }), 10)
-		Fixtures.expectNear(chase.up, Vector3.new(1, 0, 0))
+		Fixtures.expectNear(chase.up, Vector3.new(0.5, math.sqrt(3) / 2, 0))
 		Fixtures.expectNear(chase.forward, Vector3.new(0, 0, -1))
+		-- A bank gentler than the limit, 20°, it follows all the way.
+		local bank = Vector3.new(math.sin(math.rad(20)), math.cos(math.rad(20)), 0)
+		chase:step(target({ up = bank }), 10)
+		Fixtures.expectNear(chase.up, bank)
+		-- Another limit leans that far: 45° on the wall.
+		local settings = Fixtures.config({ Camera = { maxTiltDeg = 45 } }).Camera
+		local wide = ChaseCamera.new(settings, HARD_CAP, Vector3.yAxis, -Vector3.zAxis)
+		wide:step(target({ up = Vector3.xAxis }), 10)
+		Fixtures.expectNear(wide.up, Vector3.new(math.sqrt(0.5), math.sqrt(0.5), 0))
 	end)
 
-	it("rolls over the top like a loop when its up turns upside down", function()
+	it("never leans past maxTiltDeg, on any surface, over a lip or upside down", function()
+		-- Surfaces all the way round, from the floor over a wall to a ceiling and back, a few frames on each.
 		local chase = camera()
-		chase:step(target({ up = -Vector3.yAxis }), 10)
-		Fixtures.expectNear(chase.up, Vector3.new(0, -1, 0))
-		Fixtures.expectNear(chase.forward, Vector3.new(0, 0, 1))
+		for step = 0, 24 do
+			local angle = math.rad(15 * step)
+			chase:step(target({ up = Vector3.new(math.sin(angle), math.cos(angle), 0) }), 0.05)
+			expect(math.deg(math.atan2(chase.up:Cross(Vector3.yAxis).Magnitude, chase.up.Y))).toBeLessThan(30 + 1e-3)
+		end
+		-- A lip 135° from world up, overhanging toward −X: the view leans the limit toward it.
+		local lip = camera()
+		lip:step(target({ up = Vector3.new(-1, -1, 0).Unit }), 10)
+		Fixtures.expectNear(lip.up, Vector3.new(-0.5, math.sqrt(3) / 2, 0))
+		-- Straight down no side is nearer than another: it keeps the lean it has.
+		lip:step(target({ up = -Vector3.yAxis }), 10)
+		Fixtures.expectNear(lip.up, Vector3.new(-0.5, math.sqrt(3) / 2, 0))
+		local level = camera()
+		level:step(target({ up = -Vector3.yAxis }), 10)
+		Fixtures.expectNear(level.up, Vector3.yAxis)
+		Fixtures.expectNear(level.forward, Vector3.new(0, 0, -1))
+	end)
+
+	it("rolls back level at rollResponse once the surface flattens", function()
+		local chase = camera()
+		chase:step(target({ up = Vector3.xAxis }), 10)
+		chase:step(target(), 0.1)
+		-- 30° × e^(−8 × 0.1) = 13.48° left.
+		expect(chase.up:Dot(Vector3.yAxis)).toBeCloseTo(math.cos(math.rad(30 * math.exp(-0.8))), 4)
+		chase:step(target(), 10)
+		Fixtures.expectNear(chase.up, Vector3.yAxis)
 	end)
 
 	it("swings behind the travel once the look input rests, only when the device allows it", function()
@@ -146,5 +182,13 @@ describe("ChaseCamera", function()
 		expect(chase.pitch).toBe(0)
 		expect(chase.idle).toBe(0)
 		expect(chase.fov).toBe(70)
+		-- A new character on a wall: the view starts leaning only the limit toward it.
+		chase:reset(Vector3.xAxis, -Vector3.zAxis)
+		Fixtures.expectNear(chase.up, Vector3.new(0.5, math.sqrt(3) / 2, 0))
+		Fixtures.expectNear(chase.forward, Vector3.new(0, 0, -1))
+		-- Under a surface facing straight down no side is nearer: it starts level.
+		chase:reset(-Vector3.yAxis, -Vector3.zAxis)
+		Fixtures.expectNear(chase.up, Vector3.yAxis)
+		Fixtures.expectNear(chase.forward, Vector3.new(0, 0, -1))
 	end)
 end)
