@@ -661,6 +661,44 @@ function SkateMath.diveChange(self: Skater, speed: number): Vector3
 	return facingOn(self, up) * target - across
 end
 
+-- A strike's aim (#277): the facing turned toward `offset` (from the skater to their target, or the stick's way) across
+-- what the speedometer reads (the surface; the ground below in the air), by at most `maxAngle` radians. An offset
+-- straight along that up leaves it.
+function SkateMath.faceToward(self: Skater, offset: Vector3, maxAngle: number)
+	local up = readingUp(self)
+	local way = alongSurface(offset, up)
+	if way.Magnitude > EPSILON then
+		self.forward = rotateToward(facingOn(self, up), way.Unit, maxAngle, up)
+	end
+end
+
+-- The change that turns the speed across that same plane toward `way` by at most `maxAngle` radians, keeping it and
+-- what lies off the plane (a rise, the hover's pull): a strike turning its skater at the press (#277).
+function SkateMath.turnChange(self: Skater, way: Vector3, maxAngle: number): Vector3
+	local up = readingUp(self)
+	local across = alongSurface(self.velocity, up)
+	local toward = alongSurface(way, up)
+	local speed = across.Magnitude
+	if speed <= EPSILON or toward.Magnitude <= EPSILON then
+		return Vector3.zero
+	end
+	return rotateToward(across / speed, toward.Unit, maxAngle, up) * speed - across
+end
+
+-- A homing strike's change toward `offset` (#277): on the ground as turnChange; in the air the whole motion turns, so
+-- an Uppercut's leap tilts toward an opponent above and an air strike bends down at one below.
+function SkateMath.homeChange(self: Skater, offset: Vector3, maxAngle: number): Vector3
+	if self.mode ~= "Airborne" then
+		return self:turnChange(offset, maxAngle)
+	end
+	local velocity = self.velocity
+	local speed = velocity.Magnitude
+	if speed <= EPSILON or offset.Magnitude <= EPSILON then
+		return Vector3.zero
+	end
+	return rotateToward(velocity / speed, offset.Unit, maxAngle, self.up) * speed - velocity
+end
+
 -- A surface in the way (the controller finds it): the velocity loses its part into the surface and keeps the rest, so
 -- the skater slides along it. Says whether anything was lost.
 function SkateMath.block(self: Skater, normal: Vector3): boolean

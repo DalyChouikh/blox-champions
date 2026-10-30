@@ -102,21 +102,33 @@ describe("Config defaults", function()
 				requires = requires("without"),
 				effect = "Knockdown",
 				pose = "Lunge",
-				hit = { range = 7, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
+				hit = { range = 7, coneDeg = 90, aimUpDeg = 0, knockdownSeconds = 1.5 },
+				-- Q57-Q61: 2 bodies in the front half, else 3 bodies within 45°; a quarter-turn over its strike.
+				seek = {
+					snap = { range = 12, coneDeg = 90, aimUpDeg = 0 },
+					bend = { range = 18, coneDeg = 45, aimUpDeg = 0 },
+					turnDegPerSecond = 300,
+				},
 				-- 48 km/h more, never past 72 km/h; in the air 0.4 as much (#241: RC's 27 -> 42 km/h).
 				motion = { lungeSpeed = 40, lungeCap = 60 },
 				airMultiplier = 0.4,
 				followUp = { action = "Dive", from = 0.1, to = 1 },
 			},
-			-- Only as the Tackle's follow-up, a 0.7 s glide, then on the belly at the first touch of the ground until
-			-- the slide stops (#221, #240, #242).
+			-- Only as the Tackle's follow-up, a 0.3 s flight (#277, Q66), then on the belly at the first touch of the
+			-- ground until the slide stops (#221, #240, #242).
 			Dive = {
-				phases = { windup = 0, active = 0.7, recovery = 0.9 },
+				phases = { windup = 0, active = 0.3, recovery = 0.9 },
 				cooldown = 0.8,
 				requires = requires("without"),
 				effect = "Knockdown",
 				pose = "Lunge",
-				hit = { range = 11, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
+				hit = { range = 11, coneDeg = 90, aimUpDeg = 0, knockdownSeconds = 1.5 },
+				-- Q64: 3 bodies up to 120° (beside, a little behind), else within 45°.
+				seek = {
+					snap = { range = 18, coneDeg = 120, aimUpDeg = 0 },
+					bend = { range = 18, coneDeg = 45, aimUpDeg = 0 },
+					turnDegPerSecond = 300,
+				},
 				-- 72 km/h along the way, or a faster skater's own speed (#241).
 				motion = { diveSpeed = 60 },
 				landing = { knockdownSeconds = 1.5, stopSpeed = 2 },
@@ -135,7 +147,13 @@ describe("Config defaults", function()
 				requires = requires("without", "grounded"),
 				effect = "Knockdown",
 				pose = "None",
-				hit = { range = 6, coneDeg = 60, aimUpDeg = 30, knockdownSeconds = 1.5 },
+				hit = { range = 6, coneDeg = 90, aimUpDeg = 0, knockdownSeconds = 1.5 },
+				-- Q58: an opponent above, up to its 31-stud leap within 45° of straight up.
+				seek = {
+					snap = { range = 12, coneDeg = 90, aimUpDeg = 0 },
+					bend = { range = 31, coneDeg = 45, aimUpDeg = 90 },
+					turnDegPerSecond = 360,
+				},
 				-- √(2/3) of 110: as high at two thirds of the gravity (#279).
 				motion = { leapImpulse = 89.81 },
 			},
@@ -1009,6 +1027,17 @@ describe("Config.forMode", function()
 		end
 	end)
 
+	it("accepts strike seeks just inside their limits", function()
+		local cone = { range = 0.01, coneDeg = 180, aimUpDeg = 90 }
+		local actions = Fixtures.config({
+			Actions = { Tackle = { seek = { snap = cone, bend = cone, turnDegPerSecond = 0 } } },
+		}).Actions
+		local seek = actions.Tackle.seek :: Config.Seek
+		expect(seek.snap).toEqual(cone)
+		expect(seek.bend).toEqual(cone)
+		expect(seek.turnDegPerSecond).toBe(0)
+	end)
+
 	it("accepts a crawl just inside its limits", function()
 		local movement = Fixtures.config({ Movement = { crawlSpeed = 45.9, crawlLimitDeg = 90 } }).Movement
 		expect(movement.crawlSpeed).toBe(45.9)
@@ -1074,6 +1103,31 @@ describe("Config.forMode", function()
 			{
 				overrides = { Dive = { motion = { diveSpeed = 0 } } },
 				message = "Actions.Dive.motion.diveSpeed: must be > 0 (got 0)",
+			},
+			-- The strikes' seeks (#277): cones like the hits', a turn rate of zero or more, only on the strikes.
+			{
+				overrides = { Tackle = { seek = { snap = { range = 0 } } } },
+				message = "Actions.Tackle.seek.snap.range: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Dive = { seek = { snap = { coneDeg = 181 } } } },
+				message = "Actions.Dive.seek.snap.coneDeg: must be <= 180 (got 181)",
+			},
+			{
+				overrides = { Uppercut = { seek = { bend = { aimUpDeg = 91 } } } },
+				message = "Actions.Uppercut.seek.bend.aimUpDeg: must be <= 90 (got 91)",
+			},
+			{
+				overrides = { Tackle = { seek = { bend = { coneDeg = 0 } } } },
+				message = "Actions.Tackle.seek.bend.coneDeg: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Tackle = { seek = { turnDegPerSecond = -1 } } },
+				message = "Actions.Tackle.seek.turnDegPerSecond: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { Dodge = { seek = { turnDegPerSecond = 1 } } },
+				message = "Actions.Dodge.seek: unknown key",
 			},
 		}
 		for _, case in cases do

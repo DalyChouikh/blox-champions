@@ -17,6 +17,7 @@ local RideSurfaces = require(Client.RideSurfaces)
 local SkateController = require(Client.SkateController)
 local SkaterBody = require(ServerScriptService.Server.SkaterBody)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
+local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
 local config = Config.defaults()
 local movement = config.Movement
@@ -28,6 +29,8 @@ local DT = 1 / 60
 -- Looking toward -Z from behind the skater, so the skater's right is the camera's right, +X.
 local CAMERA = { CFrame = CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)) }
 local LOCAL_ID = "1"
+-- The other skaters the skating sees (SkateController's views), reset before each test.
+local others: { any } = {}
 
 local folder: Folder
 -- Roblox's menu: opening it pauses the controls.
@@ -88,7 +91,7 @@ local function setup(surfaces: { BasePart }?)
 		RideSurfaces = RideSurfaces,
 		Camera = CAMERA,
 		Skaters = function(): { any }
-			return {}
+			return others
 		end,
 		SendSkateState = function() end,
 		Team = function(): string?
@@ -109,6 +112,34 @@ local function setup(surfaces: { BasePart }?)
 		end,
 		LocalId = LOCAL_ID,
 	})
+end
+
+-- Another skater standing at `position` (an Orange opponent unless `team` says otherwise): a character with a
+-- root, as the skating's views show the other players.
+local function standing(name: string, position: Vector3, team: string?): Model
+	local character = Instance.new("Model")
+	character.Name = name
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Anchored = true
+	root.CanCollide = false
+	root.Size = Vector3.new(2, 2, 1)
+	root.Position = position
+	root.Parent = character
+	character.Parent = folder
+	table.insert(others, { player = name, team = team or "Orange", root = root })
+	return character
+end
+
+-- Moves `character` 14 studs from the skater, `degrees` to the right of the way `from` points.
+local function aside(character: Model, from: Vector3, degrees: number)
+	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart
+	root.Position = rig:GetPivot().Position + CFrame.Angles(0, -math.rad(degrees), 0):VectorToWorldSpace(from) * 14
+end
+
+-- The skater's facing and way across the ground, as unit vectors.
+local function across(vector: Vector3): Vector3
+	return Vector3.new(vector.X, 0, vector.Z).Unit
 end
 
 -- One physics step as the game runs it: the skating first, then the actions.
@@ -144,6 +175,7 @@ beforeEach(function()
 	folder.Parent = workspace
 	requests = {}
 	bindings = {}
+	others = {}
 end)
 afterEach(function()
 	InputController:destroy()
@@ -614,5 +646,225 @@ describe("ActionController", function()
 		end
 		expect(#requests).toBe(0)
 		expect(total / 600).toBeLessThan(0.0001)
+	end)
+end)
+
+describe("ActionController's magnetic strikes (#277)", function()
+	local HOVER = movement.hoverHeight
+	-- One step's turn at the Tackle's turn rate, in degrees: 300 deg/s over 1/60 s.
+	local TACKLE_STEP = (config.Actions.Tackle.seek :: Config.Seek).turnDegPerSecond * DT
+
+	-- A Tackle pressed at 30 studs/s with an opponent 15 studs ahead, 30 deg right: in the cone, past the snap zone.
+	-- Returns the opponent and the facing the press turned to.
+	local function tackleAhead(): (Model, Vector3)
+		setup()
+		frame()
+		local target = standing("Ahead", Vector3.new(7.5, HOVER, -13))
+		skater().velocity = Vector3.new(0, 0, -30)
+		press("Tackle")
+		actionsOnly()
+		return target, across(skater().forward)
+	end
+
+	-- Degrees the facing turned across the ground since `before`.
+	local function turnedFrom(before: Vector3): number
+		return math.deg(Vectors.angleBetween(before, across(skater().forward)))
+	end
+
+	it("strikes the stick's way when nobody is near: D and the Tackle key lunge to the right (Video 26)", function()
+		setup()
+		frame()
+		skater().velocity = Vector3.new(0, 0, -30)
+		bindingOf("Move"):Fire(Vector2.new(1, 0))
+		press("Tackle")
+		frame()
+		expect(across(skater().forward):Dot(Vector3.xAxis)).toBeGreaterThan(0.999)
+		expect(across(skater().velocity):Dot(Vector3.xAxis)).toBeGreaterThan(0.999)
+	end)
+
+	it("snaps at once to an opponent close beside, facing and moving at them (Q61)", function()
+		setup()
+		frame()
+		standing("Beside", Vector3.new(8, HOVER, -0.5))
+		skater().velocity = Vector3.new(0, 0, -30)
+		press("Tackle")
+		actionsOnly()
+		local way = across(Vector3.new(8, 0, -0.5))
+		expect(across(skater().forward):Dot(way)).toBeGreaterThan(0.999)
+		expect(across(skater().velocity):Dot(way)).toBeGreaterThan(0.999)
+	end)
+
+	it(
+		"turns at once toward a target in its cone, then bends at most turnDegPerSecond while the strike runs",
+		function()
+			local target, before = tackleAhead()
+			local way = across(Vector3.new(7.5, 0, -13))
+			expect(before:Dot(way)).toBeGreaterThan(0.999)
+			expect(across(skater().velocity):Dot(way)).toBeGreaterThan(0.999)
+			-- 20 deg further right, still in the 45 deg cone: one step turns 5 deg toward them.
+			aside(target, before, 20)
+			actionsOnly()
+			expect(turnedFrom(before)).toBeCloseTo(TACKLE_STEP, 1)
+		end
+	)
+
+	it("turns no further while its target is outside the cone, and bends again once they are back in it", function()
+		local target, before = tackleAhead()
+		aside(target, before, 60)
+		actionsOnly()
+		expect(turnedFrom(before)).toBeLessThan(1e-3)
+		aside(target, before, 20)
+		actionsOnly()
+		expect(turnedFrom(before)).toBeCloseTo(TACKLE_STEP, 1)
+	end)
+
+	it("never homes onto a teammate, a knocked-down or a dodging opponent", function()
+		setup()
+		frame()
+		standing("Mate", Vector3.new(8, HOVER, -0.5), "Blue")
+		standing("Down", Vector3.new(6, HOVER, -0.5)):SetAttribute(Attributes.KnockedDown, "Hit")
+		standing("Dodging", Vector3.new(7, HOVER, -0.5)):SetAttribute(Attributes.Action, "Dodge")
+		skater().velocity = Vector3.new(0, 0, -30)
+		press("Tackle")
+		actionsOnly()
+		expect(across(skater().forward):Dot(-Vector3.zAxis)).toBeGreaterThan(0.999)
+	end)
+
+	it("never homes onto an opponent knocked down since the last strike", function()
+		setup()
+		frame()
+		standing("Ahead", Vector3.new(0, HOVER, -10))
+		-- Nearer, 85 deg right: the first strike's target.
+		local near = standing("Near", Vector3.new(6, HOVER, -0.5))
+		skater().velocity = Vector3.new(0, 0, -30)
+		press("Tackle")
+		actionsOnly()
+		near:SetAttribute(Attributes.KnockedDown, "Hit")
+		ActionController.runner:reset()
+		skater().forward = -Vector3.zAxis
+		skater().velocity = Vector3.new(0, 0, -30)
+		press("Tackle")
+		actionsOnly()
+		expect(across(skater().forward):Dot(-Vector3.zAxis)).toBeGreaterThan(0.999)
+	end)
+
+	it("stops bending once its target is knocked down", function()
+		local target, before = tackleAhead()
+		target:SetAttribute(Attributes.KnockedDown, "Hit")
+		aside(target, before, 20)
+		actionsOnly()
+		expect(turnedFrom(before)).toBeLessThan(1e-3)
+	end)
+
+	it("stops bending once its target's character is gone", function()
+		local target, before = tackleAhead()
+		aside(target, before, 20)
+		target:Destroy()
+		actionsOnly()
+		expect(turnedFrom(before)).toBeLessThan(1e-3)
+	end)
+
+	it("stops bending at the strike's recovery", function()
+		local target, before = tackleAhead()
+		local phases = config.Actions.Tackle.phases
+		for _ = 1, math.ceil((phases.windup + phases.active) / DT) + 1 do
+			actionsOnly()
+		end
+		expect(ActionController.runner.phase).toBe("Recovery")
+		before = across(skater().forward)
+		aside(target, before, 20)
+		actionsOnly()
+		expect(turnedFrom(before)).toBeLessThan(1e-3)
+	end)
+
+	it("stops bending when the server refuses the strike", function()
+		local target, before = tackleAhead()
+		ActionController:rejected({ action = "Tackle" })
+		aside(target, before, 20)
+		actionsOnly()
+		expect(turnedFrom(before)).toBeLessThan(1e-3)
+	end)
+
+	it("looks for its target along the stick's way (Q59)", function()
+		setup()
+		frame()
+		-- 15 studs away, 30 deg behind the stick's way (D: +X), 120 deg off the facing.
+		standing("BehindRight", Vector3.new(13, HOVER, 7.5))
+		skater().velocity = Vector3.new(0, 0, -30)
+		bindingOf("Move"):Fire(Vector2.new(1, 0))
+		press("Tackle")
+		frame()
+		local way = across(Vector3.new(13, 0, 7.5) - rig:GetPivot().Position)
+		expect(across(skater().forward):Dot(way)).toBeGreaterThan(0.999)
+	end)
+
+	it("forgets the last strike's target: a Dive after a Tackle looks for its own", function()
+		local target, before = tackleAhead()
+		intoWindow(actionsOnly)
+		-- 30 studs ahead: past the Dive's reach.
+		local root = target:FindFirstChild("HumanoidRootPart") :: BasePart
+		root.Position = rig:GetPivot().Position + before * 30
+		press("Tackle")
+		actionsOnly()
+		expect(ActionController.runner.action).toBe("Dive")
+		local facing = across(skater().forward)
+		aside(target, facing, 20)
+		actionsOnly()
+		expect(turnedFrom(facing)).toBeLessThan(1e-3)
+	end)
+
+	it("dives at an opponent beside, a little behind, whom its Tackle left (Q64)", function()
+		setup()
+		frame()
+		-- 15 studs away, 100 deg right of the facing: past the Tackle's snap zone and cone, inside the Dive's snap.
+		local offset = Vector3.new(15 * math.sin(math.rad(100)), 0, -15 * math.cos(math.rad(100)))
+		standing("Beside", offset + Vector3.new(0, HOVER, 0))
+		skater().velocity = Vector3.new(0, 0, -30)
+		press("Tackle")
+		actionsOnly()
+		expect(across(skater().forward):Dot(-Vector3.zAxis)).toBeGreaterThan(0.999)
+		intoWindow(actionsOnly)
+		press("Tackle")
+		actionsOnly()
+		expect(ActionController.runner.action).toBe("Dive")
+		expect(across(skater().forward):Dot(across(offset))).toBeGreaterThan(0.999)
+	end)
+
+	it("takes an opponent in the snap zone before a nearer one only in the cone", function()
+		setup()
+		frame()
+		-- 10.4 studs up and a little behind: in the Uppercut's cone round straight up, outside its front half.
+		standing("Above", Vector3.new(0, HOVER + 10, 3))
+		-- 11 studs away, 85 deg right: in its snap zone.
+		standing("Beside", Vector3.new(11, HOVER, -1))
+		press("Uppercut")
+		actionsOnly()
+		expect(across(skater().forward):Dot(across(Vector3.new(11, 0, -1)))).toBeGreaterThan(0.999)
+	end)
+
+	it("bends an Uppercut's leap toward an opponent above (Q56)", function()
+		setup()
+		frame()
+		-- 26.9 studs away, 21.8 deg from straight up.
+		standing("Above", Vector3.new(0, HOVER + 25, -10))
+		skater().velocity = Vector3.zero
+		press("Uppercut")
+		actionsOnly()
+		local leap = skater().velocity
+		actionsOnly()
+		-- The leap straight up turned one step (6 deg) toward them: (0, 89.32, -9.39) for 89.81 studs/s.
+		local step = math.rad((config.Actions.Uppercut.seek :: Config.Seek).turnDegPerSecond * DT)
+		Fixtures.expectNear(skater().velocity, Vector3.new(0, math.cos(step), -math.sin(step)) * leap.Magnitude)
+	end)
+
+	it("never bends an Uppercut's leap toward an opponent on the ground", function()
+		setup()
+		frame()
+		standing("Ground", Vector3.new(0, HOVER, -8))
+		press("Uppercut")
+		actionsOnly()
+		local leap = skater().velocity
+		actionsOnly()
+		expect(Vectors.angleBetween(leap, skater().velocity)).toBeLessThan(1e-3)
 	end)
 end)

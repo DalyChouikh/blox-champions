@@ -24,6 +24,13 @@ export type Requires = {
 }
 -- Who a strike reaches: within range, and within coneDeg of the facing pitched up by aimUpDeg.
 export type Hit = { range: number, coneDeg: number, aimUpDeg: number, knockdownSeconds: number }
+-- Where a strike looks for an opponent (#277): within range, and within coneDeg of the stick's way (else the
+-- facing) pitched up by aimUpDeg.
+export type Cone = { range: number, coneDeg: number, aimUpDeg: number }
+-- How a strike homes (#277): the nearest opponent in `snap`, else in `bend`, is its target. At the press the skater
+-- turns at once to face and move toward them (else the stick's way), and while they stay within `bend`'s cone the
+-- motion turns toward them at most turnDegPerSecond until the strike ends.
+export type Seek = { snap: Cone, bend: Cone, turnDegPerSecond: number }
 -- The push an action gives its skater when it starts. The lunges' speeds are as the speedometer reads them: along the
 -- surface on the ground, across the ground in the air (#233).
 export type Motion = {
@@ -71,6 +78,7 @@ export type ActionConfig = {
 	effect: Effect,
 	pose: PoseName,
 	hit: Hit?,
+	seek: Seek?,
 	motion: Motion?,
 	-- In the air its push is this much of its ground value instead of Actions.airMultiplier.
 	airMultiplier: number?,
@@ -127,30 +135,44 @@ local defaults: ActionsConfig = {
 	-- 0.1-0.2 s after the press for 0.7-0.8 s, and "Tackle" is back 0.9-1.0 s after it. Its lunge adds 48 km/h but
 	-- never past 72 km/h, and eases back over the recovery (the owner, #241: RC's peaked at 65-75 km/h whatever the
 	-- speed before, and fell back within ~0.3 s); in the air 0.4 as much, 19 km/h, under the same ceiling (RC: 27 -> 42
-	-- km/h, 18 -> 37).
+	-- km/h, 18 -> 37). It homes (the owner, #277: Q57-Q61; RC's hits in Video 24 landed 1-3 body lengths ahead, up to
+	-- ~30 deg aside, 0.1-0.3 s after the press, and its lunge goes where the stick points, Video 26): anyone within
+	-- 2 bodies in the front half, else 3 bodies within 45 deg, a quarter-turn over its strike; its hit counts the
+	-- front half, so a skater beside is reached.
 	Tackle = {
 		phases = { windup = 0.05, active = 0.25, recovery = 0.35 },
 		cooldown = 1,
 		requires = requires("without"),
 		effect = "Knockdown",
 		pose = "Lunge",
-		hit = { range = 7, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
+		hit = { range = 7, coneDeg = 90, aimUpDeg = 0, knockdownSeconds = 1.5 },
+		seek = {
+			snap = { range = 12, coneDeg = 90, aimUpDeg = 0 },
+			bend = { range = 18, coneDeg = 45, aimUpDeg = 0 },
+			turnDegPerSecond = 300,
+		},
 		motion = { lungeSpeed = 40, lungeCap = 60 },
 		airMultiplier = 0.4,
 		followUp = { action = "Dive", from = 0.1, to = 1 },
 	},
 	-- Roller Champions' dive (the owner's Videos 5 and 6), only as the Tackle's follow-up: 72 km/h along the way, or a
 	-- faster skater's own speed, and in the air down the fall line, speeding up (RC: 19 -> 65 km/h at the press, 133
-	-- at the touchdown 1.1 s later). Its strike is a 0.7 s glide, then on the belly until the slide is under 2 studs/s
-	-- (2.4 km/h), 1.5 s at most (the owner, #242: RC's glided ~0.3 s at ~70 km/h, slid to 0-3 km/h in 0.7-0.8 s, and
-	-- every action came back at the stop).
+	-- at the touchdown 1.1 s later). Its strike is a 0.3 s flight (the owner, #277 Q66: shorter, as RC's ~0.3 s), then
+	-- on the belly until the slide is under 2 studs/s (2.4 km/h), 1.5 s at most (the owner, #242: RC's slid to 0-3 km/h
+	-- in 0.7-0.8 s, and every action came back at the stop). It snaps to an opponent beside the diver, even a little
+	-- behind (Q64: the owner's dives missed opponents 10-19 studs away, 62-96 deg off the facing).
 	Dive = {
-		phases = { windup = 0, active = 0.7, recovery = 0.9 },
+		phases = { windup = 0, active = 0.3, recovery = 0.9 },
 		cooldown = 0.8,
 		requires = requires("without"),
 		effect = "Knockdown",
 		pose = "Lunge",
-		hit = { range = 11, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
+		hit = { range = 11, coneDeg = 90, aimUpDeg = 0, knockdownSeconds = 1.5 },
+		seek = {
+			snap = { range = 18, coneDeg = 120, aimUpDeg = 0 },
+			bend = { range = 18, coneDeg = 45, aimUpDeg = 0 },
+			turnDegPerSecond = 300,
+		},
 		motion = { diveSpeed = 60 },
 		landing = { knockdownSeconds = 1.5, stopSpeed = 2 },
 	},
@@ -167,14 +189,21 @@ local defaults: ActionsConfig = {
 	-- 31 studs, 1.37 s in the air (the owner, #219: RC's uppercut launches on open floor; #279: √(2/3) of 110 at two
 	-- thirds of the gravity, as high as before, hanging longer like RC's), or from a wall, but never in the air (the
 	-- owner, #262: RC greys it there, Videos 10-11). No recovery: a Tackle may follow once its strike is over (the
-	-- owner, #240: RC's air Tackle was ready 0.13-0.3 s after an Uppercut).
+	-- owner, #240: RC's air Tackle was ready 0.13-0.3 s after an Uppercut). It homes on an opponent above, up to its
+	-- leap within 45 deg of straight up (the owner, #277: Q56, Q58), and hits a close skater anywhere in its front
+	-- half, on the ground too (the owner's note; RC's Uppercuts at Video 24's 119.6 and 153.8 s).
 	Uppercut = {
 		phases = { windup = 0.05, active = 0.2, recovery = 0 },
 		cooldown = 1.2,
 		requires = requires("without", "grounded"),
 		effect = "Knockdown",
 		pose = "None",
-		hit = { range = 6, coneDeg = 60, aimUpDeg = 30, knockdownSeconds = 1.5 },
+		hit = { range = 6, coneDeg = 90, aimUpDeg = 0, knockdownSeconds = 1.5 },
+		seek = {
+			snap = { range = 12, coneDeg = 90, aimUpDeg = 0 },
+			bend = { range = 31, coneDeg = 45, aimUpDeg = 90 },
+			turnDegPerSecond = 360,
+		},
 		motion = { leapImpulse = 89.81 },
 	},
 	ChargeThrow = {
@@ -213,12 +242,10 @@ local requiresSchema = Validate.record({
 	grounded = Validate.string({ oneOf = { "grounded", "airborne", "any" } }),
 	notKnockedDown = Validate.boolean(),
 })
-local hit = Validate.record({
-	range = positive,
-	coneDeg = cone,
-	aimUpDeg = Validate.number({ min = 0, max = 90 }),
-	knockdownSeconds = positive,
-})
+local aimUp = Validate.number({ min = 0, max = 90 })
+local hit = Validate.record({ range = positive, coneDeg = cone, aimUpDeg = aimUp, knockdownSeconds = positive })
+local coneRecord = Validate.record({ range = positive, coneDeg = cone, aimUpDeg = aimUp })
+local seek = Validate.record({ snap = coneRecord, bend = coneRecord, turnDegPerSecond = nonNegative })
 local throw = Validate.check(
 	Validate.record({
 		chargeMaxSeconds = positive,
@@ -294,18 +321,21 @@ local schema = Validate.record({
 	getUpAfter = positive,
 	Tackle = action(defaults.Tackle, {
 		hit = hit,
+		seek = seek,
 		motion = Validate.record({ lungeSpeed = positive, lungeCap = positive }),
 		airMultiplier = fraction,
 		followUp = followUp("Tackle"),
 	}),
 	Dive = action(defaults.Dive, {
 		hit = hit,
+		seek = seek,
 		motion = Validate.record({ diveSpeed = positive }),
 		landing = Validate.record({ knockdownSeconds = positive, stopSpeed = positive }),
 	}),
 	Dodge = action(defaults.Dodge, { motion = Validate.record({ sideSpeed = positive }) }),
 	Uppercut = action(defaults.Uppercut, {
 		hit = hit,
+		seek = seek,
 		motion = Validate.record({ leapImpulse = positive }),
 	}),
 	ChargeThrow = action(defaults.ChargeThrow, { throw = throw }),

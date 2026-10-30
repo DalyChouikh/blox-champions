@@ -692,6 +692,61 @@ describe("SkateMath lunges", function()
 		Fixtures.expectNear(airborne(Vector3.new(0, 30, -40)):slowChange(10), Vector3.new(0, 0, 30))
 	end)
 
+	it("turns the facing toward a strike's target across the surface, at most by the given angle", function()
+		local s = skater(Vector3.zero)
+		s:faceToward(Vector3.new(10, 5, 0), math.huge)
+		Fixtures.expectNear(s.forward, Vector3.xAxis)
+		-- 30° of the 90° toward +X.
+		local partway = skater(Vector3.zero)
+		partway:faceToward(Vector3.new(10, 0, 0), math.rad(30))
+		Fixtures.expectNear(partway.forward, Vector3.new(0.5, 0, -0.866))
+		-- Straight above lies nowhere across the ground: the facing stays.
+		local above = skater(Vector3.zero)
+		above:faceToward(Vector3.new(0, 10, 0), math.huge)
+		Fixtures.expectNear(above.forward, -Vector3.zAxis)
+		-- In the air across the ground below.
+		local flying = airborne(Vector3.zero)
+		flying:faceToward(Vector3.new(10, -20, 0), math.huge)
+		Fixtures.expectNear(flying.forward, Vector3.xAxis)
+	end)
+
+	it("turns the speed across the surface toward a strike's way, keeping it and the rise", function()
+		Fixtures.expectNear(
+			skater(Vector3.new(0, 0, -30)):turnChange(Vector3.new(10, 0, 0), math.huge),
+			Vector3.new(30, 0, 30)
+		)
+		-- 30°: (0, 0, -30) becomes (15.000, 0, -25.981).
+		Fixtures.expectNear(
+			skater(Vector3.new(0, 0, -30)):turnChange(Vector3.new(10, 0, 0), math.rad(30)),
+			Vector3.new(15.000, 0, 4.019)
+		)
+		Fixtures.expectNear(
+			airborne(Vector3.new(0, 20, -30)):turnChange(Vector3.xAxis, math.huge),
+			Vector3.new(30, 0, 30)
+		)
+		Fixtures.expectNear(skater(Vector3.zero):turnChange(Vector3.xAxis, math.huge), Vector3.zero)
+	end)
+
+	it(
+		"homes along the surface on the ground and in 3D in the air: an Uppercut's leap tilts toward a target",
+		function()
+			Fixtures.expectNear(
+				skater(Vector3.new(0, 0, -30)):homeChange(Vector3.new(10, 5, 0), math.huge),
+				Vector3.new(30, 0, 30)
+			)
+			-- (0, 50, 0) turned 30° toward (0, 30, -30): (0, 43.301, -25.000).
+			Fixtures.expectNear(
+				airborne(Vector3.new(0, 50, 0)):homeChange(Vector3.new(0, 30, -30), math.rad(30)),
+				Vector3.new(0, -6.699, -25.000)
+			)
+			Fixtures.expectNear(
+				airborne(Vector3.new(0, 50, 0)):homeChange(Vector3.new(0, 30, -30), math.huge),
+				Vector3.new(0, -14.645, -35.355)
+			)
+			Fixtures.expectNear(airborne(Vector3.zero):homeChange(Vector3.xAxis, math.huge), Vector3.zero)
+		end
+	)
+
 	it("dives along the facing on the ground, at the dive's speed or a faster skater's own", function()
 		Fixtures.expectNear(skater(Vector3.new(0, 0, -30)):diveChange(60), Vector3.new(0, 0, -30))
 		Fixtures.expectNear(skater(Vector3.new(0, 0, -90)):diveChange(60), Vector3.zero)
