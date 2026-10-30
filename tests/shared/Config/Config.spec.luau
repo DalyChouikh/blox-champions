@@ -184,6 +184,7 @@ describe("Config defaults", function()
 			attachBoostSpeed = 75,
 			attachCooldown = 3,
 			knockdownDecel = 75,
+			hardLanding = { drop = 40, knockdownSeconds = 1.5 },
 			speedometerScale = 1.2,
 		})
 	end)
@@ -791,6 +792,14 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { wallGravityScale = 0 } },
 				message = "Movement.wallGravityScale: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { hardLanding = { drop = 0 } } },
+				message = "Movement.hardLanding.drop: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { hardLanding = { knockdownSeconds = 0 } } },
+				message = "Movement.hardLanding.knockdownSeconds: must be > 0 (got 0)",
 			},
 			{
 				overrides = { Movement = { wallGravityScale = 1.5 } },
