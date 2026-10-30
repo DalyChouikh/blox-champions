@@ -23,7 +23,6 @@ local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 type Fired = { name: string, payload: any, to: string?, ballAt: string? }
 
 local FRAME = 1 / 60
-local BASE_MATCH = { lapsToOpenGoal = 1, lapsForStreakPoint = 2 }
 -- The middle of the track, where the ball spawns: carried and lined-up rigs skate along it.
 local MIDDLE = Config.defaults().Arena.trackWidth / 2
 
@@ -74,7 +73,7 @@ local function tagged(): TaggedLayout.TaggedArena
 end
 
 local function setup(match: { [string]: any }?)
-	config = Fixtures.config({ Match = match or BASE_MATCH })
+	config = Fixtures.config({ Match = match })
 	table.clear(fired)
 	folder = Instance.new("Folder")
 	folder.Name = "MatchTest"
@@ -418,7 +417,7 @@ describe("A match on the generated arena", function()
 	end)
 
 	it("starts a new match with everyone reseated after the post-match pause", function()
-		setup({ lapsToOpenGoal = 1, lapsForStreakPoint = 2, pointsToWin = 1, postMatchSeconds = 2 })
+		setup({ pointsToWin = 1, postMatchSeconds = 2 })
 		local first = MatchService.engine
 		scoreOnce()
 		expect(table.find(events(), "MatchEnded")).never.toBeNil()
@@ -485,7 +484,7 @@ describe("A match on the generated arena", function()
 
 	it("closes the goal for the next match when a match ends on time with the goal open", function()
 		-- Time for both goal openings: each carries the ball at most two laps (about 13 s at 2 studs a frame).
-		setup({ lapsToOpenGoal = 1, lapsForStreakPoint = 2, durationSeconds = 40, postMatchSeconds = 1 })
+		setup({ durationSeconds = 40, postMatchSeconds = 1 })
 		local rig = scoreOnce()
 		frames(config.Match.celebrationSeconds + config.Match.kickoffCountdownSeconds + 0.1)
 		catchWith(rig)
@@ -546,7 +545,7 @@ describe("A match on the generated arena", function()
 	)
 
 	it("forgets, when the next match starts, the names of players no longer in the server", function()
-		setup({ lapsToOpenGoal = 1, lapsForStreakPoint = 2, pointsToWin = 1, postMatchSeconds = 2 })
+		setup({ pointsToWin = 1, postMatchSeconds = 2 })
 		local leaver = Fixtures.stubPlayer(9)
 		TeamService:join(leaver)
 		TeamService:leave(leaver)

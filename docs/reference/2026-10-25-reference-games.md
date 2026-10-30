@@ -1050,6 +1050,99 @@ about two thirds of a lap, swinging from wall to wall.
     bend reaches about 27 studs (4.7 bodies), not 31 (Q58), timing unchanged; not chosen: the hit for the whole rise
     (0.69 s, delaying the air Tackle; RC's was ready 0.13-0.3 s after, Video 5); keep the 31-stud bend.
 
+## The owner's answers, 2026-10-30 (session 50, the Ball & rules part's grilling, round 1)
+
+Before asking (session 50, frames of the owner's recordings; ledger `.superpowers/sdd/ball/progress.md`): RC's carried
+ball measured against its holder in Video 13 at 99.0 s (at the hip: 0.18-0.19 of a skating crouch) and Video 4 at
+365.0-365.25 s (before the face, nearer the camera: 0.14), so about 1/7 to 1/6 of a skater's height; RC's pickups in
+Video 13 (1:36.8-1:37.2, 0:37.8-0:38.1): a loose ball about a body length away flies into the hand in ~0.2 s; RC's
+kickoff (Video 4 0:08-0:13, Video 13 0:22-0:27): 5, 4, 3, 2, 1 in the goal ring, a number a second, skaters free to
+skate and act, the ball in play and the clock started at "GO" (where the ball comes from was off-screen). The Feel
+stack (#225-#304) was approved for merging the same turn ("Merge now").
+- **Q90 the ball's size** (recommended): **1 stud across, RC's proportion** (about 1/6 of our 5.85-stud skater; ours
+  was 3, half a skater); the ring marker stays; built first as a playable Studio trial with Q91. Not chosen: 1.5
+  studs; keep 3.
+- **Q91 the magnet pickup** (recommended): a loose ball within **1 body length (6 studs)** of the skater becomes theirs
+  at once (the server decides then, so nobody steals it mid-pull) and **flies into their hand over 0.2 s**; a thrower
+  still waits 0.4 s before catching their own throw; tried in the same trial. Not measured: RC's exact edge, whether
+  an opponent can cut in during the pull. Not chosen: 2 bodies; keep today's 5 studs from the middle, snapped.
+- **Q92 the kickoff** (recommended): **RC's 5 s count, 5-4-3-2-1 in the goal ring, everyone free** to skate and act
+  from their team's spawn; at GO the ball appears at a random ball spawn (as today) and the clock starts. Not chosen:
+  the count in the ring with everyone frozen; keep today's 3 s frozen with the number on screen.
+- **Q93 the loose ball** (recommended, the owner's issue list: "Ball gets spawned randomly again when not being picked
+  after a while at the start"): **the 15 s respawn goes**; a loose ball stays where it rolls until someone picks it
+  up; it respawns only if it ever leaves the arena (a fault) or rests 5 s on something nobody can skate on (the goal's
+  housing or arm). No RC video studied (3, 4, 13) showed a loose ball vanish. Not chosen: no exceptions; keep 15 s.
+- **Round 2** (session 50, after reading Video 3 at 44:50-45:13: at overtime's start RC shows "OVERTIME" and play
+  goes on with a 3:00 clock, no reset, laps kept, as ours already does). **Q94 Last Chance** (recommended): **one attack
+  only, any deficit**: it ends when the leaders pick up the ball (they win) or when the trailing team scores (level =
+  overtime, ahead = they win, still behind = the leaders win); a missed throw left loose does not end it while the
+  trailing team can still pick it up. Not chosen: a goal that leaves them behind gives a new kickoff and Last Chance
+  goes on (today's rule, only 1 behind). **Q95 overtime's end** (recommended): **a draw the moment the overtime clock
+  reaches 0:00**, even if a team holds the ball (RC's no-goal overtime end was never seen). Not chosen: a last attack,
+  then a draw. **Q96 leavers** (recommended, the owner's list: "When a player leaves, remove their name from
+  scoreboard"): **the row disappears at once**; the team's score keeps their goals; a rejoin in the same match returns
+  them to their team with their row and numbers back. Not chosen: gone for good; keep it dimmed (today). **Q97 team
+  switching**, the owner's words: "first, team switching not offered in upcoming ranked mode, only offered in normal
+  games, and yes they switch by choice, and shouldn't have auto balance, every player leaves a match they get switched
+  by a bot, in all modes, normal, ranked, everything, and yes, we should always keep the same team for next match, even
+  if the other team is less players". So: **switching by choice in normal games only** (never ranked, M7); **no
+  auto-balance**; **a leaver is replaced by a bot in every mode** (bots arrive in M2); **the next match keeps everyone's
+  team**, even when the teams are uneven.
+- **Round 3** (session 50, after reading RC's charge in Video 4 at 6:05.9-6:07.4 at 10 frames a second: a dot at the
+  press, four arcs complete by ~0.4-0.5 s, released ~1.15 s after the press, dashed rings following the ball into the
+  ring; Video 3 at 36:58 the same in ~0.6 s). **Q98 the shooting trajectory** (not the recommended): **both** - a
+  predicted arc from the hand while charging (neither RC nor Illegal Soccer has it) and a trail behind the thrown ball;
+  RC's building crosshair stays. Not chosen: RC's way + a trail only; the predicted arc only. **Q99 the charge**
+  (recommended): **a full charge in 0.5 s** like RC's crosshair (ours 1.0 s); the speeds (60 at a tap, 160 at full,
+  10-27 body lengths a second) stay and are judged in the same Studio trial as the 1-stud ball and the magnet. Not
+  chosen: keep 1.0 s. **Q100** (recommended): **add RC's "Cancel & Dodge" and "Roll Ball"**: while charging, E (Dodge)
+  drops the charge and dodges, Q (Uppercut) rolls the ball along the floor ahead at the charge's speed; the hints show
+  them while charging. The owner recorded two RC clips for it ("ball throwing, cancel & dodge, charge speed and power,
+  and roll ball, take a thorough look"): **Video 31** `D:\Screenshots\Videos\Screen Recording 2026-10-30 153307.mp4`
+  and **Video 32** `D:\Screenshots\Videos\Screen Recording 2026-10-30 153401.mp4`. **Q101 networking**: "for now
+  mostly about the ball steps/trails, if anything else you find fix it": make the ball smooth on every screen (the
+  carried ball in the carrier's hand on each screen, a loose or flying ball moved smoothly between the server's
+  updates). The owner also pointed at GitHub's incident (2026-10-30 14:31 UTC, "Disruption with GitHub services"):
+  use HTTPS for now (the merges' SSH pushes were refused).
+- **Videos 31-32 studied** (session 50; 2 frames a second throughout, 5-10 at the moments): **Video 31** (Hidden
+  Cenote, standing throws along the straight): the kickoff again (hints greyed 14.0-15.5, "5" at 16.0 ... "1" at
+  20.5, GO 21.0); five pickups, each followed by a charge of 1.5-2.5 s while slowing to 0-6 km/h and a throw that flies
+  down the straight (its marker near the far end within ~1 s; no side view, so its speed is not measurable); **Roll
+  Ball** at 1:19.4 (the press marker on its row): the ball drops to the floor beside the skater and its marker travels
+  away along the floor. **Video 32**: a Cancel & Dodge at ~4.6 s turns the Dodge row into **"Dive" for ~1 s**
+  (4.6-5.6), then "Dodge" again (again at ~8.5): RC's Dodge with the ball has a Dive follow-up like the Tackle; Pump
+  is greyed while charging; after a goal (24.5) play goes on with the clock held.
+- **Round 4** (session 50). **Q102** (not the recommended): **add the Dodge -> Dive with the ball; the carrier keeps
+  the ball**, and the owner recorded it: **Video 33** `D:\Screenshots\Videos\Screen Recording 2026-10-30 155246.mp4`.
+  Not chosen: wait for a clip; leave it out. **Q103** (the owner's words): "name it magnetic pass like RC, and player
+  should aim in the direction of his teamaate and we show a hint that he can pass to him, otherwise pagnetic pass
+  should be greyed out like RC, watch this video, I recorded for passing in RC: ... take a thorough look, today our
+  passing and ball mechanics is bad, follow RC": **Video 34** `D:\Screenshots\Videos\Screen Recording 2026-10-30
+  155713.mp4`. So: the pass is **"Magnetic Pass"**, available only while the player aims toward a teammate (a hint
+  shows they can pass to them), **greyed otherwise**, RC's way; RC's passing and ball mechanics are to be followed.
+  **Q104** (recommended): a **"Switch team" button on the score tab works whenever the other team has a free seat**
+  (from M2 a bot's seat counts as free: the bot leaves), even if that makes teams uneven; not while holding the ball;
+  the player re-spawns on the new team's side at once. Not chosen: only to the smaller team.
+- **The Feel stack merged** (session 50, the owner's OK "Merge now"): 45 squash merges #225 -> #304 onto main
+  (bfc0e1d, tree equal to #304's head); GitHub's incident of 2026-10-30 (502s, cut-off API replies, SSH refused) was
+  ridden out over HTTPS with retries; every Feel issue closed with its PR.
+- **Videos 33-34 studied** (session 50; 2 frames a second throughout, 10 at the moments). **Video 33** (Fallen
+  Stadium): a Cancel & Dodge at ~17.0 s (24 -> 57 km/h readout in 0.1 s), the row reads "Dive" 17.0-17.6, the Dive at
+  ~17.6 (56), on the belly by 18.0, sliding 33 -> 0 by 19.0 (1.0 s) with every hint greyed but Charge Throw, all back
+  at 19.1: **the carrier keeps the ball through the dive** (twice more at 21-22 and 26-28 s). **Video 34** (Venice
+  Beach with AI teammates): with the ball a key letter ("E") floats over the teammate in the aim's direction and
+  "Magnetic Pass" lights, greyed otherwise; the owner's pass at ~43.0 is a straight streak into the teammate's hands
+  by ~43.15 (3-4 body lengths); a call puts a hand over the caller, and the AI teammate passes within ~0.5-1 s of the
+  owner's call (the ball streaks in from ahead, ~49.9 -> 50.3, then a catch flash at the screen's centre); an "F"
+  letter and a "Hold & Release [F] ... Speed Boost" prompt behind a teammate are the Attach whip (1:06.5-1:09.5).
+- **Round 5** (session 50). **Q105 the Magnetic Pass** (recommended): the target is a teammate **within 70 deg of the
+  aim and 120 studs** (a caller first, else the one nearest the aim's line); **the pass key's letter shows over them
+  and the hint lights**; with no target the hint is **greyed and the key does nothing**; the pass **flies straight to
+  their hand at 150 studs/s** (4 body lengths in ~0.15 s), homing hard so it arrives unless glass is in the way (then
+  it bounces off, loose); the speed is judged in the Studio trial. Not chosen: another speed now. The owner also
+  approved deleting the 45 merged local Feel branches (done).
+
 ## Roller Champions
 
 ### Video 1: TmarTn2, "Roller Champions Gameplay" (E3 2019 pre-alpha, 11:03), sampled every 2 s

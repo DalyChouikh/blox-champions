@@ -43,17 +43,19 @@ describe("ScoreKeeper", function()
 		expect(scores:player("Nobody")).toBeNil()
 	end)
 
-	it("scores goals, assists and streak points", function()
+	-- The owner (#305): a goal is worth +1, +3 or +5 to the team by its streak's laps; the scorer's own score is
+	-- the same for any goal.
+	it("scores goals at their points for the team, and assists", function()
 		local scores = keeper()
-		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B1", assister = "B2" })
-		expect(scores:teamScores()).toEqual({ Blue = 1, Orange = 0 })
+		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B1", assister = "B2", points = 3 })
+		expect(scores:teamScores()).toEqual({ Blue = 3, Orange = 0 })
 		expect(scores:player("B1")).toMatchObject({ score = 100, goals = 1 })
 		expect(scores:player("B2")).toMatchObject({ score = 0, assists = 0 })
 		scores:apply({ name = "AssistAwarded", player = "B2" })
 		expect(scores:player("B2")).toMatchObject({ score = 50, assists = 1 })
-		scores:apply({ name = "StreakPointScored", team = "Blue", holder = "B2" })
-		expect(scores:teamScores()).toEqual({ Blue = 2, Orange = 0 })
-		expect(scores:player("B2")).toMatchObject({ score = 150, goals = 0 })
+		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B2", points = 5 })
+		expect(scores:teamScores()).toEqual({ Blue = 8, Orange = 0 })
+		expect(scores:player("B2")).toMatchObject({ score = 150, goals = 1 })
 	end)
 
 	it("scores saves, steals, laps and knockdowns", function()
@@ -67,10 +69,10 @@ describe("ScoreKeeper", function()
 		expect(scores:teamScores()).toEqual({ Blue = 0, Orange = 0 })
 	end)
 
-	it("uses the configured point values", function()
-		local scores = keeper({ Match = { pointValue = { goal = 2 } }, Scoring = { points = { goal = 7 } } })
-		scores:apply({ name = "GoalScored", team = "Orange", scorer = "O1" })
-		expect(scores:teamScores()).toEqual({ Blue = 0, Orange = 2 })
+	it("uses the configured scorer's points", function()
+		local scores = keeper({ Scoring = { points = { goal = 7 } } })
+		scores:apply({ name = "GoalScored", team = "Orange", scorer = "O1", points = 1 })
+		expect(scores:teamScores()).toEqual({ Blue = 0, Orange = 1 })
 		expect(scores:player("O1")).toMatchObject({ score = 7 })
 	end)
 
@@ -83,7 +85,7 @@ describe("ScoreKeeper", function()
 
 	it("keeps a departed player's stats and restores them when the player returns", function()
 		local scores = keeper()
-		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B1" })
+		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B1", points = 1 })
 		scores:removePlayer("B1")
 		expect(scores:player("B1")).toMatchObject({ present = false, score = 100 })
 		scores:addPlayer("B1", "Blue")
@@ -112,7 +114,7 @@ describe("ScoreKeeper", function()
 		scores:addPlayer("O1", "Orange")
 		scores:addPlayer("B1", "Blue")
 		scores:addPlayer("B2", "Blue")
-		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B2" })
+		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B2", points = 1 })
 		local stats = scores:stats()
 		expect(stats.scores).toEqual({ Blue = 1, Orange = 0 })
 		local order = {}
@@ -128,25 +130,28 @@ end)
 describe("ScoreKeeper:mvp", function()
 	it("picks the top scorer of the team", function()
 		expect(mvpAfter({
-			{ name = "GoalScored", team = "Blue", scorer = "B1" },
+			{ name = "GoalScored", team = "Blue", scorer = "B1", points = 1 },
 			{ name = "SaveMade", player = "B2", kind = "Block" },
 		})).toBe("B1")
 	end)
 
 	it("breaks score ties by goals, then saves, then assists, then join order", function()
-		local streakB1: Types.Event = { name = "StreakPointScored", team = "Blue", holder = "B1" }
+		-- Five steals score as much as a goal (5 x 20) and win no tie-break.
+		local stealB1: Types.Event = { name = "Steal", player = "B1", fromTeam = "Orange" }
+		local stealsB1 = { stealB1, stealB1, stealB1, stealB1, stealB1 }
 		local saveB1: Types.Event = { name = "SaveMade", player = "B1", kind = "Block" }
 		local saveB2: Types.Event = { name = "SaveMade", player = "B2", kind = "Block" }
 		local assistB2: Types.Event = { name = "AssistAwarded", player = "B2" }
-		expect(mvpAfter({ { name = "GoalScored", team = "Blue", scorer = "B2" }, saveB1, saveB1 })).toBe("B2")
-		expect(mvpAfter({ saveB2, saveB2, streakB1 })).toBe("B2")
-		expect(mvpAfter({ assistB2, assistB2, streakB1 })).toBe("B2")
+		local goalB2: Types.Event = { name = "GoalScored", team = "Blue", scorer = "B2", points = 1 }
+		expect(mvpAfter({ goalB2, saveB1, saveB1 })).toBe("B2")
+		expect(mvpAfter({ saveB2, saveB2, table.unpack(stealsB1) })).toBe("B2")
+		expect(mvpAfter({ assistB2, assistB2, table.unpack(stealsB1) })).toBe("B2")
 		expect(mvpAfter({ saveB1, saveB2 })).toBe("B1")
 	end)
 
 	it("ignores departed players and returns nil when nobody on the team is present", function()
 		local scores = keeper()
-		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B1" })
+		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B1", points = 1 })
 		scores:apply({ name = "SaveMade", player = "B2", kind = "Block" })
 		scores:removePlayer("B1")
 		expect(scores:mvp("Blue")).toBe("B2")

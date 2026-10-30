@@ -6,7 +6,6 @@ local Validate = require(script.Parent.Validate)
 export type ScoringConfig = {
 	points: {
 		goal: number,
-		streakPoint: number,
 		assist: number,
 		save: number,
 		lapCompleted: number,
@@ -20,7 +19,6 @@ export type ScoringConfig = {
 local defaults: ScoringConfig = {
 	points = {
 		goal = 100,
-		streakPoint = 100,
 		assist = 50,
 		save = 50,
 		lapCompleted = 10,
@@ -37,7 +35,6 @@ local window = Validate.number({ min = 0.1 })
 local schema = Validate.record({
 	points = Validate.record({
 		goal = points,
-		streakPoint = points,
 		assist = points,
 		save = points,
 		lapCompleted = points,

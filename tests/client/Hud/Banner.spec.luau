@@ -62,7 +62,6 @@ describe("Banner", function()
 		local size = hud.layout.banner.size
 		local banners: { HudState.Banner } = {
 			{ kind = "Goal" },
-			{ kind = "StreakPoint" },
 			{ kind = "Denied" },
 			{ kind = "LastChance" },
 			{ kind = "Overtime" },

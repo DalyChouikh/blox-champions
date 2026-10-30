@@ -18,10 +18,10 @@ local Types = require(script.Parent.Parent.Rules.Types)
 type Team = Team.Team
 type PlayerId = Types.PlayerId
 
-export type BannerKind = "Countdown" | "Goal" | "StreakPoint" | "Denied" | "ClockWarning" | "LastChance" | "Overtime"
+export type BannerKind = "Countdown" | "Goal" | "Denied" | "ClockWarning" | "LastChance" | "Overtime"
 -- `value`: the countdown's digit, or the seconds a clock warning marks.
 export type Banner = { kind: BannerKind, team: Team?, value: number? }
-export type FeedKind = "Possession" | "Lap" | "GoalOpen" | "Goal" | "StreakPoint"
+export type FeedKind = "Possession" | "Lap" | "GoalOpen" | "Goal"
 -- `id`: a running number, the entry's stable key; `value`: a completed lap's streak.
 export type FeedEntry = { id: number, kind: FeedKind, team: Team, player: PlayerId?, value: number?, timeLeft: number }
 export type Ended = { winner: Team, mvp: PlayerId?, stats: Types.MatchStats }
@@ -144,9 +144,6 @@ function HudState.applyEvents(self: HudState, events: { Types.Event })
 		elseif event.name == "GoalScored" then
 			showBanner(self, "Goal", event.team, nil)
 			addEntry(self, "Goal", event.team, event.scorer, nil)
-		elseif event.name == "StreakPointScored" then
-			showBanner(self, "StreakPoint", event.team, nil)
-			addEntry(self, "StreakPoint", event.team, event.holder, nil)
 		elseif event.name == "SaveMade" then
 			showBanner(self, "Denied", HudState.teamOf(self.match, event.player), nil)
 		elseif event.name == "ClockWarning" then

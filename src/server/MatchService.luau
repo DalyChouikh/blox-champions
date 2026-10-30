@@ -121,7 +121,7 @@ local function react(self: MatchService, event: Types.Event)
 		setGoalOpen(self, true)
 	elseif name == "GoalClosed" then
 		setGoalOpen(self, false)
-	elseif name == "GoalScored" or name == "StreakPointScored" then
+	elseif name == "GoalScored" then
 		self._ball:kill()
 	elseif name == "MatchEnded" then
 		self._ball:kill()
