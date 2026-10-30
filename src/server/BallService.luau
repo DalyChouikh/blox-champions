@@ -1,14 +1,15 @@
 --!strict
 -- The ball in the arena (spec §9.3): one server-owned physics part, in its own model that streams to every client, that
 -- BallState says what to do with. It is hidden (in ServerStorage, so its next spawn is never replicated early) until a
--- kickoff ends, then spawns at a random ball spawn. A ball that leaves the arena (the box inside the glass, its top
--- included: Bounds.inArena) is recovered in any state, a loose one resting a while on something nobody skates (the
--- goal's rim, #308) too, and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each frame `step`
--- reports how it really moved, a throw since the last frame, who caught it, and whose body it touched. Jumps the
--- server makes (a spawn, a respawn, the snap to a catcher's side, a carrier it moves, a drop it places) are never
--- reported as movement, so they can never cross a gate or the ring. A pass flies flat, its weight cancelled, and homes
--- on its target, until it touches anything or anyone or the target can no longer catch; then it falls like any ball.
--- A ball passes through the player who let go of it until it is clear of them.
+-- kickoff ends, then drops in from above (Ball/DropIn, #321). A ball that leaves the arena (the box inside the glass,
+-- its top included: Bounds.inArena) drops in again whatever its state, a loose one resting a while on something
+-- nobody skates (the goal's rim, #308) too, and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt.
+-- Each frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose body it
+-- touched. Jumps the server makes (a drop-in's start, the snap to a catcher's side, a carrier it moves, a drop it
+-- places) are never reported as movement, so they can never cross a gate or the ring. A pass flies flat, its weight
+-- cancelled, and homes on its target, until it touches anything or anyone or the target can no longer catch; a drop-in
+-- falls steadily the lap's way, its weight cancelled too, until it touches anything or anyone; then either falls like
+-- any ball. A ball passes through the player who let go of it until it is clear of them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -17,6 +18,7 @@ local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local BallState = require(ReplicatedStorage.Shared.Ball.BallState)
 local Bounds = require(ReplicatedStorage.Shared.Arena.Geometry.Bounds)
 local Config = require(ReplicatedStorage.Shared.Config)
+local DropIn = require(ReplicatedStorage.Shared.Ball.DropIn)
 local Homing = require(ReplicatedStorage.Shared.Ball.Homing)
 local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
@@ -74,7 +76,6 @@ export type BallService = {
 	step: (self: BallService, dt: number, holders: { Holder }) -> BallFrame,
 	destroy: (self: BallService) -> (),
 	_config: Config.GameConfig,
-	_spawns: { CFrame },
 	_random: Random,
 	_reach: number,
 	-- How close a body is to touch the ball: the ball's and the collider's radii, plus the lag tolerance.
@@ -84,6 +85,8 @@ export type BallService = {
 	_speedLimit: number,
 	-- The pass's target while it homes.
 	_passTarget: PlayerId?,
+	-- While the ball drops in, until it first touches anything or anyone (#321).
+	_droppingIn: boolean,
 	-- The world's gravity, which a pass's lift cancels.
 	_gravity: Vector3,
 	_hidden: boolean,
@@ -95,7 +98,8 @@ export type BallService = {
 	-- Built with each ball part. While enabled, its Part1 is the collider of the player who just let go of the ball,
 	-- until the ball is clear of them.
 	_grace: NoCollisionConstraint,
-	-- Built with each ball part: the ball's weight, upward. Enabled while a pass flies, so it flies flat.
+	-- Built with each ball part: the ball's weight, upward. Enabled while a pass or a drop-in flies, so a pass
+	-- flies flat and a drop-in falls at its steady speed.
 	_lift: VectorForce,
 	_touched: RBXScriptConnection?,
 	-- What a resting ball lies on: a ray into the arena only, from its center to a radius past its bottom (#308).
@@ -178,9 +182,10 @@ local function rebuiltIfDestroyed(self: BallService): boolean
 	return true
 end
 
--- The pass is over, or never was: the ball falls and homes on no one.
-local function endPass(self: BallService)
+-- The pass or the drop-in is over, or never was: the ball falls, holds no drop-in's velocity, homes on no one.
+local function endGuidance(self: BallService)
 	self._passTarget = nil
+	self._droppingIn = false
 	self._lift.Enabled = false
 end
 
@@ -220,7 +225,7 @@ end
 -- Welds the ball at the carrier's side (Ball.carryOffset in their root's frame). A Weld with an explicit offset puts
 -- it in the same place on every machine; while carried it is weightless and touches nothing.
 local function attach(self: BallService, holder: Holder)
-	endPass(self)
+	endGuidance(self)
 	local part = self.part
 	local offset = CFrame.new(self._config.Ball.carryOffset)
 	part.CFrame = holder.root.CFrame * offset
@@ -236,29 +241,32 @@ local function attach(self: BallService, holder: Holder)
 	self._teleported = true
 end
 
-local function placeAtRandomSpawn(self: BallService)
+-- Into play from above at a random start (Ball/DropIn), holding the drop-in's velocity there, its weight cancelled.
+local function dropIn(self: BallService)
 	rebuiltIfDestroyed(self)
 	release(self)
-	endPass(self)
+	endGuidance(self)
+	local config = self._config
 	local part = self.part
-	part.CFrame = self._spawns[self._random:NextInteger(1, #self._spawns)]
-	part.AssemblyLinearVelocity = Vector3.zero
+	local start = DropIn.pick(config.Arena, config.Ball, self._random)
+	part.CFrame = CFrame.new(start)
+	part.AssemblyLinearVelocity = DropIn.velocity(config.Arena, config.Ball, start)
 	part.AssemblyAngularVelocity = Vector3.zero
 	self.model.Parent = workspace
 	part:SetNetworkOwner(nil)
 	self._hidden = false
 	self._teleported = true
-	-- Every entry into play waits the whole stranded time again.
-	self._strandedSeconds = 0
+	self._droppingIn = true
+	self._lift.Enabled = true
 end
 
--- Back into play at a random ball spawn from wherever it was, a carried ball taken from its carrier first.
+-- Back into play by a drop-in from wherever it was, a carried ball taken from its carrier first.
 local function respawn(self: BallService, frame: BallFrame)
 	if self.state.status == "Carried" then
 		release(self)
 		self.state:drop()
 	end
-	placeAtRandomSpawn(self)
+	dropIn(self)
 	self.state:respawn()
 	frame.respawned = true
 end
@@ -314,12 +322,20 @@ local function home(self: BallService, holders: { Holder }, position: Vector3, d
 	end
 	local holder = findHolder(holders, target)
 	if self.state.status ~= "Flying" or holder == nil or not holder.canCatch then
-		endPass(self)
+		endGuidance(self)
 		return
 	end
 	local part = self.part
 	part.AssemblyLinearVelocity =
 		Homing.step(position, part.AssemblyLinearVelocity, holder.root.Position, self._homingAccel, dt)
+end
+
+-- Holds a drop-in's velocity where the ball now is (Q116): the lap's way round a curved end too.
+local function holdDropIn(self: BallService, position: Vector3)
+	if self._droppingIn then
+		local config = self._config
+		self.part.AssemblyLinearVelocity = DropIn.velocity(config.Arena, config.Ball, position)
+	end
 end
 
 -- Whether the loose ball has rested Ball.strandedSeconds on something nobody skates (#308, Q93): slower than
@@ -344,13 +360,13 @@ local BallService: BallService = {
 	part = nil :: any,
 	state = nil :: any,
 	_config = nil :: any,
-	_spawns = {},
 	_random = Random.new(),
 	_reach = 0,
 	_contact = 0,
 	_homingAccel = 0,
 	_speedLimit = 0,
 	_passTarget = nil,
+	_droppingIn = false,
 	_gravity = Vector3.zero,
 	_hidden = true,
 	_teleported = true,
@@ -370,11 +386,10 @@ local BallService: BallService = {
 	end,
 	_frame = nil :: any,
 
-	-- deps.Random makes the spawn choice repeatable in tests.
+	-- deps.Random makes the drop-ins' spots repeatable in tests.
 	init = function(self: BallService, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
-		self._spawns = deps.ArenaService.arena.ballSpawns
 		self._random = deps.Random or Random.new()
 		local lagTolerance = config.Network.pickupLagToleranceStuds
 		self._reach = config.Ball.pickupRadius + lagTolerance
@@ -382,6 +397,7 @@ local BallService: BallService = {
 		self._homingAccel = (config.Actions.Pass.pass :: Config.PassSettings).homingAccel
 		self._speedLimit = MovementCheck.speedLimit(config.Movement, config.Network)
 		self._passTarget = nil
+		self._droppingIn = false
 		self._gravity = Config.gravity(config)
 		self.state = BallState.new(config.Ball.rethrowPickupDelay)
 		local restParams = RaycastParams.new()
@@ -419,7 +435,7 @@ local BallService: BallService = {
 	hide = function(self: BallService)
 		rebuiltIfDestroyed(self)
 		release(self)
-		endPass(self)
+		endGuidance(self)
 		self.state:kill()
 		self.model.Parent = ServerStorage
 		self._hidden = true
@@ -427,7 +443,7 @@ local BallService: BallService = {
 	end,
 
 	spawn = function(self: BallService)
-		placeAtRandomSpawn(self)
+		dropIn(self)
 		if self.state.status == "Dead" then
 			self.state:release()
 		else
@@ -437,7 +453,7 @@ local BallService: BallService = {
 
 	kill = function(self: BallService)
 		release(self)
-		endPass(self)
+		endGuidance(self)
 		self.state:kill()
 	end,
 
@@ -479,10 +495,13 @@ local BallService: BallService = {
 	end,
 
 	onTouched = function(self: BallService, hit: BasePart)
-		if self.state.status == "Flying" and not isCharacterPart(hit) then
-			self.state:land()
-			endPass(self)
+		if isCharacterPart(hit) then
+			return
 		end
+		if self.state.status == "Flying" then
+			self.state:land()
+		end
+		endGuidance(self)
 	end,
 
 	step = function(self: BallService, dt: number, holders: { Holder }): BallFrame
@@ -550,9 +569,10 @@ local BallService: BallService = {
 			frame.toucher = toucher
 			frame.touchPosition = position
 			frame.touchVelocity = self.part.AssemblyLinearVelocity
-			endPass(self)
+			endGuidance(self)
 		end
 		home(self, holders, position, dt)
+		holdDropIn(self, position)
 		return frame
 	end,
 

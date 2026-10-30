@@ -53,7 +53,7 @@ describe("Builder.build", function()
 			expect(#(panels:FindFirstChild(`GatePanel{gate}`) :: Model):GetChildren()).toBe(#panel.pieces)
 		end
 		expect(arena:FindFirstChild("Markers")).toBeNil()
-		expect(#folder(arena, "Spawns"):GetChildren()).toBe(8)
+		expect(#folder(arena, "Spawns"):GetChildren()).toBe(6)
 		-- The hoop, its panel and the arm's two blocks.
 		expect(#folder(arena, "Goal"):GetChildren()).toBe(4)
 		local hoop = folder(arena, "Goal"):FindFirstChild("GoalHoop") :: Model
@@ -224,7 +224,6 @@ describe("Builder.build", function()
 			Arena = {
 				gateThickness = 0.5,
 				spawnPad = { width = 6, thickness = 0.3, transparency = 0.2 },
-				ballSpawnSize = 2,
 				goal = { panelTransparency = 0.6 },
 			},
 		})
@@ -233,7 +232,6 @@ describe("Builder.build", function()
 		local pad = folder(arena, "Spawns"):FindFirstChild("Orange2") :: Part
 		expect(pad.Size).toEqual(Vector3.new(6, 0.3, 6))
 		expect(pad.Transparency).toBeCloseTo(0.2, 4)
-		expect((folder(arena, "Spawns"):FindFirstChild("Ball1") :: Part).Size).toEqual(Vector3.new(2, 2, 2))
 		expect((folder(arena, "Goal"):FindFirstChild("GoalPanel") :: Part).Transparency).toBeCloseTo(0.6, 4)
 	end)
 

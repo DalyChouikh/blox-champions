@@ -77,12 +77,10 @@ export type ArenaConfig = {
 	-- Skaters pass through it.
 	gatePanel: { depth: number },
 	teamSpawnSpacing: number,
-	ballSpawnHeight: number,
-	-- Parts that only carry a tag: lap gates (invisible; only their plane counts), team spawn pads (a square in the
-	-- team's color) and ball spawns (invisible).
+	-- Parts that only carry a tag: lap gates (invisible; only their plane counts) and team spawn pads (a square in the
+	-- team's color).
 	gateThickness: number,
 	spawnPad: { width: number, thickness: number, transparency: number },
-	ballSpawnSize: number,
 	-- glass: the glass walls', a closed map's roof and the gate walls.
 	colors: { surface: Color3, infield: Color3, goal: Color3, glass: Color3 },
 }
@@ -114,10 +112,8 @@ local defaults: ArenaConfig = {
 	},
 	gatePanel = { depth = 0.2 },
 	teamSpawnSpacing = 10,
-	ballSpawnHeight = 6,
 	gateThickness = 0.2,
 	spawnPad = { width = 4, thickness = 0.2, transparency = 0.4 },
-	ballSpawnSize = 1,
 	colors = {
 		surface = Color3.fromRGB(163, 162, 165),
 		infield = Color3.fromRGB(99, 95, 98),
@@ -186,10 +182,8 @@ local fields = Validate.record({
 	}),
 	gatePanel = Validate.record({ depth = partSize }),
 	teamSpawnSpacing = size,
-	ballSpawnHeight = size,
 	gateThickness = partSize,
 	spawnPad = Validate.record({ width = partSize, thickness = partSize, transparency = transparency }),
-	ballSpawnSize = partSize,
 	colors = Validate.record({ surface = color, infield = color, goal = color, glass = color }),
 })
 

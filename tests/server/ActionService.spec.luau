@@ -29,7 +29,6 @@ local throwSettings = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
 -- The Tackle's Dive (#240).
 local FOLLOW_UP = config.Actions.Tackle.followUp :: Config.FollowUp
 local DT = 1 / 60
-local SPAWNS = { CFrame.new(0, 500, 0) }
 -- Far from each other and from every test's play, until a test moves them.
 local PARKED = Vector3.new(0, 300, 0)
 -- On the middle of a straight: a free ball there is in play.
@@ -62,7 +61,7 @@ local smoothNormal: (Vector3, Vector3) -> Vector3 = Fixtures.faceNormal
 -- for each test.
 local fakeArena = {
 	model = nil :: Instance?,
-	arena = { ballSpawns = SPAWNS, teamSpawns = { Blue = {}, Orange = {} }, rideSurfaces = {} :: { Instance } },
+	arena = { teamSpawns = { Blue = {}, Orange = {} }, rideSurfaces = {} :: { Instance } },
 }
 
 local folder: Folder

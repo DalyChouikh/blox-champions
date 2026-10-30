@@ -206,10 +206,6 @@ local function buildSpawns(geometry: Geometry.ArenaGeometry, config: Config.Game
 			part:AddTag(Tags.TeamSpawn)
 		end
 	end
-	local ballSize = Vector3.one * config.Arena.ballSpawnSize
-	for index, frame in geometry.ballSpawns do
-		addGhost(`Ball{index}`, frame, ballSize, HIDDEN, parent):AddTag(Tags.BallSpawn)
-	end
 end
 
 function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConfig, parent: Instance): Model
