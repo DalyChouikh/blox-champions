@@ -44,7 +44,8 @@ describe("Config defaults", function()
 			elasticity = 0.5,
 			pickupRadius = 5,
 			rethrowPickupDelay = 0.4,
-			ballIdleResetSeconds = 15,
+			strandedSeconds = 5,
+			restSpeed = 1,
 			outOfBoundsMargin = 2,
 			carryOffset = Vector3.new(2.5, 0, -0.5),
 		})
@@ -959,6 +960,28 @@ describe("Config.forMode", function()
 				Fixtures.config(case.overrides)
 			end).toThrow(case.message)
 		end
+	end)
+
+	-- The owner (Q93, #308): a loose ball stays where it rolls; only one resting on something nobody skates respawns.
+	it("rejects a ball stranded for no time, or resting at no speed", function()
+		expect(function()
+			Fixtures.config({ Ball = { strandedSeconds = 0 } })
+		end).toThrow("Ball.strandedSeconds: must be > 0 (got 0)")
+		expect(function()
+			Fixtures.config({ Ball = { restSpeed = 0 } })
+		end).toThrow("Ball.restSpeed: must be > 0 (got 0)")
+	end)
+
+	it("accepts a stranded wait and a rest speed just inside their limits", function()
+		local ball = Fixtures.config({ Ball = { strandedSeconds = 0.01, restSpeed = 0.01 } }).Ball
+		expect(ball.strandedSeconds).toBe(0.01)
+		expect(ball.restSpeed).toBe(0.01)
+	end)
+
+	it("rejects the old idle respawn as unknown", function()
+		expect(function()
+			Fixtures.config({ Ball = { ballIdleResetSeconds = 15 } })
+		end).toThrow("Ball.ballIdleResetSeconds: unknown key")
 	end)
 
 	it("rejects skating speeds, turn rates and sizes that contradict each other", function()

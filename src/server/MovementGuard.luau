@@ -33,7 +33,7 @@ export type MovementGuard = {
 	-- Where each skater's root was at their last sample inside the arena.
 	_inside: { [string]: Vector3 },
 	_holders: () -> { BallService.Holder },
-	-- Stands a seated player's character on their team's spawn (CharacterService), unfrozen.
+	-- Stands a seated player's character on their team's spawn (CharacterService).
 	_place: (player: string) -> (),
 	_clock: () -> number,
 	_log: (line: string) -> (),

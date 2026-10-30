@@ -17,6 +17,7 @@ local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
+local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local TeamService = require(ServerScriptService.Server.TeamService)
 
 local defaults = Fixtures.config()
@@ -57,8 +58,10 @@ local fakeNet = {
 -- (#294).
 local smoothNormal: (Vector3, Vector3) -> Vector3 = Fixtures.faceNormal
 
--- Its ride surfaces: a floor under the track spot, set for each test.
+-- Its model (the test's folder) and its ride surfaces (a floor under the track spot, tagged as the arena's are), set
+-- for each test.
 local fakeArena = {
+	model = nil :: Instance?,
 	arena = { ballSpawns = SPAWNS, teamSpawns = { Blue = {}, Orange = {} }, rideSurfaces = {} :: { Instance } },
 }
 
@@ -84,12 +87,14 @@ beforeEach(function()
 	-- Its top at y 0: a root standing on the track spot is 3 studs above it.
 	local floor = Instance.new("Folder")
 	floor.Name = "Floor"
+	floor:AddTag(Tags.RideSurface)
 	local slab = Instance.new("Part")
 	slab.Anchored = true
 	slab.Size = Vector3.new(400, 1, 400)
 	slab.CFrame = CFrame.new(ON_TRACK.X, -0.5, ON_TRACK.Z)
 	slab.Parent = floor
 	floor.Parent = folder
+	fakeArena.model = folder
 	fakeArena.arena.rideSurfaces = { floor }
 	BallService:init({ Config = config, ArenaService = fakeArena })
 	TeamService:init({ Config = config })

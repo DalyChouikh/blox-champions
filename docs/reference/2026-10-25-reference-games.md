@@ -1156,6 +1156,27 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   (Video 31 21.0-23.0 s: white letters with an orange outline, ~60 px tall, centred ~22% down, ~2 s). Not chosen: no
   text at GO. **Q110** (recommended): **the count in each player's own team colour** (RC's was orange for an Orange
   player, one sample). Not chosen: white.
+- **Q111 the ball enters by dropping from above** (session 52, the owner's words while Connecting Rojo for #308):
+  "just like RC, at kickoff, I want the ball to drop from above and roll next to the outer wall or middle wall at
+  random spots, not just at the curved rounds, otherwise players will get used to it and stay there ... most
+  importantly, not just spawn instantly at the ground in a random spot, I want it to drop from above and roll with the
+  wall". Ours today: two ball spawns, 6 studs over the middle of the track at each curved end's apex, the ball placed
+  there at GO. RC, **Video 31** (4 frames a second 20.5-28.5, full-size frames 21.75-24.25): at GO (21.0) the ball's
+  off-screen icon already shows at the screen's top; its ring marker with a thin vertical line under it comes into
+  view high above the far curved end (21.75-22.75), reaches the floor by that end's wall about 23.5, and the ball then
+  rolls along the foot of a wall ahead of the skater, who catches it at 27.8 (6.8 s after GO). Not measurable (no side
+  view, one sample): the drop's height, its fall speed, the roll's way and speed. Video 3 at 37.4-38.8 (Mexico): the
+  recorder was high on the glass; the ball's entry was not readable.
+- **Q112-Q115 the ball's drop** (session 52, AskUserQuestion right after Q111, all recommended). **Q112** where:
+  **a new random spot every time, anywhere round the loop** (straights and curved ends), **half the time by the outer
+  wall** (landing on its curved foot), **half the time by the middle glass** (landing on the inner bank). Not chosen:
+  the outer wall only; a fixed set of 8 spots. **Q113** the fall: **slowed like RC's ~2.5 s**: from just under the
+  glass's top lip (~108 studs, 18 body heights) at a quarter of gravity until it first touches something (lands ~2.6
+  s after GO), then a normal ball. Not chosen: full gravity (lands 1.3 s after GO at ~170 studs/s). **Q114** the roll:
+  **it falls already moving along the wall the way skaters lap** (gate 1 to 2 to 3 to 4) **at a slow skate, ~20
+  studs/s** (3.4 body lengths/s), so it rolls along the wall's foot and round the curved ends. Not chosen: a random
+  way; no push. **Q115** respawns (out of the arena; 5 s on something nobody skates, #308): **drop the same way**. Not
+  chosen: only at kickoffs. Built after a playable Studio trial (the owner's rule for feel choices).
 
 ## Roller Champions
 
