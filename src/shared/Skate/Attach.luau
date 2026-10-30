@@ -1,7 +1,7 @@
 --!strict
 -- Attaching behind a teammate (spec §7.2, Roller Champions' Grapple Whip). A skater holding Attach right behind a
 -- teammate is pulled along behind them; letting go, holding too long or losing the leader releases them with a
--- boost toward the stick held then, or along the leader's facing, then a cooldown. This module decides when;
+-- boost toward the stick held then, or the way the leader travels, then a cooldown. This module decides when;
 -- SkateMath.follow and release move.
 
 local Config = require(script.Parent.Parent.Config)
@@ -21,12 +21,19 @@ type Fields = {
 	leader: PlayerId?,
 	attachedFor: number,
 	cooldownLeft: number,
-	-- The way the release boosts: the stick held at the release, else the leader's facing at the last update.
+	-- The way the release boosts: the stick held at the release, else the leader's travel at the last update.
 	releaseDirection: Vector3,
 	_movement: Config.MovementConfig,
 }
 
 export type Attach = typeof(setmetatable({} :: Fields, Attach))
+
+-- The way a leader travels, or their facing while they stand still: a leader riding backwards (#246) faces against
+-- their travel, and the boost goes their way (#214, the review #303).
+local function travelOf(leader: Candidate): Vector3
+	local velocity = leader.velocity
+	return if velocity.Magnitude > Vectors.EPSILON then velocity.Unit else leader.forward
+end
 
 function Attach.new(movement: Config.MovementConfig): Attach
 	local self: Fields = {
@@ -82,7 +89,7 @@ function Attach.update(self: Attach, dt: number, holding: boolean, leader: Candi
 		if holding and self.cooldownLeft == 0 and leader ~= nil then
 			self.leader = leader.player
 			self.attachedFor = 0
-			self.releaseDirection = leader.forward
+			self.releaseDirection = travelOf(leader)
 			return "Attached"
 		end
 		return "None"
@@ -90,7 +97,7 @@ function Attach.update(self: Attach, dt: number, holding: boolean, leader: Candi
 
 	self.attachedFor += dt
 	if leader ~= nil then
-		self.releaseDirection = leader.forward
+		self.releaseDirection = travelOf(leader)
 	end
 	if not holding or leader == nil or self.attachedFor >= movement.attachMaxSeconds then
 		self.leader = nil

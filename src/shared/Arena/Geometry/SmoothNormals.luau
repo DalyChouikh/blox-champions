@@ -138,28 +138,31 @@ function SmoothNormals.at(field: Field, position: Vector3): Vector3
 	local acrossX, acrossZ = math.cos(yaw), -math.sin(yaw)
 	local u = (position.X - centre.X) * acrossX + (position.Z - centre.Z) * acrossZ + arena.trackWidth / 2
 	local y = position.Y
-	local baseI, baseJ = (i - 1) * count, (j - 1) * count
-	local fu, fy = field.u, field.y
+	-- Each station's points sit `count` apart in the lists: rows from these offsets.
+	local rowI, rowJ = (i - 1) * count, (j - 1) * count
+	local pointU, pointY = field.u, field.y
 	-- The nearest strip of the section between the two stations, and how far along it the point lies.
 	local nearest, along, gap = 1, 0, math.huge
 	for strip = 1, count do
 		local onward = strip % count + 1
-		local pu = fu[baseI + strip] + (fu[baseJ + strip] - fu[baseI + strip]) * t
-		local py = fy[baseI + strip] + (fy[baseJ + strip] - fy[baseI + strip]) * t
-		local du = fu[baseI + onward] + (fu[baseJ + onward] - fu[baseI + onward]) * t - pu
-		local dy = fy[baseI + onward] + (fy[baseJ + onward] - fy[baseI + onward]) * t - py
-		local s = math.clamp(((u - pu) * du + (y - py) * dy) / (du * du + dy * dy), 0, 1)
-		local gu, gy = pu + du * s - u, py + dy * s - y
-		if gu * gu + gy * gy < gap then
-			nearest, along, gap = strip, s, gu * gu + gy * gy
+		-- The strip from its start (fromU, fromY) by (stepU, stepY), each blended between the two stations.
+		local fromU = pointU[rowI + strip] + (pointU[rowJ + strip] - pointU[rowI + strip]) * t
+		local fromY = pointY[rowI + strip] + (pointY[rowJ + strip] - pointY[rowI + strip]) * t
+		local stepU = pointU[rowI + onward] + (pointU[rowJ + onward] - pointU[rowI + onward]) * t - fromU
+		local stepY = pointY[rowI + onward] + (pointY[rowJ + onward] - pointY[rowI + onward]) * t - fromY
+		local share = math.clamp(((u - fromU) * stepU + (y - fromY) * stepY) / (stepU * stepU + stepY * stepY), 0, 1)
+		local offU, offY = fromU + stepU * share - u, fromY + stepY * share - y
+		if offU * offU + offY * offY < gap then
+			nearest, along, gap = strip, share, offU * offU + offY * offY
 		end
 	end
-	local a, b = baseI + nearest, baseJ + nearest
-	local nu = (field.startU[a] + (field.endU[a] - field.startU[a]) * along) * (1 - t)
-		+ (field.startU[b] + (field.endU[b] - field.startU[b]) * along) * t
-	local ny = (field.startY[a] + (field.endY[a] - field.startY[a]) * along) * (1 - t)
-		+ (field.startY[b] + (field.endY[b] - field.startY[b]) * along) * t
-	return Vector3.new(acrossX * nu, ny, acrossZ * nu).Unit
+	-- That strip's direction where the point lies along it, blended between the two stations: the normal's parts.
+	local atI, atJ = rowI + nearest, rowJ + nearest
+	local normalU = (field.startU[atI] + (field.endU[atI] - field.startU[atI]) * along) * (1 - t)
+		+ (field.startU[atJ] + (field.endU[atJ] - field.startU[atJ]) * along) * t
+	local normalY = (field.startY[atI] + (field.endY[atI] - field.startY[atI]) * along) * (1 - t)
+		+ (field.startY[atJ] + (field.endY[atJ] - field.startY[atJ]) * along) * t
+	return Vector3.new(acrossX * normalU, normalY, acrossZ * normalU).Unit
 end
 
 -- The arena's own Reader: its shape prepared once, read at the point whatever face the ray met.

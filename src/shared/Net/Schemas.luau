@@ -32,6 +32,9 @@ local function actionRequest(): Validate.Validator
 	return Validate.tagged("action", variants)
 end
 
+-- What SkateState carries.
+export type SkateState = { pump: boolean, brake: boolean, airPose: boolean }
+
 return table.freeze({
 	-- Whether the sender is pumping, braking and striking the Air Pose, sent whenever any of them changes.
 	SkateState = Validate.record({

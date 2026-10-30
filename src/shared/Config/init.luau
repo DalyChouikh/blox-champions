@@ -95,6 +95,46 @@ local crossAreaRules: { Validate.Rule } = {
 			return config.Ball.radius < config.Arena.goal.ringRadius
 		end,
 	},
+	{
+		-- A knockdown lasts at least getUpAfter, so an honest client asks to get up once per knockdown
+		-- (Network.maxGetUpsPerSecond; the review, #303).
+		message = "Actions: getUpAfter must not exceed any hit's knockdownSeconds nor "
+			.. "Movement.hardLanding.knockdownSeconds",
+		holds = function(config: GameConfig): boolean
+			local actions = config.Actions
+			if config.Movement.hardLanding.knockdownSeconds < actions.getUpAfter then
+				return false
+			end
+			for _, name: ActionName in Actions.names do
+				local hit = actions[name].hit
+				if hit ~= nil and hit.knockdownSeconds < actions.getUpAfter then
+					return false
+				end
+			end
+			return true
+		end,
+	},
+	{
+		-- A leap homes no farther than its hit reaches by its strike's end (the owner, #303, Q89): its rise over the
+		-- windup and the active phase, then the hit's range and the server's lag tolerance.
+		message = "Actions: a leap's seek.bend.range must be within what its hit reaches by its strike's end "
+			.. "(the leap's rise, hit.range and Network.hitLagToleranceStuds)",
+		holds = function(config: GameConfig): boolean
+			for _, name: ActionName in Actions.names do
+				local action = config.Actions[name]
+				local motion, seek, hit = action.motion, action.seek, action.hit
+				local leap = if motion ~= nil then motion.leapImpulse else nil
+				if leap ~= nil and seek ~= nil and hit ~= nil then
+					local strike = action.phases.windup + action.phases.active
+					local rise = leap * strike - config.World.gravity * strike * strike / 2
+					if seek.bend.range > rise + hit.range + config.Network.hitLagToleranceStuds then
+						return false
+					end
+				end
+			end
+			return true
+		end,
+	},
 }
 
 Config.schema = Validate.checkAll(

@@ -42,7 +42,7 @@ function Centerline.length(arena: ArenaConfig): number
 end
 
 -- A point on the cross-section at `distance` (lateral measured from the inner wall face toward the outer wall, height
--- from the lower floor), and the heading's yaw in radians: Roblox's Orientation Y, so CFrame.Angles(0, yaw, 0) looks
+-- from the lowest floor), and the heading's yaw in radians: Roblox's Orientation Y, so CFrame.Angles(0, yaw, 0) looks
 -- along the travel direction, (-sin yaw, 0, -cos yaw). Plain numbers and a Vector3 (a native value), so a caller
 -- placing a part every frame allocates nothing.
 function Centerline.pose(arena: ArenaConfig, distance: number, lateral: number, height: number): (Vector3, number)

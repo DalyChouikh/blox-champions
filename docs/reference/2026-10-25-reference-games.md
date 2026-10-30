@@ -1038,6 +1038,17 @@ about two thirds of a lap, swinging from wall to wall.
     studs/s, 6.8 bodies/s; the rise topped in 1.27 s, the outer wall to ~3.4 studs onto the glass at 2.35 s, then
     down and across): **"Feels right"**; the mouse with the Roblox Player's Camera Sensitivity at 1 (3,600 px a turn,
     as Studio, Q83): **"Feels right at 1"**. The Feel part's skating has no open finding left.
+  - **The Feel part's end-of-phase review; Q87-Q89** (2026-10-30, session 49, AskUserQuestion, plain words). The
+    review (Standards + Spec, main deb87b9 -> dd8dc14) found three behaviours no answer settled. **Q87** (not the
+    recommended): a Dive touching flat ground 40+ studs (7 bodies) below its last top (an Uppercut high on the glass,
+    56-83 up, then Tackle, Dive) stays **a hard landing** (on the back, 1.5 s, the Get Up prompt), as built; not
+    chosen: always a dive (Q65's "every dive still ends on the belly"; no RC video shows a dive from that high).
+    **Q88** (recommended): **keep RC's Get Up prompt** during tackle and fall knockdowns although since #287 (Q62)
+    pressing no longer shortens them (RC shows it, Videos 5 and 7; whether pressing helps in RC can't be told); the
+    texts saying it gets them up sooner are fixed; not chosen: remove it. **Q89** (recommended): **the Uppercut homes
+    only as far as it hits**: its hit counts the first 0.25 s, the leap then 18 studs up, the hit 6 (+3 lag), so its
+    bend reaches about 27 studs (4.7 bodies), not 31 (Q58), timing unchanged; not chosen: the hit for the whole rise
+    (0.69 s, delaying the air Tackle; RC's was ready 0.13-0.3 s after, Video 5); keep the 31-stud bend.
 
 ## Roller Champions
 

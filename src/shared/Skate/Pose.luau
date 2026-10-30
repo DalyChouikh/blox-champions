@@ -6,8 +6,8 @@
 -- -z forward), which R15 joint frames match; PoseController turns them into each joint's own frame. A positive turn
 -- about x tips the torso back and swings a hanging limb forward.
 
-local Attributes = require(script.Parent.Parent.Net.Attributes)
 local Config = require(script.Parent.Parent.Config)
+local Types = require(script.Parent.Types)
 
 export type Role = "root" | "waist" | "leftHip" | "rightHip" | "leftKnee" | "rightKnee" | "rightShoulder"
 
@@ -35,7 +35,7 @@ export type PoseInput = {
 	airPosing: boolean,
 	-- The knockdown posed (its kind), kept while the skater rises from it; and how far into its pose they are, from 0
 	-- (on their feet) to 1 (down), as `settle` moves it.
-	knockdown: Attributes.Knockdown?,
+	knockdown: Types.Knockdown?,
 	down: number,
 	-- How far the root joint lifts the body so the avatar's feet meet the ground.
 	bodyOffset: number,

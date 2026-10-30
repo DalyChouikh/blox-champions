@@ -148,10 +148,10 @@ describe("Config defaults", function()
 				effect = "Knockdown",
 				pose = "None",
 				hit = { range = 6, coneDeg = 90, aimUpDeg = 0, knockdownSeconds = 1.5 },
-				-- Q58: an opponent above, up to its 31-stud leap within 45° of straight up.
+				-- Q58: an opponent above within 45° of straight up; Q89: only as far as its hit reaches (27.4 studs).
 				seek = {
 					snap = { range = 12, coneDeg = 90, aimUpDeg = 0 },
-					bend = { range = 31, coneDeg = 45, aimUpDeg = 90 },
+					bend = { range = 27, coneDeg = 45, aimUpDeg = 90 },
 					turnDegPerSecond = 360,
 				},
 				-- √(2/3) of 110: as high at two thirds of the gravity (#279).
@@ -767,6 +767,25 @@ describe("Config.forMode", function()
 				overrides = { straight = { bankWidth = 0 } },
 				message = "Arena.straight.bankWidth: must be > 0 (got 0)",
 			},
+			-- Every piece of a straight and of a curved end has a size (#268).
+			{ overrides = { straight = { roomEnd = 0 } }, message = "Arena.straight.roomEnd: must be > 0 (got 0)" },
+			{ overrides = { straight = { riseEnd = 0 } }, message = "Arena.straight.riseEnd: must be > 0 (got 0)" },
+			{
+				overrides = { straight = { riseHeight = 0 } },
+				message = "Arena.straight.riseHeight: must be > 0 (got 0)",
+			},
+			{
+				overrides = { straight = { footRadius = 0 } },
+				message = "Arena.straight.footRadius: must be > 0 (got 0)",
+			},
+			{
+				overrides = { curvedEnd = { bowlHeight = 0 } },
+				message = "Arena.curvedEnd.bowlHeight: must be > 0 (got 0)",
+			},
+			{
+				overrides = { curvedEnd = { footRadius = 0 } },
+				message = "Arena.curvedEnd.footRadius: must be > 0 (got 0)",
+			},
 			-- The incline's slope must stay finite.
 			{
 				overrides = { straight = { inclineDeg = -1 } },
@@ -1017,6 +1036,9 @@ describe("Config.forMode", function()
 				overrides = { Movement = { fallLineDeg = 91 } },
 				message = "Movement.fallLineDeg: must be <= 90 (got 91)",
 			},
+			-- A wall is steeper than wallAngle from flat: some slope, short of upright (#216, the review #303).
+			{ overrides = { Movement = { wallAngle = 0 } }, message = "Movement.wallAngle: must be > 0 (got 0)" },
+			{ overrides = { Movement = { wallAngle = 90 } }, message = "Movement.wallAngle: must be < 90" },
 		}
 		for _, case in cases do
 			expect(function()
@@ -1144,6 +1166,95 @@ describe("Config.forMode", function()
 		end).toThrow("Network.maxGetUpsPerSecond: must be > 0 (got 0)")
 	end)
 
+	-- The review (#303): a knockdown lasts at least getUpAfter (Network.maxGetUpsPerSecond's honest client), and a
+	-- leap homes no farther than its hit can reach (Q89).
+	it("rejects getting up after a knockdown ends, and a leap homing past what its hit reaches", function()
+		local GET_UP = "Actions: getUpAfter must not exceed any hit's knockdownSeconds nor "
+			.. "Movement.hardLanding.knockdownSeconds"
+		-- The Uppercut's strike ends 0.25 s after the press, the leap then 89.81 × 0.25 − 130.8 × 0.25² / 2 = 18.365
+		-- up; its hit reaches 6 more, and 3 for the server's lag: 27.365.
+		local REACH = "Actions: a leap's seek.bend.range must be within what its hit reaches by its strike's end "
+			.. "(the leap's rise, hit.range and Network.hitLagToleranceStuds)"
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{ overrides = { Actions = { getUpAfter = 1.6 } }, message = GET_UP },
+			{ overrides = { Actions = { Tackle = { hit = { knockdownSeconds = 1.4 } } } }, message = GET_UP },
+			{ overrides = { Movement = { hardLanding = { knockdownSeconds = 1.4 } } }, message = GET_UP },
+			{ overrides = { Actions = { Uppercut = { seek = { bend = { range = 27.4 } } } } }, message = REACH },
+			-- A shorter strike reaches less: 0.15 s, 12.0 up, 21.0 in all.
+			{ overrides = { Actions = { Uppercut = { phases = { active = 0.1 } } } }, message = REACH },
+			{ overrides = { Network = { hitLagToleranceStuds = 0 } }, message = REACH },
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config(case.overrides)
+			end).toThrow(case.message)
+		end
+		local inside = Fixtures.config({ Actions = { Uppercut = { seek = { bend = { range = 27.36 } } } } })
+		expect((inside.Actions.Uppercut.seek :: Config.Seek).bend.range).toBe(27.36)
+	end)
+
+	-- The review (#303): the Feel part's settings, each just inside its limit (getUpAfter brought down with the
+	-- knockdowns it must not outlast).
+	it(
+		"accepts the Feel part's skating, action, network, pose, camera and label settings just inside their limits",
+		function()
+			local movement: { [string]: any } = {
+				backwardsConeDeg = 90,
+				fallLineDeg = 90,
+				cornerDeg = 90,
+				wallAngle = 89.9,
+				bellyLandingKeep = 1,
+				jumpSpeedCost = 1,
+				airPoseImpulse = 0,
+				overSpeedBleed = 0,
+				wallGrip = 0,
+				wallTurnRate = 0,
+				turnRoundSeconds = 0.01,
+				bodyUpSmoothing = 0.01,
+				knockdownSlideSeconds = { Hit = 0.01, Fall = 0.01, Dive = 0.01 },
+				hardLanding = { drop = 0.01, knockdownSeconds = 0.01 },
+			}
+			local pose: { [string]: any } = {
+				airPoseDeg = 180,
+				airPoseArmDeg = 0,
+				diveDeg = 0,
+				diveHipDeg = 180,
+				diveKneeDeg = 0,
+				diveSinkStuds = 0,
+				knockdownEaseSeconds = 0.01,
+				knockdownSinkStuds = 0,
+			}
+			local config = Fixtures.config({
+				Movement = movement,
+				Actions = {
+					getUpAfter = 0.01,
+					Tackle = { followUp = { from = 0, to = 0.01 } },
+					Dive = { landing = { knockdownSeconds = 0.01, stopSpeed = 0.01 } },
+				},
+				Network = { maxGetUpsPerSecond = 0.01, posedLandingTolerance = 0 },
+				Pose = pose,
+				Camera = { maxTiltDeg = 89 },
+				UI = { controlLabels = { AirPose = "A", GetUp = "G" }, text = { touchMove = "M" } },
+			})
+			local readMovement: any, readPose: any = config.Movement, config.Pose
+			for name, value in movement do
+				expect(readMovement[name]).toEqual(value)
+			end
+			for name, value in pose do
+				expect(readPose[name]).toBe(value)
+			end
+			expect(config.Actions.getUpAfter).toBe(0.01)
+			expect(config.Actions.Tackle.followUp).toEqual({ action = "Dive", from = 0, to = 0.01 })
+			expect(config.Actions.Dive.landing).toEqual({ knockdownSeconds = 0.01, stopSpeed = 0.01 })
+			expect(config.Network.maxGetUpsPerSecond).toBe(0.01)
+			expect(config.Network.posedLandingTolerance).toBe(0)
+			expect(config.Camera.maxTiltDeg).toBe(89)
+			expect(config.UI.controlLabels.AirPose).toBe("A")
+			expect(config.UI.controlLabels.GetUp).toBe("G")
+			expect(config.UI.text.touchMove).toBe("M")
+		end
+	)
+
 	it("rejects a posed landing reported for less than no time", function()
 		expect(function()
 			Fixtures.config({ Network = { posedLandingTolerance = -0.1 } })
@@ -1178,6 +1289,13 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Pose = { knockdownSinkStuds = -0.5 } })
 		end).toThrow("Pose.knockdownSinkStuds: must be >= 0 (got -0.5)")
+		-- The Air Pose's stretch (#218).
+		expect(function()
+			Fixtures.config({ Pose = { airPoseDeg = 181 } })
+		end).toThrow("Pose.airPoseDeg: must be <= 180 (got 181)")
+		expect(function()
+			Fixtures.config({ Pose = { airPoseArmDeg = -1 } })
+		end).toThrow("Pose.airPoseArmDeg: must be >= 0 (got -1)")
 	end)
 
 	it("rejects a key bound to two actions", function()
@@ -1346,6 +1464,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { UI = { controlLabels = { GetUp = "" } } },
 				message = "UI.controlLabels.GetUp: must not be empty",
+			},
+			{
+				overrides = { UI = { controlLabels = { AirPose = "" } } },
+				message = "UI.controlLabels.AirPose: must not be empty",
 			},
 			{ overrides = { UI = { text = { touchMove = "" } } }, message = "UI.text.touchMove: must not be empty" },
 			{

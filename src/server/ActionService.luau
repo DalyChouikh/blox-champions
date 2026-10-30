@@ -33,6 +33,7 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 local SmoothNormals = require(ReplicatedStorage.Shared.Arena.Geometry.SmoothNormals)
 local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
+local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local TeamService = require(script.Parent.TeamService)
 local Throw = require(ReplicatedStorage.Shared.Actions.Throw)
@@ -278,15 +279,11 @@ local function lookDown(self: ActionService, holder: Holder)
 	local record = recordOf(self, player)
 	local root = holder.root
 	local movement = self._config.Movement
-	local hit = workspace:Raycast(root.Position, -root.CFrame.UpVector * movement.groundProbeLength, self._rideParams)
 	local ground = self._ground
-	ground.hit = hit ~= nil
-	if hit ~= nil then
-		ground.normal = self._smoothNormal(hit.Position, hit.Normal)
-		ground.distance = hit.Distance
-	end
+	local reach = -root.CFrame.UpVector * movement.groundProbeLength
+	TaggedLayout.readGround(ground, workspace:Raycast(root.Position, reach, self._rideParams), self._smoothNormal)
 	local touchdown = record.fall:step(root.Position.Y, ground)
-	if hit == nil or record.knockdownLeft > 0 then
+	if not ground.hit or record.knockdownLeft > 0 then
 		return
 	end
 	local landing: Config.ActionName? = record.landing

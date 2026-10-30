@@ -11,6 +11,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.InputController)
 local RideSurfaces = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.RideSurfaces)
+local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 local SkateController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.SkateController)
 local SkaterBody = require(ServerScriptService.Server.SkaterBody)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
@@ -95,8 +96,8 @@ local function setup(overrides: { [string]: any }?, arenaNormals: boolean?)
 		Skaters = function(): { any }
 			return others
 		end,
-		SendSkateState = function(pump: boolean, brake: boolean, airPose: boolean)
-			table.insert(sent, { pump, brake, airPose })
+		SendSkateState = function(state: Schemas.SkateState)
+			table.insert(sent, { state.pump, state.brake, state.airPose })
 		end,
 		SendGetUp = function()
 			getUps += 1

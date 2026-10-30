@@ -34,7 +34,7 @@ export type CarrierBeam = {
 	_ballPart: BallPart.BallPart,
 	_store: HudStore.HudStore,
 	_parent: Instance,
-	-- Where the beam's centre stands: across the track from the inner glass's face, and above the lower floor.
+	-- Where the beam's centre stands: across the track from the inner glass's face, and above the lowest floor.
 	_lateral: number,
 	_height: number,
 	-- What was last written.

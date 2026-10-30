@@ -32,6 +32,13 @@ describe("Validate", function()
 		expect(v(0, "A.size")).toEqual({ "A.size: must be > 0 (got 0)" })
 	end)
 
+	-- A slope short of upright (wallAngle, pumpFlatSlopeDeg, the incline): one rule, not three copies (#303).
+	it("enforces an exclusive upper bound with below", function()
+		local v = Validate.number({ min = 0, below = 90 })
+		expect(v(89.9, "A.deg")).toEqual({})
+		expect(v(90, "A.deg")).toEqual({ "A.deg: must be < 90 (got 90)" })
+	end)
+
 	it("validates booleans and strings with oneOf", function()
 		expect(Validate.boolean()(1, "B")).toEqual({ "B: expected boolean, got number" })
 		local s = Validate.string({ oneOf = { "Hold", "Toggle" } })

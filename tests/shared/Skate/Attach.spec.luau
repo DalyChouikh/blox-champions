@@ -76,6 +76,25 @@ describe("Attach", function()
 		Fixtures.expectNear(again.releaseDirection, Vector3.new(0, 0, -1))
 	end)
 
+	-- The review (#303): behind a leader riding backwards (#246) the boost went against the way they travel.
+	it(
+		"boosts along the leader's travel with the stick at rest, along their facing only while they stand still",
+		function()
+			local backwards: Attach.Candidate =
+				{ player = "A", position = Vector3.zero, velocity = Vector3.new(0, 0, -30), forward = Vector3.zAxis }
+			local attach = Attach.new(movement)
+			attach:update(1 / 60, true, backwards, NO_AIM)
+			attach:update(1 / 60, false, backwards, NO_AIM)
+			Fixtures.expectNear(attach.releaseDirection, Vector3.new(0, 0, -1))
+			local still: Attach.Candidate =
+				{ player = "A", position = Vector3.zero, velocity = Vector3.zero, forward = Vector3.xAxis }
+			local again = Attach.new(movement)
+			again:update(1 / 60, true, still, NO_AIM)
+			again:update(1 / 60, false, still, NO_AIM)
+			Fixtures.expectNear(again.releaseDirection, Vector3.xAxis)
+		end
+	)
+
 	it("lets go when the leader is gone", function()
 		local attach = Attach.new(movement)
 		attach:update(1 / 60, true, LEADER, NO_AIM)
