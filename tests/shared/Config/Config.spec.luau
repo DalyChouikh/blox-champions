@@ -104,7 +104,7 @@ describe("Config defaults", function()
 				effect = "Knockdown",
 				pose = "None",
 				hit = { range = 6, coneDeg = 60, aimUpDeg = 30, knockdownSeconds = 1.5 },
-				motion = { wallLeapDistance = 5, wallLeapImpulse = 110 },
+				motion = { leapImpulse = 110 },
 			},
 			ChargeThrow = {
 				phases = { windup = 0, active = 0, recovery = 0 },
@@ -814,6 +814,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { Tackle = { effect = "Throw" } },
 				message = 'Actions.Tackle.effect: must be one of Knockdown (got "Throw")',
+			},
+			{
+				overrides = { Uppercut = { motion = { leapImpulse = 0 } } },
+				message = "Actions.Uppercut.motion.leapImpulse: must be > 0 (got 0)",
 			},
 		}
 		for _, case in cases do

@@ -65,8 +65,6 @@ export type SkateController = {
 	attachable: boolean,
 	-- An action's push, written to the skater body at once; `launch` leaves the ground.
 	push: (self: SkateController, change: Vector3, launch: boolean) -> (),
-	-- A steep ride surface (a wall) lies within `distance` ahead.
-	wallAhead: (self: SkateController, distance: number) -> boolean,
 	_config: Config.GameConfig,
 	_inputController: InputController.InputController,
 	_camera: { CFrame: CFrame },
@@ -519,16 +517,6 @@ local SkateController: SkateController = {
 			collide(self, root, skater, self._stepSeconds)
 			apply(self, skater)
 		end
-	end,
-
-	wallAhead = function(self: SkateController, distance: number): boolean
-		local skater = self.skater
-		local root = self.root
-		if skater == nil or root == nil then
-			return false
-		end
-		local result = self._raycast(root.Position, skater.forward * distance, self._surfaces.params)
-		return result ~= nil and skater:isSteep(result.Normal)
 	end,
 }
 
