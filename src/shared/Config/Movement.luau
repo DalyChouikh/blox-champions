@@ -21,9 +21,6 @@ export type MovementConfig = {
 	rollingFriction: number,
 	-- Speed lost per second per stud/s of speed.
 	airDrag: number,
-	-- On the ground, a skater pressing nothing (no stick, pump or brake) loses this much more speed per second
-	-- (the owner, #215: from 72 km/h to a stop in about 5 s). A knocked-down skater slides by knockdownSlideSeconds.
-	coastDecel: number,
 	-- The stride's top speed on flat ground: 46 reads 55 km/h, like Roller Champions' 45-58 (the owner, #265).
 	cruiseSpeed: number,
 	-- Speeding up fades from softCap to nothing at hardCap; hardCap is never exceeded, on the ground or in the air
@@ -132,7 +129,6 @@ local defaults: MovementConfig = {
 	strideAccel = 30,
 	rollingFriction = 4,
 	airDrag = 0.02,
-	coastDecel = 7.5,
 	cruiseSpeed = 46,
 	softCap = 90,
 	hardCap = 121,
@@ -189,7 +185,6 @@ local fields = Validate.record({
 	strideAccel = nonNegative,
 	rollingFriction = nonNegative,
 	airDrag = nonNegative,
-	coastDecel = nonNegative,
 	cruiseSpeed = positive,
 	softCap = positive,
 	hardCap = positive,

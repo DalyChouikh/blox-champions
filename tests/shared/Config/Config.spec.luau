@@ -199,7 +199,6 @@ describe("Config defaults", function()
 			strideAccel = 30,
 			rollingFriction = 4,
 			airDrag = 0.02,
-			coastDecel = 7.5,
 			-- Roller Champions' stride on the flat: 55 km/h (#265).
 			cruiseSpeed = 46,
 			softCap = 90,
@@ -935,10 +934,6 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { overSpeedBleed = -1 } },
 				message = "Movement.overSpeedBleed: must be >= 0 (got -1)",
-			},
-			{
-				overrides = { Movement = { coastDecel = -1 } },
-				message = "Movement.coastDecel: must be >= 0 (got -1)",
 			},
 			{
 				overrides = { Movement = { jumpSpeedCost = -0.1 } },
