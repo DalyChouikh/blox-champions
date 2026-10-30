@@ -101,7 +101,7 @@ local function EndScreen(props: EndScreenProps): React.ReactElement
 			Padding = Style.padding(config),
 			Fit = Style.fit(config, props.area, size, contentHeight(config, #stats.players, mvpStats ~= nil, compact)),
 			Layout = Style.list(config, Enum.FillDirection.Vertical),
-			Winner = title(config, 1, text:wins(ended.winner), ui.teamColors[ended.winner]),
+			Result = title(config, 1, text:result(ended.winner), Style.teamColor(config, ended.winner)),
 			Totals = React.createElement(
 				"Frame",
 				Style.holder({ LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.XY }),

@@ -13,7 +13,6 @@ local Config = require(script.Parent.Parent.Config)
 local Crossing = require(script.Parent.Crossing)
 local Finite = require(script.Parent.Parent.Util.Finite)
 local GoalJudge = require(script.Parent.GoalJudge)
-local LastChance = require(script.Parent.LastChance)
 local LapTracker = require(script.Parent.LapTracker)
 local MatchClock = require(script.Parent.MatchClock)
 local MatchOutcome = require(script.Parent.MatchOutcome)
@@ -39,8 +38,8 @@ export type Snapshot = {
 	phaseSecondsLeft: number,
 	-- The team playing its Last Chance, while the period is "LastChance".
 	trailingTeam: Team?,
+	-- Regulation's time left, 0 through Last Chance, then overtime's.
 	secondsLeft: number,
-	overtimeSeconds: number,
 	scores: { [Team]: number },
 	possessingTeam: Team?,
 	lastHolder: PlayerId?,
@@ -52,8 +51,8 @@ export type Snapshot = {
 	goalOpenFor: Team?,
 	-- The score tab: every player who played this match, by team, then score.
 	stats: Types.MatchStats,
-	-- Once the match has ended: the winning team, and its MVP (nil if none of its players is still in the match), as
-	-- MatchEnded gave them, so a player who joins afterwards sees the result too.
+	-- Once the match has ended: the winning team (nil after a draw) and its MVP (nil if none of its players is still
+	-- in the match), as MatchEnded gave them, so a player who joins afterwards sees the result too.
 	winner: Team?,
 	mvp: PlayerId?,
 }
@@ -101,7 +100,7 @@ type Fields = {
 	_period: Types.Period,
 	-- The team playing its Last Chance; set only while the period is "LastChance".
 	_trailingTeam: Team?,
-	-- Set when the match ends.
+	-- Set when the match ends with a winner; nil after a draw.
 	_winner: Team?,
 	_mvp: PlayerId?,
 	_phaseTimeLeft: number,
@@ -180,7 +179,8 @@ local function kickoff(self: MatchEngine)
 	emit(self, { name = "KickoffStarted", countdownSeconds = self._phaseTimeLeft })
 end
 
-local function endMatch(self: MatchEngine, winner: Team)
+-- `winner` is nil for a draw, whose MVP is the best player of both teams (ScoreKeeper.mvp).
+local function endMatch(self: MatchEngine, winner: Team?)
 	confirmBlock(self)
 	self._state = "Ended"
 	self._winner = winner
@@ -191,7 +191,7 @@ end
 local function startOvertime(self: MatchEngine)
 	self._period = "Overtime"
 	self._trailingTeam = nil
-	self._clock:startOvertime()
+	self._clock:startOvertime(self._config.Match.overtimeSeconds)
 	emit(self, { name = "OvertimeStarted" })
 end
 
@@ -200,21 +200,13 @@ local function pointScored(self: MatchEngine, team: Team)
 	confirmBlock(self)
 	closeGoal(self)
 	local match = self._config.Match
-	local scores = self._scores:teamScores()
-	local winner: Team? = MatchOutcome.afterPoint(self._period, scores, team, match.pointsToWin)
-	if winner ~= nil then
+	local after: MatchOutcome.AfterPoint, winner: Team? =
+		MatchOutcome.afterPoint(self._period, self._scores:teamScores(), team, match.pointsToWin)
+	if after == "Win" then
 		endMatch(self, winner)
 		return
-	end
-	-- During Last Chance only the trailing team can score: a leading-team pickup would already have ended it.
-	if self._period == "LastChance" then
-		local result: LastChance.AfterPoint = LastChance.afterPoint(scores, team)
-		if result == "Win" then
-			endMatch(self, team)
-			return
-		elseif result == "Overtime" then
-			startOvertime(self)
-		end
+	elseif after == "Overtime" then
+		startOvertime(self)
 	end
 	self._state = "Celebration"
 	self._phaseTimeLeft = match.celebrationSeconds
@@ -224,8 +216,12 @@ local function timeUp(self: MatchEngine)
 	-- The ball is dead during a kickoff or celebration, so nobody has it for Last Chance; the possession
 	-- left over from a celebrated point is about to be reset anyway.
 	local possessing: Team? = if self._state == "Live" then self._possession.team else nil
-	local outcome: MatchOutcome.TimeUp, team: Team? =
-		MatchOutcome.atTimeUp(self._scores:teamScores(), possessing, self._config.Match.lastChance)
+	local outcome: MatchOutcome.TimeUp, team: Team? = MatchOutcome.atTimeUp(
+		self._period,
+		self._scores:teamScores(),
+		possessing,
+		self._config.Match.lastChance.enabled
+	)
 	if outcome == "Overtime" then
 		startOvertime(self)
 	elseif outcome == "LastChance" then
@@ -233,7 +229,8 @@ local function timeUp(self: MatchEngine)
 		self._trailingTeam = team
 		emit(self, { name = "LastChanceStarted", team = team :: Team })
 	else
-		endMatch(self, team :: Team)
+		-- A "Win" names the winner; a "Draw" has none.
+		endMatch(self, team)
 	end
 end
 
@@ -414,9 +411,9 @@ function MatchEngine.pickedUp(self: MatchEngine, player: PlayerId, ballPosition:
 	end
 	self._assists:pickedUp(player, self._now)
 
-	local trailing: Team? = self._trailingTeam
-	if self._period == "LastChance" and trailing ~= nil and LastChance.endsOnPickup(trailing, team) then
-		endMatch(self, team)
+	local winner: Team? = MatchOutcome.afterPickup(self._trailingTeam, team)
+	if winner ~= nil then
+		endMatch(self, winner)
 	end
 end
 
@@ -472,7 +469,6 @@ function MatchEngine.snapshot(self: MatchEngine): Snapshot
 		phaseSecondsLeft = if timed then math.max(self._phaseTimeLeft, 0) else 0,
 		trailingTeam = self._trailingTeam,
 		secondsLeft = self._clock.secondsLeft,
-		overtimeSeconds = self._clock.overtimeSeconds,
 		scores = self._scores:teamScores(),
 		possessingTeam = self._possession.team,
 		lastHolder = self._possession.lastHolder,

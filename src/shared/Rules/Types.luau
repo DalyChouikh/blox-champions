@@ -49,6 +49,7 @@ export type Event =
 	| { name: "ClockWarning", secondsLeft: number }
 	| { name: "LastChanceStarted", team: Team }
 	| { name: "OvertimeStarted" }
-	| { name: "MatchEnded", winner: Team, mvp: PlayerId?, stats: MatchStats }
+	-- `winner`: nil when overtime ran out in a draw (the owner, Q95).
+	| { name: "MatchEnded", winner: Team?, mvp: PlayerId?, stats: MatchStats }
 
 return table.freeze({})

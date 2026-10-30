@@ -77,7 +77,7 @@ end
 local function lapBar(props: ScoreboardProps, team: Team?, order: number): React.ReactElement
 	local config, match = props.config, props.match
 	local hud = config.UI.hud
-	local color = if team ~= nil then config.UI.teamColors[team] else hud.textColor
+	local color = Style.teamColor(config, team)
 	local count = match.gateCount
 	-- Segments fill the bar's width exactly, spacing apart.
 	local segment = UDim2.new(1 / count, -hud.spacing * (count - 1) / count, 1, 0)
@@ -115,13 +115,12 @@ end
 
 local function Scoreboard(props: ScoreboardProps): React.ReactElement
 	local config, match, carrier = props.config, props.match, props.carrier
-	local ui = config.UI
-	local hud = ui.hud
+	local hud = config.UI.hud
 	local place = hud.layout.scoreboard
-	local carrierTeam = if carrier ~= nil then HudState.teamOf(match, carrier) else nil
+	local carrierTeam: Team? = if carrier ~= nil then HudState.teamOf(match, carrier) else nil
 	local period = props.text:period(match)
 	-- Set only through Last Chance.
-	local trailing = match.trailingTeam
+	local trailing: Team? = match.trailingTeam
 	local line = UDim2.new(1, 0, 0, hud.textSize)
 	return React.createElement(
 		"Frame",
@@ -162,7 +161,7 @@ local function Scoreboard(props: ScoreboardProps): React.ReactElement
 					LayoutOrder = 2,
 					Size = line,
 					Text = period or "",
-					TextColor3 = if trailing ~= nil then ui.teamColors[trailing] else hud.textColor,
+					TextColor3 = Style.teamColor(config, trailing),
 					Visible = period ~= nil,
 				})
 			),
@@ -172,7 +171,7 @@ local function Scoreboard(props: ScoreboardProps): React.ReactElement
 					LayoutOrder = 3,
 					Size = line,
 					Text = if carrier ~= nil then props.text:name(carrier, props.names) else "",
-					TextColor3 = if carrierTeam ~= nil then ui.teamColors[carrierTeam] else hud.textColor,
+					TextColor3 = Style.teamColor(config, carrierTeam),
 					Visible = carrier ~= nil,
 				})
 			),

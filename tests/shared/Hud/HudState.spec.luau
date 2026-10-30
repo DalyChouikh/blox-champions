@@ -53,11 +53,11 @@ describe("HudState", function()
 		expect(match(running).secondsLeft).toBeCloseTo(119, 6)
 	end)
 
-	it("counts overtime up, and holds 0:00 in Last Chance", function()
-		local overtime = liveState({ period = "Overtime", secondsLeft = 0 })
+	it("counts overtime down like regulation, and holds 0:00 in Last Chance", function()
+		local overtime = liveState({ period = "Overtime", secondsLeft = 180 })
 		overtime:step(2.5)
-		expect(match(overtime).overtimeSeconds).toBeCloseTo(2.5, 6)
-		expect(overtime:clockSeconds()).toBe(2)
+		expect(match(overtime).secondsLeft).toBeCloseTo(177.5, 6)
+		expect(overtime:clockSeconds()).toBe(178)
 
 		local lastChance = liveState({ period = "LastChance", secondsLeft = 0, trailingTeam = "Orange" })
 		lastChance:step(1)
@@ -177,6 +177,24 @@ describe("HudState", function()
 		expect(ended.winner).toBe("Orange")
 		expect(ended.mvp).toBe("2")
 		expect(ended.stats == match(state).stats).toBe(true)
+	end)
+
+	-- The owner (Q95): overtime's 0:00 is a draw, which has no winner.
+	it("shows a draw from MatchEnded and from a snapshot of the ended match", function()
+		local state = liveState()
+		local stats = (match(state) :: any).stats
+		state:applyEvents({ { name = "MatchEnded", mvp = "1", stats = stats } })
+		local ended = state.ended :: HudState.Ended
+		expect(ended ~= nil).toBe(true)
+		expect(ended.winner).toBeNil()
+		expect(ended.mvp).toBe("1")
+
+		local joined = HudState.new(config)
+		joined:applySnapshot(Fixtures.matchSnapshot({ state = "Ended", period = "Overtime", mvp = "2" }))
+		local shown = joined.ended :: HudState.Ended
+		expect(shown ~= nil).toBe(true)
+		expect(shown.winner).toBeNil()
+		expect(shown.mvp).toBe("2")
 	end)
 
 	it("changes its version only when something it shows changes", function()

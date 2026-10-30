@@ -428,6 +428,24 @@ describe("A match on the generated arena", function()
 		expect(#MatchService.engine:stats().players).toBe(1)
 	end)
 
+	-- The owner (Q95): overtime's 0:00 ends a level match in a draw, which ends it like a win does.
+	it("ends a level match in a draw when overtime runs out, then starts the next match", function()
+		setup({ durationSeconds = 1, overtimeSeconds = 1, postMatchSeconds = 1 })
+		local first = MatchService.engine
+		seat(1)
+		kickoff()
+		frames(2 + FRAME)
+		expect(table.find(events(), "OvertimeStarted")).never.toBeNil()
+		local ended = eventsNamed("MatchEnded")
+		expect(#ended).toBe(1)
+		expect(ended[1].winner).toBeNil()
+		expect(ended[1].mvp).toBe("1")
+		expect(ended[1].stats.players[1].player).toBe("1")
+		frames(1.05)
+		expect(MatchService.engine).never.toBe(first)
+		expect(MatchService.engine:snapshot().state).toBe("Kickoff")
+	end)
+
 	-- The guard's placements move carriers and their ball (Phase 9 review): the ball's step must see them that frame.
 	it("steps the movement guard each frame after the actions and before the ball", function()
 		local actionSteps = jest.spyOn(ActionService, "step")

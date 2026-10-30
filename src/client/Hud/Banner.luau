@@ -1,6 +1,6 @@
 --!strict
--- The banner across the screen (spec §11.1): the kickoff's 3-2-1, GOAL!, STREAK POINT!, DENIED!, the clock warnings,
--- LAST CHANCE and OVERTIME, in the colour of the team it is about, or the HUD's text colour. Hidden without a banner.
+-- The banner across the screen (spec §11.1): the kickoff's 3-2-1, GOAL!, DENIED!, the clock warnings, LAST CHANCE and
+-- OVERTIME, in the colour of the team it is about, or the HUD's text colour. Hidden without a banner.
 -- It centres in the HUD's stage (left of the touch buttons on touch) and shrinks to fit it. A plain function of its
 -- props.
 
@@ -11,6 +11,7 @@ local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local React = require(ReplicatedStorage.Packages.React)
 local Style = require(script.Parent.Style)
+local Team = require(ReplicatedStorage.Shared.Rules.Team)
 
 export type BannerProps = {
 	config: Config.GameConfig,
@@ -24,7 +25,7 @@ local function Banner(props: BannerProps): React.ReactElement
 	local config, banner = props.config, props.banner
 	local ui = config.UI
 	local place = ui.hud.layout.banner
-	local team = if banner ~= nil then banner.team else nil
+	local team: Team.Team? = if banner ~= nil then banner.team else nil
 	return React.createElement(
 		"TextLabel",
 		Style.text(config, {
@@ -33,7 +34,7 @@ local function Banner(props: BannerProps): React.ReactElement
 			Size = place.size,
 			TextSize = ui.hud.bannerSize,
 			Text = if banner ~= nil then props.text:banner(banner) else "",
-			TextColor3 = if team ~= nil then ui.teamColors[team] else ui.hud.textColor,
+			TextColor3 = Style.teamColor(config, team),
 			Visible = banner ~= nil,
 		}),
 		{ Fit = Style.fit(config, props.area, place.size) }
