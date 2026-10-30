@@ -96,6 +96,15 @@ local crossAreaRules: { Validate.Rule } = {
 		end,
 	},
 	{
+		-- A drop-in by the middle glass starts nearer it than one by the outer wall (#321).
+		message = "Ball: the drop-in's two lines must lie apart across the track "
+			.. "(dropIn.innerIn + dropIn.outerIn < Arena.trackWidth)",
+		holds = function(config: GameConfig): boolean
+			local dropIn = config.Ball.dropIn
+			return dropIn.innerIn + dropIn.outerIn < config.Arena.trackWidth
+		end,
+	},
+	{
 		-- A knockdown lasts at least getUpAfter, so an honest client asks to get up once per knockdown
 		-- (Network.maxGetUpsPerSecond; the review, #303).
 		message = "Actions: getUpAfter must not exceed any hit's knockdownSeconds nor "

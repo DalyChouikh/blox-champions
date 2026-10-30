@@ -25,8 +25,6 @@ export type TaggedArena = {
 	markers: { PVInstance },
 	-- Each team's spawn parts' frames, sorted by part name.
 	teamSpawns: Types.TeamSpawns,
-	-- Sorted by part name.
-	ballSpawns: { CFrame },
 	-- Everything tagged RideSurface (folders of the floors, banks, walls and glass), for a RaycastParams include list.
 	rideSurfaces: { Instance },
 }
@@ -176,17 +174,6 @@ local function readTeamSpawns(root: Instance): Types.TeamSpawns
 	return spawns
 end
 
-local function readBallSpawns(root: Instance): { CFrame }
-	local spawns: { CFrame } = {}
-	for _, part in partsTagged(root, Tags.BallSpawn) do
-		table.insert(spawns, part.CFrame)
-	end
-	if #spawns == 0 then
-		fail(`no {Tags.BallSpawn} found`)
-	end
-	return spawns
-end
-
 local function readRideSurfaces(root: Instance): { Instance }
 	local surfaces = taggedUnder(root, Tags.RideSurface)
 	if #surfaces == 0 then
@@ -202,7 +189,6 @@ function TaggedLayout.read(root: Instance): TaggedArena
 		goalPanel = asPart(single(root, Tags.GoalPanel), Tags.GoalPanel),
 		markers = readMarkers(root, #gates),
 		teamSpawns = readTeamSpawns(root),
-		ballSpawns = readBallSpawns(root),
 		rideSurfaces = readRideSurfaces(root),
 	}
 	return Freeze.deep(arena)
