@@ -51,11 +51,6 @@ local function closed(rate: number, dt: number): number
 	return 1 - math.exp(-rate * dt)
 end
 
--- The angle between two vectors, exact even when it is tiny.
-local function angleBetween(a: Vector3, b: Vector3): number
-	return math.atan2(a:Cross(b).Magnitude, a:Dot(b))
-end
-
 -- `vector` laid onto the plane perpendicular to the unit `up`, as a unit vector; `fallback` when it lies on no such
 -- plane (it points along up).
 local function onPlane(vector: Vector3, up: Vector3, fallback: Vector3): Vector3
@@ -70,7 +65,7 @@ local function turnToward(self: ChaseCamera, direction: Vector3, share: number)
 		return
 	end
 	local goal = flat.Unit
-	local turned = Vectors.rotateToward(self.forward, goal, angleBetween(self.forward, goal) * share, self.up)
+	local turned = Vectors.rotateToward(self.forward, goal, Vectors.angleBetween(self.forward, goal) * share, self.up)
 	self.forward = onPlane(turned, self.up, self.forward)
 end
 
@@ -81,7 +76,7 @@ local function roll(self: ChaseCamera, toward: Vector3, dt: number)
 		return
 	end
 	local goal = toward.Unit
-	local angle = angleBetween(self.up, goal)
+	local angle = Vectors.angleBetween(self.up, goal)
 	if angle <= Vectors.EPSILON then
 		return
 	end

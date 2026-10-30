@@ -5,6 +5,7 @@
 local Actions = require(script.Parent.Parent.Config.Actions)
 local Reach = require(script.Parent.Reach)
 local Types = require(script.Parent.Parent.Rules.Types)
+local Vectors = require(script.Parent.Parent.Util.Vectors)
 
 local PassTarget = {}
 
@@ -48,8 +49,7 @@ function PassTarget.choose(
 	for _, teammate in teammates do
 		local offset = teammate.position - passer
 		local distance = offset.Magnitude
-		-- atan2 of the cross and dot products stays exact for small angles, where acos of a dot product does not.
-		local angle = math.deg(math.atan2(aim:Cross(offset).Magnitude, aim:Dot(offset)))
+		local angle = math.deg(Vectors.angleBetween(aim, offset))
 		if angle <= pass.coneDeg and distance <= pass.maxRange then
 			local score = pass.angleWeight * (1 - angle / pass.coneDeg)
 				+ pass.distanceWeight * (1 - distance / pass.maxRange)
