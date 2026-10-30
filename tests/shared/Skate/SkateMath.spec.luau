@@ -567,8 +567,10 @@ describe("SkateMath pushes and knockdowns", function()
 		end
 	end)
 
-	-- The owner (#245, Q14): a posed fall gains forward speed down the dive's fall line (RC: ~85 km/h per s).
-	it("flies a posed skater down the fall line once falling, as a diver; rising, as anyone", function()
+	-- The owner (#278, Q76): a posed fall is a plain fall, the pose's hop then gravity only, so a moving skater goes on
+	-- by their own momentum and gains nothing (RC, Video 7: an Uppercut + Air Pose touched down 1.7-2.0 s after the
+	-- Uppercut; ours down #245's fall line took 2.3-2.5 s, as a plain fall 1.6-1.8 s). Only a diver flies the line.
+	it("flies a posed skater as anyone in the air, rising or falling, steering included", function()
 		local inAir = ground(FLAT, 0, false)
 		local function flying(velocity: Vector3, posing: boolean): SkateMath.Skater
 			local s = skater(velocity)
@@ -577,18 +579,36 @@ describe("SkateMath pushes and knockdowns", function()
 			s.airPoseReady = not posing
 			return s
 		end
-		local posed, diver = flying(Vector3.new(0, -1, -40), true), flying(Vector3.new(0, -1, -40), false)
-		for _ = 1, 30 do
-			posed:step(input({ jumpHeld = true }), inAir, 1 / 60)
-			diver:step(input({ diving = true }), inAir, 1 / 60)
+		for _, velocity in { Vector3.new(0, 20, -40), Vector3.new(0, -1, -40) } do
+			local posed, plain = flying(velocity, true), flying(velocity, false)
+			for _ = 1, 30 do
+				posed:step(input({ jumpHeld = true, move = Vector3.xAxis }), inAir, 1 / 60)
+				plain:step(input({ move = Vector3.xAxis }), inAir, 1 / 60)
+			end
+			expect(posed.airPosing).toBe(true)
+			Fixtures.expectNear(posed.velocity, plain.velocity)
 		end
-		Fixtures.expectNear(posed.velocity, diver.velocity)
-		expect(posed:shownSpeed()).toBeGreaterThan(40)
-		-- Still rising after the hop: gravity straight down, as for anyone in the air.
-		local rising, plain = flying(Vector3.new(0, 20, -40), true), flying(Vector3.new(0, 20, -40), false)
-		rising:step(input({ jumpHeld = true }), inAir, 1 / 60)
-		plain:step(input(), inAir, 1 / 60)
-		Fixtures.expectNear(rising.velocity, plain.velocity)
+	end)
+
+	-- The owner (#278, Q43): "if he jumps standing still and air pose, he shouldn't go forward". Before, the pose fell
+	-- down the fall line below the facing: a standing jump's pose drifted 6.1 body lengths forward (at gravity 130.8).
+	it("lands a standing jump with an Air Pose at its top where it took off, as a plain fall", function()
+		local s = skater(Vector3.zero)
+		s:step(input({ jump = true }), ground(), 1 / 60)
+		local position, steps, posed = s.velocity / 60, 1, false
+		while position.Y > 0 and steps < 600 do
+			local press = not posed and s.velocity.Y <= 0
+			posed = posed or press
+			s:step(input({ jump = press, jumpHeld = posed }), ground(FLAT, 0, false), 1 / 60)
+			position += s.velocity / 60
+			steps += 1
+		end
+		expect(s.airPosing).toBe(true)
+		expect(position.X).toBeCloseTo(0, 6)
+		expect(position.Z).toBeCloseTo(0, 6)
+		-- Worked (s48 worked278.py, gravity and linear drag in closed form): up 0.2491 s to 6.096, the hop 0.1745 s
+		-- to 2.9895 more, down 0.3046 s: 0.7282 s, 43.69 steps; a step's press and landing each round up by one.
+		expect(math.abs(steps / 60 - 0.7282) <= 2 / 60).toBe(true)
 	end)
 
 	-- The owner (#245, Q19): RC's belly touchdowns from the air kept 59-73% of the speed (133 -> 84, 139 -> 101,
