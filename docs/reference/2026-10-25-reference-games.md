@@ -981,6 +981,56 @@ about two thirds of a lap, swinging from wall to wall.
     fall line. A Play built (both ready lines, gravity 130.8). The owner played it (a standing jump + pose straight
     down, a cruising one carried by its momentum, Uppercut + pose, an air Dive unchanged): **Q78 "Keep it"** (build it
     test-first as trialled).
+  - **The re-playtest of the published stack head 1069c16; Q79 and Q80** (2026-10-30, session 48). Published
+    10:24:42Z (GetProductInfo). Checklist in four groups (AskUserQuestion): map and walls (#268, #294, #267, #289,
+    #239), the air, strikes and knockdowns (#278, posed landing, #287, #286, #277) and the camera and mouse (#276,
+    #275): **"Feels right"**. Skating and steering (#265, #266, #272, #288, #273, #279), **Q79**: "make brakes when
+    pressing against your motion is a little faster so player turn fast, decrease a little the turn weights, and make
+    players able to climb more easily the spawn room's rise, that is pretty much it, look at" **Video 19** ("look at
+    how I kept turning in a loop that I can't do a hard turn and clear the inner space, since I have speed, but if I am
+    really slow, it should turn in place"). Ours, worked from the rules: from cruise (7.9 body lengths/s) S held stops
+    the skater in 1.33 s over 5.2 body lengths (the stride's 30 studs/s^2 pushing back) before they turn round; a loop
+    at cruise 5.2 body lengths across, 2.06 s (turn rates 4.0 / 1.5); at 2 body lengths/s a loop is 1.0 body length
+    across (slow skaters already nearly turn in place); a W-only start in the spawn room tops the rise in 4.8 s (#273's
+    Play measurement), creeping at 0.57 body lengths/s. RC (Video 19): loops ~1-2 body heights across by the trails
+    (by eye); RC's turn rate not measurable (its camera swings with the skater). **Q80 (recommended): build trial
+    S1**: the push against the motion x2 (stop from cruise in 0.71 s over 2.8 bodies), turn rates +25% (5.0 / 2.0: a
+    cruise loop 4.1 bodies across in 1.63 s), the crawl up slopes x2 (6.67 studs/s, 1.1 bodies/s; the outer wall's
+    foot curve too); the owner plays it and says more or less. Not chosen: smaller (x1.5, 4.5 / 1.75, crawl x1.5);
+    bigger (x3, 6.0 / 2.5, crawl x3).
+  - **Trial S1 played; Q81** (2026-10-30, session 48). Trial S1 (Studio copies only: SkateMath's push against the
+    motion x2, Movement turnRateLow 5.0 / turnRateHigh 2.0, crawlSpeed 6.67). The owner: **"stop more sooner to turn
+    around, and make players crawl faster more, like it is easy to clear that slope, even the foot of the outer wall,
+    it is okay, RC does that"** (the loops: no comment, kept). Trial S2 built from it: the push x3 (stop from cruise in
+    0.49 s over 1.9 bodies), the crawl x4 (13.33 studs/s, 2.3 bodies/s, under cruise 46), turn rates as S1.
+  - **Trial S2 played; Q82 and Q83** (2026-10-30, session 48). Trial S2 (push x3, crawl 13.33, turn rates 5.0 / 2.0).
+    The owner: **"stop more sooner, and crawl the slope more faster, almost as they are walking on a straight floor,
+    but almost not quite"**. Coupled, said first: the crawl lifts a slow skater to its speed in one step (unseen at
+    3.33, visible near skating speed). **Q82 (recommended): build trial S3**: the push x4 = the Brake key's 120
+    studs/s^2 (stop from cruise in 0.37 s over 1.5 bodies), the crawl gaining at the stride's own rate (as on the flat)
+    up to 34.5 studs/s (5.9 bodies/s, 3/4 of the flat's 7.9), turn rates as S1. The owner also asked why Studio's
+    mouse feels faster than the published game. Ours: 0.1 deg per pixel x Roblox's own Camera Sensitivity setting
+    (UserGameSettings.MouseSensitivity, read by InputController), and Studio and the Roblox Player each keep their own;
+    Studio's read 1.0. **Q83**: "bring it back to 3600 for now and keep it like that, I guess yes my roblox player
+    settings have lower camera sensitivity I guess that is why": the code stays (3,600 px a turn at a setting of 1);
+    told to set the Player's slider to 1 for the same feel.
+  - **Trial S3 played; Q84** (2026-10-30, session 48). Trial S3 (push x4 = 120 studs/s^2; the crawl gaining at the
+    stride's rate up to 34.5 studs/s on slopes under 45 deg; turn rates 5.0 / 2.0). Measured in Play, W only from a
+    stop in the spawn room: the rise's top at 1.36 s (today 4.8 s), the incline's top 1.93 s, up the outer wall's foot
+    to ~22 studs before sliding back. The owner: **"looks good, just one thing I want, I want a little more power on
+    the slope and wallks climb, I want the player to be able to climb all walls, just till they reach the glass then
+    they start dropping, so if you can have them climb more faster or something"**. Trial S4 built from it: the climb
+    on every solid ride surface whatever its steepness (the outer wall to its glass at 40, the inner bank to the inner
+    glass), never on the glass (real physics there, #239); gaining at 1.5x the stride's rate (45 studs/s^2) up to 40
+    studs/s (6.8 bodies/s; cruise 7.9).
+  - **Trial S4 kept; Q85** (2026-10-30, session 48). Trial S4 (Studio copies only): the stick against the motion
+    pushes back at 4x the stride (120 studs/s^2, the Brake key's rate: from cruise stopped in 0.37 s over 1.5 bodies);
+    turn rates 5.0 / 2.0 (a cruise loop 4.1 bodies across in 1.63 s); holding the stick up any solid ride surface,
+    however steep, but never the glass, gains speed at 45 studs/s^2 (1.5x the stride) up to 40 studs/s (6.8
+    bodies/s). Measured in Play, W only from the spawn room: up the outer wall at 40, ~4 studs onto the glass by
+    momentum, then down the whole wall and back across the track (on the upright part a stick pointing into the wall
+    has no part along it), then up again (~5 s a cycle). The owner played it: **Q85 "Keep it"** (build it test-first
+    as trialled).
 
 ## Roller Champions
 

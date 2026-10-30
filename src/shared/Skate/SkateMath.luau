@@ -262,8 +262,8 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	local stick = math.min(input.move.Magnitude, 1)
 	local wish = alongSurface(input.move, normal)
 	local wishDirection = Vector3.zero
-	-- How far the stick points back against the motion (Roller Champions, #266): that part pushes back like a
-	-- stride and only the rest turns, so a stick held straight back stops the skater before they go its way,
+	-- How far the stick points back against the motion (Roller Champions, #266): that part brakes like the Brake
+	-- key (#298) and only the rest turns, so a stick held straight back stops the skater before they go its way,
 	-- never carving a U-turn at speed.
 	local against = 0
 	if stick > 0 and wish.Magnitude > EPSILON then
@@ -289,10 +289,10 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	end
 	if not wall and not brake and stick > 0 then
 		local push = if against > 0
-			then -against
-			elseif speed < movement.cruiseSpeed then math.max(0, wishDirection:Dot(heading))
+			then -movement.brakeDecel * against
+			elseif speed < movement.cruiseSpeed then movement.strideAccel * math.max(0, wishDirection:Dot(heading))
 			else 0
-		acceleration += heading * (movement.strideAccel * stick * push)
+		acceleration += heading * (stick * push)
 	end
 	local forwardPart = acceleration:Dot(heading)
 	if forwardPart > 0 and speed > movement.softCap then
