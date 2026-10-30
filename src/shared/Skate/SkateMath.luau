@@ -357,15 +357,16 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	end
 end
 
--- Ballistic: gravity and drag, a little horizontal steering, and turning back upright. A diver, and a posed skater
--- once falling (#245), fly down the fall line instead, gravity's pull along it speeding them up (#241).
+-- Ballistic: gravity and drag, a little horizontal steering, and turning back upright. A diver flies down the fall
+-- line instead, gravity's pull along it speeding them up (#241). A posed skater falls as anyone does: the pose adds no
+-- motion of its own (the owner, #278, Q76: a standing jump's pose lands where it took off).
 local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
 	local movement = self._movement
 	local worldUp = self._worldUp
 	local velocity = self.velocity
 	local wish = input.move - worldUp * input.move:Dot(worldUp)
 	local wishDirection = if wish.Magnitude > EPSILON then wish.Unit else Vector3.zero
-	if input.diving or (self.airPosing and velocity:Dot(worldUp) <= 0) then
+	if input.diving then
 		local line = fallLine(self)
 		velocity = line * (math.max(velocity:Dot(line), 0) + self._linePull * dt)
 	else

@@ -88,7 +88,7 @@ export type MovementConfig = {
 	-- The Air Pose (a press in the air, once until landing; it lasts while the key is held, #245) cancels any fall and
 	-- adds this speed straight up: a hop of 34.29² / (2 × 130.8) = 4.5 studs, about half a jump's 9.2 (the owner,
 	-- #218; √(2/3) of 42 since #279).
-	-- Falling posed, the skater flies down the fall line like a diver (#245).
+	-- After the hop the skater falls as anyone does: the pose adds no motion of its own (the owner, #278, Q76).
 	airPoseImpulse: number,
 	-- Touching down from the air on the belly (diving, or still posing) keeps this share of the speed, then the slide
 	-- (the owner, #245: RC kept 59-73%, 65.5% on average: 133 -> 84, 139 -> 101, 104 -> 70, 97 -> 57 km/h).

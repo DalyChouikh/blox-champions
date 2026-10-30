@@ -958,6 +958,29 @@ about two thirds of a lap, swinging from wall to wall.
     and its only effect left is ignoring the first ray of new ground after a flight (a touchdown that same step would
     use the last surface's direction). The owner: "remove it, but can you explain it more clearly and simply again";
     re-asked in plain words with a picture: **Q75 "Remove it"**.
+  - **#278 grilled; Q76 and Q77** (2026-10-30, session 48, AskUserQuestion with ASCII side views, both recommended).
+    Timed by frames, no speedometer: **Video 7** at 10 frames a second: Uppercut ~19.4 s -> Air Pose offered 19.6 ->
+    touchdown posed (Get Up) 21.4-21.5, and Uppercut ~27.3-27.4 -> Air Pose offered 27.5 -> touchdown 29.1: RC's
+    Uppercut + Air Pose lands 1.7-2.0 s after the Uppercut. Ours, stepped at 60 Hz (claude-handoffs\s48\
+    pose278_sim2.py, pose278_uppercut.py; gravity 130.8, the pose pressed 0.6-0.8 s after the Uppercut): today's posed
+    fall slides down a line 20 deg below the facing, 2.3-2.5 s from cruise (a standing jump + pose drifts 6.1 body
+    lengths forward and stays up 1.95 s); a plain fall 1.6-1.8 s (a standing jump + pose 1.08 s, landing where it took
+    off). The ticket's first reading (the glide along the motion's way, straight down only when exactly still) glides a
+    skater rolling a third of a body length a second 6.4 bodies on; a glide eased by speed still carries one rolling
+    1 body/s 3.6 bodies on. **Q76 a posed fall is a plain fall**: the pose's hop, then gravity only; standing it lands
+    where it took off, moving it goes on by its own momentum (from cruise 7.9 bodies/s: 7.9 bodies on in 1.08 s, today
+    11.0 in 1.35 s). Coupled, said first: a posed fall no longer speeds up (Q14's gain goes), so posed touchdowns slide
+    off slower; a playable Studio trial first. Not measured: a standing Air Pose in RC (no video shows one), how far
+    RC's posed falls travel (the chase camera hides it). Not chosen: the glide eased by speed; the glide along the
+    motion. **Video 5**: RC's air Dive near an Uppercut's top touched down ~1.0-1.1 s after the press; ours 1.0 s
+    (13.2 bodies on), as a plain arc after its push 0.52 s (5.0 bodies). **Q77 the Dive keeps its glide**: an air Dive
+    flies down its 20 deg line the way it lunges (its facing and its motion are the same way), speeding up until the
+    belly. Not chosen: the Dive as a plain arc too.
+  - **Trial 278 kept; Q78** (2026-10-30, session 48). Studio's SkateMath copy only: a posed skater falling flies
+    like any other faller (the pose's hop, then gravity, drag and the little air steering); only a diver keeps the
+    fall line. A Play built (both ready lines, gravity 130.8). The owner played it (a standing jump + pose straight
+    down, a cruising one carried by its momentum, Uppercut + pose, an air Dive unchanged): **Q78 "Keep it"** (build it
+    test-first as trialled).
 
 ## Roller Champions
 
