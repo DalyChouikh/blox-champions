@@ -31,8 +31,9 @@ export type MovementConfig = {
 	-- the excess, so the further over, the faster (RC: whipped to 144 km/h, back near 110 within a second).
 	overSpeedBleed: number,
 	-- Turn rate at rest and at hardCap: turns widen with speed; a stick held back brakes instead of turning (#266).
-	-- Halved once (Q34), back to these (the owner, #272, Q37): Roller Champions' skaters circle with W, A, S, D in
-	-- turn at 14-45 km/h (Video 19), where the halved rates stopped ours; ~3 rad/s at the 55 km/h stride.
+	-- Halved once (Q34), back (#272, Q37), then a quarter quicker (the owner, #298, Q85: "decrease a little the turn
+	-- weights"; Roller Champions' skaters circle with W, A, S, D in turn, Video 19): a loop at the stride's top
+	-- speed is 4.1 body lengths across, 1.63 s round.
 	turnRateLow: number,
 	turnRateHigh: number,
 	-- The skater's facing turns toward the way they move at most a half-turn in this many seconds, so it never snaps
@@ -78,6 +79,8 @@ export type MovementConfig = {
 	pumpFlatAccel: number,
 	-- Within this slope of flat, pumping gives pumpFlatAccel.
 	pumpFlatSlopeDeg: number,
+	-- The Brake key's deceleration. The stick's part held back against the motion brakes as hard (the owner, #298,
+	-- Q85: from the stride's top speed stopped in 0.37 s over 1.5 body lengths, then turned round).
 	brakeDecel: number,
 	tiptoeSpeed: number,
 	-- A jump leaves the ground this fast: 48.99² / (2 × 130.8) = 9.2 studs up, 0.75 s in the air. √(2/3) of
@@ -139,8 +142,8 @@ local defaults: MovementConfig = {
 	softCap = 90,
 	hardCap = 121,
 	overSpeedBleed = 5,
-	turnRateLow = 4.0,
-	turnRateHigh = 1.5,
+	turnRateLow = 5.0,
+	turnRateHigh = 2.0,
 	turnRoundSeconds = 0.3,
 	backwardsConeDeg = 30,
 	airTurnRate = 1,

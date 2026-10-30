@@ -205,8 +205,8 @@ describe("Config defaults", function()
 			hardCap = 121,
 			overSpeedBleed = 5,
 			-- Back to the earlier rates (#272, Q37): RC's skaters circle with W, A, S, D pressed in turn (Video 19).
-			turnRateLow = 4.0,
-			turnRateHigh = 1.5,
+			turnRateLow = 5.0,
+			turnRateHigh = 2.0,
 			-- A half-turn of the facing, never a snap (#246: RC turned round over ~0.3 s), and how near the way back
 			-- the stick and the facing keep a skater riding backwards.
 			turnRoundSeconds = 0.3,
@@ -899,7 +899,7 @@ describe("Config.forMode", function()
 				message = "Movement: speeds must rise: cruiseSpeed <= softCap < hardCap",
 			},
 			{
-				overrides = { Movement = { turnRateHigh = 5 } },
+				overrides = { Movement = { turnRateHigh = 6 } },
 				message = "Movement: turnRateHigh must not exceed turnRateLow",
 			},
 			{
