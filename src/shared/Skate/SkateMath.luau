@@ -405,4 +405,12 @@ function SkateMath.stop(self: Skater)
 	forget(self)
 end
 
+-- The speed the speedometer shows, in studs per second, Roller Champions' way (#233): along the surface on the ground,
+-- on walls and behind a teammate, without the hover's pull off it; across the ground in the air, so a standing jump
+-- reads 0 and a fall adds nothing.
+function SkateMath.shownSpeed(self: Skater): number
+	local normal = if self.mode == "Airborne" then self._worldUp else self.up
+	return alongSurface(self.velocity, normal).Magnitude
+end
+
 return SkateMath

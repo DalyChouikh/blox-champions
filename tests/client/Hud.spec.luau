@@ -229,7 +229,7 @@ describe("Hud", function()
 		expect(part("GetUp")).toBeNil()
 	end)
 
-	it("shows the skater's speed in km/h, and none without a character", function()
+	it("shows the skater's speed in km/h as the speedometer reads it, and none without a character", function()
 		Hud:step(0)
 		local speedometer = part("Speedometer") :: TextLabel
 		expect(speedometer.Visible).toBe(false)
@@ -239,6 +239,11 @@ describe("Hud", function()
 		Hud:step(0)
 		expect(speedometer.Visible).toBe(true)
 		expect(speedometer.Text).toBe("120 km/h")
+		-- Jumping at 50 studs/s: 50 × 1.2 across the ground, not the 78 km/h of |(0, 60, -50)| × 1.2 (#233).
+		skater.mode = "Airborne"
+		skater.velocity = Vector3.new(0, 60, -50)
+		Hud:step(0)
+		expect(speedometer.Text).toBe("60 km/h")
 	end)
 
 	it("opens the score tab while its key is held, and toggles it with the touch button", function()
