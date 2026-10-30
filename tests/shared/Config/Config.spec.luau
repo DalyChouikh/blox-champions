@@ -148,6 +148,7 @@ describe("Config defaults", function()
 			strideAccel = 30,
 			rollingFriction = 4,
 			airDrag = 0.02,
+			coastDecel = 7.5,
 			cruiseSpeed = 60,
 			softCap = 90,
 			hardCap = 121,
@@ -758,6 +759,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { overSpeedBleed = -1 } },
 				message = "Movement.overSpeedBleed: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { Movement = { coastDecel = -1 } },
+				message = "Movement.coastDecel: must be >= 0 (got -1)",
 			},
 		}
 		for _, case in cases do

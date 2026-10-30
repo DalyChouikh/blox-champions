@@ -143,9 +143,12 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	velocity = heading * speed + acceleration * dt
 	speed = velocity.Magnitude
 	local direction = if speed > EPSILON then velocity / speed else heading
-	-- Friction and drag, and a knocked-down skater's slowing on top.
-	local knockdown = if input.knockedDown then movement.knockdownDecel else 0
-	speed = math.max(0, speed - (movement.rollingFriction + knockdown + movement.airDrag * speed) * dt)
+	-- Friction and drag, with more slowing on top for a knocked-down skater or one pressing nothing (#215).
+	local extra = if input.knockedDown
+		then movement.knockdownDecel
+		elseif stick == 0 and not input.pump and not input.brake then movement.coastDecel
+		else 0
+	speed = math.max(0, speed - (movement.rollingFriction + extra + movement.airDrag * speed) * dt)
 	if input.brake then
 		local tiptoe = movement.tiptoeSpeed * stick
 		if speed > tiptoe then
