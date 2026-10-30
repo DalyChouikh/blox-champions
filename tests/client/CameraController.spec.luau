@@ -238,20 +238,26 @@ describe("CameraController", function()
 		Fixtures.expectNear(camera.CFrame.UpVector, Vector3.new(0.5, math.sqrt(3) / 2, 0))
 	end)
 
-	it("swings behind the travel on a gamepad but not with a mouse", function()
-		skater().velocity = Vector3.new(50, 0, 0)
-		preferred = Enum.PreferredInput.Gamepad
-		for _ = 1, 60 do
+	-- The owner (#246): the view follows the facing, so a skater riding backwards keeps looking the way they face.
+	it("swings behind the skater's facing on a gamepad, riding backwards too, but not with a mouse", function()
+		local function swung(device: Enum.PreferredInput, speed: number): Vector3
+			preferred = device
+			initCamera()
+			skater().forward = -Vector3.zAxis
 			CameraController:step(DT)
+			-- Facing +X, rolling the other way.
+			skater().forward = Vector3.xAxis
+			skater().velocity = Vector3.new(-speed, 0, 0)
+			for _ = 1, 60 do
+				CameraController:step(DT)
+			end
+			return camera.CFrame.LookVector
 		end
-		expect(camera.CFrame.LookVector:Dot(Vector3.xAxis)).toBeGreaterThan(0.5)
-
-		preferred = Enum.PreferredInput.KeyboardAndMouse
-		initCamera()
-		for _ = 1, 60 do
-			CameraController:step(DT)
-		end
-		Fixtures.expectNear(camera.CFrame.LookVector, Vector3.new(0, 0, -1))
+		expect(swung(Enum.PreferredInput.Gamepad, 50):Dot(Vector3.xAxis)).toBeGreaterThan(0.5)
+		Fixtures.expectNear(swung(Enum.PreferredInput.KeyboardAndMouse, 50), Vector3.new(0, 0, -1))
+		-- Nor behind a skater slower than recenterMinSpeed.
+		local slow = config.Camera.recenterMinSpeed / 2
+		Fixtures.expectNear(swung(Enum.PreferredInput.Gamepad, slow), Vector3.new(0, 0, -1))
 	end)
 
 	it("faces down the skater's facing during the kickoff freeze", function()

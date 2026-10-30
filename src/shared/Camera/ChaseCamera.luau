@@ -2,8 +2,8 @@
 -- The chase camera's state (spec §8.4), stepped each frame: which way is up, the heading on the plane that up defines,
 -- the pitch above or below it, and the field of view. Up rolls toward the surface the skater rides, but leans at most
 -- maxTiltDeg from world up (the owner, #223; it used to roll all the way and loop over overhangs), so on a wall the
--- view tilts part of the way; the heading rides along with the roll. The look input turns and tips it. Ball Focus
--- turns it toward the ball; otherwise, on a device that allows it, it swings back behind the skater's travel once the
+-- view tilts part of the way; the heading rides along with the roll. The look input turns and tips it. Ball Focus turns
+-- it toward the ball; otherwise, on a device that allows it, it swings back behind the skater's facing (#246) once the
 -- look input has rested. Every response closes 1 − e^(−rate × dt) of its gap. Vector3 math only: a step allocates
 -- nothing.
 
@@ -17,12 +17,13 @@ local WORLD_UP = Vector3.yAxis
 export type Target = {
 	-- The up to roll toward: the skater's surface up, or world up for a spectator.
 	up: Vector3,
-	-- The velocity the swing-back turns behind.
-	travel: Vector3,
+	-- What the swing-back turns behind, as long as the speed it is worth: the skater's facing at their shown speed
+	-- (#246: riding backwards, the view still looks the way they face), or the watched ball's velocity.
+	behind: Vector3,
 	-- The look input as a rate, in radians per second, as Roblox's own camera reads it (a step turns it for dt): x > 0
 	-- turns right, y > 0 tips down.
 	look: Vector2,
-	-- The device swings back behind the travel (gamepad and touch; never a mouse).
+	-- The device swings back (gamepad and touch; never a mouse).
 	recenter: boolean,
 	-- A direction to turn toward (Ball Focus).
 	aimAt: Vector3?,
@@ -171,9 +172,9 @@ function ChaseCamera.step(self: ChaseCamera, target: Target, dt: number)
 		local wanted = math.asin(math.clamp(aimAt.Unit:Dot(self.up), -1, 1))
 		self.pitch += (math.clamp(wanted, self._minPitch, self._maxPitch) - self.pitch) * share
 	elseif target.recenter and self.idle >= camera.recenterDelay then
-		local travel = Vectors.alongSurface(target.travel, self.up)
-		if travel.Magnitude >= camera.recenterMinSpeed then
-			turnToward(self, travel, closed(camera.recenterResponse, dt))
+		local behind = Vectors.alongSurface(target.behind, self.up)
+		if behind.Magnitude >= camera.recenterMinSpeed then
+			turnToward(self, behind, closed(camera.recenterResponse, dt))
 		end
 	end
 	local fov = ChaseCamera.targetFov(camera, target.speed, self._hardCap)

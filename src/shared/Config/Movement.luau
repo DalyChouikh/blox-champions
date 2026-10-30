@@ -35,6 +35,14 @@ export type MovementConfig = {
 	-- Turn rate at rest and at hardCap: turns widen with speed.
 	turnRateLow: number,
 	turnRateHigh: number,
+	-- The skater's facing turns toward the way they move at most a half-turn in this many seconds, so it never snaps
+	-- (the owner, #246: RC turned round over ~0.3 s, Video 7): π / 0.3 = 10.5 rad/s, so the facing keeps up with
+	-- steering (at most turnRateLow, 4 rad/s).
+	turnRoundSeconds: number,
+	-- A skater carried back against their facing (down a bank or a wall they climbed) rides backwards while the stick
+	-- points within this many degrees of the way they roll, and their facing within it of the way back (the owner,
+	-- #246). S alone holds it; S with A or D, 45° off, steers elsewhere and turns them round.
+	backwardsConeDeg: number,
 	airTurnRate: number,
 	-- How fast a skater in the air turns back upright.
 	airUprightRate: number,
@@ -110,6 +118,8 @@ local defaults: MovementConfig = {
 	overSpeedBleed = 5,
 	turnRateLow = 4.0,
 	turnRateHigh = 1.5,
+	turnRoundSeconds = 0.3,
+	backwardsConeDeg = 30,
 	airTurnRate = 1,
 	airUprightRate = 6,
 	fallLineDeg = 20,
@@ -161,6 +171,8 @@ local fields = Validate.record({
 	overSpeedBleed = nonNegative,
 	turnRateLow = nonNegative,
 	turnRateHigh = nonNegative,
+	turnRoundSeconds = positive,
+	backwardsConeDeg = Validate.number({ above = 0, max = 90 }),
 	airTurnRate = nonNegative,
 	airUprightRate = positive,
 	fallLineDeg = Validate.number({ above = 0, max = 90 }),

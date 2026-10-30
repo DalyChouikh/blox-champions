@@ -157,6 +157,25 @@ describe("PoseController", function()
 		expect(math.abs(math.deg(roll))).toBeCloseTo(1.3347, 3)
 	end)
 
+	-- The owner (#246): riding backwards, the body faces against its way round the turn, so it leans its other side
+	-- to lean into the turn.
+	it("leans a character riding backwards into the turn too", function()
+		local function rolled(name: string, facing: CFrame): number
+			local rig = Fixtures.jointedRig(folder, name, HOVER_CFRAME * facing)
+			local root = Fixtures.root(rig)
+			PoseController:track(rig, false)
+			root.AssemblyLinearVelocity = Vector3.new(0, 0, -30)
+			PoseController:step(1 / 60)
+			root.AssemblyLinearVelocity = Vector3.new(30 * math.sin(1 / 60), 0, -30 * math.cos(1 / 60))
+			PoseController:step(1 / 60)
+			local _, _, roll = jointOf(rig, "Root").Transform:ToEulerAnglesXYZ()
+			return math.deg(roll)
+		end
+		local ahead = rolled("Ahead", CFrame.identity)
+		expect(math.abs(ahead)).toBeCloseTo(1.3347, 3)
+		expect(rolled("Backwards", CFrame.Angles(0, math.pi, 0))).toBeCloseTo(-ahead, 3)
+	end)
+
 	it("poses another skater's lunge and knockdown from their attributes", function()
 		local other = Fixtures.jointedRig(folder, "Other", HOVER_CFRAME)
 		PoseController:track(other, false)

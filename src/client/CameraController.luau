@@ -100,11 +100,11 @@ local function focusing(self: CameraController, device: Enum.PreferredInput): bo
 	return self._focusToggled
 end
 
--- Steps the chase toward `up` with this frame's look input, turning toward `aimAt` or swinging back behind `travel`.
+-- Steps the chase toward `up` with this frame's look input, turning toward `aimAt` or swinging back behind `behind`.
 local function follow(
 	self: CameraController,
 	up: Vector3,
-	travel: Vector3,
+	behind: Vector3,
 	speed: number,
 	aimAt: Vector3?,
 	recenter: boolean,
@@ -112,7 +112,7 @@ local function follow(
 )
 	local target = self._target
 	target.up = up
-	target.travel = travel
+	target.behind = behind
 	target.look = self._keys.look
 	target.recenter = recenter
 	target.aimAt = aimAt
@@ -187,7 +187,7 @@ local CameraController: CameraController = {
 		self._keys = InputController.newCameraKeys()
 		self._target = {
 			up = Vector3.yAxis,
-			travel = Vector3.zero,
+			behind = Vector3.zero,
 			look = Vector2.zero,
 			recenter = false,
 			aimAt = nil,
@@ -233,7 +233,8 @@ local CameraController: CameraController = {
 			local aimAt = if focused and ball ~= nil
 				then ball.Position - (root.Position + chase.up * settings.height)
 				else nil
-			follow(self, skater.up, skater.velocity, skater.velocity.Magnitude, aimAt, not usingMouse, dt)
+			local behind = skater.forward * skater:shownSpeed()
+			follow(self, skater.up, behind, skater.velocity.Magnitude, aimAt, not usingMouse, dt)
 		end
 		place(self, root.Position, settings.height, settings.distance)
 	end,

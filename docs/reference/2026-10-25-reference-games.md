@@ -335,6 +335,18 @@ about two thirds of a lap, swinging from wall to wall.
     kinematics on the owner's avatar): the shots had the diver's shins and feet up to 1.2 studs below the floor and the
     flat skater half sunk, so the diver's thighs go 50° (shins 110°, sink 0.7: shins on the floor, torso 0.6 up) and
     the tackled skater sinks 1.3 (back 0.18 up, feet touching); the tips (70° forward, 85° back) are unchanged.
+  - **Round 8, #245's Studio check** (2026-10-28, session 34, AskUserQuestion, recommended): Q22 **knockdowns from a
+    fall slide longer, like RC**: a posed touchdown or a hard landing slows at ~40 studs/s² (~48 km/h per s), tackles
+    and dives keep today's rate; a new setting, its own ticket after #246, RC's tackle and hard-landing slides
+    measured from the videos first. RC (Video 7): a posed fall's slide took 1.3–1.4 s to stop (70 → 0 km/h, ~50 km/h
+    per s); a dive's 0.7–0.8 s (84 → 10, ~92 per s, Video 6). Ours, measured in #245: every knockdown ~82 km/h per s
+    (88 → 42 km/h in 0.57 s after a posed fall, 78 → 34 after a dive). Not chosen: keep one rate; judge at the
+    playtest.
+  - **Round 9, while building #246** (2026-10-28, session 34, AskUserQuestion, recommended): Q23 **S from a
+    standstill turns the skater round smoothly** (~0.3 s) and they skate off facing the way they go: today's
+    behaviour without its one-frame snap. Riding backwards happens only when the skater is carried back against their
+    facing (rolling back down a bank or a wall they climbed, Video 7). None of the videos show S from a standstill in
+    RC. Not chosen: S from a stop skates off backwards while held.
 
 ## Roller Champions
 
