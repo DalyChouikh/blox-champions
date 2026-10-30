@@ -24,7 +24,8 @@ export type Banner = { kind: BannerKind, team: Team?, value: number? }
 export type FeedKind = "Possession" | "Lap" | "GoalOpen" | "Goal"
 -- `id`: a running number, the entry's stable key; `value`: a completed lap's streak.
 export type FeedEntry = { id: number, kind: FeedKind, team: Team, player: PlayerId?, value: number?, timeLeft: number }
-export type Ended = { winner: Team, mvp: PlayerId?, stats: Types.MatchStats }
+-- `winner`: nil after a draw.
+export type Ended = { winner: Team?, mvp: PlayerId?, stats: Types.MatchStats }
 
 local HudState = {}
 HudState.__index = HudState
@@ -89,7 +90,7 @@ local function addEntry(self: HudState, kind: FeedKind, team: Team, player: Play
 end
 
 -- What the end screen shows, from MatchEnded or from a snapshot of the ended match.
-local function endedOf(winner: Team, mvp: PlayerId?, stats: Types.MatchStats): Ended
+local function endedOf(winner: Team?, mvp: PlayerId?, stats: Types.MatchStats): Ended
 	return { winner = winner, mvp = mvp, stats = stats }
 end
 
@@ -109,8 +110,7 @@ function HudState.applySnapshot(self: HudState, payload: Payloads.MatchSnapshot)
 	local match = payload.match
 	self.match = match
 	self.names = payload.names
-	local winner: Team? = match.winner
-	self.ended = if match.state == "Ended" and winner ~= nil then endedOf(winner, match.mvp, match.stats) else nil
+	self.ended = if match.state == "Ended" then endedOf(match.winner, match.mvp, match.stats) else nil
 	local banner = self.banner
 	if match.state == "Kickoff" then
 		if banner == nil or banner.kind ~= "Countdown" then
@@ -175,11 +175,7 @@ function HudState.step(self: HudState, dt: number)
 	if match ~= nil then
 		local state: Types.MatchState = match.state
 		if MatchClock.runs(self._config.Match, state) then
-			if match.period == "Overtime" then
-				match.overtimeSeconds += dt
-			else
-				match.secondsLeft = math.max(match.secondsLeft - dt, 0)
-			end
+			match.secondsLeft = math.max(match.secondsLeft - dt, 0)
 		end
 		if state == "Kickoff" or state == "Celebration" then
 			match.phaseSecondsLeft = math.max(match.phaseSecondsLeft - dt, 0)
@@ -220,15 +216,12 @@ function HudState.step(self: HudState, dt: number)
 	end
 end
 
--- The whole seconds the clock shows: left in regulation (0 through Last Chance), counted up in overtime; the match's
--- full length before the first snapshot.
+-- The whole seconds the clock shows: left in regulation (0 through Last Chance), then in overtime; the match's full
+-- length before the first snapshot.
 function HudState.clockSeconds(self: HudState): number
 	local match = self.match
 	if match == nil then
 		return self._config.Match.durationSeconds
-	end
-	if match.period == "Overtime" then
-		return math.floor(match.overtimeSeconds)
 	end
 	return math.ceil(match.secondsLeft)
 end

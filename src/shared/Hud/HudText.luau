@@ -103,9 +103,12 @@ function HudText.team(self: HudText, team: Team.Team): string
 	return self._config.UI.teamNames[team]
 end
 
--- The end screen's headline: the winning team.
-function HudText.wins(self: HudText, team: Team.Team): string
-	return string.format(self._config.UI.text.wins, self:team(team))
+-- The end screen's headline: the winning team, or a draw (nil) when overtime ran out.
+function HudText.result(self: HudText, winner: Team.Team?): string
+	if winner == nil then
+		return self._config.UI.text.draw
+	end
+	return string.format(self._config.UI.text.wins, self:team(winner))
 end
 
 function HudText.feed(self: HudText, entry: HudState.FeedEntry, names: { [PlayerId]: string }): string

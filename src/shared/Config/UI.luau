@@ -70,6 +70,8 @@ export type UIText = {
 	scored: string,
 	-- The winning team's name (one value).
 	wins: string,
+	-- The end screen's headline when overtime runs out (the owner, Q95).
+	draw: string,
 	mvp: string,
 	scores: string,
 	columns: { player: string, score: string, goals: string, assists: string, saves: string, steals: string },
@@ -235,6 +237,7 @@ local defaults: UIConfig = {
 		goalOpen = "%s goal is active",
 		scored = "%s scored!",
 		wins = "%s WINS",
+		draw = "DRAW",
 		mvp = "MVP",
 		scores = "SCORES",
 		columns = {
@@ -448,6 +451,7 @@ local fields = Validate.record({
 		goalOpen = template(1),
 		scored = template(1),
 		wins = template(1),
+		draw = label,
 		mvp = label,
 		scores = label,
 		columns = Validate.record({

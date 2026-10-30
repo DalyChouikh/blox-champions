@@ -21,16 +21,25 @@ local folder: Folder
 -- The HUD's area, as the Hud's binding gives it.
 local area: React.Binding<Vector2>, setArea: (Vector2) -> ()
 
--- Blue won 5-3: Ana (Blue) scored 5, Rex (Orange) 3; or `players` instead of them. Compact on touch.
-local function screen(mvp: string?, players: { Types.PlayerStats }?, compact: boolean?): React.ReactElement
+-- Blue won 5-3 (or, with `draw`, overtime ran out at 3-3): Ana (Blue) scored 5, Rex (Orange) 3; or `players`
+-- instead of them. Compact on touch.
+local function screen(
+	mvp: string?,
+	players: { Types.PlayerStats }?,
+	compact: boolean?,
+	draw: boolean?
+): React.ReactElement
 	local ana = Fixtures.playerStats("1", "Blue", true)
 	ana.score, ana.goals = 5, 5
 	local rex = Fixtures.playerStats("2", "Orange", true)
 	rex.score = 3
 	local ended: HudState.Ended = {
-		winner = "Blue",
+		winner = if draw then nil else "Blue",
 		mvp = mvp,
-		stats = { scores = { Blue = 5, Orange = 3 }, players = players or { ana, rex } },
+		stats = {
+			scores = if draw then { Blue = 3, Orange = 3 } else { Blue = 5, Orange = 3 },
+			players = players or { ana, rex },
+		},
 	}
 	return React.createElement(React.Fragment, nil, {
 		EndScreen = React.createElement(EndScreen, {
@@ -61,7 +70,7 @@ describe("EndScreen", function()
 	it("shows the winner, the MVP's card and both teams' totals", function()
 		local mounted, rerender = Fixtures.mount(screen("1"), folder)
 		local frame = mounted:FindFirstChild("EndScreen") :: Frame
-		local winner = frame:FindFirstChild("Winner") :: TextLabel
+		local winner = frame:FindFirstChild("Result") :: TextLabel
 		expect(winner.Text).toBe("Blue WINS")
 		expect(winner.TextColor3 == colors.Blue).toBe(true)
 		local blue = frame:FindFirstChild("BlueTotal", true) :: TextLabel
@@ -84,6 +93,14 @@ describe("EndScreen", function()
 
 		rerender(screen(nil))
 		expect(mvp.Visible).toBe(false)
+	end)
+
+	-- The owner (Q95): a draw names no winner, so its headline is in the HUD's own text colour.
+	it("headlines a draw in the HUD's text colour", function()
+		local mounted = Fixtures.mount(screen("1", nil, false, true), folder)
+		local result = (mounted:FindFirstChild("EndScreen") :: Frame):FindFirstChild("Result") :: TextLabel
+		expect(result.Text).toBe("DRAW")
+		expect(result.TextColor3 == config.UI.hud.textColor).toBe(true)
 	end)
 
 	it("shrinks to fit a screen smaller than itself", function()
