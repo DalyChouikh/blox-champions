@@ -225,15 +225,21 @@ local function stickDirection(self: SkateController, stick: Vector2, up: Vector3
 	return right * stick.X + forward * stick.Y
 end
 
+-- Along the feet, or toward the wall a falling skater left (#258): what that ray finds is trusted as it is, since the
+-- filter guards the ground under the feet against seams.
 local function castGround(self: SkateController, root: BasePart, skater: SkateMath.Skater)
 	local ground = self._ground
-	local direction = -skater.up * self._config.Movement.groundProbeLength
-	local result = self._raycast(root.Position, direction, self._surfaces.params)
+	local direction, toWall = skater:groundRay()
+	local result =
+		self._raycast(root.Position, direction * self._config.Movement.groundProbeLength, self._surfaces.params)
 	if result == nil then
 		ground.hit = false
 		return
 	end
 	ground.hit = true
+	if toWall then
+		self._filter:reset(result.Normal)
+	end
 	ground.normal = self._filter:update(result.Normal)
 	ground.distance = result.Distance
 end
@@ -293,11 +299,32 @@ local function collide(self: SkateController, root: BasePart, skater: SkateMath.
 		if hit == nil then
 			return
 		end
-		local face = self._raycast(root.Position, -hit.Normal * (radius + travel), params)
-		if face == nil or not skater:block(face.Normal) then
+		local reach = -hit.Normal * (radius + travel)
+		local face = self._raycast(root.Position, reach, params)
+		if face == nil then
+			return
+		end
+		-- In the air, a ride surface the collider meets lands the skater on it (#258); a barrier (the same ray through
+		-- ride surfaces only meets something further, or nothing) only blocks.
+		local ride: RaycastResult? = if skater.mode == "Airborne"
+			then self._raycast(root.Position, reach, self._surfaces.params)
+			else nil
+		local touched = if ride ~= nil and ride.Distance <= face.Distance
+			then skater:touch(face.Normal, self._input)
+			else skater:block(face.Normal)
+		if not touched then
 			return
 		end
 	end
+end
+
+-- A touchdown still posing (by the ground ray, or onto a surface the collider met) is reported for
+-- Network.posedLandingTolerance, or until the knockdown (#245, #258).
+local function notePosedLanding(self: SkateController, skater: SkateMath.Skater, dt: number)
+	self._posedLandingLeft = if skater.landedPosed
+		then self._config.Network.posedLandingTolerance
+		elseif self.knockedDown then 0
+		else math.max(0, self._posedLandingLeft - dt)
 end
 
 -- Each step closes 1 − e^(−bodyUpSmoothing × dt) of the turn between the body's up and the skating's.
@@ -580,12 +607,9 @@ local SkateController: SkateController = {
 		gatherOthers(self)
 		input.draftAccel = Draft.accel(self._config.Movement, root.Position, self._sources)
 		moveSkater(self, root, skater, dt)
-		self._posedLandingLeft = if skater.landedPosed
-			then self._config.Network.posedLandingTolerance
-			elseif self.knockedDown then 0
-			else math.max(0, self._posedLandingLeft - dt)
 		self._stepSeconds = dt
 		collide(self, root, skater, dt)
+		notePosedLanding(self, skater, dt)
 		easeBody(self, skater, dt)
 		apply(self, skater)
 		shareState(self)
@@ -596,8 +620,11 @@ local SkateController: SkateController = {
 		local skater = self.skater
 		local root = self.root
 		if skater ~= nil and root ~= nil and self._velocity ~= nil then
+			-- A Dive marks the skater diving just before its push (ActionController): its touchdown is on the belly.
+			self._input.diving = self.diving
 			skater:push(change, launch)
 			collide(self, root, skater, self._stepSeconds)
+			notePosedLanding(self, skater, 0)
 			apply(self, skater)
 		end
 	end,

@@ -758,6 +758,233 @@ describe("SkateMath on curves", function()
 	end)
 end)
 
+-- The owner (#258, Q27, Q28, Videos 10-11): a skater in the air who touches a ride surface lands on it feet first;
+-- one who leaves a wall along it (an Uppercut up the glass) keeps every air action on the way up, then comes back onto
+-- it once falling, while it is in reach and they are not moving away from it.
+describe("SkateMath landing on what they touch", function()
+	local DT = 1 / 60
+	-- Upright, facing -X: the skater rides its -X side.
+	local WALL = Vector3.new(-1, 0, 0)
+
+	local function flyer(velocity: Vector3): SkateMath.Skater
+		local s = skater(velocity)
+		s.mode = "Airborne"
+		return s
+	end
+
+	it("lands on a wall it flies into, feet first, losing only the speed into it", function()
+		local s = flyer(Vector3.new(30, -10, 5))
+		expect(s:touch(WALL, input())).toBe(true)
+		expect(s.mode).toBe("Grounded")
+		Fixtures.expectNear(s.up, WALL)
+		Fixtures.expectNear(s.velocity, Vector3.new(0, -10, 5))
+		s:step(input(), ground(WALL), DT)
+		expect(s.mode).toBe("Grounded")
+		-- Moving away from it, a touch is nothing.
+		local leaving = flyer(Vector3.new(-5, 0, 0))
+		expect(leaving:touch(WALL, input())).toBe(false)
+		expect(leaving.mode).toBe("Airborne")
+	end)
+
+	it("only blocks under an overhang, and on the ground", function()
+		local s = flyer(Vector3.new(5, 20, 0))
+		expect(s:touch(Vector3.new(0, -1, 0), input())).toBe(true)
+		expect(s.mode).toBe("Airborne")
+		Fixtures.expectNear(s.velocity, Vector3.new(5, 0, 0))
+		-- A lip's first strip leans 22.5° past upright: an overhang too.
+		local lip = Vector3.new(-math.cos(math.rad(22.5)), -math.sin(math.rad(22.5)), 0)
+		local under = flyer(Vector3.new(20, 0, 0))
+		under:touch(lip, input())
+		expect(under.mode).toBe("Airborne")
+		local riding = skater(Vector3.new(30, 0, 0))
+		riding:touch(WALL, input())
+		expect(riding.mode).toBe("Grounded")
+		Fixtures.expectNear(riding.up, FLAT)
+		Fixtures.expectNear(riding.velocity, Vector3.zero)
+	end)
+
+	it("never touches down on an overhang its feet find", function()
+		local s = flyer(Vector3.new(0, 5, 0))
+		s.up = Vector3.new(0, -1, 0)
+		s:step(input(), ground(Vector3.new(0, -1, 0)), DT)
+		expect(s.mode).toBe("Airborne")
+	end)
+
+	it("touches a wall down on the belly while posing or diving, as any touchdown", function()
+		local posed = flyer(Vector3.new(30, -40, 0))
+		posed.airPosing = true
+		posed:touch(WALL, input({ jumpHeld = true }))
+		expect(posed.landedPosed).toBe(true)
+		-- (0, −40, 0) once the speed into the wall is lost, then bellyLandingKeep of it.
+		Fixtures.expectNear(posed.velocity, Vector3.new(0, -40 * movement.bellyLandingKeep, 0))
+		local diver = flyer(Vector3.new(30, -40, 0))
+		diver:touch(WALL, input({ diving = true }))
+		expect(diver.landedPosed).toBe(false)
+		Fixtures.expectNear(diver.velocity, Vector3.new(0, -40 * movement.bellyLandingKeep, 0))
+	end)
+
+	it("flies up off the wall it leaps along, then comes back onto it once falling, looking for it there", function()
+		local s = skater(Vector3.new(0, 30, 0))
+		s:step(input(), ground(WALL), DT)
+		s:push(Vector3.yAxis * 110, true)
+		expect(s.mode).toBe("Airborne")
+		local frames = 0
+		while s.velocity.Y > 0 and frames < 120 do
+			-- Rising, the ray looks along the feet, still onto the wall, which lands no one on the way up (Q28).
+			Fixtures.expectNear(s:groundRay(), -s.up)
+			s:step(input(), ground(WALL), DT)
+			expect(s.mode).toBe("Airborne")
+			frames += 1
+		end
+		Fixtures.expectNear(s:groundRay(), -WALL)
+		-- Found within the ray's reach, though further than hoverHeight: caught.
+		s:step(input(), ground(WALL, movement.hoverHeight + 1), DT)
+		expect(s.mode).toBe("Grounded")
+		Fixtures.expectNear(s.up, WALL)
+	end)
+
+	-- Measured in Play (#258): riding the outer wall's foot up to 0.08 studs closer than hoverHeight, the hover pushed
+	-- the skater off it at up to 1.5 studs/s, and a leap that kept that push was still moving off the wall at its top.
+	it("leaps up a wall without the hover's push off it, so the wall catches it at the top", function()
+		local s = skater(Vector3.new(0, 30, 0))
+		s:step(input(), ground(WALL, movement.hoverHeight - 0.08), DT)
+		expect(s.velocity:Dot(WALL)).toBeGreaterThan(1)
+		s:push(Vector3.yAxis * 60, true)
+		expect(math.abs(s.velocity:Dot(WALL))).toBeLessThan(1e-6)
+		local frames = 0
+		while s.mode == "Airborne" and frames < 120 do
+			s:step(input(), ground(WALL), DT)
+			frames += 1
+		end
+		expect(s.mode).toBe("Grounded")
+		Fixtures.expectNear(s.up, WALL)
+	end)
+
+	it("keeps the velocity off the surface in every push but a launch off the ground", function()
+		-- A lunge on the ground keeps the hover's pull: the pushes keep the velocity off their plane.
+		local riding = skater(Vector3.new(0, 0, -30))
+		riding:step(input(), ground(FLAT, movement.hoverHeight - 0.08), DT)
+		local pull = riding.velocity.Y
+		expect(pull).toBeGreaterThan(1)
+		riding:push(Vector3.new(0, 0, -10), false)
+		expect(riding.velocity.Y).toBe(pull)
+		-- A leap in the air keeps the fall it adds to, and one from behind a leader the leader's velocity.
+		local flying = skater(Vector3.new(20, -10, 0))
+		flying.mode = "Airborne"
+		flying:push(Vector3.yAxis * 50, true)
+		Fixtures.expectNear(flying.velocity, Vector3.new(20, 40, 0))
+		local attached = skater(Vector3.zero)
+		attached:follow(Vector3.zero, Vector3.zero, Vector3.new(0, -10, -30), -Vector3.zAxis)
+		attached:push(Vector3.yAxis * 50, true)
+		Fixtures.expectNear(attached.velocity, Vector3.new(0, 40, -30))
+	end)
+
+	-- The arena's glass reads up to 6.5e-5 rad past upright (measured, #234): falling beside it reads as moving off it.
+	it("comes back onto glass leaning past upright by float noise", function()
+		local lean = 6.5e-5
+		local glass = Vector3.new(-math.cos(lean), -math.sin(lean), 0)
+		local s = skater(Vector3.new(0, 30, 0))
+		s.up = glass
+		s:step(input(), ground(glass), DT)
+		s:push(Vector3.yAxis * 60, true)
+		local frames = 0
+		while s.mode == "Airborne" and frames < 120 do
+			s:step(input(), ground(glass), DT)
+			frames += 1
+		end
+		expect(s.mode).toBe("Grounded")
+	end)
+
+	-- The owner (Q28): "both": on a leap up the glass every air action works, and the glass catches them.
+	it("keeps the air on a leap up the wall, and a pose held into its catch is a fall", function()
+		local s = skater(Vector3.new(0, 30, 0))
+		s:step(input(), ground(WALL), DT)
+		s:push(Vector3.yAxis * 110, true)
+		-- Drifting into the wall on the way up, it only slides along it.
+		s.velocity += -WALL * 5
+		expect(s:touch(WALL, input())).toBe(true)
+		expect(s.mode).toBe("Airborne")
+		Fixtures.expectNear(s.velocity, Vector3.new(0, s.velocity.Y, 0))
+		s:step(input({ jump = true, jumpHeld = true }), ground(WALL), DT)
+		expect(s.airPosing).toBe(true)
+		local frames = 0
+		while s.mode == "Airborne" and frames < 180 do
+			s:step(input({ jumpHeld = true }), ground(WALL), DT)
+			frames += 1
+		end
+		expect(s.mode).toBe("Grounded")
+		expect(s.landedPosed).toBe(true)
+		Fixtures.expectNear(s.up, WALL)
+	end)
+
+	it("never catches a skater moving away from the wall they left, or out of its reach", function()
+		-- A jump off it leaves at jumpImpulse, already falling.
+		local jumper = skater(Vector3.new(0, -5, 0))
+		jumper:step(input(), ground(WALL), DT)
+		jumper:step(input({ jump = true }), ground(WALL), DT)
+		expect(jumper.mode).toBe("Airborne")
+		Fixtures.expectNear(jumper:groundRay(), -WALL)
+		jumper:step(input(), ground(WALL, 4), DT)
+		expect(jumper.mode).toBe("Airborne")
+		-- It no longer looks for the wall.
+		Fixtures.expectNear(jumper:groundRay(), -jumper.up)
+		-- Falling beside it with nothing in reach.
+		local beside = skater(Vector3.new(0, -5, 0))
+		beside:step(input(), ground(WALL), DT)
+		beside:step(input(), ground(WALL, 0, false), DT)
+		expect(beside.mode).toBe("Airborne")
+		Fixtures.expectNear(beside:groundRay(), -WALL)
+		beside:step(input(), ground(WALL, 0, false), DT)
+		Fixtures.expectNear(beside:groundRay(), -beside.up)
+	end)
+
+	it("forgets the wall it left once it lands elsewhere, or holds on behind a leader", function()
+		-- Up off the wall, then falling into another wall.
+		local OTHER = Vector3.new(0, 0, -1)
+		local s = skater(Vector3.new(0, 30, 0))
+		s:step(input(), ground(WALL), DT)
+		s:push(Vector3.yAxis * 80, true)
+		s.velocity = Vector3.new(0, -5, 20)
+		expect(s:touch(OTHER, input())).toBe(true)
+		expect(s.mode).toBe("Grounded")
+		-- Sliding down the other wall, the ray looks along the feet, into it.
+		s.velocity = Vector3.new(0, -5, 0)
+		Fixtures.expectNear(s:groundRay(), -OTHER)
+		-- Up off the wall, turning upright on the way, then behind a leader and let go.
+		local follower = skater(Vector3.new(0, 30, 0))
+		follower:step(input(), ground(WALL), DT)
+		follower:push(Vector3.yAxis * 80, true)
+		for _ = 1, 10 do
+			follower:step(input(), ground(FLAT, 0, false), DT)
+		end
+		follower:follow(Vector3.zero, Vector3.zero, Vector3.zero, -Vector3.zAxis)
+		follower:release(Vector3.zero)
+		follower.velocity = Vector3.new(0, -5, 0)
+		Fixtures.expectNear(follower:groundRay(), -follower.up)
+	end)
+
+	it("never looks back toward an overhang it fell from", function()
+		-- A lip's first strip, 22.5° past upright, lets go of a skater with no curve to hold them.
+		local lip = Vector3.new(-math.cos(math.rad(22.5)), -math.sin(math.rad(22.5)), 0)
+		local s = skater(Vector3.new(0, 0, 5))
+		s.up = lip
+		s:step(input(), ground(lip), DT)
+		expect(s.mode).toBe("Airborne")
+		expect(s.velocity.Y).toBeLessThan(0)
+		Fixtures.expectNear(s:groundRay(), -s.up)
+	end)
+
+	it("looks along the feet after leaving the floor, and lands on it only within hoverHeight", function()
+		local s = skater(Vector3.new(0, 0, -20))
+		s:step(input({ jump = true }), ground(), DT)
+		expect(s.mode).toBe("Airborne")
+		s.velocity = Vector3.new(0, -10, -20)
+		Fixtures.expectNear(s:groundRay(), -s.up)
+		s:step(input(), ground(FLAT, movement.hoverHeight + 1), DT)
+		expect(s.mode).toBe("Airborne")
+	end)
+end)
+
 -- The owner (#246): RC's skater rode back down a bank still facing up it, then turned round over ~0.3 s, never in a
 -- snap (Video 7, 16.9-17.9 s).
 describe("SkateMath facing", function()

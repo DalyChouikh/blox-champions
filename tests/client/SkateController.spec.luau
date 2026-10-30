@@ -27,6 +27,8 @@ local folder: Folder
 -- Roblox's menu: opening it pauses the controls.
 local menu: Fixtures.Menu
 local floor: Folder
+-- The arena's top (A7): barriers, empty until a test adds a pane.
+local top: Folder
 local rig: Model
 local sent: { { boolean } }
 -- How many times the client asked the server to get the skater up.
@@ -52,20 +54,30 @@ end
 -- about 0.002 studs/s into the surface.
 local CAST_TOLERANCE = 0.01
 
--- Another ride surface beside the floor: a slab in the floor's folder.
-local function addSlab(cframe: CFrame, size: Vector3)
-	local slab = Instance.new("Part")
-	slab.Anchored = true
-	slab.Size = size
-	slab.CFrame = cframe
-	slab.Parent = floor
+local function addPart(parent: Folder, cframe: CFrame, size: Vector3)
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.Size = size
+	part.CFrame = cframe
+	part.Parent = parent
 end
 
--- Puts the skater in the air at `position`, flying at `velocity`.
+-- Another ride surface beside the floor: a slab in the floor's folder.
+local function addSlab(cframe: CFrame, size: Vector3)
+	addPart(floor, cframe, size)
+end
+
+-- A barrier (the arena's top, A7): a pane in the top's folder, which only the collider's sweep finds.
+local function addBarrier(cframe: CFrame, size: Vector3)
+	addPart(top, cframe, size)
+end
+
+-- Puts the skater in the air at `position`, upright, flying at `velocity`.
 local function flying(position: Vector3, velocity: Vector3)
 	rig:PivotTo(CFrame.new(position))
 	local skater = SkateController.skater :: any
 	skater.mode = "Airborne"
+	skater.up = Vector3.yAxis
 	skater.velocity = velocity
 end
 
@@ -111,6 +123,10 @@ beforeEach(function()
 	slab.Parent = floor
 	floor.Parent = folder
 	floor:AddTag(Tags.RideSurface)
+	top = Instance.new("Folder")
+	top.Name = "Top"
+	top.Parent = folder
+	top:AddTag(Tags.Barrier)
 	sent = {}
 	getUps = 0
 	others = {}
@@ -522,23 +538,11 @@ describe("SkateController", function()
 	-- sliding under it keeps its speed along it, and one on the floor below still rides the floor.
 	it("slides under a barrier its collider reaches, which no ground ray sees", function()
 		local dt = 1 / 60
-		local barrier = Instance.new("Folder")
-		barrier.Name = "Top"
-		barrier.Parent = folder
-		barrier:AddTag(Tags.Barrier)
-		local function addBarrier(cframe: CFrame, size: Vector3)
-			local slab = Instance.new("Part")
-			slab.Anchored = true
-			slab.Size = size
-			slab.CFrame = cframe
-			slab.Parent = barrier
-		end
 		-- A ceiling facing -Y 0.5 studs above the collider's top, and a sheet tilted 30 degrees across the ground ray,
 		-- under the collider.
 		local ceiling = 20 + movement.colliderDiameter / 2 + 0.5
 		addBarrier(CFrame.new(0, ceiling + 0.5, 0), Vector3.new(40, 1, 40))
 		addBarrier(CFrame.new(-20, 0.6, 0) * CFrame.Angles(0, 0, math.rad(30)), Vector3.new(2, 0.2, 2))
-		RideSurfaces:refresh()
 
 		-- At 120 studs/s, 72 of them up: it reaches the ceiling within the step.
 		flying(Vector3.new(0, 20, 0), Vector3.new(0, 72, -96))
@@ -592,6 +596,89 @@ describe("SkateController", function()
 		SkateController:step(1 / 60)
 		SkateController:push(Vector3.new(120, 0, 0), true)
 		expect(math.abs(velocityOf(rig).X)).toBeLessThan(CAST_TOLERANCE)
+	end)
+
+	-- The owner (#258, Q27): a skater in the air who touches a ride surface lands on it feet first.
+	it("lands a skater on a ride wall the collider meets in the air, and only blocks one at a barrier", function()
+		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40))
+		flying(Vector3.new(0, 20, 0), Vector3.zero)
+		-- A step first: the push sweeps the collider as far as the last step's length.
+		SkateController:step(1 / 60)
+		SkateController:push(Vector3.new(120, 0, 0), false)
+		local skater = SkateController.skater :: any
+		expect(skater.mode).toBe("Grounded")
+		Fixtures.expectNear(skater.up, Vector3.new(-1, 0, 0))
+		-- A barrier (the arena's top, A7) is no ride surface, even with one right behind it.
+		addBarrier(CFrame.new(-3, 20, 0), Vector3.new(1, 40, 40))
+		flying(Vector3.new(0, 20, 0), Vector3.zero)
+		SkateController:push(Vector3.new(-120, 0, 0), false)
+		expect(skater.mode).toBe("Airborne")
+		expect(math.abs(skater.velocity.X)).toBeLessThan(CAST_TOLERANCE)
+		addBarrier(CFrame.new(0, 20, -2.5), Vector3.new(4, 40, 1))
+		addSlab(CFrame.new(0, 20, -3.5), Vector3.new(4, 40, 1))
+		flying(Vector3.new(0, 20, 0), Vector3.zero)
+		SkateController:push(Vector3.new(0, 0, -120), false)
+		expect(skater.mode).toBe("Airborne")
+		expect(math.abs(skater.velocity.Z)).toBeLessThan(CAST_TOLERANCE)
+	end)
+
+	it("reports a pose held into a wall the collider meets, as into the ground", function()
+		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40))
+		flying(Vector3.new(0, 20, 0), Vector3.zero)
+		SkateController:step(1 / 60)
+		local skater = SkateController.skater :: any
+		skater.airPosing = true
+		SkateController:push(Vector3.new(120, 0, 0), false)
+		expect(skater.mode).toBe("Grounded")
+		SkateController:step(1 / 60)
+		expect(sent[#sent]).toEqual({ false, false, true })
+	end)
+
+	it("reports a pose held into a wall that a step flies into", function()
+		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40))
+		flying(Vector3.new(0, 20, 0), Vector3.new(120, 10, 0))
+		local skater = SkateController.skater :: any
+		skater.airPosing = true
+		skater.airPoseReady = false
+		Fixtures.scriptedBinding(InputController.context, "Jump"):Fire(true)
+		task.wait()
+		SkateController:step(1 / 60)
+		expect(skater.mode).toBe("Grounded")
+		expect(sent).toEqual({ { false, false, true } })
+	end)
+
+	-- The Dive marks the skater diving, then pushes (ActionController): a wall its push meets is a belly touchdown.
+	it("lands a Dive pushed into a wall on the belly", function()
+		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40))
+		flying(Vector3.new(0, 20, 0), Vector3.zero)
+		SkateController:step(1 / 60)
+		local skater = SkateController.skater :: any
+		local falling = skater.velocity.Y
+		SkateController.diving = true
+		SkateController:push(Vector3.new(120, 0, 0), false)
+		expect(skater.mode).toBe("Grounded")
+		Fixtures.expectNear(skater.velocity, Vector3.new(0, falling * movement.bellyLandingKeep, 0), CAST_TOLERANCE)
+	end)
+
+	-- Falling beside the wall they left along it, the skater's ground ray looks toward the wall (#258), and trusts what
+	-- it finds there at once (it is no seam's side face under the feet).
+	it("looks toward the wall a falling skater left, and lands them on it", function()
+		local rays: { Vector3 } = {}
+		setup({
+			Raycast = function(_origin: Vector3, direction: Vector3): any
+				table.insert(rays, direction)
+				return { Normal = Vector3.new(-1, 0, 0), Distance = movement.hoverHeight }
+			end,
+		})
+		SkateController:bind(rig)
+		local skater = SkateController.skater :: any
+		skater.mode = "Airborne"
+		skater.velocity = Vector3.new(0, -5, 0)
+		skater._leftWall = Vector3.new(-1, 0, 0)
+		SkateController:step(1 / 60)
+		Fixtures.expectNear(rays[1], Vector3.xAxis * movement.groundProbeLength)
+		expect(skater.mode).toBe("Grounded")
+		Fixtures.expectNear(skater.up, Vector3.new(-1, 0, 0))
 	end)
 
 	it("drives a new character after a respawn", function()
