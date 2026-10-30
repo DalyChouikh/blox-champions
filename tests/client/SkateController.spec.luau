@@ -53,6 +53,8 @@ end
 -- A sphere cast's normal is off by up to about 1.5e-5 (measured), so a velocity of 120 studs/s it blocks keeps up to
 -- about 0.002 studs/s into the surface.
 local CAST_TOLERANCE = 0.01
+-- What a fake ground ray hits: a part in no Glass folder (#299).
+local SOLID = Instance.new("Part")
 
 local function addPart(parent: Folder, cframe: CFrame, size: Vector3)
 	local part = Instance.new("Part")
@@ -722,7 +724,7 @@ describe("SkateController", function()
 		setup({
 			Raycast = function(_origin: Vector3, direction: Vector3): any
 				table.insert(rays, direction)
-				return { Normal = Vector3.new(-1, 0, 0), Distance = movement.hoverHeight }
+				return { Normal = Vector3.new(-1, 0, 0), Distance = movement.hoverHeight, Instance = SOLID }
 			end,
 		})
 		SkateController:bind(rig)
@@ -747,7 +749,12 @@ describe("SkateController", function()
 		setup({
 			Raycast = function(origin: Vector3, direction: Vector3): any
 				local reach = direction.Unit * movement.hoverHeight
-				return { Normal = Vector3.yAxis, Distance = movement.hoverHeight, Position = origin + reach }
+				return {
+					Normal = Vector3.yAxis,
+					Distance = movement.hoverHeight,
+					Position = origin + reach,
+					Instance = SOLID,
+				}
 			end,
 			SmoothNormal = function(position: Vector3, _face: Vector3): Vector3
 				table.insert(asked, position)
@@ -762,13 +769,40 @@ describe("SkateController", function()
 		Fixtures.expectNear(skater.up, smooth)
 	end)
 
+	-- #299: the climb holds on every ride surface but the glass, so the ground says which it is.
+	it("tells SkateMath whether the ground its ray finds is glass", function()
+		local glassFolder = Instance.new("Folder")
+		glassFolder:AddTag(Tags.Glass)
+		local pane = Instance.new("Part")
+		pane.Parent = glassFolder
+		local found: Instance = pane
+		setup({
+			Raycast = function(): any
+				return { Normal = Vector3.yAxis, Distance = movement.hoverHeight, Instance = found }
+			end,
+		})
+		SkateController:bind(rig)
+		SkateController:step(1 / 60)
+		local controller = SkateController :: any
+		expect(controller._ground.glass).toBe(true)
+		found = SOLID
+		SkateController:step(1 / 60)
+		expect(controller._ground.glass).toBe(false)
+		glassFolder:Destroy()
+	end)
+
 	-- By default the normal is the arena's own (SmoothNormals): a wall caught on the middle glass's round end at
 	-- (120, 40, 0), 20 from the +X end's axis, is the cylinder there, whatever strip the ray met.
 	it("reads the arena's own smooth shape by default", function()
 		local facet = Vector3.new(math.cos(math.rad(1.875)), 0, math.sin(math.rad(1.875)))
 		setup({
 			Raycast = function(_origin: Vector3, _direction: Vector3): any
-				return { Normal = facet, Distance = movement.hoverHeight, Position = Vector3.new(120, 40, 0) }
+				return {
+					Normal = facet,
+					Distance = movement.hoverHeight,
+					Position = Vector3.new(120, 40, 0),
+					Instance = SOLID,
+				}
 			end,
 		}, true)
 		SkateController:bind(rig)
@@ -840,6 +874,7 @@ describe("SkateController", function()
 				return {
 					Normal = if direction.X > 0 then wall else Vector3.yAxis,
 					Distance = movement.hoverHeight,
+					Instance = SOLID,
 				}
 			end,
 		})
@@ -863,7 +898,7 @@ describe("SkateController", function()
 		local tilted = Vector3.new(math.sin(math.rad(15)), math.cos(math.rad(15)), 0)
 		setup({
 			Raycast = function(): any
-				return { Normal = tilted, Distance = movement.hoverHeight }
+				return { Normal = tilted, Distance = movement.hoverHeight, Instance = SOLID }
 			end,
 		})
 		local respawned = skaterAt("Respawned", Vector3.new(50, 0, 0))
@@ -924,7 +959,7 @@ describe("SkateController over an overhang", function()
 					facing = (math.floor(phi / width) + 0.5) * width
 				end
 				local normal = Vector3.new(-math.cos(facing), -math.sin(facing), 0)
-				return { Normal = normal, Distance = movement.hoverHeight }
+				return { Normal = normal, Distance = movement.hoverHeight, Instance = SOLID }
 			end,
 		})
 		SkateController:bind(rig)

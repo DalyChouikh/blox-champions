@@ -41,11 +41,12 @@ local function input(overrides: { [string]: any }?): Types.SkateInput
 	return record
 end
 
-local function ground(normal: Vector3?, distance: number?, hit: boolean?): Types.Ground
+local function ground(normal: Vector3?, distance: number?, hit: boolean?, glass: boolean?): Types.Ground
 	return {
 		hit = if hit == nil then true else hit,
 		normal = normal or FLAT,
 		distance = distance or movement.hoverHeight,
+		glass = glass,
 	}
 end
 
@@ -229,7 +230,9 @@ end)
 -- The owner (#273, Q38): Roller Champions' skater crept up a bank at 1-5 km/h with W held (Video 20), where ours
 -- stopped short of the outer wall's foot. Holding the stick up a slope gentler than crawlLimitDeg, the speed up it
 -- never falls below crawlSpeed (3.33 studs/s, 4 km/h).
-describe("SkateMath crawling up slopes", function()
+-- The owner (#299, Q79-Q85): "I want the player to be able to climb all walls, just till they reach the glass then they
+-- start dropping"; trial S4 kept. It replaces #273's crawl. Worked: s48 worked299.py.
+describe("SkateMath climbing", function()
 	-- A surface `deg` from flat falling toward -Z, and the way up it (where the stick +Z points).
 	local function slope(deg: number): (Vector3, Vector3)
 		local tilt = math.rad(deg)
@@ -237,46 +240,66 @@ describe("SkateMath crawling up slopes", function()
 	end
 	local UP_IT = input({ move = Vector3.zAxis })
 
-	it("crawls up a slope gentler than crawlLimitDeg at crawlSpeed, walls under it included", function()
-		for _, deg in { 5, 20, 39, 44 } do
+	it("gains climbAccel up any solid surface whatever its slope, upright walls included", function()
+		for _, deg in { 5, 20, 39, 60, 90 } do
 			local normal, uphill = slope(deg)
 			local s = skater(Vector3.zero)
-			s:step(UP_IT, ground(normal), 0.1)
-			Fixtures.expectNear(s.velocity, uphill * 3.33)
+			s:step(input({ move = uphill }), ground(normal), 0.1)
+			-- 45 x 0.1, whatever gravity's pull: the climb lifts what the slope took.
+			Fixtures.expectNear(s.velocity, uphill * 4.5)
 		end
-		-- And it lasts: a second up 20 deg, where the stride (30) loses to gravity's pull (67.1).
-		local normal, uphill = slope(20)
-		local s = skater(Vector3.zero)
-		for _ = 1, 60 do
-			s:step(UP_IT, ground(normal), 1 / 60)
-		end
-		Fixtures.expectNear(s.velocity, uphill * 3.33)
-		-- Already faster than the crawl: the stride and gravity only, 20 + (30 - 67.1) x 0.1, then friction and drag.
-		local climbing = skater(uphill * 20)
-		climbing:step(UP_IT, ground(normal), 0.1)
-		Fixtures.expectNear(climbing.velocity, uphill * 15.857)
 	end)
 
-	it("crawls only as hard as the stick points along the heading", function()
-		local normal, uphill = slope(39)
-		local s = skater(uphill)
-		s:step(input({ move = Vector3.new(1, 0, 1).Unit }), ground(normal), 0.1)
-		-- The stick 52.15 deg off the way up; on a wall the heading turns 0.1 rad toward it (wallTurnRate), and the
-		-- crawl along it is 3.33 x cos 46.42 deg = 2.2957.
-		Fixtures.expectNear(s.velocity, Vector3.new(1.41, 1.3629, 1.6831))
-	end)
-
-	it("slides back down a slope steeper than crawlLimitDeg", function()
-		-- From rest, 0.1 s of gravity's pull down it, then friction and drag; a wall takes no stride.
-		for _, case in { { 46, 13.6852 }, { 50, 14.5997 } } do
-			local normal, uphill = slope(case[1])
+	it("climbs up to climbSpeed and holds it, up a slope and up an upright wall", function()
+		for _, deg in { 20, 90 } do
+			local normal, uphill = slope(deg)
 			local s = skater(Vector3.zero)
-			s:step(UP_IT, ground(normal), 0.1)
-			Fixtures.expectNear(s.velocity, uphill * -case[2])
+			for _ = 1, 60 do
+				s:step(input({ move = uphill }), ground(normal), 1 / 60)
+			end
+			-- 45 a second reaches 40 at the 54th step (0.9 s), then holds it.
+			Fixtures.expectNear(s.velocity, uphill * 40)
 		end
 	end)
 
-	it("never crawls with no stick, with the stick against the motion, or on the flat", function()
+	it("leaves a skater faster than climbSpeed to gravity, down to it", function()
+		local normal, uphill = slope(20)
+		local fast = skater(uphill * 50)
+		fast:step(UP_IT, ground(normal), 0.1)
+		-- Past cruise, no stride: 50 - 67.1046 x 0.1, then friction and drag.
+		Fixtures.expectNear(fast.velocity, uphill * 42.803)
+		local over = skater(uphill * 41)
+		over:step(UP_IT, ground(normal), 0.1)
+		-- 41 + (30 - 67.1046) x 0.1, then friction and drag: 36.81, under climbSpeed, so held at it.
+		Fixtures.expectNear(over.velocity, uphill * 40)
+	end)
+
+	it("climbs as hard as the stick is pushed and as far as it points along the heading", function()
+		local normal, uphill = slope(20)
+		local half = skater(Vector3.zero)
+		half:step(input({ move = uphill * 0.5 }), ground(normal), 0.1)
+		Fixtures.expectNear(half.velocity, uphill * 2.25) -- 45 x 0.5 x 0.1
+		-- Up a 39 deg wall at 30 with the stick 52.15 deg off the way up: the heading turns 0.1 rad toward it
+		-- (wallTurnRate), and the climb holds 40 x cos 46.42 deg = 27.58 along it.
+		local wallNormal, upWall = slope(39)
+		local s = skater(upWall * 30)
+		s:step(input({ move = Vector3.new(1, 0, 1).Unit }), ground(wallNormal), 0.1)
+		Fixtures.expectNear(s.velocity, Vector3.new(3.9494, 17.1917, 21.23))
+	end)
+
+	it("never climbs the glass, where the skates only roll", function()
+		local normal, uphill = slope(60)
+		local s = skater(Vector3.zero)
+		s:step(input({ move = uphill }), ground(normal, nil, nil, true), 0.1)
+		-- From rest, 0.1 s of gravity's pull down it, then friction and drag.
+		Fixtures.expectNear(s.velocity, uphill * -16.5574)
+		local upright, up = slope(90)
+		local rising = skater(up * 30)
+		rising:step(input({ move = up }), ground(upright, nil, nil, true), 0.1)
+		Fixtures.expectNear(rising.velocity, up * 9.9592) -- 30 - 19.62, then friction and drag
+	end)
+
+	it("never climbs with no stick, with the stick against the motion, or on the flat", function()
 		local normal, uphill = slope(20)
 		-- Nothing pressed, facing up it: gravity, friction and drag.
 		local still = skater(Vector3.zero)
@@ -288,7 +311,13 @@ describe("SkateMath crawling up slopes", function()
 		local sliding = skater(uphill * -20)
 		sliding:step(UP_IT, ground(normal), 0.1)
 		Fixtures.expectNear(sliding.velocity, uphill * -14.281)
-		-- Creeping up a 39 deg wall at 0.5 with the stick pointing back down: no crawl, they slide back.
+		-- Going up at 2 with the stick 95 deg off the way up (across, a little back): its part back brakes and the turn
+		-- (0.493 rad) brings the heading within 67 deg of the stick, yet no climb: they slide back (s48 worked299.py).
+		local across = skater(uphill * 2)
+		local aside = Vector3.xAxis * math.sin(math.rad(95)) + uphill * math.cos(math.rad(95))
+		across:step(input({ move = aside }), ground(normal), 0.1)
+		expect(across.velocity:Dot(uphill) < 0).toBe(true)
+		-- Creeping up a 39 deg wall at 0.5 with the stick pointing back down: no climb, they slide back.
 		local wallNormal, upWall = slope(39)
 		local turning = skater(upWall * 0.5)
 		turning:step(input({ move = -Vector3.zAxis }), ground(wallNormal), 0.1)
@@ -456,10 +485,10 @@ describe("SkateMath off the ground and on walls", function()
 		local held = skater(Vector3.zero)
 		held:step(input({ brake = true }), ground(Vector3.xAxis), 0.1)
 		Fixtures.expectNear(held.velocity, Vector3.new(0, -19.1808, 0)) -- as with nothing pressed
+		-- With the stick up it, the climb as without the brake (#299): 45 × 0.1 up, no tiptoe.
 		local tiptoe = skater(Vector3.zero)
 		tiptoe:step(input({ brake = true, move = Vector3.yAxis }), ground(Vector3.xAxis), 0.1)
-		-- Sliding down, the stick held: 19.62 − (4 + 0.3924) × 0.1
-		Fixtures.expectNear(tiptoe.velocity, Vector3.new(0, -19.1808, 0))
+		Fixtures.expectNear(tiptoe.velocity, Vector3.new(0, 4.5, 0))
 	end)
 
 	it("pumps on a wall as on any slope: more pull on the way down", function()

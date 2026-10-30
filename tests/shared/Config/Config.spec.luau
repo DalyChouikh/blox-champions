@@ -220,9 +220,9 @@ describe("Config defaults", function()
 			-- √(38 × 22.5) = 29 studs/s, 5 body lengths a second.
 			wallGrip = 38,
 			wallTurnRate = 1,
-			-- A crawl up any slope gentler than 45 deg while the stick points up it (#273, Q38: RC's 1-5 km/h).
-			crawlSpeed = 3.33,
-			crawlLimitDeg = 45,
+			-- A climb up any solid surface while the stick points up it, never the glass (#299, Q85: trial S4).
+			climbSpeed = 40,
+			climbAccel = 45,
 			curvatureWindow = 10,
 			pumpSlopeMultiplier = 1.6,
 			pumpFlatAccel = 8,
@@ -907,20 +907,16 @@ describe("Config.forMode", function()
 				message = "Movement: groundProbeLength must reach past hoverHeight",
 			},
 			{
-				overrides = { Movement = { crawlSpeed = 0 } },
-				message = "Movement.crawlSpeed: must be > 0 (got 0)",
+				overrides = { Movement = { climbSpeed = 0 } },
+				message = "Movement.climbSpeed: must be > 0 (got 0)",
 			},
 			{
-				overrides = { Movement = { crawlLimitDeg = 0 } },
-				message = "Movement.crawlLimitDeg: must be > 0 (got 0)",
+				overrides = { Movement = { climbAccel = 0 } },
+				message = "Movement.climbAccel: must be > 0 (got 0)",
 			},
 			{
-				overrides = { Movement = { crawlLimitDeg = 91 } },
-				message = "Movement.crawlLimitDeg: must be <= 90 (got 91)",
-			},
-			{
-				overrides = { Movement = { crawlSpeed = 46 } },
-				message = "Movement: crawlSpeed must stay below cruiseSpeed",
+				overrides = { Movement = { climbSpeed = 46 } },
+				message = "Movement: climbSpeed must stay below cruiseSpeed",
 			},
 			{
 				overrides = { Movement = { tiptoeSpeed = 70 } },
@@ -1040,10 +1036,10 @@ describe("Config.forMode", function()
 		expect(seek.turnDegPerSecond).toBe(0)
 	end)
 
-	it("accepts a crawl just inside its limits", function()
-		local movement = Fixtures.config({ Movement = { crawlSpeed = 45.9, crawlLimitDeg = 90 } }).Movement
-		expect(movement.crawlSpeed).toBe(45.9)
-		expect(movement.crawlLimitDeg).toBe(90)
+	it("accepts a climb just inside its limits", function()
+		local movement = Fixtures.config({ Movement = { climbSpeed = 45.9, climbAccel = 0.01 } }).Movement
+		expect(movement.climbSpeed).toBe(45.9)
+		expect(movement.climbAccel).toBe(0.01)
 	end)
 
 	it("rejects actions that contradict themselves", function()

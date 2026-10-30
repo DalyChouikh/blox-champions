@@ -77,8 +77,6 @@ type Fields = {
 	_worldUp: Vector3,
 	-- A surface whose normal is closer to world up than this cosine is not a wall (wallAngle).
 	_wallCos: number,
-	-- A surface whose normal is closer to world up than this cosine is gentle enough to crawl up (crawlLimitDeg).
-	_crawlCos: number,
 	-- Gravity's pull along a surface no steeper than pumpFlatSlopeDeg: pumping there counts as on the flat.
 	_flatPull: number,
 	-- Gravity's pull at CONTACT_SLACK of its strength: a push this small that the curve misses is float noise.
@@ -130,7 +128,6 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_gravity = gravity,
 		_worldUp = -gravity.Unit,
 		_wallCos = math.cos(math.rad(movement.wallAngle)),
-		_crawlCos = math.cos(math.rad(movement.crawlLimitDeg)),
 		_flatPull = gravity.Magnitude * math.sin(math.rad(movement.pumpFlatSlopeDeg)),
 		_slackPull = gravity.Magnitude * CONTACT_SLACK,
 		_cornerCos = math.cos(math.rad(movement.cornerDeg)),
@@ -300,6 +297,7 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 		acceleration -= heading * (forwardPart * (1 - kept))
 	end
 
+	local startSpeed = speed
 	velocity = heading * speed + acceleration * dt
 	speed = velocity.Magnitude
 	local direction = if speed > EPSILON then velocity / speed else heading
@@ -311,18 +309,17 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	else
 		speed = math.max(0, speed - (movement.rollingFriction + movement.airDrag * speed) * dt)
 	end
-	-- Holding the stick up a slope gentler than crawlLimitDeg, and steeper than flat, a skater never slows below
-	-- crawlSpeed along their heading, walls under the limit included, so they creep up to the outer wall (the owner,
-	-- #273: RC's crawl up a bank, Video 20). Not with the stick pushing back against the motion. Flat means under
-	-- pumpFlatSlopeDeg, so float noise on a level floor never jump-starts a skater.
-	if
-		stick > 0
-		and against == 0
-		and normal:Dot(self._worldUp) > self._crawlCos
-		and gravityAlong:Dot(heading) < -self._flatPull
-	then
+	-- Holding the stick up any solid ride surface steeper than flat, however steep, a skater gains speed along their
+	-- heading at climbAccel whatever the slope, up to climbSpeed, as far as the stick points along it (the owner,
+	-- #299, Q85: "climb all walls, just till they reach the glass then they start dropping"); faster, gravity slows
+	-- them as anywhere. Never on the glass, where the skates only roll (#239), nor with the stick pushing back
+	-- against the motion. Flat means under pumpFlatSlopeDeg, so float noise on a level floor never jump-starts a
+	-- skater.
+	if stick > 0 and against == 0 and not ground.glass and gravityAlong:Dot(heading) < -self._flatPull then
 		local moving = direction * speed
-		local short = movement.crawlSpeed * wishDirection:Dot(heading) - moving:Dot(heading)
+		local reach =
+			math.min(movement.climbSpeed * wishDirection:Dot(heading), startSpeed + movement.climbAccel * stick * dt)
+		local short = reach - moving:Dot(heading)
 		if short > 0 then
 			moving += heading * short
 			speed = moving.Magnitude

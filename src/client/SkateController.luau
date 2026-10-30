@@ -33,6 +33,7 @@ local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
 local SmoothNormals = require(ReplicatedStorage.Shared.Arena.Geometry.SmoothNormals)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
+local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
@@ -247,6 +248,7 @@ local function castGround(self: SkateController, root: BasePart, skater: SkateMa
 	ground.hit = true
 	ground.normal = self._smoothNormal(result.Position, result.Normal)
 	ground.distance = result.Distance
+	ground.glass = TaggedLayout.isGlass(result.Instance)
 end
 
 local function moveSkater(self: SkateController, root: BasePart, skater: SkateMath.Skater, dt: number)
@@ -512,7 +514,7 @@ local SkateController: SkateController = {
 			knockdown = nil,
 			diving = false,
 		}
-		self._ground = { hit = false, normal = worldUp(self), distance = 0 }
+		self._ground = { hit = false, normal = worldUp(self), distance = 0, glass = false }
 		self._sources = {}
 		self._teammates = {}
 		self._views = {}

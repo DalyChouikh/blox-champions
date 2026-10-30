@@ -206,4 +206,10 @@ function TaggedLayout.read(root: Instance): TaggedArena
 	return Freeze.deep(arena)
 end
 
+-- Whether a ride surface's part is glass, by its folder's tag (#299: no climb holds on the glass).
+function TaggedLayout.isGlass(part: Instance): boolean
+	local folder = part.Parent
+	return folder ~= nil and folder:HasTag(Tags.Glass)
+end
+
 return TaggedLayout

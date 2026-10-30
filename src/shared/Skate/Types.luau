@@ -21,7 +21,8 @@ export type SkateInput = {
 	diving: boolean,
 }
 
--- What the ground ray found: the filtered surface normal, and how far below the root the surface is.
-export type Ground = { hit: boolean, normal: Vector3, distance: number }
+-- What the ground ray found: the ride surface's smooth normal (#294), how far below the root the surface is, and
+-- whether it is glass, where no climb holds (#299; only the client's skating reads it, nil means not glass).
+export type Ground = { hit: boolean, normal: Vector3, distance: number, glass: boolean? }
 
 return table.freeze({})

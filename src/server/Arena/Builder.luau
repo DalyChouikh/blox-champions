@@ -133,9 +133,10 @@ local function lookLikeGlass(part: BasePart, arena: ArenaConfig)
 end
 
 -- The glass (R5): a ride surface like the floor, so skaters ride it and their rays find it, and the ball bounces off it
--- and ends its flight on its touch; only its look is glass's.
+-- and ends its flight on its touch; only its look is glass's. Tagged Glass too: no climb holds on it (#299).
 local function addGlass(pieces: { Piece }, arena: ArenaConfig, parent: Instance)
 	local folder = addTaggedSolids(pieces, "Glass", Tags.RideSurface, arena.colors.glass, parent)
+	folder:AddTag(Tags.Glass)
 	for _, child in folder:GetChildren() do
 		lookLikeGlass(child :: BasePart, arena)
 	end
