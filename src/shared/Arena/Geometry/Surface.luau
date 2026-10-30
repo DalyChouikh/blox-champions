@@ -1,8 +1,8 @@
 --!strict
--- The riding surface: the cross-section swept around the centerline. At every station the profile (with the step
--- blended to that station's height) is placed across the track; each strip between two neighboring stations is a
--- quad, built as one block when it is a flat rectangle and as two wedge-pair triangles otherwise. The glass and the
--- top are swept the same way (Features).
+-- The riding surface: the cross-section swept around the centerline. At every station the profile (a straight's
+-- section blended into a curved end's as far as that station is from one) is placed across the track; each strip
+-- between two neighboring stations is a quad, built as one block when it is a flat rectangle and as two wedge-pair
+-- triangles otherwise. The glass and the top are swept the same way (Features).
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
@@ -121,11 +121,11 @@ function Surface.sweep(rings: { { Vector3 } }, thickness: number): { Piece }
 	return pieces
 end
 
--- The solid cross-section at a distance along the loop, with the straights' step blended to its height there
--- (Centerline.stepBlend). The sweep places it at every station; the goal's fit check and the gate panels read it at
--- a gate.
+-- The solid cross-section at a distance along the loop, blended as far as the track is straight there
+-- (Centerline.straightness). The sweep places it at every station; the goal's fit check, the gate panels and the
+-- ball's spawns read it.
 function Surface.section(arena: ArenaConfig, distance: number): { Vector2 }
-	return Profile.points(arena, arena.stepHeight * Centerline.stepBlend(arena, distance))
+	return Profile.points(arena, Centerline.straightness(arena, distance))
 end
 
 -- The riding surface: the floors, the inner bank and the outer wall, from the bank's top to the outer wall's top.

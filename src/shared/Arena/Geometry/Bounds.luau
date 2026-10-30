@@ -1,7 +1,7 @@
 --!strict
 -- Where the ball is in play and where a skater can be (Arena spec §4.4, decision A7): one box inside the glass. Seen
 -- from above it is the track, the ring between two capsules around the arena's long axis (the inner and the outer
--- glass's faces); in height it runs from the lower floor up to the top (Profile.topHeight). The top holds the ball and
+-- glass's faces); in height it runs from the lowest floor up to the top (Profile.topHeight). The top holds the ball and
 -- every skater, so only a fault puts either outside: the ball is then out and respawns (R10), and a skater is placed
 -- back on their spawn (#181).
 
@@ -20,10 +20,10 @@ local function fromAxis(arena: ArenaConfig, position: Vector3): number
 	return math.sqrt(dx * dx + position.Z * position.Z)
 end
 
--- Inside the glass: between the two glass faces seen from above, no lower than the lower floor and no higher than the
+-- Inside the glass: between the two glass faces seen from above, no lower than the lowest floor and no higher than the
 -- top, each within `margin`. Across the track, u runs from the inner glass's face toward the outer glass's
--- (Profile). The floor is judged at the lower floor's height, so a skater under the upper floor is out once they are
--- under the lower one.
+-- (Profile). The floor is judged at its lowest height (the spawn rooms', the bowls' feet), so a skater under a higher
+-- part of it is out once they are under that height.
 function Bounds.inArena(arena: ArenaConfig, position: Vector3, margin: number): boolean
 	local u = fromAxis(arena, position) - (arena.endRadius - arena.trackWidth / 2)
 	local y = position.Y

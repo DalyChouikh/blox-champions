@@ -126,9 +126,9 @@ function Centerline.stations(arena: ArenaConfig): { number }
 	return stations
 end
 
--- How much of the straights' step the cross-section at `distance` has: 1 on a straight, 0 on a curved end, eased
--- with a cosine across profileBlendLength centered on each corner.
-function Centerline.stepBlend(arena: ArenaConfig, distance: number): number
+-- How far the cross-section at `distance` is a straight's rather than a curved end's (Profile.points): 1 on a
+-- straight, 0 on a curved end, eased with a cosine across profileBlendLength centered on each corner.
+function Centerline.straightness(arena: ArenaConfig, distance: number): number
 	local index, offset = locate(arena, distance)
 	local fromNearestEnd = math.min(offset, sectionLength(arena, index) - offset)
 	local signed = if isStraight(index) then fromNearestEnd else -fromNearestEnd

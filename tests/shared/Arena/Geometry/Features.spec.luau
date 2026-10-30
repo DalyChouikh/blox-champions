@@ -222,7 +222,7 @@ describe("Features.goal", function()
 			.. "skaters",
 		function()
 			local goal = Features.goal(arena)
-			Fixtures.expectNear(goal.frame.Position, Vector3.new(-100, 18, -80))
+			Fixtures.expectNear(goal.frame.Position, Vector3.new(-100, 29, -80))
 			Fixtures.expectNear(goal.frame.LookVector, Vector3.new(-1, 0, 0))
 			expect(goal.openingRadius).toBe(7)
 		end
@@ -259,11 +259,11 @@ describe("Features.goal", function()
 				return low, high
 			end
 			local half, side = arena.trackWidth / 2, arm.thickness / 2
-			-- Over the ring's centre (u 60), and the rim's flat top (26).
+			-- Over the ring's centre (u 60), and the rim's flat top (37).
 			local centre = ring.across * arena.trackWidth - half
 			local rimTop = ring.heightAboveFloor + ring.ringRadius + ring.rimThickness
 			expect(#goal.arm).toBe(2)
-			-- The post: 14 tall, from the rim's top up to the arm's height (40).
+			-- The post: 14 tall, from the rim's top up to the arm's height (51).
 			local low, high = extent(goal.arm[1])
 			Fixtures.expectNear(low, Vector3.new(centre - side, rimTop, -side))
 			Fixtures.expectNear(high, Vector3.new(centre + side, arm.height, side))
@@ -312,21 +312,22 @@ describe("Features.goal fit", function()
 		for _, across in { 0.05, 0.95 } do
 			expect(goalWith({ goal = { across = across } })).toThrow("Arena: the goal ring must stay inside the glass")
 		end
-		-- The rim's top is 26: an arm there or lower leaves no room for its post.
-		for _, height in { 25, 26 } do
+		-- The rim's top is 37: an arm there or lower leaves no room for its post.
+		for _, height in { 36, 37 } do
 			expect(goalWith({ goal = { arm = { height = height } } })).toThrow(
 				"Arena: the goal ring must hang under its arm"
 			)
 		end
 	end)
 
-	-- At the goal gate the upper floor under the ring stands 2 high (the step half blended there): a ring whose flat
-	-- bottom (heightAboveFloor - 8) is at 1 cuts into it, one at 3 clears it.
+	-- At the goal gate the floor under the ring is the halfway blend of the two sections, rising toward the outer
+	-- glass: under the rim's outer bottom corner (1.59 past the centre, 8 below it, u 61.59) it stands 11.50 high, so a
+	-- ring whose centre is at 19 cuts into it and one at 20 clears it.
 	it("rejects a low ring whose rim would cut into the floor under it", function()
-		expect(goalWith({ goal = { heightAboveFloor = 9 } })).toThrow(
+		expect(goalWith({ goal = { heightAboveFloor = 19 } })).toThrow(
 			"Arena: the goal ring must clear the track's surface at the goal gate"
 		)
-		expect(goalWith({ goal = { heightAboveFloor = 11 } })).never.toThrow()
+		expect(goalWith({ goal = { heightAboveFloor = 20 } })).never.toThrow()
 	end)
 end)
 
@@ -351,8 +352,9 @@ describe("Features.gatePanels", function()
 		return math.abs(twice) / 2
 	end
 
-	-- The wall (R18, amended 2026-10-27): glass across the whole track, from the surface at the gate (the step half
-	-- blended there) up to the walls' top as built, breaking at every bend of either outline.
+	-- The wall (R18, amended 2026-10-27): glass across the whole track, from the surface at the gate (a straight's and
+	-- a curved end's sections blended halfway there) up to the walls' top as built, breaking at every bend of either
+	-- outline.
 	it("fills each gate with glass from the track's surface up to the walls' top", function()
 		local depth = arena.gatePanel.depth
 		local half = arena.trackWidth / 2
@@ -397,9 +399,10 @@ describe("Features.gatePanels", function()
 				expect(hasCorner(u, height(bottom, u)) and hasCorner(u, height(top, u))).toBe(true)
 			end
 		end
-		-- It meets the bank's top and the lower floor, the lips and the roof.
+		-- It meets the bank's top and its foot (halfway between a curved end's 16 and a straight's 24), the lips and
+		-- the roof.
 		expect(hasCorner(0, arena.innerBankHeight)).toBe(true)
-		expect(hasCorner(arena.innerBankHeight, 0)).toBe(true)
+		expect(hasCorner(20, 0)).toBe(true)
 		expect(hasCorner(0, Profile.lipStart(arena)) and hasCorner(arena.trackWidth, Profile.lipStart(arena))).toBe(
 			true
 		)
@@ -415,16 +418,16 @@ describe("Features.gatePanels", function()
 		expect(#panels).toBe(Centerline.gateCount)
 		local half = arena.trackWidth / 2
 		for gate, panel in panels do
-			-- 28 breaks, so 27 slices. Two are rectangles, one block each: the lower floor under the roof (u 16 to 36)
-			-- and the upper floor (u 54 to 62). The other 25 are four wedges each.
+			-- 28 breaks (the surface's 21 points and the top's 10, three of them at a glass face twice or thrice), so
+			-- 27 slices. None is a rectangle: the halfway blend at a gate is flat nowhere. Each is four wedges.
 			local blocks = 0
 			for _, piece in panel.pieces do
 				if piece.shape == "Block" then
 					blocks += 1
 				end
 			end
-			expect(blocks).toBe(2)
-			expect(#panel.pieces).toBe(2 + 25 * 4)
+			expect(blocks).toBe(0)
+			expect(#panel.pieces).toBe(27 * 4)
 			-- Its pivot is the wall's middle, halfway between the surface and the roof, facing the travel direction.
 			local distance = Centerline.gateDistance(arena, gate)
 			local floor = Profile.heightAt(Surface.section(arena, distance), half) :: number
@@ -434,12 +437,11 @@ describe("Features.gatePanels", function()
 		end
 	end)
 
-	-- With the inner lip's end half a smallest part before the step's start (u 36), the two outlines bend 0.0005
-	-- apart over the flat lower floor and under the flat roof: a slice between the bends would be a block thinner than
-	-- Roblox builds.
+	-- With the inner lip's end half a smallest part before the bank's foot at a gate (u 20, halfway between a curved
+	-- end's 16 and a straight's 24), the two outlines bend 0.0005 apart: a slice between the bends would be thinner
+	-- than Roblox builds.
 	it("merges breaks closer than Roblox's smallest part", function()
-		local stepStart = arena.trackWidth - arena.wallCurveRadius - arena.upperFloorWidth - arena.stepWidth
-		local close = Fixtures.config({ Arena = { glass = { lipRadius = stepStart - PartSize.MIN / 2 } } }).Arena
+		local close = Fixtures.config({ Arena = { glass = { lipRadius = 20 - PartSize.MIN / 2 } } }).Arena
 		for _, panel in Features.gatePanels(close) do
 			for _, piece in panel.pieces do
 				local size = piece.size
@@ -450,14 +452,14 @@ describe("Features.gatePanels", function()
 end)
 
 describe("Features spawns and infield", function()
-	it("lines each team up on the lower floor of its straight, mirrored across the long axis", function()
+	it("lines each team up in the spawn room of its straight, mirrored across the long axis", function()
 		local spawns = Features.teamSpawns(arena, 3)
 		expect(#spawns.Blue).toBe(3)
 		expect(#spawns.Orange).toBe(3)
-		-- The lower floor's middle, u (16 + 36) / 2 = 26 from the inner glass's face at 20: 46 off the long axis.
-		Fixtures.expectNear(spawns.Blue[1].Position, Vector3.new(10, 0, -46))
-		Fixtures.expectNear(spawns.Blue[2].Position, Vector3.new(0, 0, -46))
-		Fixtures.expectNear(spawns.Blue[3].Position, Vector3.new(-10, 0, -46))
+		-- The spawn room's middle, u (24 + 30) / 2 = 27 from the inner glass's face at 20: 47 off the long axis.
+		Fixtures.expectNear(spawns.Blue[1].Position, Vector3.new(10, 0, -47))
+		Fixtures.expectNear(spawns.Blue[2].Position, Vector3.new(0, 0, -47))
+		Fixtures.expectNear(spawns.Blue[3].Position, Vector3.new(-10, 0, -47))
 		Fixtures.expectNear(spawns.Blue[1].LookVector, Vector3.new(-1, 0, 0))
 		for index, blue in spawns.Blue do
 			local orange = spawns.Orange[#spawns.Orange + 1 - index]
@@ -469,8 +471,10 @@ describe("Features spawns and infield", function()
 	it("drops the ball above the apex of each curved end, equally far from both teams", function()
 		local balls = Features.ballSpawns(arena)
 		expect(#balls).toBe(2)
-		Fixtures.expectNear(balls[1].Position, Vector3.new(-160, 6, 0))
-		Fixtures.expectNear(balls[2].Position, Vector3.new(160, 6, 0))
+		-- ballSpawnHeight (6) over the bowl as built across the track's middle (u 40), on the chord from (39.732,
+		-- 2.679) to (43.595, 3.622): 2.744 high.
+		Fixtures.expectNear(balls[1].Position, Vector3.new(-160, 8.744, 0))
+		Fixtures.expectNear(balls[2].Position, Vector3.new(160, 8.744, 0))
 		local spawns = Features.teamSpawns(arena, 3)
 		for _, ball in balls do
 			expect((ball.Position - spawns.Blue[2].Position).Magnitude).toBeCloseTo(

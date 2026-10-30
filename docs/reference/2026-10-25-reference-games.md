@@ -556,6 +556,198 @@ about two thirds of a lap, swinging from wall to wall.
     `turnRateLow` 4.0 -> 2.0 and `turnRateHigh` 1.5 -> 0.75 rad/s, so at the 55 km/h stride ~1.5 rad/s (90 deg in ~1 s,
     a circle ~60 studs across). RC judged by eye only (Video 15 16.6-17.4: ~1.3 rad/s at 55-67 km/h, a circle ~75
     across); ours was 3.0 rad/s at 55 km/h. Not chosen: two-thirds (3.0 -> 1.0); keep today's.
+  - **#268 mock-ups shown** (2026-10-29, session 39; private page https://claude.ai/artifact/NSwD1bUEe3GiVBMPLpsrgT):
+    candidates built in Studio from the real arena code with only `Profile.points` swapped, four camera views each
+    beside the owner's four screenshots and Video 14 frames (0:01, 0:03, 0:17, 0:45, 1:02, 1:13), floor tinted by slope:
+    today (ends flat 46; step 4 x 18, 19 deg, 8 flat on top); **A** bowl rising 10 (y = 10 s^2, 2.5 up halfway, 21 deg
+    at the wall's foot), bump 8 over 16 (38 deg, no flat top); **B** bowl 14 (3.5 halfway, 27 deg), bump 10 over 18
+    (41 deg); **C** bowl 8 (y = 8 s^1.5, 2.8 halfway, 13 deg), bump 6 over 14 (34 deg). The goal ring at gate 2 rises
+    with the floor under it (today's clearance kept: A 24.8, B 27.5, C 23.0, was 18); the outer wall's upright part
+    starts higher (wall top A 34, B 38, C 32, was 28); the straights' flat lower floor widens (28-32, was 20). Asked
+    (recommended B for both, by eye; RC not measured). The owner did not pick yet: they recorded **Video 17**
+    `D:\Screenshots\Videos\Screen Recording 2026-10-29 092147.mp4` (Mexico Arena cross-sections, on my request) and,
+    for the straights: "check video first then ask me again with screenshots".
+  - **Two camera requests** (same answer, 2026-10-29), the owner's words: "see how the camera gets close to the player
+    and the fades him out, when I move the mouse up, and go back to till the top of the player when I move mouse down,
+    check this video: **Video 18** `D:\Screenshots\Videos\Screen Recording 2026-10-29 092319.mp4`, I want to do that,
+    and also do one more thing for the camera, lower its sensitivity, today I can do 360 around the player in a small
+    movement of the mouse to the right or left, but in RC, I can't do it easily, I need to do more drag movement to do
+    a 360, check the same video at the end". To study, then a grilling round and tickets.
+  - **Video 17 studied** (session 39; RC 'Mexico Arena', 1:43, 1918x1078, 30 fps; recorded for the cross-sections):
+    2 frames a second over the whole clip, 4 a second at 18-25 s, full frames at 7, 16, 19, 21-23, 29, 39, 47, 55-69 s
+    (`claude-handoffs\s39\v17`). **A straight's bump is a ridge**: from the inner side, a red bank with white chevrons
+    and a grey dotted lane, the wooden floor (gate numbers painted), then a wooden band with black chevrons that rises
+    and falls straight back down (no flat top) to a **flat grey striped lane** running to the outer wall's red foot
+    (0:07 seen from the floor side, rising to the right; 0:16-0:19 the skater stopped on the grey lane at its foot, the
+    band rising to the left; 0:21-0:24 crossing it toward the wall the readout fell 24 -> 10 km/h at its top, then 12,
+    15, 18, 22, 27, 30 on the far side and up the red wall). **A curved end is one bowl**: the low red island (flat,
+    rideable: the skater stood on it at 1:11-1:12) with a black rim, then wood rising from the rim all the way to the
+    wall, gentle by the island and steep by the wall (0:55, 0:59 stopped on it at 0 km/h, 1:04, 1:08.5). No height or
+    angle can be read in numbers (no known size but the skater). Round 1's straights (a bump rising into the wall) did
+    not match, so round 2 built three ridges, bowl B at the ends: **RA** 5 high over 20 (38 deg), **RB** 6 over 20
+    (43 deg), both with a flat floor 16 before (u 16-32) and a flat lane 10 after (u 52-62); **RC** 8 over 24 (46 deg),
+    floor 12, lane 10. With a ridge the goal ring at gate 2 rises only with the bowl (bowl B: 22.6, was 18). Page
+    updated (round 2, same link).
+  - **Video 18 studied, first pass** (session 39; RC Mexico, 0:22, 1918x1078, 30 fps; the owner's camera clip): 5 frames
+    a second. Standing still: mouse up (2.0-2.8 s) the camera drops toward the floor and closes in on the skater, who
+    turns see-through and vanishes (2.6-6.6 s, the view looking up at the roof from the skater's feet); mouse down
+    (9-15 s) the camera rises until it looks down on the skater from above; then a slow orbit (16-21.6 s). Ours (code):
+    pitch -70..60 deg at a fixed 12 studs, pulled in only in front of a surface, the skater never fades.
+  - **Round 15** (2026-10-29, session 39, AskUserQuestion): the ridge (RB recommended) and the bowl (B recommended):
+    the owner: "I couldn't determine, I can have a decision if I play those options" (both): **they play the options
+    in Studio before picking**. **Q35 mouse sensitivity: half** (recommended): 0.25 deg per pixel across (1,440 px per
+    full turn, was 720) and half today's up/down; RC's value not measurable from video. Not chosen: a third (2,160 px);
+    two thirds (1,080 px).
+  - **#268 trials in Studio** (2026-10-29, session 39; each patched into Studio's copies of `Profile` and
+    `Config.Arena` only, restored after, the owner playing): **Trial 1** ridge RB + bowl B. The owner: "no, it
+    shouldn't be like this, it shouldn't be a just bump like that, it should be like the state it was before, but just
+    the straight floor, we raise it up, and have it over 24 or like more into 30, and have all the bump a little steep,
+    no actual straight floor in the bump, and not to steep, because we still want the player to be able to skate in it
+    in the middle, but if he can't just stand still on it, he will drop from it", with two RC Mexico screenshots (on a
+    straight: the inner red bank, the wood, the chevron band and the grey lane all one surface rising toward the wall).
+    **Trial 2** one incline instead of the step and its flat top: flat floor u 16-32, then y = 10 s^1.5 rising into the
+    wall's foot curve at its arrival angle (~15 deg on average, 22 at its top, no flat part), bowl B. The owner: "rise
+    it, and move the spawn positions a little closer to the middle wall, so we get more width of the bumps". **Trial 3**
+    flat floor u 16-26 (spawns 5 studs nearer the middle glass: lane u 21, was 26), incline y = 14 s^1.5 (~18 deg on
+    average, 26 at its top), goal ring at 27.9 (today's clearance), bowl B. The owner: "raise the bump, also currently
+    the player can't get close to the wall at low speed at all, unlike RC, look at this vide, I am just clicking W, I am
+    able to get close and ride the walls a little" (**Video 20** `D:\Screenshots\Videos\Screen Recording 2026-10-29
+    104308.mp4`, RC Pinball Stadium, 0:37), "and another thing, currently the players turns is so hard, unlike RC,
+    here is a video, that I keps turning around with the W,A,S,D keys, I am in a circle, unlike our game today, it needs
+    to get to 0 km to stop and turn" (**Video 19** `D:\Screenshots\Videos\Screen Recording 2026-10-29 103956.mp4`,
+    RC Pinball Stadium, 0:26), "and if you want look also at the bumps in the straight and curved ends".
+  - **Video 19 studied** (session 39; RC 'Pinball Stadium', 0:26, 1918x1078, 30 fps; the owner turning with W, A, S,
+    D in turn): 2 frames a second over the clip, 10 a second at 1.5-7.5 s (`claude-handoffs\s39\v19`). The skater
+    circles continuously at 14-45 km/h (never below 2 after the start), loops about 1-2 skater-heights across by the
+    trails (by eye, not measured). Ours, simulated (`claude-handoffs\s39\turn_sim.py`, SkateMath's steering, stride
+    and friction on the flat, keys every 0.4/0.6/0.8 s from 30 km/h): today's rates (Q34: 2.0 / 0.75) drop to 0 km/h
+    (0.4-1.0 s of every 6 below 5 km/h); the pre-Q34 rates (4.0 / 1.5) circle at 12-44 km/h with keys every 0.4 s and
+    55 with slower keys.
+  - **Video 20 studied** (session 39; RC 'Pinball Stadium', 0:37, 1918x1078, 30 fps; the owner holding only W): 2
+    frames a second over the clip, 5 a second at 3-12 s and 31.5-36.5 s (`claude-handoffs\s39\v20`). From a stop
+    facing a curved end's wooden bank (3.0 s): 0 -> 11 -> 18 -> 25 km/h on the flat (3.4-4.2 s), then up the bank 23
+    -> 21 -> 17 -> 13 -> 9 -> 4 (4.4-5.6 s), then a crawl up the bank's upper band at 1-5 km/h for 4+ s (5.6-10.0 s;
+    the hint still reads Brake, not Tiptoe: no brake held). From 61 km/h straight at the outer wall (31.4 s): 61 -> 54
+    -> 46 -> 37 -> 27 -> 15 -> 3 up the wall in 1.6 s (high, by the crowd's sign), then back down 14 -> 27 -> 39 -> 40.
+    Pinball's curved end: a green island with a white rim, a wooden bowl up to a green band, then a grey ramp higher
+    up. Ours, simulated on trial 3's incline (`climb_sim.py`): the stride (30 studs/s^2) beats gravity only on slopes
+    under 8.8 deg (asin(30/196.2)); holding W from a stop gets 3.3 studs up, from 20 km/h 4.5, from 55 km/h 9.9, never
+    the wall's foot (14.7); with a 4 km/h crawl floor every start reaches it.
+  - **Round 16** (2026-10-29, session 39, AskUserQuestion, all recommended): **Q36 the straights' incline rises 18**
+    (from u 26, y = 18 s^1.3, ~22 deg on average, 28 at its top: the highest that stays under the 30 deg wall angle),
+    "but let me playtest it first" (trial 4). **Q37 turn rates back to the pre-Q34 values** (turnRateLow 4.0,
+    turnRateHigh 1.5; ~3.5 rad/s at 30 km/h); a key held straight back still brakes first (Video 15); REPLACES Q34.
+    Not chosen: faster (5.0 / 2.0); no braking at all. **Q38 slow climbs: crawl up like RC**: holding the stick up a
+    floor slope (under wallAngle) never lets the speed fall below ~4 km/h, so a skater creeps to the wall's foot; walls
+    still slide them back. Not chosen: full stride uphill (to 55 km/h); keep today's. **Q39 the camera RC's way**
+    (Video 18): looking up, the camera slides in toward the skater's feet and the skater fades out up close; looking
+    down, it rises above them; distances measured from Video 18 and shown to the owner before shipping. Not chosen:
+    only the fade; later (Presentation). With Q35 (mouse sensitivity halved) these make new tickets.
+  - **Trial 4** (2026-10-29, session 39; Studio copies only: incline y = 18 s^1.3 from u 26, ~22 deg on average, 28
+    at its top; goal ring 29.7 and its arm 51.7; spawns lane u 21; bowl B; turn rates 4.0 / 1.5 and a 4 km/h crawl
+    up floor slopes as prototypes of Q37/Q38). The owner: "no I still don't like the straights, the curved ends I
+    think they are fine, and I still don't like how the players can't get even close to wall, look at this video I
+    recorded in RC" (**Video 21** `D:\Screenshots\Videos\Screen Recording 2026-10-29 113421.mp4`), "look at the
+    straights and in the middle wall, it is in a different arena with green colors, it might help you better visualize
+    the bumps and straights, it starts a little smooth curved, not real steep near the outer wall, then there is a bump
+    that is curved, then goes into a steep ground, then small straight room where the spawns are, then starts to curve
+    out to the middle wall, the curve next to the middle wall in RC have more width than ours today, and look at how the
+    player can climb the walls and ride them a little". So the curved ends' bowl B is accepted.
+  - **Video 21 studied** (session 39; RC 'Lost Civilisation', 1:21, 1912x1068, 30 fps; the owner's straights and
+    middle wall): 2 frames a second over the clip, full frames at 10, 11.5, 26.8-28.6, 33.4, 34 s (`claude-handoffs\
+    s39\v21`). Across a straight from the middle: a perforated grey rim and a checkered strip curving up into the
+    middle glass, a mint band (gate numbers painted, white edges) sloping up and over, a green field, then a dark
+    asphalt lane with white dashes curving up into the outer wall (28.6-29.5: 30 -> 22 -> 17 km/h up the outer wall,
+    riding it a little). Heights not measurable. The owner's order (from the outer wall in): a gentle curve by the wall,
+    a rounded bump, steep ground down from it, a small flat room for the spawns, then a curve up to the middle wall
+    wider than ours. **Video 20 re-read for wall gravity** (5 frames a second, 31.8-33.0 s, straight up Pinball's outer
+    wall): 59 -> 54 -> 46 -> 37 -> 27 -> 15 -> 3 km/h, at most 60 km/h per second (~50 studs/s^2 at speedometerScale
+    1.2) on the steepest part; ours on an upright wall 196.2 studs/s^2 = 235 km/h per second (Q25), ~4x.
+  - **Round 17** (2026-10-29, session 39, AskUserQuestion, recommended): **Q40 walls and glass (steeper than
+    wallAngle) pull at a quarter of gravity** (~60 km/h per s on an upright wall, RC's measured rate); floors and the
+    air keep full gravity. REVERSES Q25 (the no-input loop that drove Q25 was the filter-lag bug, fixed in #255).
+    Computed on an upright wall: from 30 km/h ~6 studs up (was ~1.6), from 61 km/h ~26 (was ~7). Not chosen: a third;
+    keep full. **Trial 5's straight approved as drawn** (ASCII preview; first-guess numbers to play): a wider inner
+    bank (an ellipse quarter 24 wide, 16 high), a flat spawn room u 24-30, steep ground up to a rounded crest 8 high at
+    u 46, a gentle descent to a valley 5 high at u 54, then a gentle foot curve r 26 up into the outer wall; the curved
+    ends keep bowl B (accepted after trial 4).
+  - **Trial 5** (2026-10-29, session 39; Studio copies only: the drawn straight with a valley 5 high at u 54, bowl B,
+    turn rates 4.0 / 1.5, the crawl, walls at a quarter of gravity). The owner: "why there is a gap in the bump near
+    the outer wall I think you are calling in gentle valley, that shoudln't be like that, it should be just a continious
+    floor, and about the wall riding, the infinite wall riding issue came back, look at" (**Video 22**, ours,
+    `D:\Screenshots\Videos\Screen Recording 2026-10-29 115102.mp4`, 0:50), "why is this taking so long to mimic RC
+    core match & mechanic & map, what is the issue". Video 22 at 2 frames a second: the skater rides along the outer
+    glass for 2-9 s and 17-46 s at 40-100 km/h, the speed holding or rising. Cause (computed): with a quarter gravity
+    a level line along upright glass needs only g/4 / wallTurnRate = 49 studs/s (59 km/h; was 196 at full gravity),
+    and pumping still works on walls (pumpSlopeMultiplier 1.6 adds energy riding down the glass), so a rider steers
+    level and pumps forever. RC: a 90 km/h rider held a line ~2 s (Video 3 21:09), a 104 km/h entry stayed high ~6 s
+    (14:25).
+  - **Round 18** (2026-10-29, session 39, AskUserQuestion; told first, plainly, why it is slow: no RC numbers exist,
+    every shape and constant comes from perspective video and an integer speedometer, I misread the drawings several
+    times, and I changed wall gravity without its partner rule): asked how to end the endless wall rides (recommended:
+    no pump on walls + half steering, 0.5 rad/s, a level line then needing 118 km/h). The owner: **"well if they are
+    pumping while thery getting down they should get speed" (Q41: pumping keeps working on walls)**; the steering half
+    goes into trial 6 as the prototype. **Trial 6's straight approved as drawn** (continuous, no dip): the 24-wide inner
+    bank, a flat spawn room u 24-30, steep ground up (a Hermite S from slope 0 to tan 14 deg, steepest ~39 deg) to 8
+    high at u 44, a gentle 14 deg incline to (63.3, 12.8), a foot arc r 22 from 14 deg to upright at u 80 (top 34.1).
+  - **#268 PICKED: trial 6** (2026-10-29, session 39, the owner played it: "Keep it"). Straights (u from the inner
+    glass's face, y above the lower floor; trackWidth 80): the inner bank an ellipse quarter 24 wide, 16 high (was a
+    circle r 16); a flat spawn room u 24-30 (spawn lane u 27); a Hermite rise from (30, 0) flat to (44, 8) arriving at
+    tan 14 deg (steepest ~39 deg); a straight 14 deg incline from (44, 8) to (63.3, 12.8); a foot arc r 22 from 14 deg
+    to upright at u 80 (top 34.1); the wall up to 40, then the glass. Curved ends: the bank a circle r 16, then bowl B
+    y = 14 s^2 from the bank's foot to the foot arc r 18 that starts at the bowl's arrival angle (27.3 deg), split at
+    the straight's breaks; the two blended point by point by the corners' stepBlend (strip counts 4/2/5/3/5/1). The
+    goal ring at gate 2 rises with the floor under it (centre 28.9, arm 50.9: today's clearance kept). Played with the
+    prototypes of Q37 (turn rates 4.0 / 1.5), Q38 (a 4 km/h crawl up floor slopes), Q40 (walls at a quarter of
+    gravity) with Q41 (pumping on walls kept) and wallTurnRate 1 -> 0.5 (a level line along upright glass then needs
+    g/4 / 0.5 = 98 studs/s, 118 km/h): these become their own tickets, with Q35 (mouse sensitivity) and Q39 (camera).
+  - **Tickets approved** (2026-10-29, session 39): five from today's answers (turn rates Q37; the crawl Q38; walls a
+    quarter of gravity Q40 + pump kept Q41 + wall steering 0.5; mouse sensitivity Q35; the camera Q39), and the owner
+    added two: **Q42 a magnetic tackle**: "when trying to tackle someone, it should be like a magnetic tackle, like what
+    a player pres tackle with a direction, and in that direction a player coming up, he should tackle him, not only when
+    passing through him"; **Q43 the Air Pose adds no forward motion**: "air posing shouldn't take player forward, if he
+    jumps standing still and air pose, he shouldn't go forward, that is depending on his movement, if he is going
+    forward and jump and air posing then naturally he is going forward" (today Q14's posed fall pulls along a line
+    20 deg below the facing, so a standing jump's pose drifts forward). RC's tackle reach and homing to be measured
+    from the videos before coding.
+  - **#268 built, measured, and the owner's answer** (2026-10-29, session 40): trial 6 built test-first (no turn,
+    crawl or wall-gravity prototypes; today's rules). Measured in Play, nothing pressed, from the spawn room straight
+    at the outer wall: swings rock in the dip between the bank and the rise (from 72 km/h 3 round trips, stopped at
+    9.0 s; old map 2 trips, 7.6 s; 108: 4 trips, 11.6 s; 145: 14.1 s); crest hops (108: two ~0.1 s; 145: 0.3 s from
+    the rise's top to the wall's foot; inward at 73-94: 0.1-0.2 s); combos (108: the Uppercut from the wider foot
+    curve flies up beside the glass to 53.5 and drops back to 25, old map caught at 56.1; 145: caught at 62.4; with
+    the Air Pose 57.7 / 67.0); a lap along the spawn lane 15.0 s. Asked (recommended: keep, judge at the playtest).
+    The owner: **"player currently can can't even go up into the outer wall from the middle straight: check this"**
+    (**Video 23** `D:\Screenshots\Videos\Screen Recording 2026-10-29 131734.mp4`), **"I don't know, I feel that we
+    are not getting RC gameplay too much, why is it being hard, maybe gravity is too much or something? but then wall
+    riding becomes easy again, can't you jsut take a thorough look at all RC videos and notes, don't measure with
+    their speedometer or ours, I think it is just confusing us"** (Q44). To do: study Video 23 and every RC video
+    again by eye and by time (frames, body sizes), not by any speedometer.
+  - **Gravity by time and body size** (2026-10-29, session 40, the owner's Q44 request: no speedometer). Our skater
+    (the owner's avatar in Play) is 5.85 studs tall, so our gravity 196.2 studs/s^2 is 33.5 body heights/s^2. RC:
+    **Video 20** 32.5-33.7 s at 10 frames a second: straight up Pinball's upright outer wall from its bottom stripe
+    (32.6 s) to the crowd level (~33.15 s), 3.3 body heights (read on the wall, roughly square to the camera), back at
+    the stripe ~33.65 s: up 0.55 s, down 0.5 s (a wall pulls the same going up as coming down: no lighter wall
+    gravity) -> about 22 body heights/s^2. **Video 5** standing jumps: in the air 0.60-0.73 s (ours 0.61 s, 9.2 studs).
+    **Video 14** 1:19.8-1:21.3: an Uppercut up the glass ~1.5 s in the air (ours 1.12 s, 31 studs). At 2/3 of our
+    gravity with our jump and Uppercut heights kept, they would hang 0.75 s and 1.37 s and the wall climb fits: all
+    three point to RC's gravity at about 2/3 of ours (range 0.5-0.9 from the eye-read heights). **Video 21** 28.4-29.6
+    s (up a curved slope, not upright): up ~0.6 s, down ~0.5 s. **Video 23** (ours, trial 6, 0:19): in the straight's
+    spawn room the skater pushes toward the outer wall at 0-26 km/h and turns back every time: at the stride's top
+    speed our gravity carries ~5.4 studs uphill, the rise is 8 high and its steep middle (~39 deg) is past wallAngle
+    30, where the skates only roll. Q40's quarter (#274) came from RC's readout, which does not show the full speed on
+    walls. **Q45** (AskUserQuestion, recommended): **build trial 7**: gravity 2/3 everywhere, walls the same as floors
+    (drops Q40's quarter), jump / Uppercut / Air Pose keep today's heights (hang 0.75 / 1.37 s), wall steering as
+    today (a level line along upright glass would need g / wallTurnRate = 131 studs/s, past hardCap 121), the crawl
+    up slopes on the rise's steep middle too. Not measured: RC's ball gravity (the ball changes with it; judged in
+    Ball & rules). Not chosen: measure more clips first; something else.
+  - **Trial 7 kept** (2026-10-29, session 40, Q46; the owner played it: "Keep it"). Studio copies + the place's
+    gravity only: workspace.Gravity 130.8 (2/3), walls the same as floors; jumpImpulse 48.99, airPoseImpulse 34.29,
+    the Uppercut's leapImpulse 89.82 (x sqrt(2/3): today's heights, hang 0.75 / 1.37 s); turn rates 4.0 / 1.5 (Q37);
+    wallTurnRate 1; a 4 km/h crawl up any slope gentler than 45 deg while the stick points up it (the rise's 39 deg
+    middle too). Checked before: from a standstill in the spawn room, the stick toward the outer wall crawled over the
+    rise and up the incline (u 27 -> 54 in 8 s). Q40's quarter (#274) is dropped; tickets follow (gravity + heights
+    new; #273's crawl to 45 deg).
 
 ## Roller Champions
 
