@@ -1147,6 +1147,15 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
 - **Q107 overtime's warnings** (session 51, while building #306: overtime now counts 3:00 down to a draw; no RC
   clip shows an overtime reaching its end): **the same "60 SECONDS" and "30 SECONDS" banners in overtime** as in
   regulation (recommended), since overtime now ends the match too. Not chosen: no banners in overtime.
+- **Q108-Q110 the kickoff's look** (session 51, before building #307). **Q108** (the owner's words, correcting my
+  reading of Video 4): "no it is not in the goal ring, the goal ring is closed, it shows in the middle of the screen,
+  like this" (Videos 31 and 33). So RC's count is **on the screen**: an orange ring about 19% of the screen's height
+  across with the digit inside, centred, about a third down (Video 31 at 1918x1078: ring centre (959, 340), 200 px
+  across, digit ~75 px tall), one number a second, 5 at 16.0 s to 1 gone at 21.0 s; the clock holds 07:00 until GO
+  (06:59 at 22.0). It replaces #307's "in the goal ring". **Q109** (recommended): **"GO <team> TEAM!" at GO**, as RC
+  (Video 31 21.0-23.0 s: white letters with an orange outline, ~60 px tall, centred ~22% down, ~2 s). Not chosen: no
+  text at GO. **Q110** (recommended): **the count in each player's own team colour** (RC's was orange for an Orange
+  player, one sample). Not chosen: white.
 
 ## Roller Champions
 

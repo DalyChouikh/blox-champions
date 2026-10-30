@@ -50,11 +50,24 @@ describe("Banner", function()
 		expect(label.Visible).toBe(false)
 	end)
 
-	it("shows the countdown's digit in the HUD's text colour", function()
-		local mounted = Fixtures.mount(banner({ kind = "Countdown", value = 2 }), folder)
+	-- The owner (Q108, Q110): RC's count, a digit inside a ring, both in the player's own team colour.
+	it("shows the kickoff count's digit inside a ring, both in its team's colour, and the ring only then", function()
+		local countdown = config.UI.hud.countdown
+		local mounted, rerender = Fixtures.mount(banner({ kind = "Countdown", team = "Orange", value = 2 }), folder)
 		local label = mounted:FindFirstChild("Banner") :: TextLabel
 		expect(label.Text).toBe("2")
-		expect(label.TextColor3 == config.UI.hud.textColor).toBe(true)
+		expect(label.TextSize).toBe(countdown.textSize)
+		expect(label.TextColor3 == config.UI.teamColors.Orange).toBe(true)
+		local ring = label:FindFirstChild("Ring") :: Frame
+		expect(ring.Visible).toBe(true)
+		expect(ring.Size).toEqual(UDim2.fromOffset(countdown.ringSize, countdown.ringSize))
+		local stroke = ring:FindFirstChildOfClass("UIStroke") :: UIStroke
+		expect(stroke.Thickness).toBe(countdown.ringThickness)
+		expect(stroke.Color == config.UI.teamColors.Orange).toBe(true)
+		rerender(banner({ kind = "Go", team = "Orange" }))
+		expect(label.Text).toBe("GO ORANGE TEAM!")
+		expect(label.TextSize).toBe(config.UI.hud.bannerSize)
+		expect(ring.Visible).toBe(false)
 	end)
 
 	it("fits every banner's text on its label", function()
@@ -65,6 +78,8 @@ describe("Banner", function()
 			{ kind = "Denied" },
 			{ kind = "LastChance" },
 			{ kind = "Overtime" },
+			{ kind = "Go", team = "Blue" },
+			{ kind = "Go", team = "Orange" },
 		}
 		for _, seconds in config.UI.clockWarnings do
 			table.insert(banners, { kind = "ClockWarning", value = seconds })
@@ -75,7 +90,8 @@ describe("Banner", function()
 		local tooBig: { string } = {}
 		for _, shown in banners do
 			local written = text:banner(shown)
-			local bounds = TextService:GetTextSize(written, hud.bannerSize, hud.font, Vector2.new(math.huge, math.huge))
+			local textSize = if shown.kind == "Countdown" then hud.countdown.textSize else hud.bannerSize
+			local bounds = TextService:GetTextSize(written, textSize, hud.font, Vector2.new(math.huge, math.huge))
 			if bounds.X > size.X.Offset or bounds.Y > size.Y.Offset then
 				table.insert(tooBig, written)
 			end
@@ -84,11 +100,11 @@ describe("Banner", function()
 	end)
 
 	it("shrinks to fit a screen narrower than itself", function()
-		-- (480 - 2 margins) / 640.
+		-- (480 - 2 margins) / 720.
 		setArea(Vector2.new(480, 323))
 		local mounted = Fixtures.mount(banner({ kind = "Goal", team = "Blue" }), folder)
 		local fit = (mounted:FindFirstChild("Banner") :: TextLabel):FindFirstChild("Fit") :: UIScale
-		expect(fit.Scale).toBeCloseTo(464 / 640, 4)
+		expect(fit.Scale).toBeCloseTo(464 / 720, 4)
 		setArea(Vector2.new(1920, 1000))
 		expect(fit.Scale).toBe(1)
 	end)

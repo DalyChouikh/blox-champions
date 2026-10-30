@@ -426,13 +426,13 @@ local ActionService: ActionService = {
 		end)
 	end,
 
-	-- Refused when the player has no seated, living character, is frozen, or their runner says no (a diver who has
-	-- not landed counts as down), with Network.actionTimingTolerance of slack on its timing, for lag.
+	-- Refused when the player has no seated, living character, or their runner says no (a diver who has not landed
+	-- counts as down), with Network.actionTimingTolerance of slack on its timing, for lag.
 	request = function(self: ActionService, player: PlayerId, payload: any)
 		local name: Config.ActionName = payload.action
 		refreshHolders(self)
 		local holder = self._holderOf[player]
-		if holder == nil or holder.root.Anchored then
+		if holder == nil then
 			reject(self, player, name)
 			return
 		end

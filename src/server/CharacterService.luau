@@ -1,9 +1,9 @@
 --!strict
 -- Seated players' characters (spec §4.5, §10.1): loaded only for players with a seat (spectators watch without
--- one), stood on their team spawn slot at kickoff and held still through the countdown, and loaded again after a
--- death. Loading yields, so it always runs on its own thread: whoever seats a player never waits for it. The loaded
--- character is registered by that thread, not by CharacterAdded: Roblox defers that event until after the load has
--- returned. Each loaded character gets its skater body (SkaterBody) and is stood with its root at
+-- one), stood on their team spawn slot at each kickoff, free to skate through its count (the owner, Q92), and loaded
+-- again after a death. Loading yields, so it always runs on its own thread: whoever seats a player never waits for
+-- it. The loaded character is registered by that thread, not by CharacterAdded: Roblox defers that event until after
+-- the load has returned. Each loaded character gets its skater body (SkaterBody) and is stood with its root at
 -- Movement.hoverHeight above its spawn, where its own client's skating takes over. It lists every seated living
 -- character, marking who can catch (not while knocked down), for the ball, the actions and the movement guard, and
 -- announces any that goes away so a carrier's ball drops.
@@ -36,9 +36,10 @@ export type CharacterService = {
 	requestLoad: (self: CharacterService, player: PlayerId) -> (),
 	adopt: (self: CharacterService, player: PlayerId, character: Model) -> (),
 	onDied: (self: CharacterService, player: PlayerId, character: Model) -> (),
-	place: (self: CharacterService, player: PlayerId, frozen: boolean) -> (),
-	placeAll: (self: CharacterService, frozen: boolean) -> (),
-	freezeAll: (self: CharacterService, frozen: boolean) -> (),
+	-- Stands the player's character on their spawn and counts the placement on it (Attributes.Placed), so its
+	-- client starts the skater over from rest there.
+	place: (self: CharacterService, player: PlayerId) -> (),
+	placeAll: (self: CharacterService) -> (),
 	holders: (self: CharacterService) -> { BallService.Holder },
 	-- A seated player's pump, brake and Air Pose, shown on their character for every client to pose.
 	setSkateState: (self: CharacterService, player: PlayerId, state: Schemas.SkateState) -> (),
@@ -52,8 +53,6 @@ export type CharacterService = {
 	-- Loads the player's character and returns it, or nil when the player is gone (Player:LoadCharacterAsync; a fake
 	-- in tests).
 	_loadCharacter: (player: PlayerId) -> Model?,
-	-- Whether kickoff placement currently freezes characters, so one that loads mid-countdown is frozen too.
-	_frozen: boolean,
 	_loading: { [PlayerId]: boolean },
 	-- One respawn wait per player: a later death starts it over.
 	_respawns: { [PlayerId]: thread },
@@ -102,7 +101,6 @@ local CharacterService: CharacterService = {
 	_loadCharacter = function(_player: PlayerId): Model?
 		return nil
 	end,
-	_frozen = false,
 	_loading = {},
 	_respawns = {},
 	_characters = {},
@@ -124,7 +122,6 @@ local CharacterService: CharacterService = {
 				player:LoadCharacterAsync()
 				return player.Character
 			end
-		self._frozen = false
 		self._loading = {}
 		self._respawns = {}
 		self._characters = {}
@@ -165,8 +162,8 @@ local CharacterService: CharacterService = {
 		end
 	end,
 
-	-- Loads the player's character unless they have one or it is already loading, then stands it on its spawn,
-	-- frozen while a kickoff countdown runs. Never yields the caller.
+	-- Loads the player's character unless they have one or it is already loading, then stands it on its spawn.
+	-- Never yields the caller.
 	requestLoad = function(self: CharacterService, player: PlayerId)
 		local existing: Model? = self._characters[player]
 		if existing ~= nil or self._loading[player] then
@@ -180,7 +177,7 @@ local CharacterService: CharacterService = {
 				-- In the resumption the load returns in, before the client can start the default animations.
 				SkaterBody.build(character, self._config.Movement)
 				self:adopt(player, character)
-				self:place(player, self._frozen)
+				self:place(player)
 			end
 		end)
 	end,
@@ -222,7 +219,7 @@ local CharacterService: CharacterService = {
 		end)
 	end,
 
-	place = function(self: CharacterService, player: PlayerId, frozen: boolean)
+	place = function(self: CharacterService, player: PlayerId)
 		local character: Model? = self._characters[player]
 		local team, slot = self._teams:slotOf(player)
 		if
@@ -236,27 +233,15 @@ local CharacterService: CharacterService = {
 		end
 		local spawn = self._teamSpawns[team][slot]
 		character:PivotTo(spawn * CFrame.new(0, self._config.Movement.hoverHeight, 0))
-		local root = rootOf(character)
-		if root ~= nil then
-			root.Anchored = frozen
-		end
+		-- After the move, so a client that sees the new count already has its character on the spawn.
+		local placed: number? = character:GetAttribute(Attributes.Placed) :: number?
+		character:SetAttribute(Attributes.Placed, (placed or 0) + 1)
 		self.placed:Fire(player)
 	end,
 
-	placeAll = function(self: CharacterService, frozen: boolean)
-		self._frozen = frozen
+	placeAll = function(self: CharacterService)
 		for _, player in table.clone(self._order) do
-			self:place(player, frozen)
-		end
-	end,
-
-	freezeAll = function(self: CharacterService, frozen: boolean)
-		self._frozen = frozen
-		for _, character in self._characters do
-			local root = rootOf(character)
-			if root ~= nil then
-				root.Anchored = frozen
-			end
+			self:place(player)
 		end
 	end,
 

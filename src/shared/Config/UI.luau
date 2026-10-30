@@ -72,6 +72,8 @@ export type UIText = {
 	wins: string,
 	-- The end screen's headline when overtime runs out (the owner, Q95).
 	draw: string,
+	-- At GO, the player's own team's name in capitals (one value): Roller Champions' line (the owner, Q109).
+	go: string,
 	mvp: string,
 	scores: string,
 	columns: { player: string, score: string, goals: string, assists: string, saves: string, steals: string },
@@ -120,6 +122,8 @@ export type HudSettings = {
 	titleSize: number,
 	bannerSize: number,
 	bannerSeconds: number,
+	-- The kickoff count in the banner's place (pixels): its digit inside a ring of the player's team colour.
+	countdown: { textSize: number, ringSize: number, ringThickness: number },
 	feedSeconds: number,
 	feedMaxEntries: number,
 	glowThickness: number,
@@ -238,6 +242,7 @@ local defaults: UIConfig = {
 		scored = "%s scored!",
 		wins = "%s WINS",
 		draw = "DRAW",
+		go = "GO %s TEAM!",
 		mvp = "MVP",
 		scores = "SCORES",
 		columns = {
@@ -267,6 +272,9 @@ local defaults: UIConfig = {
 		titleSize = 32,
 		bannerSize = 96,
 		bannerSeconds = 2,
+		-- Roller Champions' count at 1918 x 1078 (Video 31 at 16.5 s): a 200 px ring with a 75 px digit (the owner,
+		-- Q108).
+		countdown = { textSize = 76, ringSize = 200, ringThickness = 8 },
 		feedSeconds = 6,
 		feedMaxEntries = 5,
 		glowThickness = 3,
@@ -275,8 +283,9 @@ local defaults: UIConfig = {
 		screenMargin = 8,
 		layout = {
 			scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
-			-- Its centre 200 px from the top: clear of the scoreboard on a phone too (the owner's choice).
-			banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(640, 110) },
+			-- Its centre 200 px from the top: clear of the scoreboard on a phone too (the owner's choice); 720 px wide
+			-- for its longest line, GO ORANGE TEAM! (691 px at bannerSize).
+			banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(720, 110) },
 			feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
 			hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
 			speedometer = {
@@ -452,6 +461,7 @@ local fields = Validate.record({
 		scored = template(1),
 		wins = template(1),
 		draw = label,
+		go = template(1),
 		mvp = label,
 		scores = label,
 		columns = Validate.record({
@@ -478,6 +488,7 @@ local fields = Validate.record({
 		titleSize = textSize,
 		bannerSize = textSize,
 		bannerSeconds = positive,
+		countdown = Validate.record({ textSize = textSize, ringSize = positive, ringThickness = positive }),
 		feedSeconds = positive,
 		feedMaxEntries = Validate.number({ min = 1, integer = true }),
 		glowThickness = Validate.number({ min = 0 }),
@@ -525,6 +536,13 @@ local fields = Validate.record({
 })
 
 local schema = Validate.checkAll(fields, {
+	{
+		message = "the count's digit must fit inside its ring (textSize < ringSize - 2 × ringThickness)",
+		holds = function(ui: UIConfig): boolean
+			local countdown = ui.hud.countdown
+			return countdown.textSize < countdown.ringSize - 2 * countdown.ringThickness
+		end,
+	},
 	{
 		message = "the score tab's number columns must leave room for names, in the tab and the end screen",
 		holds = namesFit,

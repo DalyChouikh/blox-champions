@@ -74,7 +74,7 @@ beforeEach(function()
 	preferred = Enum.PreferredInput.KeyboardAndMouse
 	screen = PHONE
 	Fixtures.startSkating(folder, config, LOCAL_ID)
-	HudStore:init({ Config = config })
+	HudStore:init({ Config = config, LocalId = LOCAL_ID })
 	HudStore:onSnapshot(Fixtures.matchSnapshot())
 	Hud:init({
 		Config = config,
@@ -344,12 +344,12 @@ describe("Hud", function()
 		-- With a keyboard the stage is the whole HUD area: the tab's height decides, less a margin at each side.
 		expect(part("Stage").Size).toEqual(UDim2.fromOffset(750, 323))
 		expect(fit("ScoreTab")).toBeCloseTo(307 / 360, 4)
-		-- On touch it ends where the buttons begin: (504 - 2 margins) / 640 for the tab and the banner.
+		-- On touch it ends where the buttons begin: (504 - 2 margins) / 640 for the tab, / 720 for the banner.
 		preferred = Enum.PreferredInput.Touch
 		Hud:step(0)
 		expect(part("Stage").Size).toEqual(UDim2.fromOffset(504, 323))
 		expect(fit("ScoreTab")).toBeCloseTo(488 / 640, 4)
-		expect(fit("Banner")).toBeCloseTo(488 / 640, 4)
+		expect(fit("Banner")).toBeCloseTo(488 / 720, 4)
 		expect(fit("Feed")).toBe(1)
 		-- The compact end screen is as tall as its parts, so its width decides: (504 - 2 margins) / 720.
 		endMatch()

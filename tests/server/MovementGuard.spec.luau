@@ -22,8 +22,8 @@ local rig: Model
 local holders: { { player: string, root: BasePart } }
 local characterService: any
 local logs: { string }
--- Who the guard asked CharacterService to place on their spawn, and frozen or not.
-local placements: { { player: string, frozen: boolean } }
+-- Who the guard asked CharacterService to place on their spawn.
+local placements: { string }
 local now: number
 -- A fake BallService: who carries the ball, and what the guard asked of it.
 local ball: { state: { carrier: string? }, drops: { Vector3 }, jumps: number }
@@ -50,8 +50,8 @@ beforeEach(function()
 		holders = function(): { { player: string, root: BasePart } }
 			return holders
 		end,
-		place = function(_self: any, player: string, frozen: boolean)
-			table.insert(placements, { player = player, frozen = frozen })
+		place = function(_self: any, player: string)
+			table.insert(placements, player)
 		end,
 		placed = Signal.new(),
 		characterRemoved = Signal.new(),
@@ -114,7 +114,7 @@ describe("MovementGuard", function()
 		-- 13 studs under the floor: a fall, which the speed rule never judges.
 		rig:PivotTo(CFrame.new(START_X, -10, LANE_Z))
 		tick()
-		expect(placements).toEqual({ { player = "1", frozen = false } })
+		expect(placements).toEqual({ "1" })
 		expect(#logs).toBe(1)
 		expect(string.find(logs[1], "1", 1, true) ~= nil).toBe(true)
 		expect(string.find(logs[1], "outside the arena", 1, true) ~= nil).toBe(true)
@@ -141,7 +141,7 @@ describe("MovementGuard", function()
 		tick()
 		expect(#ball.drops).toBe(1)
 		Fixtures.expectNear(ball.drops[1], Vector3.new(START_X + 20, 3, LANE_Z))
-		expect(placements).toEqual({ { player = "1", frozen = false } })
+		expect(placements).toEqual({ "1" })
 		expect(ball.jumps).toBe(0)
 	end)
 
@@ -170,15 +170,8 @@ describe("MovementGuard", function()
 		end
 	)
 
-	it("leaves frozen skaters alone, wherever they are, and trusts the server's placements", function()
-		local root = Fixtures.root(rig)
-		root.Anchored = true
-		moveTo(500)
+	it("trusts the server's placements", function()
 		tick()
-		expect(#logs).toBe(0)
-		expect(#placements).toBe(0)
-
-		root.Anchored = false
 		characterService.placed:Fire("1")
 		-- On the other straight: far, but inside the arena.
 		rig:PivotTo(CFrame.new(0, 3, -LANE_Z))

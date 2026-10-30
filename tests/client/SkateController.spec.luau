@@ -195,42 +195,42 @@ describe("SkateController", function()
 		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -2.594))
 	end)
 
-	-- The kickoff freeze anchors every root while the server places them (spec §4.5). Nothing held or pressed during
-	-- it may carry into the kickoff.
-	it(
-		"starts the kickoff from rest, upright, facing its spawn, whatever was held or pressed during the freeze",
-		function()
-			local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
-			table.insert(others, { player = "2", team = "Blue", root = Fixtures.root(leader) })
-			local attachKey = Fixtures.scriptedBinding(InputController.context, "Attach")
-			attachKey:Fire(true)
-			SkateController:step(1 / 60)
-			local skater = SkateController.skater :: any
-			expect(skater.mode).toBe("Attached")
-			-- Riding a wall when the point is scored.
-			skater.up = Vector3.xAxis
+	-- Each kickoff stands everyone on their spawn, free to skate through its count (the owner, Q92): the server counts
+	-- the placement on the character (Attributes.Placed), and nothing going or pressed before it carries into the
+	-- kickoff.
+	it("starts over from rest, upright, facing its spawn when the server places it, then skates on at once", function()
+		local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
+		table.insert(others, { player = "2", team = "Blue", root = Fixtures.root(leader) })
+		local attachKey = Fixtures.scriptedBinding(InputController.context, "Attach")
+		attachKey:Fire(true)
+		SkateController:step(1 / 60)
+		local skater = SkateController.skater :: any
+		expect(skater.mode).toBe("Attached")
+		-- Riding a wall when the point is scored.
+		skater.up = Vector3.xAxis
 
-			Fixtures.root(rig).Anchored = true
-			local spawn = Vector3.new(0, movement.hoverHeight, 0)
-			rig:PivotTo(CFrame.lookAt(spawn, spawn + Vector3.xAxis))
-			attachKey:Fire(false)
-			local jumpKey = Fixtures.scriptedBinding(InputController.context, "Jump")
-			jumpKey:Fire(true)
-			task.wait()
-			jumpKey:Fire(false)
-			for _ = 1, 3 do
-				SkateController:step(1 / 60)
-			end
+		local spawn = Vector3.new(0, movement.hoverHeight, 0)
+		rig:PivotTo(CFrame.lookAt(spawn, spawn + Vector3.xAxis))
+		rig:SetAttribute(Attributes.Placed, 1)
+		attachKey:Fire(false)
+		local jumpKey = Fixtures.scriptedBinding(InputController.context, "Jump")
+		jumpKey:Fire(true)
+		task.wait()
+		jumpKey:Fire(false)
+		SkateController:step(1 / 60)
+		expect(SkateController.frozen).toBe(true)
+		expect(skater.mode).toBe("Grounded")
+		Fixtures.expectNear(skater.velocity, Vector3.zero)
+		Fixtures.expectNear(alignOf(rig).SecondaryAxis, Vector3.yAxis)
+		-- Facing +X, so the skater's right is +Z.
+		Fixtures.expectNear(alignOf(rig).PrimaryAxis, Vector3.zAxis)
 
-			Fixtures.root(rig).Anchored = false
-			SkateController:step(1 / 60)
-			expect(skater.mode).toBe("Grounded")
-			expect(velocityOf(rig).Magnitude).toBeLessThan(1)
-			Fixtures.expectNear(alignOf(rig).SecondaryAxis, Vector3.yAxis)
-			-- Facing +X, so the skater's right is +Z.
-			Fixtures.expectNear(alignOf(rig).PrimaryAxis, Vector3.zAxis)
-		end
-	)
+		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(0, 1))
+		SkateController:step(1 / 60)
+		expect(SkateController.frozen).toBe(false)
+		expect(skater.mode).toBe("Grounded")
+		expect(velocityOf(rig).Magnitude).toBeGreaterThan(0)
+	end)
 
 	it("locks a knocked-down skater's input and lets go of the attach", function()
 		local skater = SkateController.skater :: any
