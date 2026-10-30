@@ -1031,6 +1031,13 @@ about two thirds of a lap, swinging from wall to wall.
     momentum, then down the whole wall and back across the track (on the upright part a stick pointing into the wall
     has no part along it), then up again (~5 s a cycle). The owner played it: **Q85 "Keep it"** (build it test-first
     as trialled).
+  - **The re-playtest of the published stack head 6bfbeef; Q86** (2026-10-30, session 49). Published 11:41:43Z
+    (GetProductInfo; #298 + #299 on top of 1069c16). AskUserQuestion, each with ours beside RC: the stick against the
+    motion (from cruise stopped in 0.40 s over 1.4 bodies; RC Video 15 near a stop in ~0.5 s) and turns a quarter
+    quicker (a cruise loop 4.1 bodies across in 1.6 s): **"Feels right"**; the climb (W up any solid surface to 40
+    studs/s, 6.8 bodies/s; the rise topped in 1.27 s, the outer wall to ~3.4 studs onto the glass at 2.35 s, then
+    down and across): **"Feels right"**; the mouse with the Roblox Player's Camera Sensitivity at 1 (3,600 px a turn,
+    as Studio, Q83): **"Feels right at 1"**. The Feel part's skating has no open finding left.
 
 ## Roller Champions
 
