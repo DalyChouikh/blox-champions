@@ -110,7 +110,7 @@ describe("Config defaults", function()
 			Uppercut = {
 				phases = { windup = 0.05, active = 0.2, recovery = 0 },
 				cooldown = 1.2,
-				requires = requires("without"),
+				requires = requires("without", "grounded"),
 				effect = "Knockdown",
 				pose = "None",
 				hit = { range = 6, coneDeg = 60, aimUpDeg = 30, knockdownSeconds = 1.5 },
