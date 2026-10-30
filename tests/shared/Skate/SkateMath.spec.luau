@@ -24,6 +24,7 @@ local function input(overrides: { [string]: any }?): Types.SkateInput
 		pump = false,
 		brake = false,
 		jump = false,
+		jumpHeld = false,
 		draftAccel = 0,
 		knockedDown = false,
 		diving = false,
@@ -411,6 +412,100 @@ describe("SkateMath pushes and knockdowns", function()
 		s:step(input({ knockedDown = true, diving = true }), ground(), 0.5)
 		-- 80 − (4 + 0.02 × 80) × 0.5 − 75 × 0.5
 		expect(s.velocity.Magnitude).toBeCloseTo(39.7, 2)
+	end)
+
+	-- The owner (#245, Q13): the Air Pose lasts while the jump key is held.
+	it("holds the Air Pose while the jump key is held and ends it when let go, until landing", function()
+		local inAir = ground(FLAT, 0, false)
+		local s = skater(Vector3.new(0, 10, -40))
+		s.mode = "Airborne"
+		s:step(input({ jump = true, jumpHeld = true }), inAir, 1 / 60)
+		expect(s.airPosing).toBe(true)
+		s:step(input({ jumpHeld = true }), inAir, 1 / 60)
+		expect(s.airPosing).toBe(true)
+		s:step(input(), inAir, 1 / 60)
+		expect(s.airPosing).toBe(false)
+		-- Holding the key again strikes nothing more until landing.
+		s:step(input({ jumpHeld = true }), inAir, 1 / 60)
+		expect(s.airPosing).toBe(false)
+		expect(s.airPoseReady).toBe(false)
+	end)
+
+	-- A dive or a knockdown locks the jump key too (#245): the pose ends, so the touchdown is a dive's, or none.
+	it("ends the Air Pose of a skater who dives or is knocked down in the air, the key still held", function()
+		local cases: { { [string]: any } } = {
+			{ diving = true, jumpHeld = true },
+			{ knockedDown = true, jumpHeld = true },
+		}
+		for _, overrides in cases do
+			local s = skater(Vector3.new(0, 10, -40))
+			s.mode = "Airborne"
+			s.airPosing = true
+			s.airPoseReady = false
+			s:step(input(overrides), ground(FLAT, 0, false), 1 / 60)
+			expect(s.airPosing).toBe(false)
+		end
+	end)
+
+	-- The owner (#245, Q14): a posed fall gains forward speed down the dive's fall line (RC: ~85 km/h per s).
+	it("flies a posed skater down the fall line once falling, as a diver; rising, as anyone", function()
+		local inAir = ground(FLAT, 0, false)
+		local function flying(velocity: Vector3, posing: boolean): SkateMath.Skater
+			local s = skater(velocity)
+			s.mode = "Airborne"
+			s.airPosing = posing
+			s.airPoseReady = not posing
+			return s
+		end
+		local posed, diver = flying(Vector3.new(0, -1, -40), true), flying(Vector3.new(0, -1, -40), false)
+		for _ = 1, 30 do
+			posed:step(input({ jumpHeld = true }), inAir, 1 / 60)
+			diver:step(input({ diving = true }), inAir, 1 / 60)
+		end
+		Fixtures.expectNear(posed.velocity, diver.velocity)
+		expect(posed:shownSpeed()).toBeGreaterThan(40)
+		-- Still rising after the hop: gravity straight down, as for anyone in the air.
+		local rising, plain = flying(Vector3.new(0, 20, -40), true), flying(Vector3.new(0, 20, -40), false)
+		rising:step(input({ jumpHeld = true }), inAir, 1 / 60)
+		plain:step(input(), inAir, 1 / 60)
+		Fixtures.expectNear(rising.velocity, plain.velocity)
+	end)
+
+	-- The owner (#245, Q19): RC's belly touchdowns from the air kept 59-73% of the speed (133 -> 84, 139 -> 101,
+	-- 104 -> 70, 97 -> 57 km/h; Videos 5-7).
+	it("keeps bellyLandingKeep of the speed through a belly touchdown from the air, and says so", function()
+		local keep = movement.bellyLandingKeep
+		local touchdown = ground(FLAT, movement.hoverHeight - 0.1)
+		local function landed(posing: boolean, overrides: { [string]: any }): SkateMath.Skater
+			local s = skater(Vector3.new(0, -10, -60))
+			s.mode = "Airborne"
+			s.airPosing = posing
+			s.airPoseReady = not posing
+			s:step(input(overrides), touchdown, 1 / 60)
+			return s
+		end
+		local function slowed(speed: number, extra: number): number
+			return speed - (movement.rollingFriction + extra + movement.airDrag * speed) / 60
+		end
+		-- Held into the ground: 60 x 0.65 = 39 along the floor, then a step of friction, drag and coasting.
+		local posed = landed(true, { jumpHeld = true })
+		expect(posed.mode).toBe("Grounded")
+		expect(posed.landedPosed).toBe(true)
+		expect(posed:shownSpeed()).toBeCloseTo(slowed(60 * keep, movement.coastDecel), 3)
+		-- A diver too, gliding on.
+		local diver = landed(false, { diving = true })
+		expect(diver.landedPosed).toBe(false)
+		expect(diver:shownSpeed()).toBeCloseTo(slowed(60 * keep, 0), 3)
+		-- Let go before the touchdown, or never posing: nothing lost.
+		local released = landed(true, {})
+		expect(released.landedPosed).toBe(false)
+		expect(released:shownSpeed()).toBeCloseTo(slowed(60, movement.coastDecel), 3)
+		-- The landing step only, and a step attached behind a teammate is none.
+		posed:step(input({ jumpHeld = true }), touchdown, 1 / 60)
+		expect(posed.landedPosed).toBe(false)
+		local attached = landed(true, { jumpHeld = true })
+		attached:follow(Vector3.zero, Vector3.zero, Vector3.zero, -Vector3.zAxis)
+		expect(attached.landedPosed).toBe(false)
 	end)
 
 	it("stops a knocked-down skater at zero, never backwards", function()

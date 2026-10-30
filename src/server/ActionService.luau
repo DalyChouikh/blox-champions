@@ -6,11 +6,12 @@
 -- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns (each with
 -- its kind, Attributes.Knockdown), the running action (until its recovery) and calls for a pass show as character
 -- attributes every client reads. Each frame the server casts its own ray along each skater's down: a hard landing
--- (Skate/Fall) knocks them down, and so does a diver's first touch of the ground past the dive's active phase (an
--- action with a landing ends on the belly; nothing else starts meanwhile). No one scores those knockdowns. A player
--- knocked down by a strike or a hard landing whose client asks to get up (GetUp, sent when they move) is up once
--- Actions.getUpAfter has passed since the knockdown, never sooner; a diver is up once their root slides slower than the
--- landing's stopSpeed along the ground, whatever they ask (#242); anyone, at the latest after the knockdown's seconds.
+-- (Skate/Fall), or any landing while their client reports the Air Pose (touching down posed, #245), knocks them down as
+-- a fall, and so does a diver's first touch of the ground past the dive's active phase (an action with a landing ends
+-- on the belly; nothing else starts meanwhile). No one scores those knockdowns. A player knocked down by a strike or a
+-- fall whose client asks to get up (GetUp, sent when they move) is up once Actions.getUpAfter has passed since the
+-- knockdown, never sooner; a diver is up once their root slides slower than the landing's stopSpeed along the ground,
+-- whatever they ask (#242); anyone, at the latest after the knockdown's seconds.
 -- A throw keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held for.
 -- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
 -- sum of the frames it is stepped, so a request between frames counts as the last frame's.
@@ -216,8 +217,8 @@ end
 
 -- Down for `seconds` as `kind`: their action (a dive's landing with it) stops without a refund, and a carried ball
 -- drops with their momentum. A request to get up made before it no longer counts. A diver's own touchdown passes its
--- landing's `stopSpeed`. Only a knockdown someone dealt is listed for the rules; a diver's own touchdown and a hard
--- landing have no `attacker`.
+-- landing's `stopSpeed`. Only a knockdown someone dealt is listed for the rules; a diver's own touchdown and a fall
+-- have no `attacker`.
 local function knockDown(
 	self: ActionService,
 	attacker: PlayerId?,
@@ -263,9 +264,16 @@ local function upEarly(self: ActionService, player: PlayerId, record: Record): b
 	return Vectors.alongSurface(root.AssemblyLinearVelocity, root.CFrame.UpVector).Magnitude < stopSpeed
 end
 
+-- Whether the player's client reports the Air Pose (one it touched down in included: SkateController).
+local function posing(root: BasePart): boolean
+	local character = root.Parent
+	return character ~= nil and character:GetAttribute(Attributes.AirPosing) == true
+end
+
 -- The server's own look at the ground under a skater, once a frame: a ray along their down as their skating casts it
--- (Movement.groundProbeLength, through the arena's ride surfaces). A hard landing knocks them down; so does a diver's
--- first touch of the ground past the dive's active phase. Neither adds to a knockdown already running.
+-- (Movement.groundProbeLength, through the arena's ride surfaces). A hard landing knocks them down as a fall, and so
+-- does any landing posed (#245); a diver's first touch of the ground past the dive's active phase knocks them down as
+-- a dive. None adds to a knockdown already running.
 local function lookDown(self: ActionService, holder: Holder)
 	local player = holder.player
 	local record = recordOf(self, player)
@@ -278,13 +286,13 @@ local function lookDown(self: ActionService, holder: Holder)
 		ground.normal = hit.Normal
 		ground.distance = hit.Distance
 	end
-	local hard = record.fall:step(root.Position.Y, ground)
+	local touchdown = record.fall:step(root.Position.Y, ground)
 	if hit == nil or record.knockdownLeft > 0 then
 		return
 	end
 	local landing: Config.ActionName? = record.landing
 	local runner = record.runner
-	if hard then
+	if touchdown == "Hard" or (touchdown == "Soft" and posing(root)) then
 		knockDown(self, nil, player, "Fall", movement.hardLanding.knockdownSeconds)
 	elseif landing ~= nil and (runner.action ~= landing or runner.phase == "Recovery") then
 		local settings = self._config.Actions[landing].landing :: Config.Landing

@@ -1,7 +1,7 @@
 --!strict
 -- One skater's body pose (spec §7.1): how far each joint turns, from the lean, the pump, the brake, the air, the
 -- carried ball, the lunge, the knockdown and the Air Pose. A knockdown's pose eases in and back out (`settle`, #243): a
--- strike's or a hard landing's lays the body flat on the back, a diver's face-down, kneeling. Pure: it writes into a
+-- strike's or a fall's lays the body flat on the back, a diver's face-down, kneeling. Pure: it writes into a
 -- table the caller reuses, so a pose allocates only the CFrames it returns. Every turn is in body axes (x right, y up,
 -- -z forward), which R15 joint frames match; PoseController turns them into each joint's own frame. A positive turn
 -- about x tips the torso back and swings a hanging limb forward.

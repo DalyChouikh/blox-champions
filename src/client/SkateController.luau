@@ -6,11 +6,13 @@
 -- - steps SkateMath, slides the skater along any ride surface in its way, and writes the result into the skater body
 --   the server built.
 -- It holds the skater still during the kickoff freeze and until the arena has reached this client. A knocked-down
--- skater (the server's KnockedDown attribute) lets go of any attach and only slides; knocked down by a strike or a hard
--- landing, they ask the server to get up (GetUp) once per knockdown, as soon as the stick moves: the server decides
--- when. A diver's own knockdown ends when the slide stops (the server sees it, #242). A diver (`diving`) lets go of any
+-- skater (the server's KnockedDown attribute) lets go of any attach and only slides; knocked down by a strike or a
+-- fall, they ask the server to get up (GetUp) once per knockdown, as soon as the stick moves: the server decides when.
+-- A diver's own knockdown ends when the slide stops (the server sees it, #242). A diver (`diving`) lets go of any
 -- attach too and glides until that knockdown. While Roblox's menu holds the keys the skater lets go of any attach too,
--- with no release boost. Actions push the skater through `push`.
+-- with no release boost. Actions push the skater through `push`. Pump, brake and the Air Pose go to the server
+-- (SkateState); a pose held into the ground is a fall the server judges from that report, so it is still reported for
+-- Network.posedLandingTolerance after the touchdown, or until the knockdown (#245).
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
 -- humanoid's state machine off here, on the owning client only: the server keeps it on so deaths still fire Died.
 
@@ -87,6 +89,8 @@ export type SkateController = {
 	_statePending: boolean,
 	-- The Air Pose as the server last heard it.
 	_airPosing: boolean,
+	-- Seconds left reporting the Air Pose the skater touched down in (#245); 0 when none.
+	_posedLandingLeft: number,
 	_sendGetUp: () -> (),
 	-- This knockdown's GetUp went out.
 	_askedToGetUp: boolean,
@@ -308,7 +312,7 @@ end
 -- goes out as the latest state once it may, since the server would drop it and nothing would send it again.
 local function shareState(self: SkateController)
 	local keys = self._keys
-	local posing = (self.skater :: SkateMath.Skater).airPosing
+	local posing = (self.skater :: SkateMath.Skater).airPosing or self._posedLandingLeft > 0
 	if keys.pump ~= self.pumping or keys.brake ~= self.braking or posing ~= self._airPosing then
 		self.pumping = keys.pump
 		self.braking = keys.brake
@@ -339,6 +343,7 @@ local function freeze(self: SkateController, root: BasePart, skater: SkateMath.S
 	self._inputController:read(self._keys)
 	skater:stop()
 	self.diving = false
+	self._posedLandingLeft = 0
 	local up = worldUp(self)
 	skater.up = up
 	local facing = Vectors.alongSurface(root.CFrame.LookVector, up)
@@ -375,6 +380,7 @@ local SkateController: SkateController = {
 	_clock = os.clock,
 	_statePending = false,
 	_airPosing = false,
+	_posedLandingLeft = 0,
 	_sendGetUp = function() end,
 	_askedToGetUp = false,
 	_team = function(): string?
@@ -427,6 +433,7 @@ local SkateController: SkateController = {
 		self._clock = deps.Clock or os.clock
 		self._statePending = false
 		self._airPosing = false
+		self._posedLandingLeft = 0
 		self._sendGetUp = deps.SendGetUp
 			or function()
 				Remotes.get(ReplicatedStorage, Remotes.names.GetUp):FireServer({})
@@ -455,6 +462,7 @@ local SkateController: SkateController = {
 			pump = false,
 			brake = false,
 			jump = false,
+			jumpHeld = false,
 			draftAccel = 0,
 			knockedDown = false,
 			diving = false,
@@ -512,6 +520,7 @@ local SkateController: SkateController = {
 		self.braking = false
 		self.diving = false
 		self._airPosing = false
+		self._posedLandingLeft = 0
 		self._statePending = false
 	end,
 
@@ -549,6 +558,7 @@ local SkateController: SkateController = {
 		input.pump = keys.pump
 		input.brake = keys.brake
 		input.jump = keys.jump
+		input.jumpHeld = keys.jumpHeld
 		input.knockedDown = self.knockedDown
 		input.diving = self.diving
 		self.move = input.move
@@ -556,6 +566,10 @@ local SkateController: SkateController = {
 		gatherOthers(self)
 		input.draftAccel = Draft.accel(self._config.Movement, root.Position, self._sources)
 		moveSkater(self, root, skater, dt)
+		self._posedLandingLeft = if skater.landedPosed
+			then self._config.Network.posedLandingTolerance
+			elseif self.knockedDown then 0
+			else math.max(0, self._posedLandingLeft - dt)
 		self._stepSeconds = dt
 		collide(self, root, skater, dt)
 		apply(self, skater)

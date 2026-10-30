@@ -22,7 +22,7 @@ export type PoseConfig = {
 	airborneProbe: number,
 	-- A tackle or dive tips the body forward by this much.
 	lungeDeg: number,
-	-- A skater knocked down by a strike or a hard landing tips back by this much and sinks knockdownSinkStuds toward
+	-- A skater knocked down by a strike or a fall tips back by this much and sinks knockdownSinkStuds toward
 	-- the ground: flat on the back (the owner, #243; RC's tackled skaters lie flat sliding).
 	knockdownTiltDeg: number,
 	knockdownSinkStuds: number,

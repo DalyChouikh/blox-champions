@@ -16,8 +16,16 @@ local StarterGui = game:GetService("StarterGui")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 
--- One read of the keys: the move stick (x right, y forward) and the buttons. `jump` is a press since the last read.
-export type SkateKeys = { move: Vector2, pump: boolean, brake: boolean, attach: boolean, jump: boolean }
+-- One read of the keys: the move stick (x right, y forward) and the buttons. `jump` is a press since the last read,
+-- `jumpHeld` the jump key held now (the Air Pose lasts while it is, #245).
+export type SkateKeys = {
+	move: Vector2,
+	pump: boolean,
+	brake: boolean,
+	attach: boolean,
+	jump: boolean,
+	jumpHeld: boolean,
+}
 -- One read of the action keys: a press since the last read for each, and the throw held now.
 export type ActionKeys = { tackle: boolean, uppercut: boolean, pass: boolean, throw: boolean }
 -- One read of the camera keys: the look (radians per second), Ball Focus held now, and pressed since the last read.
@@ -58,6 +66,7 @@ export type InputController = {
 	destroy: (self: InputController) -> (),
 	_input: Config.InputConfig,
 	_move: InputAction,
+	_jump: InputAction,
 	_pump: InputAction,
 	_brake: InputAction,
 	_attach: InputAction,
@@ -193,6 +202,7 @@ local InputController: InputController = {
 	paused = false,
 	_input = nil :: any,
 	_move = nil :: any,
+	_jump = nil :: any,
 	_pump = nil :: any,
 	_brake = nil :: any,
 	_attach = nil :: any,
@@ -244,7 +254,7 @@ local InputController: InputController = {
 		stick.Parent = move
 		self._move = move
 		self._stick = stick
-		newPressButton(self, NAMES.jump, input.jump, "jump")
+		self._jump = newPressButton(self, NAMES.jump, input.jump, "jump")
 		self._pump = newButton(context, NAMES.pump, input.pump)
 		self._brake = newButton(context, NAMES.brake, input.brake)
 		self._attach = newButton(context, NAMES.attach, input.attach)
@@ -288,7 +298,7 @@ local InputController: InputController = {
 	end,
 
 	newKeys = function(): SkateKeys
-		return { move = Vector2.zero, pump = false, brake = false, attach = false, jump = false }
+		return { move = Vector2.zero, pump = false, brake = false, attach = false, jump = false, jumpHeld = false }
 	end,
 
 	read = function(self: InputController, into: SkateKeys)
@@ -297,6 +307,7 @@ local InputController: InputController = {
 		into.brake = self._brake:GetState() :: boolean
 		into.attach = self._attach:GetState() :: boolean
 		into.jump = takePress(self, "jump")
+		into.jumpHeld = self._jump:GetState() :: boolean
 	end,
 
 	newActionKeys = function(): ActionKeys

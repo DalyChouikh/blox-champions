@@ -9,7 +9,7 @@
 -- the config, so a quiet frame allocates nothing. Hints name each key as the device shows it: on a gamepad Roblox's
 -- glyph, otherwise the name the player's own keyboard layout gives it, else Config.UI.keyNames, else the KeyCode's
 -- name. There are none on touch, where the buttons carry the labels. The Get Up prompt (a skater knocked down by a
--- strike or a hard landing: SkateController.promptsGetUp, #242) names the movement keys the same way: the first
+-- strike or a fall: SkateController.promptsGetUp, #242) names the movement keys the same way: the first
 -- composite's four keys, the gamepad's stick, or on touch Config.UI.text's name for the stick. The score tab shows
 -- while its key is held; on touch a button toggles it, and the toggle clears once the device is not touch and whenever
 -- the end screen appears or goes, so the tab never pops open unasked.

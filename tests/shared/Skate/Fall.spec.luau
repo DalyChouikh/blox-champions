@@ -30,14 +30,14 @@ end
 local function fly(fall: Fall.Fall, from: number, to: number)
 	local direction = if to > from then 1 else -1
 	for height = from, to, 2 * direction do
-		assert(not fall:step(height, NONE), "a frame in the air landed")
+		assert(fall:step(height, NONE) == "None", "a frame in the air landed")
 	end
-	assert(not fall:step(to, NONE), "a frame in the air landed")
+	assert(fall:step(to, NONE) == "None", "a frame in the air landed")
 end
 
--- Drops a new fall from `drop` studs above where the root comes to rest onto ground facing `normal`: whether it lands
--- hard. The landing frame finds the ground 5 studs below, still 5 - hoverHeight above resting on it.
-local function landsHard(drop: number, normal: Vector3?): boolean
+-- Drops a new fall from `drop` studs above where the root comes to rest onto ground facing `normal`: how it lands.
+-- The landing frame finds the ground 5 studs below, still 5 - hoverHeight above resting on it.
+local function landing(drop: number, normal: Vector3?): Fall.Landing
 	local fall = Fall.new(movement)
 	fly(fall, REST + drop, REACH + 1)
 	return fall:step(5, ground(5, normal))
@@ -48,9 +48,9 @@ describe("Fall", function()
 	it("lands hard from hardLanding.drop or more onto flat ground, on the landing frame only", function()
 		local fall = Fall.new(movement)
 		fly(fall, REST + hard.drop + 0.5, REACH + 1)
-		expect(fall:step(5, ground(5))).toBe(true)
-		expect(fall:step(REST, ground(REST))).toBe(false)
-		expect(landsHard(hard.drop - 0.5)).toBe(false)
+		expect(fall:step(5, ground(5))).toBe("Hard")
+		expect(fall:step(REST, ground(REST))).toBe("None")
+		expect(landing(hard.drop - 0.5)).toBe("Soft")
 	end)
 
 	-- The owner chose 40 over 20 so that an uppercut never knocks its own user down.
@@ -58,13 +58,16 @@ describe("Fall", function()
 		local leapImpulse = assert(config.Actions.Uppercut.motion).leapImpulse :: number
 		-- (110² + 42²) / (2 × 196.2) = 35.3 studs.
 		local leap = (leapImpulse ^ 2 + movement.airPoseImpulse ^ 2) / (2 * workspace.Gravity)
-		expect(landsHard(leap)).toBe(false)
+		expect(landing(leap)).toBe("Soft")
 	end)
 
 	it("lands on a wall or a bank steeper than wallAngle safely", function()
 		-- 45° and 20°, either side of wallAngle 30.
-		expect(landsHard(hard.drop + 10, slope(45))).toBe(false)
-		expect(landsHard(hard.drop + 10, slope(20))).toBe(true)
+		expect(landing(hard.drop + 10, slope(45))).toBe("None")
+		expect(landing(hard.drop + 10, slope(20))).toBe("Hard")
+		-- A short drop onto a wall is no landing either; onto flatter ground it is a soft one.
+		expect(landing(2, slope(45))).toBe("None")
+		expect(landing(2, slope(20))).toBe("Soft")
 	end)
 
 	-- The owner (#222): an Air Pose breaks a fall.
@@ -75,17 +78,17 @@ describe("Fall", function()
 		fly(fall, REST + 60, REACH + 2)
 		fly(fall, REACH + 2, REACH + 2 + hop)
 		fly(fall, REACH + 2 + hop, REACH + 1)
-		expect(fall:step(5, ground(5))).toBe(false)
+		expect(fall:step(5, ground(5))).toBe("Soft")
 	end)
 
 	it("counts a fall from where the skater left the ground", function()
 		local fall = Fall.new(movement)
 		-- Down the glass from 60 studs to a ledge 8 up, the ground under them all the way, then off it.
 		for height = REST + 60, REST + 8, -2 do
-			expect(fall:step(height, ground(REST, slope(80)))).toBe(false)
+			expect(fall:step(height, ground(REST, slope(80)))).toBe("None")
 		end
 		fly(fall, REST + 7, REACH + 1)
-		expect(fall:step(5, ground(5))).toBe(false)
+		expect(fall:step(5, ground(5))).toBe("Soft")
 	end)
 
 	it("starts over where a placement puts the skater", function()
@@ -93,10 +96,20 @@ describe("Fall", function()
 		fly(fall, REST + 60, REST + 50)
 		-- On the floor (a kickoff, a return to the spawn): no fall.
 		fall:reset()
-		expect(fall:step(REST, ground(REST))).toBe(false)
+		expect(fall:step(REST, ground(REST))).toBe("None")
 		-- Placed in the air, the fall counts from there.
 		fall:reset()
 		fly(fall, REST + hard.drop + 0.5, REACH + 1)
-		expect(fall:step(5, ground(5))).toBe(true)
+		expect(fall:step(5, ground(5))).toBe("Hard")
+	end)
+
+	-- The owner (#245): touching down still posing is a fall at any height; the server needs every landing.
+	it("tells a soft landing from riding the ground: the first frame in reach after the air only", function()
+		local fall = Fall.new(movement)
+		fly(fall, REACH + 1, REACH + 1)
+		expect(fall:step(REACH - 1, ground(REACH - 1))).toBe("Soft")
+		for height = REACH - 2, REST, -1 do
+			expect(fall:step(height, ground(height))).toBe("None")
+		end
 	end)
 end)

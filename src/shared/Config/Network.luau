@@ -30,6 +30,10 @@ export type NetworkConfig = {
 	-- How many requests to get up a client may send (a burst of this many, refilled per second): an honest client
 	-- sends one per knockdown, and a knockdown lasts at least Actions.getUpAfter (0.5 s).
 	maxGetUpsPerSecond: number,
+	-- How long a client keeps reporting an Air Pose it touched down in (#245): the server judges that fall from the
+	-- report, but sees the touchdown behind this client's screen, and the character's physics and remote events reach
+	-- it in no fixed order. The server's knockdown ends the report sooner.
+	posedLandingTolerance: number,
 }
 
 local defaults: NetworkConfig = {
@@ -44,6 +48,7 @@ local defaults: NetworkConfig = {
 	hitLagToleranceStuds = 3,
 	actionTimingTolerance = 0.1,
 	maxGetUpsPerSecond = 2,
+	posedLandingTolerance = 0.3,
 }
 
 local schema = Validate.record({
@@ -58,6 +63,7 @@ local schema = Validate.record({
 	hitLagToleranceStuds = Validate.number({ min = 0 }),
 	actionTimingTolerance = Validate.number({ min = 0 }),
 	maxGetUpsPerSecond = Validate.number({ above = 0 }),
+	posedLandingTolerance = Validate.number({ min = 0 }),
 })
 
 return {

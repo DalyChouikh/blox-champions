@@ -1,6 +1,6 @@
 --!strict
 -- Skating (spec §7.2): the skater's body, momentum, steering, wall riding, pump, brake, jump, draft and attach, the
--- slide of a knocked-down skater, a hard landing, and the speedometer's scale.
+-- slide of a knocked-down skater, a hard landing and a belly landing, and the speedometer's scale.
 -- Speeds are in studs/s, accelerations in studs/s², turn rates in rad/s, angles in degrees. The values the spec
 -- doesn't give (hoverSpring, strideAccel, airTurnRate, airUprightRate, pumpFlatSlopeDeg, normalFilter, attachSpring)
 -- are starting points for tuning, like the spec's own.
@@ -63,9 +63,13 @@ export type MovementConfig = {
 	jumpImpulse: number,
 	-- A jump, and an Air Pose, costs this share of the speed (the owner, #218: 10%, so jumping is no free move).
 	jumpSpeedCost: number,
-	-- The Air Pose (a press in the air, once until landing) cancels any fall and adds this speed straight up: a hop
-	-- of 42² / (2 × 196.2) = 4.5 studs, about half a jump's 9.2 (the owner, #218).
+	-- The Air Pose (a press in the air, once until landing; it lasts while the key is held, #245) cancels any fall and
+	-- adds this speed straight up: a hop of 42² / (2 × 196.2) = 4.5 studs, about half a jump's 9.2 (the owner, #218).
+	-- Falling posed, the skater flies down the fall line like a diver (#245).
 	airPoseImpulse: number,
+	-- Touching down from the air on the belly (diving, or still posing) keeps this share of the speed, then the slide
+	-- (the owner, #245: RC kept 59-73%, 65.5% on average: 133 -> 84, 139 -> 101, 104 -> 70, 97 -> 57 km/h).
+	bellyLandingKeep: number,
 	-- A ground normal turning more than maxTurnDeg is trusted only once a second ray agrees; smaller turns are
 	-- smoothed at this rate (per second).
 	normalFilter: { maxTurnDeg: number, smoothing: number },
@@ -121,6 +125,7 @@ local defaults: MovementConfig = {
 	jumpImpulse = 60,
 	jumpSpeedCost = 0.1,
 	airPoseImpulse = 42,
+	bellyLandingKeep = 0.65,
 	normalFilter = { maxTurnDeg = 30, smoothing = 30 },
 	draftRange = 18,
 	draftConeDeg = 30,
@@ -173,6 +178,7 @@ local fields = Validate.record({
 	jumpImpulse = nonNegative,
 	jumpSpeedCost = Validate.number({ min = 0, max = 1 }),
 	airPoseImpulse = nonNegative,
+	bellyLandingKeep = Validate.number({ above = 0, max = 1 }),
 	normalFilter = Validate.record({ maxTurnDeg = angle, smoothing = positive }),
 	draftRange = positive,
 	draftConeDeg = angle,

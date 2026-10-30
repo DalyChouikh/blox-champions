@@ -386,23 +386,77 @@ describe("SkateController", function()
 		expect(sent).toEqual({ { true, false, false } })
 	end)
 
-	-- Everyone else poses the Air Pose from the server's attribute (#218).
-	it("tells the server when the Air Pose starts and ends", function()
+	-- Everyone else poses the Air Pose from the server's attribute (#218). The owner (#245): it lasts while the jump
+	-- key is held.
+	it("tells the server when the Air Pose starts and when letting go of the key ends it", function()
 		local skater = SkateController.skater :: any
 		skater.mode = "Airborne"
 		skater.velocity = Vector3.new(0, 30, 0)
-		Fixtures.scriptedBinding(InputController.context, "Jump"):Fire(true)
+		local jump = Fixtures.scriptedBinding(InputController.context, "Jump")
+		jump:Fire(true)
 		-- The press arrives with the deferred events.
 		task.wait()
 		SkateController:step(1 / 60)
 		expect(sent).toEqual({ { false, false, true } })
-		-- It comes back down onto the floor, and the pose ends.
-		for _ = 1, 60 do
-			SkateController:step(1 / 60)
-		end
-		expect(skater.mode).toBe("Grounded")
+		jump:Fire(false)
+		task.wait()
+		SkateController:step(1 / 60)
+		expect(skater.mode).toBe("Airborne")
 		expect(sent).toEqual({ { false, false, true }, { false, false, false } })
 	end)
+
+	-- The owner (#245): touching down still posing is a fall, which the server judges from the attribute, behind this
+	-- screen. So a pose held into the ground is still reported for posedLandingTolerance, or until the knockdown.
+	it(
+		"still reports a pose held into the ground for posedLandingTolerance, or until a knockdown or a freeze",
+		function()
+			local skater = SkateController.skater :: any
+			local jump = Fixtures.scriptedBinding(InputController.context, "Jump")
+			local POSED, STANDING = { false, false, true }, { false, false, false }
+			-- Strikes the pose on a hop and holds it down to the floor, then lets go.
+			local function landPosed()
+				skater.mode = "Airborne"
+				skater.velocity = Vector3.new(0, 30, 0)
+				jump:Fire(true)
+				task.wait()
+				for _ = 1, 60 do
+					SkateController:step(1 / 60)
+					if skater.mode == "Grounded" then
+						break
+					end
+				end
+				expect(skater.mode).toBe("Grounded")
+				jump:Fire(false)
+				task.wait()
+			end
+			landPosed()
+			-- 0.3 s is 18 frames: one short of them, still posed; one past them, not.
+			local frames = math.round(config.Network.posedLandingTolerance * 60)
+			for _ = 1, frames - 1 do
+				SkateController:step(1 / 60)
+			end
+			expect(sent).toEqual({ POSED })
+			SkateController:step(1 / 60)
+			SkateController:step(1 / 60)
+			expect(sent).toEqual({ POSED, STANDING })
+			landPosed()
+			expect(sent).toEqual({ POSED, STANDING, POSED })
+			rig:SetAttribute(Attributes.KnockedDown, "Fall")
+			SkateController:step(1 / 60)
+			expect(sent).toEqual({ POSED, STANDING, POSED, STANDING })
+			-- So do a kickoff freeze and a new character.
+			rig:SetAttribute(Attributes.KnockedDown, nil)
+			landPosed()
+			Fixtures.root(rig).Anchored = true
+			SkateController:step(1 / 60)
+			expect(sent).toEqual({ POSED, STANDING, POSED, STANDING, POSED, STANDING })
+			Fixtures.root(rig).Anchored = false
+			landPosed()
+			SkateController:bind(skaterAt("Respawned", Vector3.new(50, 0, 0)))
+			SkateController:step(1 / 60)
+			expect(sent).toEqual({ POSED, STANDING, POSED, STANDING, POSED, STANDING, POSED })
+		end
+	)
 
 	it("drops a jump pressed while it had no character", function()
 		local jumpKey = Fixtures.scriptedBinding(InputController.context, "Jump")
