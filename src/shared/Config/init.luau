@@ -22,6 +22,7 @@ export type ActionName = Actions.ActionName
 export type Effect = Actions.Effect
 export type PoseName = Actions.PoseName
 export type Hit = Actions.Hit
+export type Landing = Actions.Landing
 export type ThrowSettings = Actions.ThrowSettings
 export type PassSettings = Actions.PassSettings
 export type ArenaConfig = Arena.ArenaConfig

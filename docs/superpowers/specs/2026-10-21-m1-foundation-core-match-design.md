@@ -273,24 +273,25 @@ Each action is a data entry in `Config/Actions`:
 Tackle = {
     phases = { windup = 0.05, active = 0.25, recovery = 0.35 },
     cooldown = 0.8,
-    requires = { ball = "without", grounded = "any", notKnockedDown = true },
-    hit = { range = 7, coneDeg = 50, effect = "Knockdown", knockdownSeconds = 1.5 },
+    requires = { ball = "without", grounded = "grounded", notKnockedDown = true },
+    effect = "Knockdown",
+    pose = "Lunge",
+    hit = { range = 7, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
     motion = { lungeSpeed = 40 },
-    followUp = { action = "Dive", window = "active" },
 }
 ```
 
-`ActionRunner` (pure) advances phases, enforces cooldowns/requirements, and reports effect windows. The client starts the action immediately (pose + motion); the server's `ActionService` re-checks requirements and cooldown, and resolves hits against server-side positions with `Network.hitLagToleranceStuds` = 3 extra range. Adding an action (or an M5 item) = config entry + one effect function.
+`ActionRunner` (pure) advances phases, enforces cooldowns/requirements, and reports effect windows. A key starts the first of its `Input.actions` whose requirements fit the ball and the ground or air (the Tackle key: a Tackle on the ground, a Dive in the air, a Dodge with the ball). The client starts the action immediately (pose + motion); the server's `ActionService` re-checks requirements and cooldown, and resolves hits against server-side positions with `Network.hitLagToleranceStuds` = 3 extra range. The server's view of a jump lags the client's, so it never judges the air: an action needing the ground or the air may start there either way. An action with a `landing` (the Dive) ends on the skater's belly (§8.2). Adding an action (or an M5 item) = config entry + one effect function.
 
 ### 8.2 Action list (initial values in `Config/Actions`)
 
 | Action | Requires | Behavior |
 |---|---|---|
-| Tackle | no ball | Lunge; hit opponent in cone → knockdown 1.5 s; a hit ball carrier drops the ball, which keeps their momentum. |
-| Dive | pressing Tackle during Tackle's active phase | Range 11, active 0.35 s, recovery 0.9 s. |
+| Tackle | no ball, on the ground | Lunge; hit opponent in cone → knockdown 1.5 s; a hit ball carrier drops the ball, which keeps their momentum. |
+| Dive | no ball, in the air (the Tackle key) | Lunge along the facing at the full `lungeSpeed = 60` (never `airMultiplier`'d: it only starts in the air), up to the `hardCap` ceiling (145 km/h); range 11, active 0.35 s, recovery 0.9 s. It ends on the belly: nothing else starts until the diver's first touch of the ground after the active phase, which knocks them down for `landing.knockdownSeconds = 1.5` (sliding, then the Get Up flow). The server sees the touchdown with its own ray along the diver's down (`Movement.groundProbeLength`) against the arena's ride surfaces; no one scores that knockdown. *The owner (#221): Roller Champions' dive (Video 5 at 1:13) starts in the air, rose to 139 km/h and ended on the belly, sliding; it is its own anti-spam, so the 3 s wait after a dive planned earlier is dropped. Was a Tackle follow-up during its active phase.* |
 | Dodge | ball | Side-step at `sideSpeed = 45` in the move direction; tackle-immune for 0.3 s; cooldown 1.5 s. |
 | Uppercut | no ball | Knocks down an opponent in front/above (range 6, cone 60°). Leaps the skater straight up anywhere (`leapImpulse = 110`: about 31 studs from the ground, `airMultiplier` as strong in the air), never past `hardCap`. *The owner (#219): Roller Champions' uppercut launches on open floor; was a leap only within 5 studs of a wall.* Cooldown 1.2 s. |
-| Air tackle / Air dodge | airborne | Same as Tackle / Dodge with `airMultiplier = 0.8` on lunge/side speed. |
+| Air dodge | ball, airborne | Same as Dodge with `airMultiplier = 0.8` on the side speed. |
 | Charge Throw | ball | Hold to charge up to `chargeMaxSeconds = 1.0`; release throws along camera aim at `lerp(minThrowSpeed = 60, maxThrowSpeed = 160, charge)` + `inheritCarrierVelocity = 0.5` × carrier velocity. |
 | Pass | ball | Magnetic pass at `passSpeed = 90` to a teammate who called within `callPassWindow = 3` s (most recent caller first), else the best-scored teammate inside `passTargeting.coneDeg = 70` and `passTargeting.maxRange = 120`, where score = `angleWeight (0.6)` × (1 − angle/cone) + `distanceWeight (0.4)` × (1 − distance/maxRange). With no valid target, the ball is passed straight along the aim at `passSpeed`. Homing acceleration `passHomingAccel = 60`; interceptable. |
 | Call Pass | no ball | Shows a hand icon over you for `callPassWindow`; cooldown 1 s. |
@@ -307,7 +308,7 @@ Tackle = {
 | Brake / Tiptoe (hold) | LeftControl | ButtonR1 | Hold button |
 | Charge Throw (with ball) | MouseButton1 hold | ButtonL2 hold | Hold button |
 | Ball Focus (without ball) | MouseButton2 | ButtonL2 | Toggle button |
-| Tackle → Dive / Dodge (with ball) | E | ButtonX | Context button |
+| Tackle (ground) / Dive (air) / Dodge (with ball) | E | ButtonX | Context button |
 | Uppercut | Q | ButtonB | Button |
 | Pass / Call Pass | R | ButtonY | Context button |
 | Attach (hold) | F | ButtonL1 | Appears only when behind a teammate |

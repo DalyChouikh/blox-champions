@@ -4,7 +4,9 @@
 -- server, which checks the action again. A throw or pass predicts the ball leaving. A refusal (ActionRejected) stops
 -- the action, refunds its cooldown and gives a refused throw's ball back; a push already given stays, which the
 -- movement guard tolerates. A throw let go while another action runs waits for it. Nothing starts while the skater is
--- frozen for a kickoff or knocked down.
+-- frozen for a kickoff, knocked down or diving: an action with a landing (the Dive) holds the skater
+-- (SkateController.diving) until the server knocks them down at their touchdown, and a knockdown stops the running
+-- action, as the server stops it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -45,36 +47,27 @@ export type ActionController = {
 	_camera: { CFrame: CFrame },
 	_sendRequest: (payload: { [string]: any }) -> (),
 	_localId: PlayerId,
-	-- Records reused every step.
+	-- Records reused every step: the keys, an action's start, and which action a key names (never knocked down).
 	_keys: InputController.ActionKeys,
 	_context: ActionRunner.Context,
+	_keyContext: ActionRunner.Context,
 	-- Seconds the throw has been held with the ball; nil while not charging.
 	_charge: number?,
 	-- The throw key was seen up while the player held the ball, so holding it now charges a throw.
 	_throwReady: boolean,
 }
 
--- The action a key starts: its own, or the running action's follow-up when that runs in its window (a dive during a
--- tackle's active phase).
-local function forKey(self: ActionController, own: Config.ActionName): Config.ActionName
-	local runner = self.runner
-	local running: Config.ActionName? = runner.action
-	if running == own then
-		local followUp = self._config.Actions[running].followUp
-		if followUp ~= nil and runner.phase == followUp.window then
-			return followUp.action
-		end
-	end
-	return own
-end
-
--- The action `key` starts: the first of Config.Input.actions[key] whose ball requirement fits, as its own or as its
--- follow-up; nil when none fits (an uppercut with the ball, a throw without).
+-- The action `key` starts: the first of Config.Input.actions[key] whose requirements fit the ball and the air (a
+-- tackle on the ground, a dive in the air); nil when none fits (an uppercut with the ball, a throw without).
 local function actionFor(self: ActionController, key: Config.ActionKey, hasBall: boolean): Config.ActionName?
+	local skater = self._skate.skater
+	local context = self._keyContext
+	context.hasBall = hasBall
+	context.airborne = skater ~= nil and skater.mode == "Airborne"
 	local actions = self._config.Actions
 	for _, name in self._config.Input.actions[key] do
-		if ActionRunner.ballFits(actions[name].requires.ball, hasBall) then
-			return forKey(self, name)
+		if ActionRunner.allows(actions[name].requires, context) then
+			return name
 		end
 	end
 	return nil
@@ -119,7 +112,7 @@ local function chosen(
 end
 
 -- The push an action gives as it starts: a lunge along the facing, a dodge along the stick (to the right without one),
--- a leap straight up. In the air it is airMultiplier as strong.
+-- a leap straight up. In the air it is airMultiplier as strong, unless the action starts only there (the dive).
 local function push(self: ActionController, skater: SkateMath.Skater, action: Config.ActionConfig)
 	local motion = action.motion
 	if motion == nil then
@@ -144,7 +137,7 @@ local function push(self: ActionController, skater: SkateMath.Skater, action: Co
 	if change.Magnitude <= Vectors.EPSILON then
 		return
 	end
-	if skater.mode == "Airborne" then
+	if skater.mode == "Airborne" and action.requires.grounded ~= "airborne" then
 		change *= self._config.Actions.airMultiplier
 	end
 	self._skate:push(change, launch)
@@ -175,10 +168,11 @@ local function request(
 end
 
 local function begin(self: ActionController, skater: SkateMath.Skater, name: Config.ActionName, hasBall: boolean)
+	local skate = self._skate
 	local context = self._context
 	context.hasBall = hasBall
 	context.airborne = skater.mode == "Airborne"
-	context.knockedDown = self._skate.knockedDown
+	context.knockedDown = skate.knockedDown or skate.diving
 	if self.runner:start(name, context) ~= "Started" then
 		return
 	end
@@ -187,6 +181,9 @@ local function begin(self: ActionController, skater: SkateMath.Skater, name: Con
 		self._charge = nil
 	end
 	local action = self._config.Actions[name]
+	if action.landing ~= nil then
+		skate.diving = true
+	end
 	push(self, skater, action)
 	self._sendRequest(request(self, name, action, held))
 	if letsGoOfBall(action) then
@@ -207,6 +204,7 @@ local ActionController: ActionController = {
 	_localId = "",
 	_keys = nil :: any,
 	_context = nil :: any,
+	_keyContext = nil :: any,
 	_charge = nil,
 	_throwReady = false,
 
@@ -226,6 +224,7 @@ local ActionController: ActionController = {
 		self.runner = ActionRunner.new(config.Actions)
 		self._keys = InputController.newActionKeys()
 		self._context = { hasBall = false, airborne = false, knockedDown = false }
+		self._keyContext = { hasBall = false, airborne = false, knockedDown = false }
 		self._charge = nil
 		self._throwReady = false
 	end,
@@ -262,6 +261,10 @@ local ActionController: ActionController = {
 			return
 		end
 		self.runner:step(dt)
+		local running: Config.ActionName? = self.runner.action
+		if skate.knockedDown and running ~= nil then
+			self.runner:cancel(running, false)
+		end
 		self._input:readActions(keys)
 		local hasBall = holdsBall(self)
 		local name: Config.ActionName? = chosen(self, keys, hasBall, dt)
@@ -274,8 +277,12 @@ local ActionController: ActionController = {
 		local name: Config.ActionName? = Actions.nameOf(payload.action)
 		if name ~= nil then
 			self.runner:cancel(name, true)
-			if letsGoOfBall(self._config.Actions[name]) then
+			local action = self._config.Actions[name]
+			if letsGoOfBall(action) then
 				self._carrier:undoPrediction()
+			end
+			if action.landing ~= nil then
+				self._skate.diving = false
 			end
 		end
 	end,

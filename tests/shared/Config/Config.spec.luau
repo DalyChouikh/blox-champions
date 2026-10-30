@@ -65,31 +65,33 @@ describe("Config defaults", function()
 	end)
 
 	it("match the spec's actions, plus this phase's", function()
-		local requires = function(ball: string): any
-			return { ball = ball, grounded = "any", notKnockedDown = true }
+		local requires = function(ball: string, grounded: string?): any
+			return { ball = ball, grounded = grounded or "any", notKnockedDown = true }
 		end
 		expect(Config.defaults().Actions).toEqual({
 			airMultiplier = 0.8,
 			callPassWindow = 3,
 			getUpAfter = 0.5,
+			-- On the ground only: in the air the tackle key dives (#221).
 			Tackle = {
 				phases = { windup = 0.05, active = 0.25, recovery = 0.35 },
 				cooldown = 0.8,
-				requires = requires("without"),
+				requires = requires("without", "grounded"),
 				effect = "Knockdown",
 				pose = "Lunge",
 				hit = { range = 7, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
 				motion = { lungeSpeed = 40 },
-				followUp = { action = "Dive", window = "Active" },
 			},
+			-- In the air only, ending on the belly at the first touch of the ground (#221).
 			Dive = {
 				phases = { windup = 0, active = 0.35, recovery = 0.9 },
 				cooldown = 0.8,
-				requires = requires("without"),
+				requires = requires("without", "airborne"),
 				effect = "Knockdown",
 				pose = "Lunge",
 				hit = { range = 11, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
 				motion = { lungeSpeed = 60 },
+				landing = { knockdownSeconds = 1.5 },
 			},
 			Dodge = {
 				phases = { windup = 0, active = 0.3, recovery = 0.2 },
@@ -243,7 +245,7 @@ describe("Config defaults", function()
 		expect(input.touchBallFocusMode).toBe("Toggle")
 		expect(input.scoreTab).toEqual({ Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect })
 		expect(input.actions).toEqual({
-			tackle = { "Tackle", "Dodge" },
+			tackle = { "Tackle", "Dive", "Dodge" },
 			uppercut = { "Uppercut" },
 			pass = { "Pass", "CallPass" },
 			throw = { "ChargeThrow" },
@@ -808,9 +810,14 @@ describe("Config.forMode", function()
 				overrides = { ChargeThrow = { throw = { maxSpeed = 50 } } },
 				message = "Actions.ChargeThrow.throw: maxSpeed must be at least minSpeed",
 			},
+			-- No action follows another any more: the Dive starts in the air (#221).
 			{
-				overrides = { Tackle = { followUp = { action = "Tackle" } } },
-				message = "Actions.Tackle.followUp.action: must name another action",
+				overrides = { Tackle = { followUp = { action = "Dive", window = "Active" } } },
+				message = "Actions.Tackle.followUp: unknown key",
+			},
+			{
+				overrides = { Dive = { landing = { knockdownSeconds = 0 } } },
+				message = "Actions.Dive.landing.knockdownSeconds: must be > 0 (got 0)",
 			},
 			{
 				overrides = { Dodge = { hit = { range = 1, coneDeg = 1, aimUpDeg = 0, knockdownSeconds = 1 } } },

@@ -197,16 +197,10 @@ describe("TouchControls", function()
 		expect(button("throw").Text).toBe(labels.ChargeThrow)
 		expect(button("uppercut").Visible).toBe(false)
 
-		-- Into the tackle's active phase, past its 0.05 s windup: the button would dive.
+		-- In the air, without the ball, the button dives (#221).
 		BallCarrier:set(nil)
-		local tackle = Fixtures.scriptedBinding(InputController.context, "Tackle")
-		tackle:Fire(true)
-		task.wait() -- Pressed is deferred
-		tackle:Fire(false)
-		for _ = 1, 5 do
-			SkateController:step(DT)
-			ActionController:step(DT)
-		end
+		local skater = SkateController.skater :: any
+		skater.mode = "Airborne"
 		TouchControls:step(DT)
 		expect(button("tackle").Text).toBe(labels.Dive)
 

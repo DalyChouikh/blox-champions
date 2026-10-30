@@ -24,6 +24,8 @@ local SPAWNS = { CFrame.new(0, 500, 0) }
 local PARKED = Vector3.new(0, 300, 0)
 -- On the middle of a straight: a free ball there is in play.
 local ON_TRACK = Vector3.new(0, 3, config.Arena.endRadius)
+-- High over the track spot: a root there is out of the ground ray's reach (Movement.groundProbeLength).
+local AIR = Vector3.new(0, 30, 0)
 
 type Sent = { to: string, name: string, payload: any }
 
@@ -42,8 +44,9 @@ local fakeNet = {
 	end,
 }
 
+-- Its ride surfaces: a floor under the track spot, set for each test.
 local fakeArena = {
-	arena = { ballSpawns = SPAWNS, teamSpawns = { Blue = {}, Orange = {} } },
+	arena = { ballSpawns = SPAWNS, teamSpawns = { Blue = {}, Orange = {} }, rideSurfaces = {} :: { Instance } },
 }
 
 local folder: Folder
@@ -64,6 +67,16 @@ beforeEach(function()
 	table.clear(rigs)
 	table.clear(stubs)
 	blue, orange = {}, {}
+	-- Its top at y 0: a root standing on the track spot is 3 studs above it.
+	local floor = Instance.new("Folder")
+	floor.Name = "Floor"
+	local slab = Instance.new("Part")
+	slab.Anchored = true
+	slab.Size = Vector3.new(400, 1, 400)
+	slab.CFrame = CFrame.new(ON_TRACK.X, -0.5, ON_TRACK.Z)
+	slab.Parent = floor
+	floor.Parent = folder
+	fakeArena.arena.rideSurfaces = { floor }
 	BallService:init({ Config = config, ArenaService = fakeArena })
 	TeamService:init({ Config = config })
 	CharacterService:init({
@@ -78,6 +91,7 @@ beforeEach(function()
 		BallService = BallService,
 		TeamService = TeamService,
 		CharacterService = CharacterService,
+		ArenaService = fakeArena,
 	})
 	-- Teams take turns, with a random first pick: sort the six seated players by the team they got.
 	for index = 1, 6 do
@@ -417,15 +431,74 @@ describe("ActionService", function()
 		expect(advance(0.4, 0.4)).toEqual({ `{a}>{b}` })
 	end)
 
-	it("rejects a dive that does not follow a tackle", function()
+	-- The server can't tell when a client left the ground (its view lags), so it takes the client's dive (#221).
+	it("dives: strikes an opponent within the dive's reach", function()
 		local a, b = blue[1], orange[1]
-		stand(a, Vector3.zero)
+		stand(a, AIR)
 		-- Inside a dive's reach (11 + the lag tolerance), outside a tackle's.
-		stand(b, Vector3.new(0, 0, -12))
+		stand(b, AIR + Vector3.new(0, 0, -12))
 		ActionService:request(a, { action = "Dive" })
-		expect(rejected(a)).toEqual({ "Dive" })
+		expect(rejected(a)).toEqual({})
+		expect(attribute(a, Attributes.Action)).toBe("Dive")
+		expect(advance(0.4)).toEqual({ `{a}>{b}` })
+	end)
+
+	-- Roller Champions' dive ends on the diver's belly (#221); nothing else starts meanwhile.
+	it("knocks a diver down at their first touch of the ground after the dive's active phase", function()
+		local a = blue[1]
+		local landing = config.Actions.Dive.landing :: Config.Landing
+		stand(a, AIR)
+		ActionService:request(a, { action = "Dive" })
+		ActionService:request(a, { action = "Uppercut" })
+		expect(rejected(a)).toEqual({ "Uppercut" })
+		-- On the floor during the active phase (0.35 s): not yet.
+		advance(0.1)
+		stand(a, Vector3.zero)
+		advance(0.15)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+		-- Still flying once the dive's phases are over: not yet either, and nothing else starts.
+		local phases = config.Actions.Dive.phases
+		stand(a, AIR)
+		advance(phases.windup + phases.active + phases.recovery)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+		ActionService:request(a, { action = "Uppercut" })
+		expect(rejected(a)).toEqual({ "Uppercut", "Uppercut" })
+		-- The touchdown: their own knockdown, which no one scored, for the landing's knockdownSeconds.
+		stand(a, Vector3.zero)
+		expect(advance(DT)).toEqual({})
+		expect(attribute(a, Attributes.KnockedDown)).toBe(true)
 		expect(attribute(a, Attributes.Action)).toBeNil()
-		expect(advance(0.4)).toEqual({})
+		advance(landing.knockdownSeconds - 0.05)
+		expect(attribute(a, Attributes.KnockedDown)).toBe(true)
+		advance(0.1)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+		-- Free again.
+		ActionService:request(a, { action = "Uppercut" })
+		expect(rejected(a)).toEqual({ "Uppercut", "Uppercut" })
+	end)
+
+	it("looks for no touchdown under a diver whose character has died", function()
+		local a = blue[1]
+		stand(a, AIR)
+		ActionService:request(a, { action = "Dive" })
+		stand(a, Vector3.zero)
+		local humanoid = rigs[a]:FindFirstChildOfClass("Humanoid") :: Humanoid
+		humanoid.Health = 0
+		expect(advance(1)).toEqual({})
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+	end)
+
+	it("ends a dive at a kickoff", function()
+		local a = blue[1]
+		stand(a, AIR)
+		ActionService:request(a, { action = "Dive" })
+		ActionService:reset()
+		ActionService:request(a, { action = "Uppercut" })
+		expect(rejected(a)).toEqual({})
+		-- Its touchdown knocks no one down.
+		stand(a, Vector3.zero)
+		advance(1)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 	end)
 
 	it("accepts a next action that arrives within actionTimingTolerance of the running one's end", function()
@@ -454,9 +527,8 @@ describe("ActionService", function()
 		-- The tackle recovers from 0.3 s.
 		advance(0.3)
 		expect(attribute(a, Attributes.Action)).toBeNil()
-		-- A dive from a tackle: shown through its active phase (0.35 s), not its recovery.
-		ActionService:request(b, { action = "Tackle" })
-		advance(0.1)
+		-- A dive, high in the air: shown through its active phase (0.35 s), not its recovery.
+		stand(b, AIR + Vector3.new(50, 0, 0))
 		ActionService:request(b, { action = "Dive" })
 		advance(0.3)
 		expect(attribute(b, Attributes.Action)).toBe("Dive")

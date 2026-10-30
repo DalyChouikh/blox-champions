@@ -15,9 +15,11 @@ export type PoseName = "Lunge" | "None"
 export type Phases = { windup: number, active: number, recovery: number }
 -- Whether an action needs the ball in hand, needs empty hands, or either.
 export type BallRequirement = "with" | "without" | "any"
+-- Whether an action starts only on the ground, only in the air, or either.
+export type Grounded = "grounded" | "airborne" | "any"
 export type Requires = {
 	ball: BallRequirement,
-	grounded: "grounded" | "airborne" | "any",
+	grounded: Grounded,
 	notKnockedDown: boolean,
 }
 -- Who a strike reaches: within range, and within coneDeg of the facing pitched up by aimUpDeg.
@@ -29,6 +31,9 @@ export type Motion = {
 	-- Straight up, anywhere: the Uppercut's leap (#219).
 	leapImpulse: number?,
 }
+-- How an action that ends on the skater's belly (the Dive, #221) ends: from its start they can do nothing until their
+-- first touch of the ground after its active phase, which knocks them down for knockdownSeconds.
+export type Landing = { knockdownSeconds: number }
 export type ThrowSettings = {
 	-- Holding this long charges the throw fully.
 	chargeMaxSeconds: number,
@@ -56,13 +61,13 @@ export type ActionConfig = {
 	pose: PoseName,
 	hit: Hit?,
 	motion: Motion?,
-	-- Another action that may start during this one's `window` phase, replacing it.
-	followUp: { action: ActionName, window: "Active" }?,
+	landing: Landing?,
 	throw: ThrowSettings?,
 	pass: PassSettings?,
 }
 export type ActionsConfig = {
-	-- Pushes in the air are this much of their ground value (spec's air tackle and air dodge).
+	-- Pushes in the air are this much of their ground value (an air dodge, an uppercut in the air). An action that
+	-- starts only in the air (the Dive) pushes as configured.
 	airMultiplier: number,
 	-- A call for a pass lasts this long.
 	callPassWindow: number,
@@ -82,12 +87,6 @@ export type ActionsConfig = {
 local names: { ActionName } = { "Tackle", "Dive", "Dodge", "Uppercut", "ChargeThrow", "Pass", "CallPass" }
 table.freeze(names)
 
--- The same names as plain strings, for the schema's one-of checks.
-local nameStrings: { string } = {}
-for _, name in names do
-	table.insert(nameStrings, name)
-end
-
 -- The action called `name`, or nil: a name read back as a plain string (an attribute, a message) typed again.
 local function nameOf(name: string?): ActionName?
 	for _, action: ActionName in names do
@@ -98,8 +97,9 @@ local function nameOf(name: string?): ActionName?
 	return nil
 end
 
-local function requires(ball: BallRequirement): Requires
-	return { ball = ball, grounded = "any", notKnockedDown = true }
+-- On the ground or in the air unless `grounded` says which.
+local function requires(ball: BallRequirement, grounded: Grounded?): Requires
+	return { ball = ball, grounded = grounded or "any", notKnockedDown = true }
 end
 
 local INSTANT: Phases = { windup = 0, active = 0, recovery = 0 }
@@ -109,24 +109,28 @@ local defaults: ActionsConfig = {
 	callPassWindow = 3,
 	-- The owner (#220): any movement key gets a skater up, not before 0.5 s; RC's knockdown lasted under 1.8 s.
 	getUpAfter = 0.5,
+	-- On the ground; in the air the tackle key dives (#221).
 	Tackle = {
 		phases = { windup = 0.05, active = 0.25, recovery = 0.35 },
 		cooldown = 0.8,
-		requires = requires("without"),
+		requires = requires("without", "grounded"),
 		effect = "Knockdown",
 		pose = "Lunge",
 		hit = { range = 7, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
 		motion = { lungeSpeed = 40 },
-		followUp = { action = "Dive", window = "Active" },
 	},
+	-- Roller Champions' dive (the owner's recording, Video 5 at 1:13): in the air, 60 studs/s more along the way the
+	-- skater flies (from RC's 69 km/h, 57.5 studs/s, to 117.5 = 141 km/h at once; RC's rose to 139), then on the belly
+	-- for as long as a tackle leaves its victim down.
 	Dive = {
 		phases = { windup = 0, active = 0.35, recovery = 0.9 },
 		cooldown = 0.8,
-		requires = requires("without"),
+		requires = requires("without", "airborne"),
 		effect = "Knockdown",
 		pose = "Lunge",
 		hit = { range = 11, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
 		motion = { lungeSpeed = 60 },
+		landing = { knockdownSeconds = 1.5 },
 	},
 	-- Tackle-immune exactly while active.
 	Dodge = {
@@ -217,15 +221,6 @@ local pass = Validate.check(
 	"angleWeight + distanceWeight must be above 0"
 )
 
-local function followUp(own: ActionName): Validate.Validator
-	return Validate.record({
-		action = Validate.check(Validate.string({ oneOf = nameStrings }), function(action: string): boolean
-			return action ~= own
-		end, "must name another action"),
-		window = Validate.string({ oneOf = { "Active" } }),
-	})
-end
-
 -- An action's record: the fields every action has, plus its own. Its effect is the default's and no other: modes
 -- change an action's numbers, never what it does (Net/Schemas shapes each action's request by its effect).
 local function action(default: ActionConfig, own: { [string]: Validate.Validator }): Validate.Validator
@@ -248,12 +243,12 @@ local schema = Validate.record({
 	airMultiplier = fraction,
 	callPassWindow = positive,
 	getUpAfter = positive,
-	Tackle = action(defaults.Tackle, {
+	Tackle = action(defaults.Tackle, { hit = hit, motion = Validate.record({ lungeSpeed = positive }) }),
+	Dive = action(defaults.Dive, {
 		hit = hit,
 		motion = Validate.record({ lungeSpeed = positive }),
-		followUp = followUp("Tackle"),
+		landing = Validate.record({ knockdownSeconds = positive }),
 	}),
-	Dive = action(defaults.Dive, { hit = hit, motion = Validate.record({ lungeSpeed = positive }) }),
 	Dodge = action(defaults.Dodge, { motion = Validate.record({ sideSpeed = positive }) }),
 	Uppercut = action(defaults.Uppercut, {
 		hit = hit,

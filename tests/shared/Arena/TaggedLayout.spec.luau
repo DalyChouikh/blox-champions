@@ -66,6 +66,10 @@ local function arenaRoot(): Folder
 	tagged(root, "Blue1", Tags.TeamSpawn, CFrame.new(0, 0, -53)):SetAttribute(Tags.Attribute.Team, "Blue")
 	tagged(root, "Orange1", Tags.TeamSpawn, CFrame.new(0, 0, 53)):SetAttribute(Tags.Attribute.Team, "Orange")
 	tagged(root, "Ball1", Tags.BallSpawn, CFrame.new(-140, 6, 0))
+	local floor = Instance.new("Folder")
+	floor.Name = "Floor"
+	floor:AddTag(Tags.RideSurface)
+	floor.Parent = root
 	root.Parent = ServerStorage
 	table.insert(roots, root)
 	return root
@@ -103,6 +107,9 @@ describe("TaggedLayout.read", function()
 		end
 		expect(arena.teamSpawns.Orange[1].Position).toEqual(Vector3.new(0, 0, 53))
 		expect(arena.ballSpawns[1].Position).toEqual(Vector3.new(-140, 6, 0))
+		-- The surfaces skaters ride, for the server's own rays (#221).
+		expect(#arena.rideSurfaces).toBe(1)
+		expect(arena.rideSurfaces[1].Name).toBe("Floor")
 	end)
 
 	-- An art pass may tag a single part instead of a model.
@@ -206,7 +213,7 @@ describe("TaggedLayout.read", function()
 		end).toThrow("TaggedLayout: no TeamSpawn found for Orange")
 	end)
 
-	it("rejects markers that don't match the gates and an arena with no ball spawn", function()
+	it("rejects markers that don't match the gates, and an arena with no ball spawn or no surface to ride", function()
 		local root = arenaRoot()
 		child(root, "Marker4"):Destroy()
 		expect(function()
@@ -217,5 +224,10 @@ describe("TaggedLayout.read", function()
 		expect(function()
 			TaggedLayout.read(other)
 		end).toThrow("TaggedLayout: no BallSpawn found")
+		local floorless = arenaRoot()
+		child(floorless, "Floor"):Destroy()
+		expect(function()
+			TaggedLayout.read(floorless)
+		end).toThrow("TaggedLayout: no RideSurface found")
 	end)
 end)

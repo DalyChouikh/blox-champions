@@ -1,8 +1,9 @@
 --!strict
 -- Reads an arena's tagged features (spec §9.2) back into what gameplay needs: the rules' ArenaLayout (gates and the
--- goal's scoring disc), the goal panel to open and close, the corner markers and the spawn frames. Only tagged
--- instances under `root` count, so a leftover arena or an art model elsewhere in the place is ignored. Anything
--- malformed fails fast, naming the tag at fault: a mis-tagged arena must never silently miss laps or goals.
+-- goal's scoring disc), the goal panel to open and close, the corner markers, the spawn frames and the surfaces skaters
+-- ride, which the server's own rays look for (a diver's touchdown, #221). Only tagged instances under `root` count, so
+-- a leftover arena or an art model elsewhere in the place is ignored. Anything malformed fails fast, naming the tag at
+-- fault: a mis-tagged arena must never silently miss laps or goals.
 
 local CollectionService = game:GetService("CollectionService")
 
@@ -24,6 +25,8 @@ export type TaggedArena = {
 	teamSpawns: Types.TeamSpawns,
 	-- Sorted by part name.
 	ballSpawns: { CFrame },
+	-- Everything tagged RideSurface (folders of the floors, banks, walls and glass), for a RaycastParams include list.
+	rideSurfaces: { Instance },
 }
 
 local TaggedLayout = {}
@@ -182,6 +185,14 @@ local function readBallSpawns(root: Instance): { CFrame }
 	return spawns
 end
 
+local function readRideSurfaces(root: Instance): { Instance }
+	local surfaces = taggedUnder(root, Tags.RideSurface)
+	if #surfaces == 0 then
+		fail(`no {Tags.RideSurface} found`)
+	end
+	return surfaces
+end
+
 function TaggedLayout.read(root: Instance): TaggedArena
 	local gates = readGates(root)
 	local arena: TaggedArena = {
@@ -190,6 +201,7 @@ function TaggedLayout.read(root: Instance): TaggedArena
 		markers = readMarkers(root, #gates),
 		teamSpawns = readTeamSpawns(root),
 		ballSpawns = readBallSpawns(root),
+		rideSurfaces = readRideSurfaces(root),
 	}
 	return Freeze.deep(arena)
 end
