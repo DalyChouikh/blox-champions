@@ -173,7 +173,7 @@ describe("InputController", function()
 		local look = InputController.context:FindFirstChild("Look") :: InputAction
 		expect(look.Type).toBe(Enum.InputActionType.Direction2D)
 		local byKey = lookBindings()
-		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), math.rad(0.385)), EXACT)
+		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.1), math.rad(0.077)), EXACT)
 		Fixtures.expectNear2(byKey.Thumbstick2.Vector2Scale, Vector2.new(math.rad(240), math.rad(-185)), EXACT)
 		Fixtures.expectNear2(byKey.TouchDelta.Vector2Scale, Vector2.new(math.rad(1), math.rad(0.66)), EXACT)
 		expect(byKey.Thumbstick2.ResponseCurve).toBe(2)
@@ -186,15 +186,15 @@ describe("InputController", function()
 		expect(byKey.MouseDelta.Scale).toBe(2)
 		expect(byKey.Thumbstick2.Scale).toBe(0.5)
 		expect(byKey.TouchDelta.Scale).toBe(1)
-		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), -math.rad(0.385)), EXACT)
+		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.1), -math.rad(0.077)), EXACT)
 		Fixtures.expectNear2(byKey.Thumbstick2.Vector2Scale, Vector2.new(math.rad(240), math.rad(185)), EXACT)
 		Fixtures.expectNear2(byKey.TouchDelta.Vector2Scale, Vector2.new(math.rad(1), -math.rad(0.66)), EXACT)
 		-- The same settings again change nothing; the defaults bring the defaults back.
 		InputController:setLookSettings(2, 0.5, true)
-		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), -math.rad(0.385)), EXACT)
+		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.1), -math.rad(0.077)), EXACT)
 		InputController:setLookSettings(1, 1, false)
 		expect(byKey.MouseDelta.Scale).toBe(1)
-		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.5), math.rad(0.385)), EXACT)
+		Fixtures.expectNear2(byKey.MouseDelta.Vector2Scale, Vector2.new(math.rad(0.1), math.rad(0.077)), EXACT)
 
 		-- Each read follows the settings as the player changes them.
 		local mouse = 1
