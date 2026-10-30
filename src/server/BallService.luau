@@ -2,12 +2,13 @@
 -- The ball in the arena (spec §9.3): one server-owned physics part, in its own model that streams to every client, that
 -- BallState says what to do with. It is hidden (in ServerStorage, so its next spawn is never replicated early) until a
 -- kickoff ends, then spawns at a random ball spawn. A ball that leaves the arena (the box inside the glass, its top
--- included: Bounds.inArena) is recovered in any state, and one Roblox destroys (fallen past FallenPartsDestroyHeight)
--- is rebuilt. Each frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose
--- body it touched. Jumps the server makes (a spawn, a respawn, the snap to a catcher's side, a carrier it moves, a drop
--- it places) are never reported as movement, so they can never cross a gate or the ring. A pass flies flat, its weight
--- cancelled, and homes on its target, until it touches anything or anyone or the target can no longer catch; then it
--- falls like any ball. A ball passes through the player who let go of it until it is clear of them.
+-- included: Bounds.inArena) is recovered in any state, a loose one resting a while on something nobody skates (the
+-- goal's rim, #308) too, and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each frame `step`
+-- reports how it really moved, a throw since the last frame, who caught it, and whose body it touched. Jumps the
+-- server makes (a spawn, a respawn, the snap to a catcher's side, a carrier it moves, a drop it places) are never
+-- reported as movement, so they can never cross a gate or the ring. A pass flies flat, its weight cancelled, and homes
+-- on its target, until it touches anything or anyone or the target can no longer catch; then it falls like any ball.
+-- A ball passes through the player who let go of it until it is clear of them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -20,6 +21,7 @@ local Homing = require(ReplicatedStorage.Shared.Ball.Homing)
 local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
+local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
@@ -96,6 +98,11 @@ export type BallService = {
 	-- Built with each ball part: the ball's weight, upward. Enabled while a pass flies, so it flies flat.
 	_lift: VectorForce,
 	_touched: RBXScriptConnection?,
+	-- What a resting ball lies on: a ray into the arena only, from its center to a radius past its bottom (#308).
+	_restParams: RaycastParams,
+	_restReach: Vector3,
+	-- How long the loose ball has rested on something nobody skates.
+	_strandedSeconds: number,
 	_canPickUp: (PlayerId) -> boolean,
 	-- Whose body the ball can touch: anyone but its thrower inside the rethrow delay (the rules never count theirs).
 	_canTouch: (PlayerId) -> boolean,
@@ -178,10 +185,10 @@ local function endPass(self: BallService)
 end
 
 -- Lets go of the ball if someone carries it: a free physics part again, simulated by the server. The weld goes
--- first: network ownership cannot be set on a part welded to an anchored one (a frozen character). The ball leaves
--- from the carrier's side, within touch of their collider, so it passes through them until it is clear of them: a
--- throw across their body would otherwise bounce off it. It keeps the carrier's velocity, read while still welded into
--- their assembly, up to the speed limit.
+-- first: network ownership is set for a whole assembly, and while welded the ball is part of its carrier's. The ball
+-- leaves from the carrier's side, within touch of their collider, so it passes through them until it is clear of
+-- them: a throw across their body would otherwise bounce off it. It keeps the carrier's velocity, read while still
+-- welded into their assembly, up to the speed limit.
 local function release(self: BallService)
 	local weld = self._weld
 	if weld == nil then
@@ -241,6 +248,8 @@ local function placeAtRandomSpawn(self: BallService)
 	part:SetNetworkOwner(nil)
 	self._hidden = false
 	self._teleported = true
+	-- Every entry into play waits the whole stranded time again.
+	self._strandedSeconds = 0
 end
 
 -- Back into play at a random ball spawn from wherever it was, a carried ball taken from its carrier first.
@@ -313,6 +322,21 @@ local function home(self: BallService, holders: { Holder }, position: Vector3, d
 		Homing.step(position, part.AssemblyLinearVelocity, holder.root.Position, self._homingAccel, dt)
 end
 
+-- Whether the loose ball has rested Ball.strandedSeconds on something nobody skates (#308, Q93): slower than
+-- Ball.restSpeed on any part of the arena but a ride surface (the goal's rim). Any other frame, a carried ball's
+-- included, starts the count over: a ball resting on a floor, a bank, a wall or the glass stays where it is.
+local function stranded(self: BallService, position: Vector3, dt: number): boolean
+	local ball = self._config.Ball
+	local resting = self.state.status ~= "Carried" and self.part.AssemblyLinearVelocity.Magnitude < ball.restSpeed
+	local under = if resting then workspace:Raycast(position, self._restReach, self._restParams) else nil
+	if under == nil or TaggedLayout.isRideSurface(under.Instance) then
+		self._strandedSeconds = 0
+		return false
+	end
+	self._strandedSeconds += dt
+	return self._strandedSeconds >= ball.strandedSeconds
+end
+
 local BallService: BallService = {
 	name = "BallService",
 	dependencies = { "Config", "ArenaService" },
@@ -335,6 +359,9 @@ local BallService: BallService = {
 	_lift = nil :: any,
 	_candidates = {},
 	_catchers = {},
+	_restParams = nil :: any,
+	_restReach = Vector3.zero,
+	_strandedSeconds = 0,
 	_canPickUp = function(_player: PlayerId): boolean
 		return false
 	end,
@@ -357,6 +384,12 @@ local BallService: BallService = {
 		self._passTarget = nil
 		self._gravity = Config.gravity(config)
 		self.state = BallState.new(config.Ball.rethrowPickupDelay)
+		local restParams = RaycastParams.new()
+		restParams.FilterType = Enum.RaycastFilterType.Include
+		restParams.FilterDescendantsInstances = { deps.ArenaService.model }
+		self._restParams = restParams
+		self._restReach = Vector3.new(0, -2 * config.Ball.radius, 0)
+		self._strandedSeconds = 0
 		self._canPickUp = function(player: PlayerId): boolean
 			return self._catchers[player] == true and self.state:canPickUp(player)
 		end
@@ -494,7 +527,7 @@ local BallService: BallService = {
 			end
 			return frame
 		end
-		if out or (state.status ~= "Carried" and state.looseSeconds >= ball.ballIdleResetSeconds) then
+		if out or stranded(self, position, dt) then
 			respawn(self, frame)
 			return frame
 		end

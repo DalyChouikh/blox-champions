@@ -18,13 +18,16 @@ local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local config = Fixtures.config()
 local SPAWNS = Features.ballSpawns(config.Arena)
 local OUTSIDE = Fixtures.outsideArena(config)
+-- How long a loose ball rests on something nobody skates before it respawns (#308).
+local STRANDED = config.Ball.strandedSeconds
 
 local folder: Folder
 beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "BallServiceTest"
 	folder.Parent = workspace
-	BallService:init({ Config = config, ArenaService = { arena = { ballSpawns = SPAWNS } } })
+	-- The test's folder is the arena a resting ball lies in (#308).
+	BallService:init({ Config = config, ArenaService = { model = folder, arena = { ballSpawns = SPAWNS } } })
 end)
 afterEach(function()
 	BallService:destroy()
@@ -63,6 +66,31 @@ local function isSpawn(position: Vector3): boolean
 		end
 	end
 	return false
+end
+
+-- A slab of the arena just under a ball resting still at `position`: a ride surface (a part in a folder tagged
+-- RideSurface, as the floors are) or not (as the goal's rim is, #308).
+local function slabUnder(position: Vector3, rideSurface: boolean)
+	local parent: Instance = folder
+	if rideSurface then
+		parent = Instance.new("Folder")
+		parent:AddTag(Tags.RideSurface)
+		parent.Parent = folder
+	end
+	local slab = Instance.new("Part")
+	slab.Anchored = true
+	slab.Size = Vector3.new(8, 1, 8)
+	slab.CFrame = CFrame.new(position - Vector3.new(0, config.Ball.radius + 0.5, 0))
+	slab.Parent = parent
+end
+
+-- Steps the ball a second at a time for `seconds`; true if it respawned on any step.
+local function respawnsWithin(seconds: number, holders: { BallService.Holder }?): boolean
+	local respawned = false
+	for _ = 1, seconds do
+		respawned = BallService:step(1, holders or {}).respawned or respawned
+	end
+	return respawned
 end
 
 -- Spawns the ball and has a rig standing on it catch it.
@@ -181,7 +209,7 @@ describe("BallService", function()
 		end).toThrow("BallService: only the carrier can throw (carrier: A, thrower: B)")
 	end)
 
-	it("respawns a ball that leaves the arena or lies untouched, without reporting the jump", function()
+	it("respawns a ball that leaves the arena, without reporting the jump", function()
 		BallService:spawn()
 		BallService:step(1 / 60, {})
 		BallService.part.CFrame = CFrame.new(OUTSIDE)
@@ -195,8 +223,59 @@ describe("BallService", function()
 		BallService.part.CFrame = CFrame.new(0, Profile.topHeight(config.Arena) + 5, 57)
 		expect(BallService:step(1 / 60, {}).respawned).toBe(true)
 		expect(isSpawn(BallService.part.Position)).toBe(true)
-		expect(BallService:step(15, {}).respawned).toBe(true)
-		expect(BallService.state.looseSeconds).toBe(0)
+	end)
+
+	-- The owner (Q93): no idle respawn; a loose ball stays where it rolls until someone picks it up.
+	it("leaves a loose ball resting on a ride surface where it is, however long", function()
+		BallService:spawn()
+		local resting = BallService.part.Position
+		slabUnder(resting, true)
+		expect(respawnsWithin(60)).toBe(false)
+		Fixtures.expectNear(BallService.part.Position, resting)
+		expect(BallService.state.status).toBe("Loose")
+	end)
+
+	it("respawns a loose ball resting on something nobody skates, the whole wait again after each respawn", function()
+		for _, spawn in SPAWNS do
+			slabUnder(spawn.Position, false)
+		end
+		BallService:spawn()
+		expect(respawnsWithin(STRANDED - 1)).toBe(false)
+		expect(BallService:step(1, {}).respawned).toBe(true)
+		expect(isSpawn(BallService.part.Position)).toBe(true)
+		expect(BallService.state.status).toBe("Loose")
+		expect(respawnsWithin(STRANDED - 1)).toBe(false)
+		expect(BallService:step(1, {}).respawned).toBe(true)
+	end)
+
+	it("never respawns a ball rolling there, hanging still over it, or resting there in shorter spells", function()
+		BallService:spawn()
+		local resting = BallService.part.Position
+		slabUnder(resting, false)
+		local ball = BallService.part
+		ball.AssemblyLinearVelocity = Vector3.new(config.Ball.restSpeed, 0, 0)
+		expect(respawnsWithin(2 * STRANDED)).toBe(false)
+		-- A ball's width over it, still (only for an instant at the top of a throw).
+		ball.AssemblyLinearVelocity = Vector3.zero
+		ball.CFrame = CFrame.new(resting + Vector3.new(0, 2 * config.Ball.radius, 0))
+		expect(respawnsWithin(2 * STRANDED)).toBe(false)
+		-- Resting, rolling a moment, resting again: each spell short of the wait.
+		ball.CFrame = CFrame.new(resting)
+		expect(respawnsWithin(STRANDED - 1)).toBe(false)
+		ball.AssemblyLinearVelocity = Vector3.new(0, 0, 2 * config.Ball.restSpeed)
+		expect(respawnsWithin(1)).toBe(false)
+		ball.AssemblyLinearVelocity = Vector3.zero
+		expect(respawnsWithin(STRANDED - 1)).toBe(false)
+	end)
+
+	it("lets a carrier stand still anywhere with the ball", function()
+		BallService:spawn()
+		slabUnder(BallService.part.Position, false)
+		local rig = Fixtures.rig(folder, "A", CFrame.new(BallService.part.Position))
+		BallService:step(1 / 60, { holder("A", rig) })
+		expect(BallService.state.carrier).toBe("A")
+		expect(respawnsWithin(2 * STRANDED, { holder("A", rig) })).toBe(false)
+		expect(BallService.state.carrier).toBe("A")
 	end)
 
 	it("keeps the ball in its own model, sent whole to every client and never streamed out", function()

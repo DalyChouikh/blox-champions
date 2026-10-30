@@ -425,7 +425,7 @@ The arena follows the M1 overhaul's Arena spec (`docs/superpowers/specs/2026-10-
 - **Carried:** attached to the carrier's hand; only the server assigns the carrier.
 - **Loose / Flying:** a server-owned physics part (`SetNetworkOwner(nil)`), physical properties from `Config/Ball` (`radius = 1.5`, `elasticity = 0.5`, `friction = 0.3`). Magnetic passes add homing acceleration toward the receiver.
 - **Pickup / catch:** a player who is not knocked down, within `pickupRadius = 5` (+ `Network.pickupLagToleranceStuds = 2`), gets the ball. The thrower cannot re-catch for `rethrowPickupDelay = 0.4` s.
-- **Recovery:** if the ball is not inside the arena's box by more than `Ball.outOfBoundsMargin = 2` (`Bounds.inArena`: between the two glass faces, no lower than the floor and no higher than the top; Arena spec §4.4), or stays untouched for `ballIdleResetSeconds = 15`, it respawns at a random `BallSpawn`. Possession is unchanged. The top holds the ball, so only a fault puts it outside.
+- **Recovery:** a loose ball stays where it rolls until someone picks it up: there is no idle respawn (#308). It respawns at a random `BallSpawn` only if it is not inside the arena's box by more than `Ball.outOfBoundsMargin = 2` (`Bounds.inArena`: between the two glass faces, no lower than the floor and no higher than the top; Arena spec §4.4), in any state, or if it is **stranded**: free (not carried), slower than `Ball.restSpeed = 1` stud/s, on a part of the arena that is no ride surface (a ray from its center a radius past its bottom, into the arena's model only, meets a part whose folder is not tagged `RideSurface`, `TaggedLayout.isRideSurface`: the goal's rim) for `Ball.strandedSeconds = 5` s in a row. Any other frame starts that count over, and so does each spawn. Possession is unchanged. The top holds the ball, so only a fault puts it outside. *The owner's issue list: "Ball gets spawned randomly again when not being picked after a while at the start"; Q93 (recommended): the 15 s respawn goes, a loose ball stays where it rolls until someone picks it up, and it respawns only if it ever leaves the arena (a fault) or rests 5 s on something nobody can skate on. `restSpeed` is a ruling (a sixth of a body length a second).*
 - Each server tick, the ball's previous→current segment is fed to `LapTracker` and `GoalJudge` (§4.2–4.3), so fast throws cannot tunnel through a gate or the ring.
 
 ### 9.4 Ball indicator and skins
@@ -529,7 +529,7 @@ All strings and colors in `Config/UI` (team colors: Blue and Orange).
 - **Config:** invalid config fails fast at start with a message naming the key and rule violated; the config test catches it in CI first.
 - **Remotes:** malformed or rate-exceeding payloads are dropped and counted per player; never trusted.
 - **Actions:** a server-rejected action sends the client a correction (cancel pose/motion).
-- **Ball:** out-of-bounds or idle → respawn (§9.3). A carrier leaving the game drops the ball as `Loose` at their last position.
+- **Ball:** out of bounds, or stranded on something nobody skates → respawn (§9.3). A carrier leaving the game drops the ball as `Loose` at their last position.
 - **Players leaving mid-match:** their team plays short; the slot reopens for joiners. Stats of departed players remain on the score tab.
 - **Arena generation failure:** server logs and refuses to start the match (no partial arena).
 
