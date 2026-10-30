@@ -89,7 +89,7 @@ end)
 
 describe("MovementGuard", function()
 	it("returns a cheater to their last valid place and logs it", function()
-		-- 42 studs a sample is the most skating allows (140 × 1.2 × 0.25); 50 studs a sample is three strikes.
+		-- 36.3 studs a sample is the most skating allows (121 × 1.2 × 0.25); 50 studs a sample is three strikes.
 		moveTo(START_X + 30)
 		tick()
 		moveTo(START_X + 80)

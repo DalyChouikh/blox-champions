@@ -78,13 +78,25 @@ describe("SkateMath on the ground", function()
 		Fixtures.expectNear(s.velocity, DOWNHILL * 19.3704) -- + 196.2 × sin 30° × 0.1, then friction and drag
 	end)
 
-	it("scales speeding up down between softCap and hardCap, and never exceeds hardCap", function()
+	it("scales speeding up down between softCap and hardCap", function()
 		local s = skater(DOWNHILL * 115)
 		s:step(input(), ground(SLOPE), 0.01)
-		expect(s.velocity.Magnitude).toBeCloseTo(115.4274, 3) -- 98.1 × (140 − 115)/(140 − 90) = 49.05 studs/s²
-		local fast = skater(Vector3.new(0, 0, -150))
-		fast:step(input(), ground(), 0.1)
-		Fixtures.expectNear(fast.velocity, Vector3.new(0, 0, -140))
+		-- 98.1 × (121 − 115)/(121 − 90) = 18.99 studs/s², then friction and drag, then the bleed: 90 + 25.127 × e^−0.05
+		expect(s.velocity.Magnitude).toBeCloseTo(113.9014, 3)
+	end)
+
+	-- Roller Champions (#214): a skater whipped to 144 km/h was back near 110 within about a second.
+	it("bleeds speed past softCap off, the further over the faster, and never exceeds hardCap", function()
+		local function after(speed: number): number
+			local s = skater(Vector3.new(0, 0, -speed))
+			s:step(input(), ground(), 0.1)
+			return s.velocity.Magnitude
+		end
+		-- 120 − (4 + 2.4) × 0.1 = 119.36, then 90 + 29.36 × e^−0.5
+		expect(after(120)).toBeCloseTo(107.8077, 3)
+		expect(after(100)).toBeCloseTo(95.7014, 3) -- 99.4, then 90 + 9.4 × e^−0.5
+		expect(after(80)).toBeCloseTo(79.44, 3) -- under softCap: friction and drag only
+		expect(after(150)).toBeCloseTo(121, 3) -- 125.97 after the bleed, then hardCap
 	end)
 
 	it("turns toward the stick at a rate that shrinks with speed", function()
@@ -93,8 +105,8 @@ describe("SkateMath on the ground", function()
 			s:step(input({ move = Vector3.xAxis }), ground(), 0.1)
 			return math.atan2(s.velocity.X, -s.velocity.Z)
 		end
-		expect(turned(70)).toBeCloseTo(0.275, 4) -- lerp(4.0, 1.5, 70/140) × 0.1
-		expect(turned(140)).toBeCloseTo(0.15, 4)
+		expect(turned(70)).toBeCloseTo(0.2554, 4) -- lerp(4.0, 1.5, 70/121) × 0.1
+		expect(turned(121)).toBeCloseTo(0.15, 4)
 		local still = skater(Vector3.zero)
 		still:step(input({ move = Vector3.xAxis }), ground(), 0.1)
 		Fixtures.expectNear(still.velocity, Vector3.new(2.594, 0, 0)) -- from rest it faces the stick at once
@@ -155,6 +167,29 @@ describe("SkateMath off the ground and on walls", function()
 		s:step(input(), ground(FLAT, 0, false), 0.1)
 		expect(s.mode).toBe("Airborne")
 		Fixtures.expectNear(s.velocity, Vector3.new(0, -19.5808, -29.94))
+	end)
+
+	-- Roller Champions' dive gained speed in the air, 69 to 139 km/h (#214): the bleed past softCap is the ground's.
+	it("keeps speed past softCap in the air, losing only air drag", function()
+		local s = skater(Vector3.new(0, 0, -110))
+		s.mode = "Airborne"
+		s:step(input(), ground(FLAT, 0, false), 0.1)
+		Fixtures.expectNear(s.velocity, Vector3.new(0, -19.5808, -109.78)) -- (0, −19.62, −110) × (1 − 0.02 × 0.1)
+	end)
+
+	-- One ceiling for everything (#214): skating, the whip, dives and drops.
+	it("never passes hardCap in the air, attached or released", function()
+		local over = movement.hardCap + 50
+		local falling = skater(Vector3.new(0, 0, -over))
+		falling.mode = "Airborne"
+		falling:step(input(), ground(FLAT, 0, false), 0.1)
+		expect(falling.velocity.Magnitude).toBeCloseTo(movement.hardCap, 3)
+		local attached = skater(Vector3.zero)
+		attached:follow(Vector3.zero, Vector3.zero, Vector3.new(0, 0, -over), -Vector3.zAxis)
+		expect(attached.velocity.Magnitude).toBeCloseTo(movement.hardCap, 3)
+		local released = skater(Vector3.new(0, 0, -over))
+		released:release(-Vector3.zAxis)
+		expect(released.velocity.Magnitude).toBeCloseTo(movement.hardCap, 3)
 	end)
 
 	it("lands only when near the ground and moving toward it", function()
@@ -357,23 +392,24 @@ describe("SkateMath riding the roof by loop physics", function()
 	it("lets go of a flat ceiling once the corner that led onto it is behind, at any speed", function()
 		local s = skater(Vector3.zero)
 		local wall, ceiling = Vector3.new(-1, 0, 0), Vector3.new(0, -1, 0)
+		local speed = movement.hardCap
 		for _ = 1, 10 do
-			s.velocity = Vector3.new(0, 140, 0)
+			s.velocity = Vector3.new(0, speed, 0)
 			s:step(input(), ground(wall), DT)
 		end
-		s.velocity = Vector3.new(-140, 0, 0)
+		s.velocity = Vector3.new(-speed, 0, 0)
 		s:step(input(), ground(ceiling), DT)
 		-- The corner's turn is still within the window: the skater holds for now.
 		expect(s.mode).toBe("Grounded")
 		local frames = 0
 		while s.mode == "Grounded" and frames < 60 do
-			s.velocity = Vector3.new(-140, 0, 0)
+			s.velocity = Vector3.new(-speed, 0, 0)
 			s:step(input(), ground(ceiling), DT)
 			frames += 1
 		end
 		expect(s.mode).toBe("Airborne")
-		-- Within the window plus a frame's travel (140 × DT = 2.3 studs).
-		expect(frames * 140 * DT).toBeLessThan(movement.curvatureWindow + 140 * DT + 1e-6)
+		-- Within the window plus a frame's travel (hardCap × DT, about 2 studs).
+		expect(frames * speed * DT).toBeLessThan(movement.curvatureWindow + speed * DT + 1e-6)
 	end)
 
 	it("drops a skater too slow for the wall rule on a tight overhang that their curve would still hold", function()

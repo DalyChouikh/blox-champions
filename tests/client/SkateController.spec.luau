@@ -248,6 +248,22 @@ describe("SkateController", function()
 		expect(SkateController.attachable).toBe(false)
 	end)
 
+	it("boosts a release toward the stick held as the skater lets go", function()
+		local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
+		table.insert(others, { player = "2", team = "Blue", root = Fixtures.root(leader) })
+		local attachKey = Fixtures.scriptedBinding(InputController.context, "Attach")
+		attachKey:Fire(true)
+		SkateController:step(1 / 60)
+		expect((SkateController.skater :: any).mode).toBe("Attached")
+		-- The stick's right is +X; the leader faces -Z.
+		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(1, 0))
+		attachKey:Fire(false)
+		SkateController:step(1 / 60)
+		local velocity = velocityOf(rig)
+		expect(velocity.X).toBeGreaterThan(0.95 * movement.attachBoostSpeed)
+		expect(math.abs(velocity.Z)).toBeLessThan(0.2 * movement.attachBoostSpeed)
+	end)
+
 	it("steers along the screen on a wall, as the rolled camera shows it", function()
 		-- A camera rolled onto a wall whose up is -X, looking along -Z: its right is +Y, up the wall.
 		setup({ Camera = { CFrame = CFrame.lookAlong(Vector3.zero, -Vector3.zAxis, -Vector3.xAxis) } })
@@ -388,8 +404,9 @@ describe("SkateController", function()
 	end)
 
 	it("slides into a corner, losing its velocity into both surfaces", function()
-		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40)) -- a wall facing -X at x = 2.5
-		addSlab(CFrame.new(0, 23, 0), Vector3.new(40, 1, 40)) -- a ceiling facing -Y at y = 22.5
+		-- Both 2 studs from the root: the collider (radius 1) reaches either in one step at hardCap's share along it.
+		addSlab(CFrame.new(2.5, 20, 0), Vector3.new(1, 40, 40)) -- a wall facing -X at x = 2
+		addSlab(CFrame.new(0, 22.5, 0), Vector3.new(40, 1, 40)) -- a ceiling facing -Y at y = 22
 		flying(Vector3.new(0, 20, 0), Vector3.new(120, 120, 0))
 		SkateController:step(1 / 60)
 		Fixtures.expectNear(velocityOf(rig), Vector3.zero, CAST_TOLERANCE)

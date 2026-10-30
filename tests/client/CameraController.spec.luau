@@ -277,7 +277,7 @@ describe("CameraController", function()
 
 	it("widens the view with speed", function()
 		CameraController:step(DT)
-		skater().velocity = Vector3.new(0, 0, -140)
+		skater().velocity = Vector3.new(0, 0, -movement.hardCap)
 		CameraController:step(10)
 		expect(camera.FieldOfView).toBeCloseTo(90, 3)
 	end)

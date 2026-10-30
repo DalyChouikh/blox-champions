@@ -19,6 +19,9 @@ music.
 - **Roller Champions, 45 minutes of pure gameplay (two maps: a closed glass top, then an open top)**, given by the
   owner 2026-10-26: https://www.youtube.com/watch?v=r2xWeAFSEMw ("Video 3" below).
 - Older Roller Champions links (spec §15): t2JZw0nMcic, oTxqS3wVqGw, 4Ofq9CFUWnQ.
+- **Video 4 and Video 5**: the owner's own Roller Champions games, recorded 2026-10-27 (not in the repository):
+  a full match on Pixel City (8:34; the players start in the arena) and a short game on the Mayan Stadium (1:44;
+  jumps, and uppercut -> tackle -> dive, shown on purpose).
 - The owner's list of issues with today's game (2026-10-25): summarised in spec decision A6.
 
 **How to look again:** yt-dlp 2026.10.21 (`gh release download 2026.10.21 -R yt-dlp/yt-dlp -p yt-dlp.exe`) and
@@ -172,6 +175,39 @@ revised before any more Arena code. Their words, then what still needs a questio
   from the gate's front or its back; only the order (2 -> 3 -> 4 -> 1) matters.
 - **The goal scores either way too** (answering the amendment's approval question): "also the goal should be able to
   get scored by either way, front or back". A save's block follows (a thrown ball headed through the ring either way).
+
+## The owner's answers, 2026-10-27 (the Feel part's planning)
+
+Planned by questions in rounds, each with a recommended answer; the owner accepted every recommendation unless noted.
+Measured first in our game: a skater who lets go of every key at cruise (72 km/h) on a straight rolled for 28 s,
+about two thirds of a lap, swinging from wall to wall.
+- **The camera** tilts only part of the way with the surface, up to a limit the owner picks from screenshots.
+- **Riding the glass:** real physics. The minimum wall speed (42 km/h) goes: a skater stays on the glass at any
+  speed and gravity pulls them along it, so a slow rider slides back down. While riding the glass or a wall gravity
+  pulls about **a third** as hard (a ranked player's ride up the glass lost speed about three times slower than our
+  full gravity would); in the air it stays full. The lips keep the loop rule; the glass stays 120 studs, because
+  "experienced players can use mechanic and reach high".
+- **Coasting:** a skater pressing nothing stops from 72 km/h in about 5 s on flat ground; swings between the walls
+  die out after one or two. Holding the stick or pump skates as before.
+- **Jumps** cost 10% of the speed. **Air Pose:** one more press in the air, until landing: a small hop of about half
+  a jump, costing speed like a jump, with a pose; the hint reads "Air Pose" while airborne.
+- **Hard landings:** a drop of about 20 studs or more onto flat ground knocks the skater down like a tackle (a
+  carrier drops the ball); landing along a curved wall or bank the way it slopes is safe.
+- **The Uppercut** leaps about 31 studs up anywhere, not only beside a wall.
+- **The dive**, as in Roller Champions: in the air the tackle input dives; it ends with the diver on their belly,
+  sliding, then getting up. No extra wait after it.
+- **Getting up:** a "Get Up" prompt with the movement keys; moving gets a knocked-down skater up, not before 0.5 s, and
+  they are up after 1.5 s at the latest.
+- **The middle curve:** the inner bank doubles to a smooth 16-stud quarter curve into the middle glass, like Pixel
+  City's (the owner: "it is more curved than our map currently, we should follow that curve"); screenshots first.
+- **Speed:** the owner asked whether the first answer's 115 km/h top speed was really Roller Champions' ("are you
+  sure that is like that in RC? and it follows real physics? and not just hardcoded"). It was not measured; the
+  measurement below replaced it: speed above **108 km/h** bleeds off quickly, the further over the faster, on the
+  ground; **one ceiling of 145 km/h** for everything (skating, the whip, dives, drops).
+- **The Grapple Whip** adds about 90 km/h on release, toward the direction held as the skater lets go (straight ahead
+  with no input).
+- Process (the owner, 2026-10-27): no more spec and plan documents for a part; it is planned by these questions and
+  written as GitHub issues (#214 to #224), then built issue by issue, test-first.
 
 ## Roller Champions
 
@@ -327,6 +363,43 @@ The full pass (facts seen in frames; times are video times):
 
 Tools: yt-dlp 2026.10.21 and FFmpeg n9.0, as above: the video at 1080p60, contact sheets every 4 s, and dense clips
 and full-resolution crops of each topic, each frame stamped with its video time (outside the repository).
+
+### Video 4: the owner's own match on Pixel City (8:34, 30 fps), at 1 frame per second, dense clips at 2-6
+
+- **Start:** a flyover, then the skaters stand still in the arena behind the gate-1 line; the clock reads 00:00; the
+  countdown is a circled number in the goal ring (5 ... 1), and skaters already skate during it; "GO ORANGE TEAM!",
+  then the 07:00 clock starts. No tunnel on this map.
+- **The middle:** a raised island shaped like a stadium, ringed by a wide grey band that rises from the track to a
+  white rounded rim, with clear glass on the rim. Riding into it (4:04-4:05, 1:13) the skater goes up the band, over
+  the rim and high up the glass in one smooth curve at 37-50 km/h, then flies over the island (4:05-4:06) and lands at
+  96 km/h, reading 16 a sixth of a second later (the speed into the ground lost on landing).
+- **Wall riding:** a slow skater stays on the outer glass and comes back down it, speeding up (0:28.8-0:29.5:
+  30 -> 65 km/h). The camera's horizon leans about 15-30 degrees on the glass (judged by eye).
+- **Air Pose:** in the air the hints swap Jump for "Air Pose" and Tackle for "Dive". The pose is a flip or a
+  superman stretch; its trail kinks up as it starts (a small hop); the speed holds through it.
+- **Throwing:** while charging, the hints read Throw, "Cancel & Dodge" (the dodge input cancels the charge) and "Roll
+  Ball"; a big white hand over a teammate calling for the ball; a key letter over the teammate a pass would reach.
+- **The Grapple Whip:** the hint "Hold & Release F + movement keys: Speed Boost". Every frame at 2:08.5-2:10.5: the
+  readout rose 53 -> 66 -> 91 -> 121 -> 138 -> **144** km/h in 0.3 s, then bled off 144 -> 121 in 0.2 s, -> 114 in
+  0.13 s, -> 108 in 0.4 s, and hovered 103-108; the game then showed the achievement "Reach a speed of 141.622 km/h or
+  more in any arena match type". The same shape at 2:51 (53 -> 128 -> 114) and 7:17 (65 -> 136 -> 114).
+
+### Video 5: the owner's game on the Mayan Stadium (1:44, 30 fps), every frame of the jumps
+
+- **Standing jumps** (0:40.7-0:42.9): 0.60-0.73 s in the air, rising roughly one to two body heights; ours: 0.61 s
+  and about two. So Roller Champions' gravity is in our range (judged roughly, not measured precisely).
+- **Uppercut -> tackle -> dive** (1:13-1:21): an Uppercut on flat floor, away from any wall, launches the skater up;
+  in the air Tackle becomes "Dive"; the dive's readout rose 69 -> 139 km/h in the air, then the diver landed on their
+  belly and slid (101 -> 16 km/h in 0.67 s), unable to act, then got up.
+- **Knocked down** (0:18): a "Get Up" prompt shows the movement keys; skating again in under 1.8 s.
+
+### Roller Champions' speedometer, measured
+
+Video 3's readout every 2 s for 46 minutes (about 1,380 readings): 100-120 km/h is common; the peaks are 140 (0:42),
+136 (11:44 and 11:46), 131, 130, 128; never above 140. With Video 4 (144 after a whip) and Video 5 (139 in a dive):
+skating, pumping and slopes reach about 100-110; boosts (a whip, a dive, a drop) reach about 140-145; anything above
+about 110 bleeds off within a second, faster the further above it is. The game's code is not public, so whether that
+is a physical drag or a tuned limit cannot be known; the behaviour is what the game copies.
 
 ## Illegal Soccer (the owner's recording of 2026-10-25), sampled every 2 s
 

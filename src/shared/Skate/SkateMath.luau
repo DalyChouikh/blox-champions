@@ -156,6 +156,12 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 			speed = tiptoe
 		end
 	end
+	-- Speed past softCap bleeds off, the further over the faster (RC, #214); only on the ground, since RC's dive gains
+	-- speed in the air.
+	local softCap = movement.softCap
+	if speed > softCap then
+		speed = softCap + (speed - softCap) * math.exp(-movement.overSpeedBleed * dt)
+	end
 	speed = math.min(speed, movement.hardCap)
 
 	self.velocity = direction * speed + normal * ((movement.hoverHeight - ground.distance) * movement.hoverSpring)

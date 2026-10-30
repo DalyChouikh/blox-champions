@@ -237,7 +237,7 @@ local function moveSkater(self: SkateController, root: BasePart, skater: SkateMa
 		then currentLeader(self)
 		elseif keys.attach then found
 		else nil
-	local change = attach:update(dt, keys.attach, leader)
+	local change = attach:update(dt, keys.attach, leader, self._input.move)
 	self.attachable = attach.leader ~= nil or (found ~= nil and attach.cooldownLeft == 0)
 	if attach.leader ~= nil and leader ~= nil then
 		skater:follow(Attach.target(movement, leader), root.Position, leader.velocity, leader.forward)
