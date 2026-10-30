@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-25 (design approved in brainstorming); written 2026-10-26; **revised 2026-10-26** (session 21) after the owner's direction change; **amended 2026-10-27** after the owner's playtest
 - **Milestone:** [M1 - Foundation & Core Match](https://github.com/DalyChouikh/blox-champions/milestone/1)
-- **Status:** Revision approved by the owner (2026-10-26). The first version (d558a48, approved 2026-10-26) is built as Task 1 (#186, PR #192); this revision replaces its glass barrier, sizes, gate arches and reach check. The playtest's amendment (2026-10-27) changes the glass's look (R5) and turns the gate panels into walls (R18), only the next gate's showing; its later finding starts every streak at the goal's gate, so the first wall shows on the pickup (R18, §5.1; the M1 spec's §4.2). The Feel part's #268 (2026-10-29) gives the track Roller Champions' structure (§3.1–§3.3): a spawn room, a steep rise and an incline on the straights, a bowl at the curved ends, the solid outer wall to 40.
+- **Status:** Revision approved by the owner (2026-10-26). The first version (d558a48, approved 2026-10-26) is built as Task 1 (#186, PR #192); this revision replaces its glass barrier, sizes, gate arches and reach check. The playtest's amendment (2026-10-27) changes the glass's look (R5) and turns the gate panels into walls (R18), only the next gate's showing; its later finding starts every streak at the goal's gate, so the first wall shows on the pickup (R18, §5.1; the M1 spec's §4.2). The Feel part's #268 (2026-10-29) gives the track Roller Champions' structure (§3.1–§3.3): a spawn room, a steep rise and an incline on the straights, a bowl at the curved ends, the solid outer wall to 40. Its #294 (2026-10-30) has the skating read the ride surfaces' smooth shape instead of each flat strip (§6.1); the built parts are unchanged.
 - **Parent:** `docs/superpowers/specs/2026-10-21-m1-foundation-core-match-design.md`, decision A6 (the overhaul: Arena → Feel → Ball & rules → Presentation)
 - **Reference:** `docs/reference/2026-10-25-reference-games.md` (the videos, the observations, the owner's answers; "Video 3" is the 45-minute ranked video the revision rests on)
 
@@ -311,6 +311,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 | `Geometry/Centerline` | `distanceOf(arena, position)`, the inverse of `frameAt`; and `pose(arena, distance, lateral, height)`, the point (a Vector3) and the heading (an angle), on which `frameAt` and `at` build. |
 | `Tags` | `Barrier` now marks the top; `RideSurface` covers the glass. |
 | `TaggedLayout` | Markers may be a Model or a part. |
+| `Geometry/SmoothNormals` | *Added by the Feel part's #294:* every ride surface's closed cross-section swept round the stations, its strips' directions from `Profile.directions`, `outerGlassDirections` and `innerGlassDirections` (the shape's own pieces), read at any point on it (`reader`): the ground's direction for the skating and the server's look down (M1 spec §7.1). |
 
 ### 6.2 Server
 

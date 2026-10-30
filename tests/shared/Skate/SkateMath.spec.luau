@@ -1080,8 +1080,8 @@ describe("SkateMath landing on what they touch", function()
 		Fixtures.expectNear(s.velocity, Vector3.new(0, 40, 0))
 		local frames = 0
 		while s.mode == "Airborne" and frames < 120 do
-			local _, toWall = s:groundRay()
-			s:step(input(), if toWall then ground(WALL, 1) else ground(FLAT, 0, false), DT)
+			local towardWall = s:groundRay():Dot(-WALL) > 0.999
+			s:step(input(), if towardWall then ground(WALL, 1) else ground(FLAT, 0, false), DT)
 			frames += 1
 		end
 		-- Rising for 40 / 196.2 = 0.204 s first: 12 frames.
@@ -1189,8 +1189,7 @@ describe("SkateMath landing on what they touch", function()
 		Fixtures.expectNear(s.up, pillarFace(position))
 		local _, fast = leapRoundPillar(35)
 		expect(fast.mode).toBe("Airborne")
-		local _, toWall = fast:groundRay()
-		expect(toWall).toBe(false)
+		Fixtures.expectNear(fast:groundRay(), -fast.up)
 		-- The grip turns only their speed along it: drifting off it at 1 stud/s they keep drifting off, 0.29 studs by
 		-- the top (56.7 up at 196.2), and nothing catches a skater moving off the glass.
 		local drift, drifting = leapRoundPillar(15, 1)

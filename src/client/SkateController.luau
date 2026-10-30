@@ -1,7 +1,7 @@
 --!strict
 -- The local player's skating (spec §7.1). Every physics step, first (FrameController), it:
 -- - reads the keys and casts the ground ray against the ride surfaces only;
--- - filters the ray's normal;
+-- - reads the ground's direction where the ray hits from the arena's smooth shape (#294);
 -- - works out the draft and the attach;
 -- - steps SkateMath, slides the skater along any ride surface in its way, and writes the result into the skater body
 --   the server built, whose up eases toward the skating's (#255).
@@ -24,7 +24,6 @@ local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Draft = require(ReplicatedStorage.Shared.Skate.Draft)
 local InputController = require(script.Parent.InputController)
-local NormalFilter = require(ReplicatedStorage.Shared.Skate.NormalFilter)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local PlayerList = require(ReplicatedStorage.Shared.Util.PlayerList)
 local RateLimiter = require(ReplicatedStorage.Shared.Net.RateLimiter)
@@ -32,6 +31,7 @@ local RideSurfaces = require(script.Parent.RideSurfaces)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
+local SmoothNormals = require(ReplicatedStorage.Shared.Arena.Geometry.SmoothNormals)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
@@ -102,16 +102,18 @@ export type SkateController = {
 	_askedToGetUp: boolean,
 	_team: () -> string?,
 	_gravity: Vector3,
-	-- workspace:Raycast; a fake in tests, which can then hand the controller a seam's side face.
+	-- workspace:Raycast; a fake in tests.
 	_raycast: (origin: Vector3, direction: Vector3, params: RaycastParams) -> RaycastResult?,
 	-- workspace:Spherecast, the collider's sweep; a fake in tests.
 	_spherecast: (origin: Vector3, radius: number, direction: Vector3, params: RaycastParams) -> RaycastResult?,
+	-- A ride surface's normal where a ray found it: the arena's smooth shape (SmoothNormals.reader, #294); a fake in
+	-- tests.
+	_smoothNormal: SmoothNormals.Reader,
 	_character: Model?,
 	_velocity: LinearVelocity?,
 	_align: AlignOrientation?,
-	_filter: NormalFilter.NormalFilter,
-	-- The skater body's up: the skating's, eased (Movement.bodyUpSmoothing), since the skating turns at once at each
-	-- strip of a curve (#255).
+	-- The skater body's up: the skating's, eased (Movement.bodyUpSmoothing), since the skating's up turns at once
+	-- at a touchdown or a corner (#255).
 	_shownUp: Vector3,
 	_attach: Attach.Attach,
 	-- The ride surfaces every ray goes through.
@@ -231,22 +233,19 @@ local function stickDirection(self: SkateController, stick: Vector2, up: Vector3
 	return right * stick.X + forward * stick.Y
 end
 
--- Along the feet, or toward the wall a skater left or touched, rising or falling (#258, #289): what that ray finds is
--- trusted as it is, since the filter guards the ground under the feet against seams.
+-- Along the feet, or toward the wall a skater left or touched, rising or falling (#258, #289). The ray finds where
+-- the surface is and the arena's smooth shape there is its direction (#294), so a strip's seam is no turn and the
+-- first ray onto new ground is trusted as it is (Q75).
 local function castGround(self: SkateController, root: BasePart, skater: SkateMath.Skater)
 	local ground = self._ground
-	local direction, toWall = skater:groundRay()
-	local result =
-		self._raycast(root.Position, direction * self._config.Movement.groundProbeLength, self._surfaces.params)
+	local reach = skater:groundRay() * self._config.Movement.groundProbeLength
+	local result = self._raycast(root.Position, reach, self._surfaces.params)
 	if result == nil then
 		ground.hit = false
 		return
 	end
 	ground.hit = true
-	if toWall then
-		self._filter:reset(result.Normal)
-	end
-	ground.normal = self._filter:update(result.Normal)
+	ground.normal = self._smoothNormal(result.Position, result.Normal)
 	ground.distance = result.Distance
 end
 
@@ -288,7 +287,8 @@ end
 -- a radius behind the root. A cast that meets an edge reports a normal from the edge, and sliding along a wall it
 -- presses into, the collider meets the next slab's edge at their seam (measured: normal (-0.49, 0, 0.87), and 120
 -- studs/s along the wall became 28). So the skater slides along the face that a ray from its root, along the cast's
--- normal, meets: at a seam, the wall itself.
+-- normal, meets: at a seam, the wall itself. A ride surface's direction there is its smooth shape, as the ground's
+-- is (#294); a barrier's is its own face.
 local function collide(self: SkateController, root: BasePart, skater: SkateMath.Skater, dt: number)
 	local radius = self._config.Movement.colliderDiameter / 2
 	for _ = 1, CONTACT_PASSES do
@@ -312,11 +312,9 @@ local function collide(self: SkateController, root: BasePart, skater: SkateMath.
 		end
 		-- In the air, a ride surface the collider meets lands the skater on it (#258); a barrier (the same ray through
 		-- ride surfaces only meets something further, or nothing) only blocks.
-		local ride: RaycastResult? = if skater.mode == "Airborne"
-			then self._raycast(root.Position, reach, self._surfaces.params)
-			else nil
+		local ride = self._raycast(root.Position, reach, self._surfaces.params)
 		local touched = if ride ~= nil and ride.Distance <= face.Distance
-			then skater:touch(face.Normal, self._input)
+			then skater:touch(self._smoothNormal(face.Position, face.Normal), self._input)
 			else skater:block(face.Normal)
 		if not touched then
 			return
@@ -395,7 +393,6 @@ local function freeze(self: SkateController, root: BasePart, skater: SkateMath.S
 	if facing.Magnitude > Vectors.EPSILON then
 		skater.forward = facing.Unit
 	end
-	self._filter:reset(up)
 	self._attach:reset()
 	apply(self, skater)
 	shareState(self)
@@ -443,11 +440,13 @@ local SkateController: SkateController = {
 	): RaycastResult?
 		return nil
 	end,
+	_smoothNormal = function(_position: Vector3, face: Vector3): Vector3
+		return face
+	end,
 	_character = nil,
 	root = nil,
 	_velocity = nil,
 	_align = nil,
-	_filter = nil :: any,
 	_shownUp = Vector3.yAxis,
 	_attach = nil :: any,
 	_surfaces = nil :: any,
@@ -460,8 +459,8 @@ local SkateController: SkateController = {
 	_views = {},
 	_playerList = nil,
 
-	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.SendGetUp, deps.Clock, deps.Team, deps.Raycast and
-	-- deps.Spherecast replace the live game in tests.
+	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.SendGetUp, deps.Clock, deps.Team, deps.Raycast,
+	-- deps.Spherecast and deps.SmoothNormal replace the live game in tests.
 	init = function(self: SkateController, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -498,7 +497,7 @@ local SkateController: SkateController = {
 			or function(origin: Vector3, radius: number, direction: Vector3, params: RaycastParams): RaycastResult?
 				return workspace:Spherecast(origin, radius, direction, params)
 			end
-		self._filter = NormalFilter.new(config.Movement.cornerDeg, worldUp(self))
+		self._smoothNormal = deps.SmoothNormal or SmoothNormals.reader(config.Arena, config.Movement.cornerDeg)
 		self._attach = Attach.new(config.Movement)
 		self._surfaces = deps.RideSurfaces
 		self._stepSeconds = 0
@@ -558,7 +557,6 @@ local SkateController: SkateController = {
 		self.root = root
 		self._velocity = velocity
 		self._align = align
-		self._filter:reset(worldUp(self))
 		self._shownUp = worldUp(self)
 		self._attach = Attach.new(self._config.Movement)
 		-- Jump presses made while there was no character to jump are spent here, not on the new one.

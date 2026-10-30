@@ -93,11 +93,11 @@ export type MovementConfig = {
 	-- Touching down from the air on the belly (diving, or still posing) keeps this share of the speed, then the slide
 	-- (the owner, #245: RC kept 59-73%, 65.5% on average: 133 -> 84, 139 -> 101, 104 -> 70, 97 -> 57 km/h).
 	bellyLandingKeep: number,
-	-- The ground's normal turning more than this between two rays is a corner, or a seam's side face: it is trusted
-	-- only once a second ray agrees, and the speed into the new face is lost. A smaller turn is a curve the arena's
-	-- flat strips stand for: the skating follows it at once and keeps its speed through it, since the ground does no
+	-- The ground's normal turning more than this between two rays is a corner: the speed into the new face is lost. A
+	-- smaller turn is a curve: the skating follows it at once and keeps its speed through it, since the ground does no
 	-- work (#255: smoothing the turn lagged the skating and added energy on curved walls; projecting the speed onto
-	-- each strip lost ~12% of it per wall visit).
+	-- each strip lost ~12% of it per wall visit). The arena's smooth shape runs on in one direction where two of its
+	-- strips meet turning less than this, so only a real corner turns sharper (#294).
 	cornerDeg: number,
 	-- The skater body's up eases toward the skating's at this rate (each step closes 1 − e^(−rate × dt) of the turn),
 	-- so it turns smoothly where the skating turns at each strip of a curve (#255).

@@ -81,9 +81,11 @@ local function flying(position: Vector3, velocity: Vector3)
 	skater.velocity = velocity
 end
 
-local function setup(overrides: { [string]: any }?)
+-- The spec's slabs are not the arena: unless `arenaNormals`, the ground keeps the face its ray finds (#294).
+local function setup(overrides: { [string]: any }?, arenaNormals: boolean?)
 	RideSurfaces:init({})
 	local deps: { [string]: any } = {
+		SmoothNormal = if arenaNormals then nil else Fixtures.faceNormal,
 		Config = config,
 		InputController = InputController,
 		RideSurfaces = RideSurfaces,
@@ -632,6 +634,47 @@ describe("SkateController", function()
 		expect(math.abs(skater.velocity.Z)).toBeLessThan(CAST_TOLERANCE)
 	end)
 
+	-- #294: a ride surface the collider meets is read by its smooth shape at the point its ray finds, as the ground
+	-- is: landing on it in the air, or blocked by it on the ground. A barrier (no ride surface) keeps its own face.
+	it("lands on or slides along a ride surface its collider meets by the surface's smooth shape", function()
+		-- The wall's shape turned 5.7° about the vertical from its face.
+		local smooth = Vector3.new(-1, 0, 0.1).Unit
+		local asked: { Vector3 } = {}
+		setup({
+			SmoothNormal = function(position: Vector3, face: Vector3): Vector3
+				table.insert(asked, position)
+				return if face.X < -0.5 then smooth else face
+			end,
+		})
+		SkateController:bind(rig)
+		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40))
+		flying(Vector3.new(0, 20, 0), Vector3.zero)
+		SkateController:step(1 / 60)
+		SkateController:push(Vector3.new(120, 0, 0), false)
+		local skater = SkateController.skater :: any
+		expect(skater.mode).toBe("Grounded")
+		Fixtures.expectNear(skater.up, smooth)
+		Fixtures.expectNear(asked[#asked], Vector3.new(2.5, 20, 0), CAST_TOLERANCE)
+		-- On the floor, pushed into the wall: its part along the smooth normal goes, so it slides along the wall the
+		-- way its shape turns.
+		rig:PivotTo(CFrame.new(0, movement.hoverHeight, 0))
+		skater.mode = "Grounded"
+		skater.up = Vector3.yAxis
+		skater.velocity = Vector3.zero
+		SkateController:step(1 / 60)
+		SkateController:push(Vector3.new(120, 0, 0), false)
+		expect(skater.velocity:Dot(smooth)).toBeCloseTo(0, 2)
+		expect(skater.velocity.Z).toBeGreaterThan(1)
+		-- A barrier blocks along its own face: nothing asks for its shape.
+		addBarrier(CFrame.new(-3, 20, 0), Vector3.new(1, 40, 40))
+		flying(Vector3.new(0, 20, 0), Vector3.zero)
+		table.clear(asked)
+		SkateController:push(Vector3.new(-120, 0, 0), false)
+		expect(skater.mode).toBe("Airborne")
+		expect(math.abs(skater.velocity.X)).toBeLessThan(CAST_TOLERANCE)
+		expect(#asked).toBe(0)
+	end)
+
 	it("reports a pose held into a wall the collider meets, as into the ground", function()
 		addSlab(CFrame.new(3, 20, 0), Vector3.new(1, 40, 40))
 		flying(Vector3.new(0, 20, 0), Vector3.zero)
@@ -673,8 +716,7 @@ describe("SkateController", function()
 	end)
 
 	-- Beside the wall they left along it, rising (its grip keeps them by it, #289) or falling (it catches them, #258),
-	-- the skater's ground ray looks toward the wall, and trusts what it finds there at once (it is no seam's side face
-	-- under the feet).
+	-- the skater's ground ray looks toward the wall.
 	it("looks toward the wall a skater left, rising or falling, and lands them on it once falling", function()
 		local rays: { Vector3 } = {}
 		setup({
@@ -696,6 +738,47 @@ describe("SkateController", function()
 		Fixtures.expectNear(rays[2], Vector3.xAxis * movement.groundProbeLength)
 		expect(skater.mode).toBe("Grounded")
 		Fixtures.expectNear(skater.up, Vector3.new(-1, 0, 0))
+	end)
+
+	-- #294: the skating reads the ride surface's smooth shape at the point the ray finds, not the strip it hits.
+	it("hands SkateMath the smooth normal at the point its ground ray finds, not the strip's face", function()
+		local asked: { Vector3 } = {}
+		local smooth = Vector3.new(0.1, 1, 0).Unit
+		setup({
+			Raycast = function(origin: Vector3, direction: Vector3): any
+				local reach = direction.Unit * movement.hoverHeight
+				return { Normal = Vector3.yAxis, Distance = movement.hoverHeight, Position = origin + reach }
+			end,
+			SmoothNormal = function(position: Vector3, _face: Vector3): Vector3
+				table.insert(asked, position)
+				return smooth
+			end,
+		})
+		SkateController:bind(rig)
+		local root = rig:FindFirstChild("HumanoidRootPart") :: BasePart
+		SkateController:step(1 / 60)
+		local skater = SkateController.skater :: any
+		Fixtures.expectNear(asked[1], root.Position - Vector3.yAxis * movement.hoverHeight, CAST_TOLERANCE)
+		Fixtures.expectNear(skater.up, smooth)
+	end)
+
+	-- By default the normal is the arena's own (SmoothNormals): a wall caught on the middle glass's round end at
+	-- (120, 40, 0), 20 from the +X end's axis, is the cylinder there, whatever strip the ray met.
+	it("reads the arena's own smooth shape by default", function()
+		local facet = Vector3.new(math.cos(math.rad(1.875)), 0, math.sin(math.rad(1.875)))
+		setup({
+			Raycast = function(_origin: Vector3, _direction: Vector3): any
+				return { Normal = facet, Distance = movement.hoverHeight, Position = Vector3.new(120, 40, 0) }
+			end,
+		}, true)
+		SkateController:bind(rig)
+		local skater = SkateController.skater :: any
+		skater.mode = "Airborne"
+		skater.velocity = Vector3.new(0, -5, 0)
+		skater._leftWall = facet
+		SkateController:step(1 / 60)
+		expect(skater.mode).toBe("Grounded")
+		Fixtures.expectNear(skater.up, Vector3.xAxis)
 	end)
 
 	it("drives a new character after a respawn", function()
@@ -746,26 +829,32 @@ describe("SkateController", function()
 		expect(sent[perSecond + 1]).toEqual({ true, false, false })
 	end)
 
-	it("ignores one seam ray's side face, so the skater's up holds", function()
-		-- Measured in Phase 3: a downward ray exactly on a seam of the step hit a slab's side face.
-		local seam = Vector3.new(0, 0.49, -0.87)
-		local normals = { Vector3.yAxis, Vector3.yAxis, seam, Vector3.yAxis }
-		local ray = 0
+	-- The ray's direction is the surface's own shape at the point it finds (#294), so the first ray onto new ground
+	-- is trusted as it is (Q75): falling onto the floor the step the wall they left lets go of them, the skater lands
+	-- on the floor's direction, not the wall's.
+	it("lands on the floor's direction the first step its ray finds the floor, right after a wall lets go", function()
+		local wall = Vector3.new(-1, 0, 0)
 		setup({
-			Raycast = function(): any
-				ray += 1
-				return { Normal = normals[ray], Distance = movement.hoverHeight }
+			-- The wall at +X, the floor below.
+			Raycast = function(_origin: Vector3, direction: Vector3): any
+				return {
+					Normal = if direction.X > 0 then wall else Vector3.yAxis,
+					Distance = movement.hoverHeight,
+				}
 			end,
 		})
 		SkateController:bind(rig)
-		local turnCos = math.cos(math.rad(movement.cornerDeg))
-		for _ = 1, #normals do
-			-- Riding at cruise: a steep normal is ridden, not fallen from, so only the filter keeps the skater's up.
-			local riding = SkateController.skater :: any
-			riding.velocity = Vector3.new(60, 0, 0)
-			SkateController:step(1 / 60)
-			expect(riding.up:Dot(Vector3.yAxis) >= turnCos).toBe(true)
-		end
+		local skater = SkateController.skater :: any
+		skater.mode = "Airborne"
+		skater.velocity = Vector3.new(0, 5, 0)
+		skater._leftWall = wall
+		SkateController:step(1 / 60)
+		expect(skater.mode).toBe("Airborne")
+		skater._leftWall = nil
+		skater.velocity = Vector3.new(0, -5, 0)
+		SkateController:step(1 / 60)
+		expect(skater.mode).toBe("Grounded")
+		Fixtures.expectNear(skater.up, Vector3.yAxis)
 	end)
 
 	-- The owner's re-playtest (#255): the skating turns at once at each strip of a curved wall, so the body eases
@@ -821,15 +910,16 @@ describe("SkateController over an overhang", function()
 	local RADIUS = 22
 	local DT = 1 / 60
 
-	-- Whether the skater stays on from a wall up to the top of the arc at `speed`. With `strips`, the arc is that many
-	-- flat strips over a half circle, as the arena builds its lips of flat strips, so the ray's normal turns only at
-	-- strip edges.
+	-- Whether the skater stays on from a wall up to the top of the arc at `speed`: ten steps up the upright wall below
+	-- it, then round it. With `strips`, the arc is that many flat strips over a half circle, as the arena builds its
+	-- lips of flat strips, so the ray's normal turns only at strip edges.
 	local function holdsOverTheTop(speed: number, strips: number?): boolean
+		-- How far round the arc the skater is: 0 on the wall below it.
 		local phi = 0
 		setup({
 			Raycast = function(): any
 				local facing = phi
-				if strips ~= nil then
+				if strips ~= nil and phi > 0 then
 					local width = math.pi / strips
 					facing = (math.floor(phi / width) + 0.5) * width
 				end
@@ -840,8 +930,8 @@ describe("SkateController over an overhang", function()
 		SkateController:bind(rig)
 		local skater = SkateController.skater :: SkateMath.Skater
 		local step = speed * DT / RADIUS
-		for frame = 0, math.ceil((math.pi / 2) / step) do
-			phi = frame * step
+		for frame = -10, math.ceil((math.pi / 2) / step) do
+			phi = math.max(frame * step, 0)
 			skater.velocity = Vector3.new(-math.sin(phi), math.cos(phi), 0) * speed
 			SkateController:step(DT)
 			if skater.mode == "Airborne" then
@@ -857,7 +947,7 @@ describe("SkateController over an overhang", function()
 		expect(holdsOverTheTop(49)).toBe(false)
 	end)
 
-	it("does the same over an arc of 21 flat strips, through its own normal filter", function()
+	it("does the same over an arc of 21 flat strips, read face by face", function()
 		expect(holdsOverTheTop(57, 21)).toBe(true)
 		expect(holdsOverTheTop(49, 21)).toBe(false)
 	end)

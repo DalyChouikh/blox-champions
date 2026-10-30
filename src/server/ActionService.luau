@@ -31,6 +31,7 @@ local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
 local Reach = require(ReplicatedStorage.Shared.Actions.Reach)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
+local SmoothNormals = require(ReplicatedStorage.Shared.Arena.Geometry.SmoothNormals)
 local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local TeamService = require(script.Parent.TeamService)
@@ -102,8 +103,10 @@ export type ActionService = {
 	_calls: { [PlayerId]: number },
 	_candidates: { Reach.Candidate },
 	_context: ActionRunner.Context,
-	-- The arena's ride surfaces, the only things the server's ground rays hit, and what the last one found.
+	-- The arena's ride surfaces, the only things the server's ground rays hit, their direction where a ray finds them
+	-- (SmoothNormals.reader, as the skating reads it: #294; a fake in tests), and what the last ray found.
 	_rideParams: RaycastParams,
+	_smoothNormal: SmoothNormals.Reader,
 	_ground: SkateTypes.Ground,
 	_knockdowns: { Knockdown },
 	-- Every Knockdown record ever made, reused frame after frame.
@@ -267,9 +270,9 @@ local function posing(root: BasePart): boolean
 end
 
 -- The server's own look at the ground under a skater, once a frame: a ray along their down as their skating casts it
--- (Movement.groundProbeLength, through the arena's ride surfaces). A hard landing knocks them down as a fall, and so
--- does any landing posed (#245); a diver's first touch of the ground past the dive's active phase knocks them down as
--- a dive. None adds to a knockdown already running.
+-- (Movement.groundProbeLength, through the arena's ride surfaces), the ground's direction its smooth shape there
+-- (#294). A hard landing knocks them down as a fall, and so does any landing posed (#245); a diver's first touch of the
+-- ground past the dive's active phase knocks them down as a dive. None adds to a knockdown already running.
 local function lookDown(self: ActionService, holder: Holder)
 	local player = holder.player
 	local record = recordOf(self, player)
@@ -279,7 +282,7 @@ local function lookDown(self: ActionService, holder: Holder)
 	local ground = self._ground
 	ground.hit = hit ~= nil
 	if hit ~= nil then
-		ground.normal = hit.Normal
+		ground.normal = self._smoothNormal(hit.Position, hit.Normal)
 		ground.distance = hit.Distance
 	end
 	local touchdown = record.fall:step(root.Position.Y, ground)
@@ -365,6 +368,7 @@ local ActionService: ActionService = {
 	_candidates = {},
 	_context = { hasBall = false, knockedDown = false },
 	_rideParams = nil :: any,
+	_smoothNormal = nil :: any,
 	_ground = nil :: any,
 	_knockdowns = {},
 	_knockdownPool = {},
@@ -390,6 +394,7 @@ local ActionService: ActionService = {
 		rideParams.FilterType = Enum.RaycastFilterType.Include
 		rideParams.FilterDescendantsInstances = deps.ArenaService.arena.rideSurfaces
 		self._rideParams = rideParams
+		self._smoothNormal = deps.SmoothNormal or SmoothNormals.reader(config.Arena, config.Movement.cornerDeg)
 		self._ground = { hit = false, normal = Vector3.yAxis, distance = 0 }
 		self._knockdowns = {}
 		self._knockdownPool = {}
