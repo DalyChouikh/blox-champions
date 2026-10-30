@@ -3,6 +3,7 @@
 -- time. Pure and deterministic. A step mutates the skater in place and allocates nothing (vectors are values), so
 -- the client can run it every physics step.
 
+local Attributes = require(script.Parent.Parent.Net.Attributes)
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Types)
 local Vectors = require(script.Parent.Parent.Util.Vectors)
@@ -19,17 +20,21 @@ local TURN_EPSILON = 1e-6
 -- A face leaning past straight up by less than this (the sine of the lean) is a vertical wall, not an overhang: the
 -- arena's built glass reads up to 6.5e-5 past vertical (measured, #234). The lips' first strip leans 22.5°.
 local OVERHANG_EPSILON = 1e-3
--- What a knocked-down skater's input becomes: no stick, pump, brake, jump or draft. They only slide.
-local LOCKED: Types.SkateInput = table.freeze({
-	move = Vector3.zero,
-	pump = false,
-	brake = false,
-	jump = false,
-	jumpHeld = false,
-	draftAccel = 0,
-	knockedDown = true,
-	diving = false,
-})
+-- What a knocked-down skater's input becomes, one for each kind of knockdown: no stick, pump, brake, jump or draft.
+-- They only slide, for their kind's time (#252).
+local function locked(knockdown: Attributes.Knockdown): Types.SkateInput
+	return table.freeze({
+		move = Vector3.zero,
+		pump = false,
+		brake = false,
+		jump = false,
+		jumpHeld = false,
+		draftAccel = 0,
+		knockdown = knockdown,
+		diving = false,
+	})
+end
+local LOCKED = table.freeze({ Hit = locked("Hit"), Fall = locked("Fall"), Dive = locked("Dive") })
 -- What a diver's input becomes until their touchdown's knockdown (#242): the same, but they glide, slowed by friction
 -- and drag only, and in the air fly down the fall line (#241).
 local GLIDING: Types.SkateInput = table.freeze({
@@ -39,7 +44,7 @@ local GLIDING: Types.SkateInput = table.freeze({
 	jump = false,
 	jumpHeld = false,
 	draftAccel = 0,
-	knockedDown = false,
+	knockdown = nil,
 	diving = true,
 })
 
@@ -77,6 +82,8 @@ type Fields = {
 	_backwardsCos: number,
 	-- Whether the skater rides backwards (#246).
 	_backwards: boolean,
+	-- How long a knocked-down skater's slide has left, from its first step on the ground; nil on their feet (#252).
+	_slideLeft: number?,
 	-- The ground normal the last grounded step rode on, nil in the air: each step's turn is measured from it (A3).
 	_lastNormal: Vector3?,
 	-- The last grounded steps, newest at `_historyHead`: how far each went and how much the ground turned under it,
@@ -111,6 +118,7 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_turnRoundRate = math.pi / movement.turnRoundSeconds,
 		_backwardsCos = math.cos(math.rad(movement.backwardsConeDeg)),
 		_backwards = false,
+		_slideLeft = nil,
 		_lastNormal = nil,
 		_steps = table.create(HISTORY, 0),
 		_turns = table.create(HISTORY, 0),
@@ -189,6 +197,16 @@ local function isWall(self: Skater, normal: Vector3): boolean
 	return normal:Dot(self._worldUp) < self._wallCos
 end
 
+-- A knocked-down skater slows evenly to a stop in their kind's knockdownSlideSeconds, whatever the speed (RC, #252),
+-- timed from the slide's first step on the ground. Each step loses its share of the time left (dt over it), so on
+-- the flat the speed falls in a straight line to zero at the end; a slope's pull only bends the line, and after
+-- the end they lie still until up.
+local function slide(self: Skater, knockdown: Attributes.Knockdown, speed: number, dt: number): number
+	local left = self._slideLeft or self._movement.knockdownSlideSeconds[knockdown]
+	self._slideLeft = math.max(left - dt, 0)
+	return if left > dt then speed * (1 - dt / left) else 0
+end
+
 local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
 	local movement = self._movement
 	local normal = ground.normal
@@ -232,14 +250,18 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	velocity = heading * speed + acceleration * dt
 	speed = velocity.Magnitude
 	local direction = if speed > EPSILON then velocity / speed else heading
-	-- Friction and drag, with more slowing on top for a knocked-down skater or one pressing nothing (#215); a diver
-	-- glides (#242).
-	local extra = if input.knockedDown
-		then movement.knockdownDecel
-		elseif input.diving then 0
-		elseif stick == 0 and not input.pump and not brake then movement.coastDecel
-		else 0
-	speed = math.max(0, speed - (movement.rollingFriction + extra + movement.airDrag * speed) * dt)
+	-- A knocked-down skater slides for their knockdown's time (#252); anyone else loses friction and drag, with more
+	-- slowing on top for one pressing nothing (#215), while a diver glides (#242).
+	local knockdown: Attributes.Knockdown? = input.knockdown
+	if knockdown ~= nil then
+		speed = slide(self, knockdown, speed, dt)
+	else
+		local extra = if input.diving
+			then 0
+			elseif stick == 0 and not input.pump and not brake then movement.coastDecel
+			else 0
+		speed = math.max(0, speed - (movement.rollingFriction + extra + movement.airDrag * speed) * dt)
+	end
 	if brake then
 		local tiptoe = movement.tiptoeSpeed * stick
 		if speed > tiptoe then
@@ -437,7 +459,12 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 end
 
 function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
-	local controls = if input.knockedDown then LOCKED elseif input.diving then GLIDING else input
+	local knockdown: Attributes.Knockdown? = input.knockdown
+	local controls = if knockdown ~= nil then LOCKED[knockdown] elseif input.diving then GLIDING else input
+	if knockdown == nil then
+		-- On their feet: the next knockdown's slide is timed afresh (#252).
+		self._slideLeft = nil
+	end
 	self.landedPosed = false
 	local travel, turn = 0, 0
 	if self.mode == "Grounded" and ground.hit then

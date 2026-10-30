@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
@@ -27,12 +28,15 @@ local function input(overrides: { [string]: any }?): Types.SkateInput
 		jump = false,
 		jumpHeld = false,
 		draftAccel = 0,
-		knockedDown = false,
+		knockdown = nil,
 		diving = false,
 	}
+	local fields: any = record
 	local changes: { [string]: any } = overrides or {}
 	for key, value in changes do
-		(record :: any)[key] = value
+		-- A retired or misspelt field would be ignored silently: only SkateInput's own (knockdown is the optional one).
+		assert(key == "knockdown" or fields[key] ~= nil, `SkateInput has no field {key}`)
+		fields[key] = value
 	end
 	return record
 end
@@ -382,18 +386,18 @@ describe("SkateMath pushes and knockdowns", function()
 		expect(s.velocity.Y).toBeCloseTo(110, 4)
 	end)
 
-	it("slides a knocked-down skater, slowing by knockdownDecel and ignoring the stick, pump and jump", function()
+	it("slides a knocked-down skater, ignoring the stick, pump and jump", function()
 		local s = skater(Vector3.new(0, 0, -80))
-		s:step(input({ move = Vector3.xAxis, pump = true, jump = true, knockedDown = true }), ground(), 0.5)
+		s:step(input({ move = Vector3.xAxis, pump = true, jump = true, knockdown = "Hit" }), ground(), 0.5)
 		expect(s.mode).toBe("Grounded")
 		Fixtures.expectNear(s.forward, -Vector3.zAxis)
-		-- 80 − (4 + 0.02 × 80) × 0.5 − 75 × 0.5
-		expect(s.velocity.Magnitude).toBeCloseTo(39.7, 2)
+		-- A tackle's slide stops in 1.5 s: 80 × (1 − 0.5 / 1.5)
+		expect(s.velocity.Magnitude).toBeCloseTo(53.33, 2)
 
 		-- Nor does a knocked-down skater steer in the air.
 		local flying = skater(Vector3.new(0, 0, -30))
 		flying.mode = "Airborne"
-		flying:step(input({ move = Vector3.xAxis, knockedDown = true }), ground(FLAT, 0, false), 0.1)
+		flying:step(input({ move = Vector3.xAxis, knockdown = "Hit" }), ground(FLAT, 0, false), 0.1)
 		expect(flying.velocity.X).toBeCloseTo(0, 6)
 	end)
 
@@ -403,16 +407,16 @@ describe("SkateMath pushes and knockdowns", function()
 		s:step(input({ move = Vector3.xAxis, pump = true, jump = true, diving = true }), ground(), 0.5)
 		expect(s.mode).toBe("Grounded")
 		Fixtures.expectNear(s.forward, -Vector3.zAxis)
-		-- 60 − (4 + 0.02 × 60) × 0.5: no coastDecel, no knockdownDecel.
+		-- 60 − (4 + 0.02 × 60) × 0.5: no coastDecel, no slide.
 		expect(s.velocity.Magnitude).toBeCloseTo(57.4, 2)
 	end)
 
 	-- A knockdown locks everything (SkateInput), a dive included.
-	it("slides a knocked-down diver as any knocked-down skater", function()
+	it("slides a knocked-down diver by the knockdown's slide, not the glide", function()
 		local s = skater(Vector3.new(0, 0, -80))
-		s:step(input({ knockedDown = true, diving = true }), ground(), 0.5)
-		-- 80 − (4 + 0.02 × 80) × 0.5 − 75 × 0.5
-		expect(s.velocity.Magnitude).toBeCloseTo(39.7, 2)
+		s:step(input({ knockdown = "Dive", diving = true }), ground(), 0.5)
+		-- A dive's slide stops in 0.8 s: 80 × (1 − 0.5 / 0.8)
+		expect(s.velocity.Magnitude).toBeCloseTo(30, 2)
 	end)
 
 	-- The owner (#245, Q13): the Air Pose lasts while the jump key is held.
@@ -436,7 +440,7 @@ describe("SkateMath pushes and knockdowns", function()
 	it("ends the Air Pose of a skater who dives or is knocked down in the air, the key still held", function()
 		local cases: { { [string]: any } } = {
 			{ diving = true, jumpHeld = true },
-			{ knockedDown = true, jumpHeld = true },
+			{ knockdown = "Hit", jumpHeld = true },
 		}
 		for _, overrides in cases do
 			local s = skater(Vector3.new(0, 10, -40))
@@ -507,12 +511,6 @@ describe("SkateMath pushes and knockdowns", function()
 		local attached = landed(true, { jumpHeld = true })
 		attached:follow(Vector3.zero, Vector3.zero, Vector3.zero, -Vector3.zAxis)
 		expect(attached.landedPosed).toBe(false)
-	end)
-
-	it("stops a knocked-down skater at zero, never backwards", function()
-		local s = skater(Vector3.new(0, 0, -10))
-		s:step(input({ knockedDown = true }), ground(), 1)
-		Fixtures.expectNear(s.velocity, Vector3.zero)
 	end)
 
 	it("loses only its velocity into a surface that blocks it, and says whether that changed it", function()
@@ -615,9 +613,77 @@ describe("SkateMath lunges", function()
 		Fixtures.expectNear(rising.velocity, LINE * 1.118)
 		-- Not diving: gravity straight down, as ever.
 		local falling = airborne(Vector3.new(0, 0, -60))
-		falling:step(input({ knockedDown = true }), ground(FLAT, 0, false), 0.1)
+		falling:step(input({ knockdown = "Hit" }), ground(FLAT, 0, false), 0.1)
 		Fixtures.expectNear(falling.velocity * Vector3.new(1, 0, 1), Vector3.new(0, 0, -59.88))
 		expect(falling.velocity.Y).toBeCloseTo(-19.62 * (1 - 0.02 * 0.1), 3)
+	end)
+end)
+
+-- The owner (#252, Q24): RC's knockdowns slow evenly to a stop in a set time, whatever the speed: a tackle 50 -> 0 km/h
+-- and posed falls 70 -> 0 and 57 -> 0 in 1.5 s each, dives 68 -> 0 in 0.7 s and 84 -> 10 in 0.8 s (Videos 4-7).
+describe("SkateMath knockdown slides", function()
+	local DT = 1 / 60
+	local KINDS: { Attributes.Knockdown } = { "Hit", "Fall", "Dive" }
+
+	it("slows each kind evenly to a stop in its own time, whatever the speed", function()
+		for _, kind in KINDS do
+			local thirdSteps = math.round(movement.knockdownSlideSeconds[kind] * 60 / 3)
+			for _, speed in { 80, 30 } do
+				local s = skater(Vector3.new(0, 0, -speed))
+				local down = input({ knockdown = kind })
+				-- A third of the time: two thirds of the speed left; two thirds: a third; then none.
+				for third = 1, 3 do
+					for _ = 1, thirdSteps do
+						s:step(down, ground(), DT)
+					end
+					expect(s.velocity.Magnitude).toBeCloseTo(speed * (1 - third / 3), 3)
+				end
+				Fixtures.expectNear(s.forward, -Vector3.zAxis)
+				-- Still stopped while down.
+				s:step(down, ground(), DT)
+				Fixtures.expectNear(s.velocity, Vector3.zero)
+			end
+		end
+		-- A step longer than the whole slide stops the skater at zero, never backwards.
+		local s = skater(Vector3.new(0, 0, -10))
+		s:step(input({ knockdown = "Dive" }), ground(), 1)
+		Fixtures.expectNear(s.velocity, Vector3.zero)
+	end)
+
+	it("times a slide from its first step on the ground, afresh for each knockdown", function()
+		local halfSteps = math.round(movement.knockdownSlideSeconds.Hit * 60 / 2)
+		local down = input({ knockdown = "Hit" })
+		local function slideHalf(s: SkateMath.Skater): number
+			s.velocity = Vector3.new(0, 0, -60)
+			for _ = 1, halfSteps do
+				s:step(down, ground(), DT)
+			end
+			return s.velocity.Magnitude
+		end
+		-- Knocked down in the air first: the time starts at the touchdown.
+		local s = skater(Vector3.new(0, 0, -60))
+		s.mode = "Airborne"
+		for _ = 1, 30 do
+			s:step(down, ground(FLAT, 0, false), DT)
+		end
+		s.mode = "Grounded"
+		expect(slideHalf(s)).toBeCloseTo(30, 3)
+		-- Up for a step, then down again: a new slide.
+		s:step(input(), ground(), DT)
+		expect(slideHalf(s)).toBeCloseTo(30, 3)
+	end)
+
+	it("stops in its time down a slope too, and lies still there until up", function()
+		local s = skater(DOWNHILL * 20)
+		local down = input({ knockdown = "Hit" })
+		for _ = 1, math.round(movement.knockdownSlideSeconds.Hit * 60) do
+			s:step(down, ground(SLOPE), DT)
+		end
+		Fixtures.expectNear(s.velocity, Vector3.zero)
+		for _ = 1, 30 do
+			s:step(down, ground(SLOPE), DT)
+		end
+		Fixtures.expectNear(s.velocity, Vector3.zero)
 	end)
 end)
 

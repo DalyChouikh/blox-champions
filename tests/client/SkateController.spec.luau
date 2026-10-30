@@ -209,8 +209,8 @@ describe("SkateController", function()
 		rig:SetAttribute(Attributes.KnockedDown, "Hit")
 		SkateController:step(0.1)
 		expect(SkateController.knockedDown).toBe(true)
-		-- No steering: 60 − (4 + 0.02 × 60) × 0.1 − knockdownDecel 75 × 0.1, still along -Z.
-		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -51.98))
+		-- No steering: a tackle's slide, 60 × (1 − 0.1 / 1.5), still along -Z.
+		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -56))
 
 		stick:Fire(Vector2.zero)
 		rig:SetAttribute(Attributes.KnockedDown, nil)
@@ -229,6 +229,16 @@ describe("SkateController", function()
 		rig:SetAttribute(Attributes.KnockedDown, nil)
 		SkateController:step(1 / 60)
 		expect(velocityOf(rig).Magnitude).toBeLessThan(movement.attachBoostSpeed)
+	end)
+
+	-- The owner (#252): each kind of knockdown slides to a stop in its own time.
+	it("slides a knocked-down skater by their knockdown's kind", function()
+		local skater = SkateController.skater :: any
+		skater.velocity = Vector3.new(0, 0, -60)
+		rig:SetAttribute(Attributes.KnockedDown, "Dive")
+		SkateController:step(0.1)
+		-- A dive's slide: 60 × (1 − 0.1 / 0.8).
+		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -52.5))
 	end)
 
 	-- Roller Champions' Get Up (#220): the server decides when the skater is up (ActionService).
@@ -283,7 +293,7 @@ describe("SkateController", function()
 		task.wait() -- the press arrives with the deferred events
 		SkateController:step(1 / 60)
 		expect(skater.airPosing).toBe(false)
-		-- On the ground, no steering, and a glide: 60 − (4 + 0.02 × 60) × 0.1, no coasting or knockdown slowing.
+		-- On the ground, no steering, and a glide: 60 − (4 + 0.02 × 60) × 0.1, no coasting or knockdown slide.
 		rig:PivotTo(CFrame.new(0, movement.hoverHeight, 0))
 		skater.mode = "Grounded"
 		skater.velocity = Vector3.new(0, 0, -60)

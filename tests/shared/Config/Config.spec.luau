@@ -198,7 +198,9 @@ describe("Config defaults", function()
 			attachMaxSeconds = 3,
 			attachBoostSpeed = 75,
 			attachCooldown = 3,
-			knockdownDecel = 75,
+			-- Every knockdown slides evenly to a stop in its kind's time (#252: RC's tackle and posed falls 1.5 s,
+			-- dives 0.7-0.8 s, whatever the speed).
+			knockdownSlideSeconds = { Hit = 1.5, Fall = 1.5, Dive = 0.8 },
 			hardLanding = { drop = 40, knockdownSeconds = 1.5 },
 			speedometerScale = 1.2,
 		})
@@ -833,6 +835,19 @@ describe("Config.forMode", function()
 			{
 				overrides = { Movement = { hardLanding = { knockdownSeconds = 0 } } },
 				message = "Movement.hardLanding.knockdownSeconds: must be > 0 (got 0)",
+			},
+			-- A slide's time (#252): every kind must stop in some time.
+			{
+				overrides = { Movement = { knockdownSlideSeconds = { Hit = 0 } } },
+				message = "Movement.knockdownSlideSeconds.Hit: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { knockdownSlideSeconds = { Fall = 0 } } },
+				message = "Movement.knockdownSlideSeconds.Fall: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { knockdownSlideSeconds = { Dive = 0 } } },
+				message = "Movement.knockdownSlideSeconds.Dive: must be > 0 (got 0)",
 			},
 			{
 				overrides = { Movement = { wallGravityScale = 1.5 } },

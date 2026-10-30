@@ -1,12 +1,15 @@
 --!strict
 -- The records SkateMath reads each step. The controller reuses one of each, so a step allocates nothing.
 
+local Attributes = require(script.Parent.Parent.Net.Attributes)
+
 export type Mode = "Grounded" | "Airborne" | "Attached"
 
 -- One step's input: the stick as a world direction from the camera (length 0..1), the held buttons, a jump pressed
 -- since the last step and whether the jump key is held (the Air Pose lasts while it is, #245), the draft's pull,
--- whether the skater is knocked down (which locks all the rest), and whether they dive (which locks the rest too: a
--- diver glides, and in the air flies down the fall line, #241, #242).
+-- why the skater is knocked down, nil on their feet (which locks all the rest; each kind slides for its own time,
+-- #252), and whether they dive (which locks the rest too: a diver glides, and in the air flies down the fall line,
+-- #241, #242).
 export type SkateInput = {
 	move: Vector3,
 	pump: boolean,
@@ -14,7 +17,7 @@ export type SkateInput = {
 	jump: boolean,
 	jumpHeld: boolean,
 	draftAccel: number,
-	knockedDown: boolean,
+	knockdown: Attributes.Knockdown?,
 	diving: boolean,
 }
 

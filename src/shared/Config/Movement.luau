@@ -22,7 +22,7 @@ export type MovementConfig = {
 	-- Speed lost per second per stud/s of speed.
 	airDrag: number,
 	-- On the ground, a skater pressing nothing (no stick, pump or brake) loses this much more speed per second
-	-- (the owner, #215: from cruise to a stop in about 5 s). A knocked-down skater slides by knockdownDecel instead.
+	-- (the owner, #215: from cruise to a stop in about 5 s). A knocked-down skater slides by knockdownSlideSeconds.
 	coastDecel: number,
 	cruiseSpeed: number,
 	-- Speeding up fades from softCap to nothing at hardCap; hardCap is never exceeded, on the ground or in the air
@@ -93,8 +93,11 @@ export type MovementConfig = {
 	-- Letting go adds this speed toward the stick held then, or along the leader's way (RC: about +90 km/h, #214).
 	attachBoostSpeed: number,
 	attachCooldown: number,
-	-- A knocked-down skater slides, losing this much speed per second on top of friction.
-	knockdownDecel: number,
+	-- A knocked-down skater slides evenly to a stop in this many seconds from the slide's first step on the ground,
+	-- whatever the speed, by the kind of knockdown (Attributes.Knockdown). The owner (#252, Q24), from RC's readout: a
+	-- tackle 50 -> 0 km/h and posed falls 70 -> 0 and 57 -> 0 in 1.5 s each, dives 68 -> 0 in 0.7 s and 84 -> 10 in
+	-- 0.8 s. Was one rate for all, 75 studs/s² on top of friction and drag.
+	knockdownSlideSeconds: { Hit: number, Fall: number, Dive: number },
 	-- A fall of `drop` studs or more (from the top of the last rise to where the skater comes to rest) onto ground
 	-- flatter than wallAngle knocks them down for knockdownSeconds, sliding. The owner (#222): 40, above an uppercut's
 	-- leap with an Air Pose at its top (~35); an Air Pose's hop starts a fall over.
@@ -147,7 +150,7 @@ local defaults: MovementConfig = {
 	attachMaxSeconds = 3,
 	attachBoostSpeed = 75,
 	attachCooldown = 3,
-	knockdownDecel = 75,
+	knockdownSlideSeconds = { Hit = 1.5, Fall = 1.5, Dive = 0.8 },
 	hardLanding = { drop = 40, knockdownSeconds = 1.5 },
 	speedometerScale = 1.2,
 }
@@ -202,7 +205,7 @@ local fields = Validate.record({
 	attachMaxSeconds = positive,
 	attachBoostSpeed = nonNegative,
 	attachCooldown = nonNegative,
-	knockdownDecel = nonNegative,
+	knockdownSlideSeconds = Validate.record({ Hit = positive, Fall = positive, Dive = positive }),
 	hardLanding = Validate.record({ drop = positive, knockdownSeconds = positive }),
 	speedometerScale = positive,
 })

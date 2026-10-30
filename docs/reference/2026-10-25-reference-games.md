@@ -347,6 +347,19 @@ about two thirds of a lap, swinging from wall to wall.
     behaviour without its one-frame snap. Riding backwards happens only when the skater is carried back against their
     facing (rolling back down a bank or a wall they climbed, Video 7). None of the videos show S from a standstill in
     RC. Not chosen: S from a stop skates off backwards while held.
+  - **Round 10, measuring for #252** (2026-10-28, session 35, AskUserQuestion, recommended): Q24 **every knockdown
+    slides RC's way: it slows evenly to a stop in a set time, whatever the speed: 1.5 s after a tackle, a hard
+    landing or a posed fall, 0.8 s after a dive.** It replaces the one fixed rate (`knockdownDecel`, ~82 km/h per s
+    for every knockdown) and Q22's "tackles and dives keep today's rate"; the Get Up rules are unchanged (the stick
+    gets a tackled or fallen skater up from 0.5 s, keeping the speed left). Measured first at 10 frames a second
+    (the speed readout): a tackle (Video 4, 2:37.2) 50 -> 0 km/h in 1.5 s, evenly (3.3-3.7 km/h every 0.1 s); posed
+    falls (Video 7) 70 -> 0 (21.5-23.0 s) and 57 -> 0 (29.1-30.6 s) in 1.5 s each, evenly; a hard landing (Video 5,
+    over the wall onto the grass outside) 31 -> 1 km/h in ~1.4 s (18.1-19.5 s; 31 -> 21 in the first 0.2 s); dives
+    68 -> 0 in 0.7 s (Video 4), 84 -> 10 in 0.8 s (Video 6), 101 -> 16 in 0.67 s (Video 5). In RC the skater pushed
+    off right as each slide stopped (0 -> 22 -> 43 km/h within 0.2 s, Video 7). Only one RC tackle knockdown was
+    found: the Get Up prompt searched by template over Videos 4 and 6 (one in Video 4, none in Video 6; Video 7's
+    frames differ in size, so its posed falls were read at the times already noted); none found in Video 3 (2021).
+    Not chosen: 1.5 s with dives as today; the issue's fixed ~48 km/h per s for falls only.
 
 ## Roller Champions
 
