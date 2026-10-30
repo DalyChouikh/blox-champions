@@ -77,7 +77,6 @@ local function newEngine(self: MatchService)
 	self.engine = MatchEngine.new({
 		config = self._config,
 		arena = arena(self).layout,
-		gravity = Vector3.new(0, -workspace.Gravity, 0),
 	})
 	self._inEngine = {}
 	self._waiting = true

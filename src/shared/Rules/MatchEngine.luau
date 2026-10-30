@@ -30,7 +30,7 @@ type Event = Types.Event
 
 export type ArenaLayout = { gates: { Crossing.Rectangle }, goal: Crossing.Disc }
 
-export type EngineOptions = { config: Config.GameConfig, arena: ArenaLayout, gravity: Vector3 }
+export type EngineOptions = { config: Config.GameConfig, arena: ArenaLayout }
 
 export type Snapshot = {
 	state: Types.MatchState,
@@ -80,7 +80,6 @@ local optionsSchema = Validate.record({
 		),
 		goal = Validate.record({ frame = frame, radius = positive }),
 	}),
-	gravity = Validate.check(Validate.datatype("Vector3"), Finite.vector, "must be finite"),
 })
 
 -- The engine keeps its own frozen copy, so the caller rebuilding its tables cannot desync the lap sequence.
@@ -298,7 +297,7 @@ function MatchEngine.new(options: EngineOptions): MatchEngine
 			_goal = GoalJudge.new(arena.goal, match.lapsToOpenGoal),
 			_clock = MatchClock.new(match.durationSeconds, config.UI.clockWarnings),
 			_assists = AssistTracker.new(config.Scoring.assistWindowSeconds),
-			_saves = SaveDetector.new(arena.goal, options.gravity, config.Scoring.saveLookaheadSeconds),
+			_saves = SaveDetector.new(arena.goal, Config.gravity(config), config.Scoring.saveLookaheadSeconds),
 			_scores = ScoreKeeper.new(config),
 			_onClockWarning = onClockWarning,
 		} :: Fields,

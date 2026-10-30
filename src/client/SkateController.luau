@@ -454,8 +454,8 @@ local SkateController: SkateController = {
 	_views = {},
 	_playerList = nil,
 
-	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.SendGetUp, deps.Clock, deps.Gravity, deps.Team, deps.Raycast
-	-- and deps.Spherecast replace the live game in tests.
+	-- deps.Camera, deps.Skaters, deps.SendSkateState, deps.SendGetUp, deps.Clock, deps.Team, deps.Raycast and
+	-- deps.Spherecast replace the live game in tests.
 	init = function(self: SkateController, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -483,7 +483,7 @@ local SkateController: SkateController = {
 			or function(): string?
 				return (Players.LocalPlayer :: Player):GetAttribute(Attributes.Team) :: string?
 			end
-		self._gravity = deps.Gravity or Vector3.new(0, -workspace.Gravity, 0)
+		self._gravity = Config.gravity(config)
 		self._raycast = deps.Raycast
 			or function(origin: Vector3, direction: Vector3, params: RaycastParams): RaycastResult?
 				return workspace:Raycast(origin, direction, params)

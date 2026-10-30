@@ -163,8 +163,9 @@ local defaults: ActionsConfig = {
 		pose = "None",
 		motion = { sideSpeed = 45 },
 	},
-	-- Aimed up, so its cone covers "in front and above"; it leaps the skater up from any ground, 110² / (2 × 196.2) =
-	-- 31 studs (the owner, #219: RC's uppercut launches on open floor), or from a wall, but never in the air (the
+	-- Aimed up, so its cone covers "in front and above"; it leaps the skater up from any ground, 89.81² / (2 × 130.8) =
+	-- 31 studs, 1.37 s in the air (the owner, #219: RC's uppercut launches on open floor; #279: √(2/3) of 110 at two
+	-- thirds of the gravity, as high as before, hanging longer like RC's), or from a wall, but never in the air (the
 	-- owner, #262: RC greys it there, Videos 10-11). No recovery: a Tackle may follow once its strike is over (the
 	-- owner, #240: RC's air Tackle was ready 0.13-0.3 s after an Uppercut).
 	Uppercut = {
@@ -174,7 +175,7 @@ local defaults: ActionsConfig = {
 		effect = "Knockdown",
 		pose = "None",
 		hit = { range = 6, coneDeg = 60, aimUpDeg = 30, knockdownSeconds = 1.5 },
-		motion = { leapImpulse = 110 },
+		motion = { leapImpulse = 89.81 },
 	},
 	ChargeThrow = {
 		phases = INSTANT,

@@ -56,8 +56,8 @@ describe("Fall", function()
 	-- The owner chose 40 over 20 so that an uppercut never knocks its own user down.
 	it("lands an uppercut with an Air Pose at its top safely", function()
 		local leapImpulse = assert(config.Actions.Uppercut.motion).leapImpulse :: number
-		-- (110² + 42²) / (2 × 196.2) = 35.3 studs.
-		local leap = (leapImpulse ^ 2 + movement.airPoseImpulse ^ 2) / (2 * workspace.Gravity)
+		-- (89.81² + 34.29²) / (2 × 130.8) = 35.3 studs.
+		local leap = (leapImpulse ^ 2 + movement.airPoseImpulse ^ 2) / (2 * config.World.gravity)
 		expect(landing(leap)).toBe("Soft")
 	end)
 
@@ -76,8 +76,8 @@ describe("Fall", function()
 	-- The owner (#222): an Air Pose breaks a fall.
 	it("counts a fall from the top of the last rise, so an Air Pose's hop starts it over", function()
 		local fall = Fall.new(movement)
-		-- 42² / (2 × 196.2) = 4.5 studs.
-		local hop = movement.airPoseImpulse ^ 2 / (2 * workspace.Gravity)
+		-- 34.29² / (2 × 130.8) = 4.5 studs.
+		local hop = movement.airPoseImpulse ^ 2 / (2 * config.World.gravity)
 		fly(fall, REST + 60, REACH + 2)
 		fly(fall, REACH + 2, REACH + 2 + hop)
 		fly(fall, REACH + 2 + hop, REACH + 1)

@@ -50,16 +50,16 @@ export type MovementConfig = {
 	-- How fast a skater in the air turns back upright.
 	airUprightRate: number,
 	-- A diver in the air flies down a line this far below their facing, gravity's pull along it speeding them up:
-	-- 196.2 × sin 20° × cos 20° = 63 studs/s² across the ground, 76 km/h per s (the owner, #241: RC's readout climbed
-	-- ~75 km/h per s diving down).
+	-- 130.8 × sin 20° × cos 20° = 42 studs/s² across the ground, 50 km/h per s (the owner, #241, from RC's readout:
+	-- ~75 km/h per s diving down; two thirds of the gravity since #279).
 	fallLineDeg: number,
 	-- A surface steeper than wallAngle (degrees from flat) is a wall. Gravity pulls along it at full strength, as
 	-- everywhere (the owner, #256: one gravity, real physics). A wall holds a skater at any speed; past straight up the
 	-- loop rule decides (A3).
 	wallAngle: number,
 	-- On a wall the skates only roll (the owner, #239): no stride, no brake, and the stick turns the heading at most
-	-- this fast. A level line along upright glass needs g / wallTurnRate (196 studs/s), past hardCap, so every rider
-	-- curves back down.
+	-- this fast. A level line along upright glass needs g / wallTurnRate (131 studs/s at #279's gravity), past
+	-- hardCap, so every rider curves back down.
 	wallTurnRate: number,
 	-- How far back along the skater's path the curve of an overhang is measured (A3): a few of a lip's flat strips,
 	-- so a curve of strips reads as the arc it makes, yet short enough to follow a curve from where it starts.
@@ -70,11 +70,14 @@ export type MovementConfig = {
 	pumpFlatSlopeDeg: number,
 	brakeDecel: number,
 	tiptoeSpeed: number,
+	-- A jump leaves the ground this fast: 48.99² / (2 × 130.8) = 9.2 studs up, 0.75 s in the air. √(2/3) of
+	-- 60, so at two thirds of the gravity it rises as high as before and hangs longer, like RC's (the owner, #279).
 	jumpImpulse: number,
 	-- A jump, and an Air Pose, costs this share of the speed (the owner, #218: 10%, so jumping is no free move).
 	jumpSpeedCost: number,
 	-- The Air Pose (a press in the air, once until landing; it lasts while the key is held, #245) cancels any fall and
-	-- adds this speed straight up: a hop of 42² / (2 × 196.2) = 4.5 studs, about half a jump's 9.2 (the owner, #218).
+	-- adds this speed straight up: a hop of 34.29² / (2 × 130.8) = 4.5 studs, about half a jump's 9.2 (the owner,
+	-- #218; √(2/3) of 42 since #279).
 	-- Falling posed, the skater flies down the fall line like a diver (#245).
 	airPoseImpulse: number,
 	-- Touching down from the air on the belly (diving, or still posing) keeps this share of the speed, then the slide
@@ -142,9 +145,9 @@ local defaults: MovementConfig = {
 	pumpFlatSlopeDeg = 3,
 	brakeDecel = 120,
 	tiptoeSpeed = 12,
-	jumpImpulse = 60,
+	jumpImpulse = 48.99,
 	jumpSpeedCost = 0.1,
-	airPoseImpulse = 42,
+	airPoseImpulse = 34.29,
 	bellyLandingKeep = 0.65,
 	cornerDeg = 30,
 	bodyUpSmoothing = 30,

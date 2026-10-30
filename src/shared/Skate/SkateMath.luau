@@ -24,8 +24,8 @@ local TURN_EPSILON = 1e-3
 -- first strip leans 22.5°.
 local CONTACT_SLACK = 1e-3
 -- A skater leaving a wall along it moves off it by float noise only (studs/s): the glass leans up to 6.5e-5 past
--- upright (#234), so at hardCap and through a second of gravity under 0.03. A jump leaves at jumpImpulse (60), a bend
--- turning away at several studs/s: neither is caught back (#258).
+-- upright (#234), so at hardCap and through a second of gravity under 0.03. A jump leaves at jumpImpulse (48.99), a
+-- bend turning away at several studs/s: neither is caught back (#258).
 local DRIFT_EPSILON = 0.1
 -- What a knocked-down skater's input becomes, one for each kind of knockdown: no stick, pump, brake, jump or draft.
 -- They only slide, for their kind's time (#252).

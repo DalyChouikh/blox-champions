@@ -91,7 +91,6 @@ local function setup(surfaces: { BasePart }?)
 			return {}
 		end,
 		SendSkateState = function() end,
-		Gravity = Fixtures.GRAVITY,
 		Team = function(): string?
 			return "Blue"
 		end,
@@ -299,8 +298,8 @@ describe("ActionController", function()
 		for _ = 1, 30 do
 			frame()
 		end
-		-- 60 along the line, then 0.5 s of gravity's pull along it (196.2 × sin 20°) less air drag: 92.782.
-		Fixtures.expectNear(skater().velocity, FALL_LINE * 92.782)
+		-- 60 along the line, then 0.5 s of the world's pull along it (130.8 × sin 20°) less air drag: 81.656.
+		Fixtures.expectNear(skater().velocity, FALL_LINE * 81.656)
 	end)
 
 	it("dodges in the air airMultiplier as hard as on the ground", function()
@@ -481,14 +480,15 @@ describe("ActionController", function()
 		expect(requests[2]).toEqual({ action = "CallPass" })
 	end)
 
-	-- Roller Champions' uppercut launches on flat floor, away from any wall (#219): 110 studs/s up, about 31 studs.
+	-- Roller Champions' uppercut launches on flat floor, away from any wall (#219): 89.81 studs/s up, about 31 studs at
+	-- the world's gravity (#279).
 	it("leaps up with an uppercut from the ground anywhere, on open floor as beside a wall", function()
 		setup()
 		frame()
 		press("Uppercut")
 		frame()
 		expect(skater().mode).toBe("Airborne")
-		expect(skater().velocity.Y).toBeCloseTo(110, 3)
+		expect(skater().velocity.Y).toBeCloseTo(89.81, 3)
 
 		-- A wall facing the skater, 4 studs ahead, changes nothing.
 		local wall: BasePart = Instance.new("Part")
@@ -502,7 +502,7 @@ describe("ActionController", function()
 		press("Uppercut")
 		frame()
 		expect(skater().mode).toBe("Airborne")
-		expect(skater().velocity.Y).toBeCloseTo(110, 3)
+		expect(skater().velocity.Y).toBeCloseTo(89.81, 3)
 		expect(requests).toEqual({ { action = "Uppercut" }, { action = "Uppercut" } })
 	end)
 

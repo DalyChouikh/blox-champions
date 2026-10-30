@@ -25,7 +25,6 @@ local function newEngine(overrides: { [string]: any }?): MatchEngine.MatchEngine
 	local engine = MatchEngine.new({
 		config = Fixtures.config(overrides),
 		arena = Fixtures.arena(),
-		gravity = Fixtures.GRAVITY,
 	})
 	engine:addPlayer("B1", "Blue")
 	engine:addPlayer("B2", "Blue")
@@ -105,35 +104,28 @@ local function lastEvent(engine: MatchEngine.MatchEngine): any
 end
 
 describe("MatchEngine options", function()
-	local function creating(arena: any, gravity: any): () -> ()
+	local function creating(arena: any): () -> ()
 		return function()
-			MatchEngine.new({ config = Fixtures.config(), arena = arena, gravity = gravity })
+			MatchEngine.new({ config = Fixtures.config(), arena = arena })
 		end
 	end
 
-	it("rejects an invalid arena layout or gravity, naming the field", function()
+	it("rejects an invalid arena layout, naming the field", function()
 		local ring = Fixtures.ring()
 		local thinGates = Fixtures.gates()
 		thinGates[3] = { frame = thinGates[3].frame, width = 0, height = 40 }
-		expect(creating({ gates = {}, goal = ring }, Fixtures.GRAVITY)).toThrow(
-			"arena.gates: must contain at least one gate"
-		)
-		expect(creating({ gates = thinGates, goal = ring }, Fixtures.GRAVITY)).toThrow(
-			"arena.gates[3].width: must be > 0"
-		)
+		expect(creating({ gates = {}, goal = ring })).toThrow("arena.gates: must contain at least one gate")
+		expect(creating({ gates = thinGates, goal = ring })).toThrow("arena.gates[3].width: must be > 0")
 		local nanRing = { frame = ring.frame, radius = 0 / 0 }
-		expect(creating({ gates = Fixtures.gates(), goal = nanRing }, Fixtures.GRAVITY)).toThrow(
-			"arena.goal.radius: must not be NaN"
-		)
-		expect(creating({ gates = Fixtures.gates(), goal = { frame = "ring", radius = 3 } }, Fixtures.GRAVITY)).toThrow(
+		expect(creating({ gates = Fixtures.gates(), goal = nanRing })).toThrow("arena.goal.radius: must not be NaN")
+		expect(creating({ gates = Fixtures.gates(), goal = { frame = "ring", radius = 3 } })).toThrow(
 			"arena.goal.frame: expected CFrame, got string"
 		)
-		expect(creating(Fixtures.arena(), Vector3.new(0, -math.huge, 0))).toThrow("gravity: must be finite")
 	end)
 
 	it("keeps its own frozen copy of the arena, so later changes to the caller's tables have no effect", function()
 		local arena = Fixtures.arena()
-		local engine = MatchEngine.new({ config = Fixtures.config(), arena = arena, gravity = Fixtures.GRAVITY })
+		local engine = MatchEngine.new({ config = Fixtures.config(), arena = arena })
 		engine:addPlayer("B1", "Blue")
 		engine:start()
 		engine:tick(3)
@@ -456,6 +448,23 @@ describe("MatchEngine saves and knockdowns", function()
 		expectEvents(engine, {})
 		engine:tick(0.5)
 		expectEvents(engine, { { name = "SaveMade", player = "O1", kind = "Block" } })
+	end)
+
+	-- The danger is judged on the world's pull (#279). From (180, 15, 0) at (50, 26.16, 0) the ball meets the ring's
+	-- plane (x 200) 0.4 s later: at 130.8 back at y 15, the ring's centre; at 196.2 at y 9.77, below its rim (3).
+	it("predicts a block on the world's gravity", function()
+		local function blocks(overrides: { [string]: any }): boolean
+			local engine = liveEngine(overrides)
+			engine:pickedUp("B1", ZERO, ZERO)
+			lap(engine)
+			engine:thrown("B1")
+			engine:drainEvents()
+			engine:touched("O1", Vector3.new(180, 15, 0), Vector3.new(50, 26.16, 0))
+			engine:tick(1.5)
+			return table.find(names(engine:drainEvents()), "SaveMade") ~= nil
+		end
+		expect(blocks(SHORT_STREAK)).toBe(true)
+		expect(blocks({ Match = SHORT_STREAK.Match, World = { gravity = 196.2 } })).toBe(false)
 	end)
 
 	it("drops a block when the ball still goes in", function()

@@ -15,6 +15,7 @@ local Pose = require(script.Pose)
 local Scoring = require(script.Scoring)
 local UI = require(script.UI)
 local Validate = require(script.Validate)
+local World = require(script.World)
 
 export type ActionsConfig = Actions.ActionsConfig
 export type ActionConfig = Actions.ActionConfig
@@ -51,6 +52,7 @@ export type HudLayout = UI.HudLayout
 export type MarkerSettings = UI.MarkerSettings
 export type NameTagSettings = UI.NameTagSettings
 export type ArenaGlowSettings = UI.ArenaGlowSettings
+export type WorldConfig = World.WorldConfig
 
 export type GameConfig = {
 	Actions: ActionsConfig,
@@ -64,6 +66,7 @@ export type GameConfig = {
 	Pose: PoseConfig,
 	Scoring: ScoringConfig,
 	UI: UIConfig,
+	World: WorldConfig,
 }
 
 export type Mode = {
@@ -105,6 +108,7 @@ Config.schema = Validate.checkAll(
 		Pose = Pose.schema,
 		Scoring = Scoring.schema,
 		UI = UI.schema,
+		World = World.schema,
 	}),
 	crossAreaRules
 )
@@ -153,6 +157,7 @@ local function build(overrides: { [string]: any }): GameConfig
 		Pose = Pose.defaults,
 		Scoring = Scoring.defaults,
 		UI = UI.defaults,
+		World = World.defaults,
 	})
 	deepMerge(config, overrides)
 	Validate.assertValid(config, Config.schema, "")
@@ -163,6 +168,11 @@ local defaultConfig = build({})
 
 function Config.defaults(): GameConfig
 	return defaultConfig
+end
+
+-- The world's pull (World.gravity) as a vector, straight down: what skating, the ball and the rules fall by.
+function Config.gravity(config: GameConfig): Vector3
+	return Vector3.new(0, -config.World.gravity, 0)
 end
 
 function Config.forMode(mode: Mode): GameConfig
