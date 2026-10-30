@@ -12,8 +12,8 @@ local EPSILON = Vectors.EPSILON
 local alongSurface = Vectors.alongSurface
 local rotateToward = Vectors.rotateToward
 
--- How many past grounded steps the curvature window can reach back over: at hardCap a window of ten studs spans five,
--- and at a crawl the window simply covers less road, where the contact rule's speed² makes the curve irrelevant.
+-- How many past steps on a surface the curvature window can reach back over: at hardCap a window of ten studs spans
+-- five, and at a crawl the window simply covers less road, where the contact rule's speed² makes the curve irrelevant.
 local HISTORY = 32
 -- A ground normal turning less than this in a step (radians) has not turned: float noise on a flat surface. Measured
 -- on the arena (#257): neighbouring rays on one face differ by up to 1.5e-4, and where it really turns by 8.5e-3 or
@@ -95,13 +95,18 @@ type Fields = {
 	_backwards: boolean,
 	-- How long a knocked-down skater's slide has left, from its first step on the ground; nil on their feet (#252).
 	_slideLeft: number?,
-	-- The ground normal the last grounded step rode on, nil in the air: each step's turn is measured from it (A3).
+	-- The normal of the surface the last measured step rode on or flew beside, nil in the air unless beside a wall
+	-- that grips them: each step's turn is measured from it (A3).
 	_lastNormal: Vector3?,
-	-- The wall the skater last left, nil once on the ground again: falling, they look for it and come back onto it
-	-- (#258), unless it is out of reach or they move away from it.
+	-- The wall the skater last left or touched, nil once on the ground again: they look for it, kept by it rising by
+	-- its grip (#289) and coming back onto it falling (#258), unless it is out of reach, they move away from it or it
+	-- bends away from them more than its grip holds.
 	_leftWall: Vector3?,
-	-- The last grounded steps, newest at `_historyHead`: how far each went and how much the ground turned under it,
-	-- positive on the inside of a loop. The curve is read over curvatureWindow studs of them.
+	-- The way the surface bends under them (unit, along its face): the way its normal last turned through a curve,
+	-- nil before one (#289).
+	_bendWay: Vector3?,
+	-- The last measured steps, newest at `_historyHead`: how far each went the way the surface bends (#289) and how
+	-- much it turned, positive on the inside of a loop. The curve is read over curvatureWindow studs of them.
 	_steps: { number },
 	_turns: { number },
 	_historyHead: number,
@@ -137,6 +142,7 @@ function SkateMath.new(movement: Config.MovementConfig, gravity: Vector3): Skate
 		_slideLeft = nil,
 		_lastNormal = nil,
 		_leftWall = nil,
+		_bendWay = nil,
 		_steps = table.create(HISTORY, 0),
 		_turns = table.create(HISTORY, 0),
 		_historyHead = 0,
@@ -224,19 +230,29 @@ local function slide(self: Skater, knockdown: Attributes.Knockdown, speed: numbe
 	return if left > dt then speed * (1 - dt / left) else 0
 end
 
+-- Whether a surface's normal turning from `last` to `normal` is a curve's small turn (the arena's strips stand for
+-- curves), not a corner (cornerDeg, #255).
+local function curving(self: Skater, last: Vector3, normal: Vector3): boolean
+	return last:Dot(normal) >= self._cornerCos
+end
+
+-- The velocity along a surface whose normal turned from `last` to `normal`: through a curve's small turn the surface
+-- does no work, so the speed along it turns with it (#255); at a corner, or with no last normal (touching down), the
+-- speed into the new face is lost.
+local function turnedOnto(self: Skater, last: Vector3?, normal: Vector3): Vector3
+	local velocity = alongSurface(self.velocity, normal)
+	local speed = velocity.Magnitude
+	if last ~= nil and curving(self, last, normal) and speed > EPSILON then
+		return velocity * (alongSurface(self.velocity, last).Magnitude / speed)
+	end
+	return velocity
+end
+
 local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
 	local movement = self._movement
 	local normal = ground.normal
-	local velocity = alongSurface(self.velocity, normal)
+	local velocity = turnedOnto(self, self._lastNormal, normal)
 	local speed = velocity.Magnitude
-	-- Through a curve's small turn (the arena's strips stand for curves) the ground does no work, so the speed along
-	-- it turns with it (#255); at a corner, or touching down, the speed into the new face is lost.
-	local last = self._lastNormal
-	if last ~= nil and last:Dot(normal) >= self._cornerCos and speed > EPSILON then
-		local kept = alongSurface(self.velocity, last).Magnitude
-		velocity *= kept / speed
-		speed = kept
-	end
 	local heading = if speed > EPSILON then velocity / speed else facingOn(self, normal)
 	-- On a wall the skates only roll (#239): the stick steers at most wallTurnRate and never strides, and the brake
 	-- does nothing. Gravity pulls along every surface at full strength (#256).
@@ -375,8 +391,17 @@ local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
 	end
 end
 
--- This step's travel along the ground and how far the ground's normal turned since the last grounded step, positive
--- when the surface bends around the skater (the inside of a loop). No turn is known before a grounded step.
+-- The skater's speed `along` the surface, the part the way it bends (all of it before any bend is known): only that
+-- part of their motion follows the curve (#289), so rising up the middle glass's round ends while drifting slowly
+-- round them bends their path little, however fast they rise.
+local function alongBend(self: Skater, along: Vector3): number
+	local way = self._bendWay
+	return if way ~= nil then math.abs(way:Dot(along)) else along.Magnitude
+end
+
+-- This step's travel the way the surface bends and how far its normal turned since the last measured step, positive
+-- when it bends around the skater (the inside of a loop). A curve's turn also says the way it bends now, along its new
+-- face (#289); a corner's says nothing of a curve. No turn is known before a step on a surface.
 local function measure(self: Skater, normal: Vector3, dt: number): (number, number)
 	local along = alongSurface(self.velocity, normal)
 	local speed = along.Magnitude
@@ -386,15 +411,18 @@ local function measure(self: Skater, normal: Vector3, dt: number): (number, numb
 	end
 	-- Exactly zero for a normal that has not turned, where an arccosine reads enough to look like a turn.
 	local angle = Vectors.angleBetween(last, normal)
-	return speed * dt, if (normal - last):Dot(along) > 0 then -angle else angle
+	if angle > TURN_EPSILON and curving(self, last, normal) then
+		self._bendWay = alongSurface(normal - last, normal).Unit
+	end
+	return alongBend(self, along) * dt, if (normal - last):Dot(along) > 0 then -angle else angle
 end
 
--- How sharply the surface bends around the skater, 1/radius (negative where it bends away), from the turns of the
--- last curvatureWindow studs of path. Across a lip's flat strips the ground turns only at each strip's edge, so the
--- curve is the turning between the oldest and the newest turn in the window over the road between them: one strip's
--- angle per strip's width, the arc they make. On a smooth curve every step turns, and this is the turn per stud. With
--- fewer than two turns in the window it is the turning over the window's road. Zero until a grounded step has
--- measured a turn.
+-- How sharply the surface bends around the skater, 1/radius (negative where it bends away), from the turns over the
+-- last curvatureWindow studs of path the way it bends (#289). Across a lip's flat strips the ground turns only at each
+-- strip's edge, so the curve is the turning between the oldest and the newest turn in the window over the road between
+-- them: one strip's angle per strip's width, the arc they make. On a smooth curve every step turns, and this is the
+-- turn per stud. With fewer than two turns in the window it is the turning over the window's road. Zero until a step
+-- has measured a turn.
 local function curvature(self: Skater, travel: number, turn: number): number
 	local window = self._movement.curvatureWindow
 	-- Walking back from now, a step's turn happened where that step ended: `behind` studs ago.
@@ -425,16 +453,36 @@ local function curvature(self: Skater, travel: number, turn: number): number
 	return if behind > EPSILON then turned / behind else 0
 end
 
--- A surface only pushes (#257, A3): the skater stays on while the push their path's curve needs, speed² × curvature
--- (negative where the surface bends away from them), reaches gravity's pull off the surface, within the slack. So a
--- flat ceiling never holds, an overhang holds only fast enough round its curve, a wall bending away holds no one, a
--- crest throws off a skater too fast for gravity to keep on it, and a curve bending toward them always holds.
-local function letsGo(self: Skater, normal: Vector3, travel: number, turn: number): boolean
-	local speed = alongSurface(self.velocity, normal).Magnitude
-	return speed * speed * curvature(self, travel, turn) < self._gravity:Dot(normal) - self._slackPull
+-- Whether a surface can hold a skater touching down on it: an overhang's push depends on a curve no touchdown knows
+-- yet, so it holds no one (#258).
+local function holds(self: Skater, normal: Vector3): boolean
+	return self._gravity:Dot(normal) <= self._slackPull
 end
 
--- Keeps this grounded step's travel and turn for the curvature window.
+-- How firmly a surface presses the skates onto it: gravity's push into it, and on one that holds never less than
+-- wallGrip (#289), since gravity presses nothing onto an upright wall. Negative under an overhang, which gravity pulls
+-- them off.
+local function pressing(self: Skater, normal: Vector3): number
+	local push = -self._gravity:Dot(normal)
+	return if holds(self, normal) then math.max(push, self._movement.wallGrip) else push
+end
+
+-- Whether it is the grip, not gravity, that presses the skates onto a surface that holds: a wall near upright (#289).
+local function grips(self: Skater, normal: Vector3): boolean
+	return holds(self, normal) and -self._gravity:Dot(normal) < self._movement.wallGrip
+end
+
+-- A surface only pushes (#257, A3): the skater stays on while the push their path's curve needs, speed² × curvature
+-- (negative where the surface bends away from them), reaches how firmly it presses them on, within the slack. So a
+-- flat ceiling never holds, an overhang holds only fast enough round its curve, a crest throws off a skater too fast
+-- for gravity to keep on it, a curve bending toward them always holds, and a wall bending away (the middle glass's
+-- round ends) holds only a drift round it slow enough for the grip (#289).
+local function letsGo(self: Skater, normal: Vector3, travel: number, turn: number): boolean
+	local speed = alongBend(self, alongSurface(self.velocity, normal))
+	return speed * speed * curvature(self, travel, turn) < -pressing(self, normal) - self._slackPull
+end
+
+-- Keeps this measured step's travel and turn for the curvature window.
 local function remember(self: Skater, normal: Vector3, travel: number, turn: number)
 	if self._lastNormal ~= nil and travel > EPSILON then
 		local head = self._historyHead % HISTORY + 1
@@ -446,9 +494,16 @@ local function remember(self: Skater, normal: Vector3, travel: number, turn: num
 	self._lastNormal = normal
 end
 
--- Off the ground the path's curve no longer says anything about a surface.
+-- Flying beside the wall they left or touched (only the air keeps one), found by the controller's ray toward it
+-- (groundRay), when its grip is what holds them there (#289): rising up it after a jump, or falling back onto it.
+local function besideWall(self: Skater, ground: Types.Ground): boolean
+	return self._leftWall ~= nil and ground.hit and grips(self, ground.normal)
+end
+
+-- Off the ground, and not beside a wall that grips them, the path's curve no longer says anything about a surface.
 local function forget(self: Skater)
 	self._lastNormal = nil
+	self._bendWay = nil
 	self._historyCount = 0
 end
 
@@ -458,12 +513,6 @@ local function land(self: Skater)
 	self.airPoseReady = true
 	self.airPosing = false
 	self._leftWall = nil
-end
-
--- Whether a surface can hold a skater touching down on it: an overhang's push depends on a curve no touchdown knows
--- yet, so it holds no one (#258).
-local function holds(self: Skater, normal: Vector3): boolean
-	return self._gravity:Dot(normal) <= self._slackPull
 end
 
 -- Into the air from the surface they rode (`up`), which they may come back onto if it is a wall that holds (#258).
@@ -525,7 +574,14 @@ end
 -- The mode changes first, so a jump or a fall is stepped in the air at once. In the air, letting go of the jump key
 -- ends the Air Pose before the touchdown is judged (#245); a press and release between two steps poses for one step,
 -- and its hop still breaks a fall.
-local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.Ground, travel: number, turn: number)
+local function resolveMode(
+	self: Skater,
+	input: Types.SkateInput,
+	ground: Types.Ground,
+	travel: number,
+	turn: number,
+	beside: boolean
+)
 	local movement = self._movement
 	if self.mode == "Grounded" then
 		if ground.hit and input.jump then
@@ -542,6 +598,18 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 	end
 	if not input.jumpHeld then
 		self.airPosing = false
+	end
+	-- Beside a wall that grips them (#289), where it bends away from them they keep by it round its curve, as on it:
+	-- the speed along it turns with it and their part off it stays, unless it bends away more than the grip holds; then
+	-- they fly on free. A wall bending toward them needs no grip: it meets them (touch).
+	local wall = self._leftWall
+	if beside and wall ~= nil then
+		if letsGo(self, ground.normal, travel, turn) then
+			self._leftWall = nil
+		elseif (ground.normal - wall):Dot(self.velocity) > 0 then
+			self.velocity = turnedOnto(self, wall, ground.normal) + ground.normal * self.velocity:Dot(wall)
+			self._leftWall = ground.normal
+		end
 	end
 	-- Down onto ground they land on: within hoverHeight and not moving off it, or the wall they left anywhere the ray
 	-- reaches while they do not move away from it (#258). A wall that no longer can catch them is let go.
@@ -570,17 +638,25 @@ function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Gro
 		self._slideLeft = nil
 	end
 	self.landedPosed = false
+	-- On the ground, or beside a wall that grips them, each step's turn is measured against the surface (#257, #289).
+	local beside = besideWall(self, ground)
+	local measured = ground.hit and (self.mode == "Grounded" or beside)
 	local travel, turn = 0, 0
-	if self.mode == "Grounded" and ground.hit then
+	if measured then
 		travel, turn = measure(self, ground.normal, dt)
 	end
-	resolveMode(self, controls, ground, travel, turn)
+	resolveMode(self, controls, ground, travel, turn, beside)
 	if self.mode == "Grounded" then
 		-- The grounded step turns the speed from the last step's ground; then this one's is kept.
 		stepGrounded(self, controls, ground, dt)
 		remember(self, ground.normal, travel, turn)
 	else
-		forget(self)
+		-- Leaving a wall that holds, or flying beside one that grips them, the path's curve is kept for the next steps.
+		if measured and self._leftWall ~= nil then
+			remember(self, ground.normal, travel, turn)
+		else
+			forget(self)
+		end
 		stepAirborne(self, controls, dt)
 	end
 end
@@ -725,11 +801,12 @@ function SkateMath.touch(self: Skater, normal: Vector3, input: Types.SkateInput)
 	return true
 end
 
--- The way the controller's ground ray looks (a unit direction): along the feet, or toward the wall they left while
--- falling beside it (#258). Says which: what that ray finds is no seam under the feet.
+-- The way the controller's ground ray looks (a unit direction): along the feet, or toward the wall they left or
+-- touched while they fly beside it, rising (its grip keeps them by it, #289) or falling (it catches them, #258). Says
+-- which: what that ray finds is no seam under the feet.
 function SkateMath.groundRay(self: Skater): (Vector3, boolean)
 	local wall = self._leftWall
-	if wall ~= nil and catching(self) then
+	if wall ~= nil then
 		return -wall, true
 	end
 	return -self.up, false

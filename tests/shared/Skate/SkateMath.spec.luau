@@ -998,15 +998,16 @@ describe("SkateMath landing on what they touch", function()
 		Fixtures.expectNear(diver.velocity, Vector3.new(0, -40 * movement.bellyLandingKeep, 0))
 	end)
 
-	it("flies up off the wall it leaps along, then comes back onto it once falling, looking for it there", function()
+	it("flies up along the wall it leaps from, looking toward it, and comes back onto it once falling", function()
 		local s = skater(Vector3.new(0, 30, 0))
 		s:step(input(), ground(WALL), DT)
 		s:push(Vector3.yAxis * 110, true)
 		expect(s.mode).toBe("Airborne")
 		local frames = 0
 		while s.velocity.Y > 0 and frames < 120 do
-			-- Rising, the ray looks along the feet, still onto the wall, which lands no one on the way up (Q28).
-			Fixtures.expectNear(s:groundRay(), -s.up)
+			-- Rising, the ray looks toward the wall, whose grip keeps them by it (#289) but which lands no one on the
+			-- way up (Q28).
+			Fixtures.expectNear(s:groundRay(), -WALL)
 			s:step(input(), ground(WALL), DT)
 			expect(s.mode).toBe("Airborne")
 			frames += 1
@@ -1033,6 +1034,23 @@ describe("SkateMath landing on what they touch", function()
 		end
 		expect(s.mode).toBe("Grounded")
 		Fixtures.expectNear(s.up, WALL)
+	end)
+
+	-- Video 30 (#289's trial): an Uppercut off the outer wall's curved foot, 8° short of upright, leaps up into the
+	-- upright wall above. That wall bends toward them: it meets them (touch), and their flight beside it never turns
+	-- them off it.
+	it("keeps a leap off a wall's curved foot moving into the upright wall above it", function()
+		local foot = Vector3.new(-math.cos(math.rad(8)), math.sin(math.rad(8)), 0)
+		local s = skater(Vector3.zero)
+		s.up = foot
+		s:step(input(), ground(foot), DT)
+		s.velocity = Vector3.new(math.sin(math.rad(8)), math.cos(math.rad(8)), 0) * 25
+		-- The Uppercut's leap: 110 × √(2/3) (#279).
+		s:push(Vector3.yAxis * 89.81, true)
+		s:step(input(), ground(WALL), DT)
+		expect(s.mode).toBe("Airborne")
+		-- 25 × sin 8° = 3.479 into it, less one air step's drag (× (1 − 0.02 / 60)): 3.478.
+		expect(s.velocity.X).toBeCloseTo(3.478, 3)
 	end)
 
 	-- RC (#267, Video 14, 4.0-7.4 s): Jump while riding up the glass rose along it and the glass took them back.
@@ -1113,6 +1131,107 @@ describe("SkateMath landing on what they touch", function()
 			frames += 1
 		end
 		expect(s.mode).toBe("Grounded")
+	end)
+
+	-- The middle glass's round ends (#289): the outside of an upright pillar of radius 20, built as flat strips 3.75°
+	-- apart (the arena's stations). The face beside a root, and what the controller's ray from it finds: that face, at
+	-- the ray's length to its plane (20 × cos 1.875° from the axis).
+	local PILLAR_STRIP = math.rad(3.75)
+	local PILLAR_FACES = 20 * math.cos(PILLAR_STRIP / 2)
+	local function pillarFace(position: Vector3): Vector3
+		local facing = (math.floor(math.atan2(position.Z, position.X) / PILLAR_STRIP) + 0.5) * PILLAR_STRIP
+		return Vector3.new(math.cos(facing), 0, math.sin(facing))
+	end
+	local function pillarGround(position: Vector3, direction: Vector3): Types.Ground
+		local normal = pillarFace(position)
+		local toward = -direction:Dot(normal)
+		local reach = if toward > Vectors.EPSILON then (position:Dot(normal) - PILLAR_FACES) / toward else math.huge
+		return ground(normal, reach, reach <= movement.groundProbeLength)
+	end
+
+	-- Riding the pillar's first strip drifting `round` studs/s round it, the skater leaps 60 up it (an action's
+	-- launch), moving `off` studs/s off it, and flies on, each step finding the ground its own ray looks for. Says how
+	-- far the root strayed from hoverHeight off the face while rising, the skater once caught (or after two seconds),
+	-- and where it is then.
+	local function leapRoundPillar(round: number, off: number?): (number, SkateMath.Skater, Vector3)
+		local first = Vector3.new(math.cos(PILLAR_STRIP / 2), 0, math.sin(PILLAR_STRIP / 2))
+		local along = Vector3.new(-first.Z, 0, first.X)
+		local position = first * (PILLAR_FACES + movement.hoverHeight) - along * 0.6
+		local s = skater(along * round)
+		s.up = first
+		s:step(input(), pillarGround(position, -s.up), DT)
+		position += s.velocity * DT
+		s:push(Vector3.yAxis * 60 + first * (off or 0), true)
+		local stray = 0
+		for _ = 1, 120 do
+			local rising = s.velocity.Y > 0
+			s:step(input(), pillarGround(position, (s:groundRay())), DT)
+			position += s.velocity * DT
+			if s.mode == "Grounded" then
+				break
+			end
+			if rising then
+				local away = position:Dot(pillarFace(position)) - PILLAR_FACES
+				stray = math.max(stray, math.abs(away - movement.hoverHeight))
+			end
+		end
+		return stray, s, position
+	end
+
+	-- The owner (#289, Q71): a leap up the middle glass's round ends keeps by the glass while drifting slowly round it
+	-- (15² / 22.5 = 10, within the grip's 38), and the glass catches them feet first once falling. Drifting round it at
+	-- riding speed lets go of them (35² / 22.5 = 54).
+	it("keeps a leap up a round pillar by it while drifting slowly round it, and catches it once falling", function()
+		local stray, s, position = leapRoundPillar(15)
+		expect(stray).toBeLessThan(0.1)
+		expect(s.mode).toBe("Grounded")
+		expect(s.velocity.Y).toBeLessThan(0)
+		Fixtures.expectNear(s.up, pillarFace(position))
+		local _, fast = leapRoundPillar(35)
+		expect(fast.mode).toBe("Airborne")
+		local _, toWall = fast:groundRay()
+		expect(toWall).toBe(false)
+		-- The grip turns only their speed along it: drifting off it at 1 stud/s they keep drifting off, 0.29 studs by
+		-- the top (56.7 up at 196.2), and nothing catches a skater moving off the glass.
+		local drift, drifting = leapRoundPillar(15, 1)
+		expect(drift).toBeGreaterThan(0.2)
+		expect(drifting.mode).toBe("Airborne")
+	end)
+
+	-- Only near-upright walls grip a flight beside them (#289): gravity presses a skater onto one 70° from flat harder
+	-- than the grip (196.2 × cos 70° = 67), and in the air nothing presses them, so a flight beside it is free.
+	it("flies free beside a wall that gravity presses harder than the grip, as with no wall near", function()
+		local steep = Vector3.new(-math.sin(math.rad(70)), math.cos(math.rad(70)), 0)
+		local s = skater(Vector3.zero)
+		s.up = steep
+		for _ = 1, 10 do
+			s.velocity = Vector3.new(0, 0, 20)
+			s:step(input(), ground(steep), DT)
+		end
+		s.velocity = Vector3.new(0, 0, 20)
+		s:push(Vector3.yAxis * 30, true)
+		local free = flyer(s.velocity)
+		-- Its face turned 3.75° round, away from them (they drift along +Z).
+		s:step(input(), ground(CFrame.Angles(0, math.rad(3.75), 0) * steep), DT)
+		free:step(input(), ground(FLAT, 0, false), DT)
+		Fixtures.expectNear(s.velocity, free.velocity)
+	end)
+
+	-- A ray that found nothing says nothing (Types.Ground): rising beside the wall they leap along while drifting along
+	-- it, a miss whose leftover normal is turned 20° round either way neither turns their flight nor stays as the
+	-- wall's last normal, so back beside the wall nothing has turned (#289).
+	it("ignores the normal of a ground ray that found nothing, beside the wall it leaps along", function()
+		for _, round in { 20, -20 } do
+			local s = skater(Vector3.new(0, 30, 0))
+			s:step(input(), ground(WALL), DT)
+			s:push(Vector3.new(0, 80, 20), true)
+			local free = flyer(s.velocity)
+			s:step(input(), ground(CFrame.Angles(0, math.rad(round), 0) * WALL, 1, false), DT)
+			free:step(input(), ground(FLAT, 0, false), DT)
+			Fixtures.expectNear(s.velocity, free.velocity)
+			s:step(input(), ground(WALL), DT)
+			Fixtures.expectNear(s:groundRay(), -WALL)
+		end
 	end)
 
 	-- The owner (Q28): "both": on a leap up the glass every air action works, and the glass catches them.
@@ -1377,27 +1496,32 @@ describe("SkateMath riding the roof by loop physics", function()
 		expect(staysOn(40, RADIUS, 0, math.pi / 6)).toBe(false)
 	end)
 
-	it("lets go of a flat ceiling once the corner that led onto it is behind, at any speed", function()
-		local s = skater(Vector3.zero)
+	-- Straight over the corner, and slantwise (45° along it): a corner says nothing of the way a curve bends (#289),
+	-- so the window counts the whole path either way.
+	it("lets go of a flat ceiling once the corner that led onto it is behind, at any speed or slant", function()
 		local wall, ceiling = Vector3.new(-1, 0, 0), Vector3.new(0, -1, 0)
 		local speed = movement.hardCap
-		for _ = 1, 10 do
-			s.velocity = Vector3.new(0, speed, 0)
-			s:step(input(), ground(wall), DT)
-		end
-		s.velocity = Vector3.new(-speed, 0, 0)
-		s:step(input(), ground(ceiling), DT)
-		-- The corner's turn is still within the window: the skater holds for now.
-		expect(s.mode).toBe("Grounded")
-		local frames = 0
-		while s.mode == "Grounded" and frames < 60 do
-			s.velocity = Vector3.new(-speed, 0, 0)
+		for _, slant in { 0, math.rad(45) } do
+			local over, along = speed * math.cos(slant), speed * math.sin(slant)
+			local s = skater(Vector3.zero)
+			for _ = 1, 10 do
+				s.velocity = Vector3.new(0, over, along)
+				s:step(input(), ground(wall), DT)
+			end
+			s.velocity = Vector3.new(-over, 0, along)
 			s:step(input(), ground(ceiling), DT)
-			frames += 1
+			-- The corner's turn is still within the window: the skater holds for now.
+			expect(s.mode).toBe("Grounded")
+			local frames = 0
+			while s.mode == "Grounded" and frames < 60 do
+				s.velocity = Vector3.new(-over, 0, along)
+				s:step(input(), ground(ceiling), DT)
+				frames += 1
+			end
+			expect(s.mode).toBe("Airborne")
+			-- Within the window plus a frame's travel (hardCap × DT, about 2 studs).
+			expect(frames * speed * DT).toBeLessThan(movement.curvatureWindow + speed * DT + 1e-6)
 		end
-		expect(s.mode).toBe("Airborne")
-		-- Within the window plus a frame's travel (hardCap × DT, about 2 studs).
-		expect(frames * speed * DT).toBeLessThan(movement.curvatureWindow + speed * DT + 1e-6)
 	end)
 
 	it("holds a slow skater on a tight overhang while its curve does, with no wall speed needed (#216)", function()
@@ -1425,32 +1549,36 @@ describe("SkateMath riding the roof by loop physics", function()
 end)
 
 -- The owner (#257, Q26): real physics, a surface only pushes. A skater stays on only while the push their path's curve
--- needs, speed² × curvature, reaches gravity's pull off the surface. Where the surface bends away from them the
--- curvature is negative: an upright wall bending away holds no one, and a crest throws off a skater too fast for
--- gravity to keep on it. Curves bending toward them hold, as before.
+-- needs, speed² × curvature, reaches how firmly the surface presses them on: gravity's push into it, and on a wall that
+-- holds at least wallGrip (#289, Q71). Where the surface bends away from them the curvature is negative: an upright
+-- wall bending away holds only a slow drift round it, and a crest throws off a skater too fast for gravity to keep on
+-- it. Curves bending toward them hold, as before. Only the speed the way the surface bends follows its curve.
 describe("SkateMath on surfaces that bend away", function()
 	local DT = 1 / 60
 
 	-- Rides an arc of `radius` from `from` to `to` (radians), one step per DT, the velocity set along it each step, and
 	-- says whether the skater stayed on. `normalAt` and `alongAt` give the surface's normal and the way along it at an
-	-- angle. The skater first rides the surface the arc starts from.
+	-- angle. The skater first rides the surface the arc starts from. With `sideways`, they also move that fast along Z,
+	-- across the arc (a slanted crossing).
 	local function staysOn(
 		speed: number,
 		radius: number,
 		from: number,
 		to: number,
 		normalAt: (number) -> Vector3,
-		alongAt: (number) -> Vector3
+		alongAt: (number) -> Vector3,
+		sideways: number?
 	): boolean
+		local side = Vector3.zAxis * (sideways or 0)
 		local s = skater(Vector3.zero)
 		for _ = 1, 10 do
-			s.velocity = alongAt(from) * speed
+			s.velocity = alongAt(from) * speed + side
 			s:step(input(), ground(normalAt(from)), DT)
 		end
 		local step = speed * DT / radius
 		for frame = 0, math.ceil((to - from) / step) do
 			local at = from + frame * step
-			s.velocity = alongAt(at) * speed
+			s.velocity = alongAt(at) * speed + side
 			s:step(input(), ground(normalAt(at)), DT)
 			if s.mode == "Airborne" then
 				return false
@@ -1475,30 +1603,48 @@ describe("SkateMath on surfaces that bend away", function()
 	end
 
 	-- Round the outside of an upright pillar of radius 20 (like the middle glass's round ends), built as flat strips
-	-- 3.75° apart (the arena's stations): the skater rides the first strip, then the face turns away from them.
-	it("flies off the outside of an upright pillar at its first turn, at any speed", function()
+	-- 3.75° apart (the arena's stations), the velocity set each frame: `round` studs/s round it and `rise` up it. The
+	-- skater rides the first strip, then the face turns away from them. Says the frame they left it at (nil if they
+	-- never did in `frames`) and the frame its face first turned.
+	local function roundPillar(round: number, rise: number, frames: number): (number?, number?)
 		local RADIUS, STRIP = 20, math.rad(3.75)
-		for _, speed in { 10, 30, 60, movement.hardCap } do
-			local s = skater(Vector3.zero)
-			local around = 0
-			local firstTurn: number? = nil
-			local leftAt: number? = nil
-			for frame = 1, 120 do
-				local strip = math.floor(around / STRIP)
-				if strip > 0 and firstTurn == nil then
-					firstTurn = frame
-				end
-				local facing = (strip + 0.5) * STRIP
-				s.velocity = Vector3.new(-math.sin(around), 0, math.cos(around)) * speed
-				s:step(input(), ground(Vector3.new(math.cos(facing), 0, math.sin(facing))), DT)
-				if s.mode == "Airborne" then
-					leftAt = frame
-					break
-				end
-				around += speed * DT / RADIUS
+		local s = skater(Vector3.zero)
+		local around = 0
+		local firstTurn: number? = nil
+		for frame = 1, frames do
+			local strip = math.floor(around / STRIP)
+			if strip > 0 and firstTurn == nil then
+				firstTurn = frame
 			end
+			local facing = (strip + 0.5) * STRIP
+			s.velocity = Vector3.new(-math.sin(around), 0, math.cos(around)) * round + Vector3.yAxis * rise
+			s:step(input(), ground(Vector3.new(math.cos(facing), 0, math.sin(facing))), DT)
+			if s.mode == "Airborne" then
+				return frame, firstTurn
+			end
+			around += round * DT / RADIUS
+		end
+		return nil, firstTurn
+	end
+
+	-- Gravity presses nothing onto an upright wall; its grip does (the owner, #289, Q71): round the pillar it holds a
+	-- drift up to √(38 × 20) = 27.6 studs/s, and a faster one flies off at the first turn.
+	it("keeps a slow drift round an upright pillar, and flies off a faster one at its first turn", function()
+		for _, round in { 10, 20 } do
+			expect((roundPillar(round, 0, 120))).toBeNil()
+		end
+		for _, round in { 35, 60, movement.hardCap } do
+			local leftAt, firstTurn = roundPillar(round, 0, 120)
 			expect(firstTurn).never.toBeNil()
 			expect(leftAt).toBe(firstTurn)
+		end
+	end)
+
+	-- Only the drift round it follows the pillar's bend (#289): rising or falling along it while drifting 20 round, the
+	-- path bends by 20² / 20 = 20 studs/s², within the grip (read per stud of the whole path, 82.5 at 80 up: let go).
+	it("keeps a slow drift round an upright pillar however fast the skater rises or falls along it", function()
+		for _, rise in { 10, 80, -80 } do
+			expect((roundPillar(20, rise, 120))).toBeNil()
 		end
 	end)
 
@@ -1508,6 +1654,62 @@ describe("SkateMath on surfaces that bend away", function()
 		local edge = math.rad(15)
 		expect(staysOn(57, 20, -edge, edge, crestNormal, crestAlong)).toBe(true)
 		expect(staysOn(66, 20, -edge, edge, crestNormal, crestAlong)).toBe(false)
+	end)
+
+	-- Off a surface its curve is forgotten, the way it bent included (#289): a skater who drifted round a pillar's face
+	-- (bending along Z) and flew off counts their whole road again riding along X, so a 15° crest at 30 studs/s holds
+	-- them (29² × 15° over the 10-stud window: 22, within gravity's 189.5).
+	it("forgets the way a surface bent once off it, counting the next ride's whole road", function()
+		local pillar = Vector3.xAxis
+		local s = skater(Vector3.zero)
+		s.up = pillar
+		for _ = 1, 5 do
+			s.velocity = Vector3.new(0, 0, 10)
+			s:step(input(), ground(pillar), DT)
+		end
+		s.velocity = Vector3.new(0, 0, 10)
+		s:step(input(), ground(CFrame.Angles(0, -math.rad(3.75), 0) * pillar), DT)
+		-- Off its edge, then down onto the floor.
+		s:step(input(), ground(FLAT, 0, false), DT)
+		s.velocity = Vector3.new(30, -1, 0)
+		s:step(input(), ground(), DT)
+		expect(s.mode).toBe("Grounded")
+		for _ = 1, 10 do
+			s.velocity = Vector3.new(30, 0, 0)
+			s:step(input(), ground(), DT)
+		end
+		s.velocity = Vector3.new(30, 0, 0)
+		s:step(input(), ground(Vector3.new(math.sin(math.rad(15)), math.cos(math.rad(15)), 0)), DT)
+		expect(s.mode).toBe("Grounded")
+	end)
+
+	-- Thrown off a surface with no wall to come back to, the path's curve is forgotten at once (#289 keeps it only by a
+	-- wall that holds): touching down the very next step loses the speed into the new face, as any touchdown.
+	it("forgets the curve of a crest it is thrown off, so a touchdown the next step is like any other", function()
+		local s = skater(Vector3.zero)
+		for _ = 1, 10 do
+			s.velocity = Vector3.new(80, 0, 0)
+			s:step(input(), ground(), DT)
+		end
+		s.velocity = Vector3.new(80, 0, 0)
+		-- 80 × cos 25° = 72.5 over a 25° crest read across the 10-stud window: 72.5² × 0.436 / 10.5 = 218, past
+		-- gravity's 177.8.
+		s:step(input(), ground(Vector3.new(math.sin(math.rad(25)), math.cos(math.rad(25)), 0)), DT)
+		expect(s.mode).toBe("Airborne")
+		local twin = skater(s.velocity)
+		twin.mode = "Airborne"
+		s:step(input(), ground(), DT)
+		twin:step(input(), ground(), DT)
+		expect(s.mode).toBe("Grounded")
+		Fixtures.expectNear(s.velocity, twin.velocity)
+	end)
+
+	-- Crossing it slantwise, only the speed across the crest follows its curve (#289): 80 studs/s at 45° crosses at
+	-- 56.6, needing 56.6² / 20 = 160, within gravity's 189.5 (read per stud of the whole path, 226: thrown off).
+	it("keeps a skater crossing a crest slantwise on while the speed across it is slow enough", function()
+		local edge = math.rad(15)
+		local across = 80 * math.cos(math.rad(45))
+		expect(staysOn(across, 20, -edge, edge, crestNormal, crestAlong, across)).toBe(true)
 	end)
 
 	-- The outer wall's foot (radius 18) bends toward the skater: it pushes harder the faster they go.

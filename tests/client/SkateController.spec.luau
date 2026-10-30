@@ -672,9 +672,10 @@ describe("SkateController", function()
 		Fixtures.expectNear(skater.velocity, Vector3.new(0, falling * movement.bellyLandingKeep, 0), CAST_TOLERANCE)
 	end)
 
-	-- Falling beside the wall they left along it, the skater's ground ray looks toward the wall (#258), and trusts what
-	-- it finds there at once (it is no seam's side face under the feet).
-	it("looks toward the wall a falling skater left, and lands them on it", function()
+	-- Beside the wall they left along it, rising (its grip keeps them by it, #289) or falling (it catches them, #258),
+	-- the skater's ground ray looks toward the wall, and trusts what it finds there at once (it is no seam's side face
+	-- under the feet).
+	it("looks toward the wall a skater left, rising or falling, and lands them on it once falling", function()
 		local rays: { Vector3 } = {}
 		setup({
 			Raycast = function(_origin: Vector3, direction: Vector3): any
@@ -685,10 +686,14 @@ describe("SkateController", function()
 		SkateController:bind(rig)
 		local skater = SkateController.skater :: any
 		skater.mode = "Airborne"
-		skater.velocity = Vector3.new(0, -5, 0)
+		skater.velocity = Vector3.new(0, 5, 0)
 		skater._leftWall = Vector3.new(-1, 0, 0)
 		SkateController:step(1 / 60)
 		Fixtures.expectNear(rays[1], Vector3.xAxis * movement.groundProbeLength)
+		expect(skater.mode).toBe("Airborne")
+		skater.velocity = Vector3.new(0, -5, 0)
+		SkateController:step(1 / 60)
+		Fixtures.expectNear(rays[2], Vector3.xAxis * movement.groundProbeLength)
 		expect(skater.mode).toBe("Grounded")
 		Fixtures.expectNear(skater.up, Vector3.new(-1, 0, 0))
 	end)
