@@ -69,7 +69,7 @@ function ActionRunner.ballFits(ball: Actions.BallRequirement, hasBall: boolean):
 end
 
 -- Whether an action with these requirements may start in this context.
-function ActionRunner.allows(requires: Actions.Requires, context: Context): boolean
+local function allows(requires: Actions.Requires, context: Context): boolean
 	if requires.notKnockedDown and context.knockedDown then
 		return false
 	end
@@ -132,7 +132,7 @@ end
 -- runs): the action it follows started last, between its window's `from` and `to` seconds ago, each edge moved by
 -- `tolerance`. What an action key would start now (ActionController).
 function ActionRunner.available(self: Runner, name: Actions.ActionName, context: Context, tolerance: number?): boolean
-	if not ActionRunner.allows(self._actions[name].requires, context) then
+	if not allows(self._actions[name].requires, context) then
 		return false
 	end
 	local source: Actions.ActionName? = self._followUpOf[name]

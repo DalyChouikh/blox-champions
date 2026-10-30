@@ -588,6 +588,20 @@ describe("ActionService", function()
 		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 	end)
 
+	-- The owner (#303, Q87): a dive that touches flat ground a hard landing's drop below its top is a hard landing.
+	it("knocks a diver who lands hard down as a fall, not as a dive", function()
+		local a = blue[1]
+		local hard = config.Movement.hardLanding
+		local phases = config.Actions.Dive.phases
+		stand(a, above(hard.drop + 0.5))
+		dive(a)
+		-- Past the dive's active phase, when its own touchdown could take the landing.
+		advance(phases.windup + phases.active + 0.05)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+		glide(a, Vector3.zero)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Fall")
+	end)
+
 	-- #294: the server judges a landing by the ground's smooth shape, as the skating rides it: a fall onto ground its
 	-- ray finds flat, where the shape is steeper than wallAngle, is no hard landing.
 	it("judges a landing by the ground's smooth shape at the point its ray finds", function()

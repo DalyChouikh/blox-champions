@@ -1,8 +1,9 @@
 --!strict
 -- The Get Up prompt (#220), shown while the local skater is knocked down: the movement keys as the device shows them,
 -- then what they do now, on the HUD's panel at the bottom centre like Roller Champions' box (the owner's recording,
--- Video 5 at 0:18), so it reads over the skater. The panel widens to fit a long label. Moving gets the skater up
--- sooner; the server decides when. It sits in the HUD's stage, so on touch it centres left of the buttons. A plain
+-- Video 5 at 0:18), so it reads over the skater. The panel widens to fit a long label. Moving asks the server to get
+-- the skater up, which it does from Actions.getUpAfter: since #287 the whole slide (Q62), and the prompt stays as
+-- RC's does (the owner, #303, Q88). It sits in the HUD's stage, so on touch it centres left of the buttons. A plain
 -- function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

@@ -38,7 +38,7 @@ export type MovementConfig = {
 	turnRateHigh: number,
 	-- The skater's facing turns toward the way they move at most a half-turn in this many seconds, so it never snaps
 	-- (the owner, #246: RC turned round over ~0.3 s, Video 7): π / 0.3 = 10.5 rad/s, so the facing keeps up with
-	-- steering (at most turnRateLow, 4 rad/s).
+	-- steering (at most turnRateLow).
 	turnRoundSeconds: number,
 	-- A skater carried back against their facing (down a bank or a wall they climbed) rides backwards while the stick
 	-- points within this many degrees of the way they roll, and their facing within it of the way back (the owner,
@@ -53,16 +53,16 @@ export type MovementConfig = {
 	fallLineDeg: number,
 	-- A surface steeper than wallAngle (degrees from flat) is a wall. Gravity pulls along it at full strength, as
 	-- everywhere (the owner, #256: one gravity, real physics). A wall holds a skater unless it bends away from them
-	-- more than it presses them on (#257); past straight up the loop rule decides (A3).
+	-- more than it presses them on (#257, the contact rule); past straight up that takes speed² × curvature (A3).
 	wallAngle: number,
 	-- A surface that holds presses the skates on at least this firmly (studs/s²) against a bend away from them, on it
 	-- or flying beside it after leaving or touching it (#289): gravity presses nothing onto an upright wall, so without
 	-- it the slightest drift round the middle glass's round ends let go. 38 holds a skater going round them (the root
 	-- 22.5 from their axis) slower than √(38 × 22.5) = 29 studs/s, 5 body lengths a second; faster flies off (Q71).
 	wallGrip: number,
-	-- On a wall the skates only roll (the owner, #239): no stride, no brake, and the stick turns the heading at most
-	-- this fast. A level line along upright glass needs g / wallTurnRate (131 studs/s at #279's gravity), past
-	-- hardCap, so every rider curves back down.
+	-- On a wall the stick never strides and the brake does nothing (the owner, #239; up a solid wall it only climbs,
+	-- below), and the stick turns the heading at most this fast. A level line along upright glass needs
+	-- g / wallTurnRate (131 studs/s at #279's gravity), past hardCap, so every rider curves back down.
 	wallTurnRate: number,
 	-- Holding the stick up any solid ride surface, however steep (the floors' slopes, the banks, the walls up to
 	-- their glass), the skater gains speed along their heading at climbAccel (studs/s²) whatever the slope, up to
@@ -104,7 +104,7 @@ export type MovementConfig = {
 	-- strips meet turning less than this, so only a real corner turns sharper (#294).
 	cornerDeg: number,
 	-- The skater body's up eases toward the skating's at this rate (each step closes 1 − e^(−rate × dt) of the turn),
-	-- so it turns smoothly where the skating turns at each strip of a curve (#255).
+	-- so it turns smoothly where the skating turns at once: at a corner or a touchdown (#255, #294).
 	bodyUpSmoothing: number,
 	draftRange: number,
 	draftConeDeg: number,
@@ -207,7 +207,8 @@ local fields = Validate.record({
 	airTurnRate = nonNegative,
 	airUprightRate = positive,
 	fallLineDeg = quarterTurn,
-	wallAngle = angle,
+	-- A slope from flat short of upright: past it a surface's tilt tells nothing (the review, #303).
+	wallAngle = Validate.number({ above = 0, below = 90 }),
 	wallGrip = nonNegative,
 	wallTurnRate = nonNegative,
 	climbSpeed = positive,
@@ -215,9 +216,7 @@ local fields = Validate.record({
 	curvatureWindow = positive,
 	pumpSlopeMultiplier = Validate.number({ min = 1 }),
 	pumpFlatAccel = nonNegative,
-	pumpFlatSlopeDeg = Validate.check(nonNegative, function(degrees: number): boolean
-		return degrees < 90
-	end, "must be < 90"),
+	pumpFlatSlopeDeg = Validate.number({ min = 0, below = 90 }),
 	brakeDecel = positive,
 	tiptoeSpeed = nonNegative,
 	jumpImpulse = nonNegative,

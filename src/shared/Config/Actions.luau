@@ -191,9 +191,10 @@ local defaults: ActionsConfig = {
 	-- 31 studs, 1.37 s in the air (the owner, #219: RC's uppercut launches on open floor; #279: √(2/3) of 110 at two
 	-- thirds of the gravity, as high as before, hanging longer like RC's), or from a wall, but never in the air (the
 	-- owner, #262: RC greys it there, Videos 10-11). No recovery: a Tackle may follow once its strike is over (the
-	-- owner, #240: RC's air Tackle was ready 0.13-0.3 s after an Uppercut). It homes on an opponent above, up to its
-	-- leap within 45 deg of straight up (the owner, #277: Q56, Q58), and hits a close skater anywhere in its front
-	-- half, on the ground too (the owner's note; RC's Uppercuts at Video 24's 119.6 and 153.8 s).
+	-- owner, #240: RC's air Tackle was ready 0.13-0.3 s after an Uppercut). It homes on an opponent above within 45 deg
+	-- of straight up (the owner, #277: Q56, Q58), only as far as its hit reaches by its strike's end (the owner, #303,
+	-- Q89): the leap 18.4 up at 0.25 s, its 6-stud hit and the server's 3 make 27.4. It hits a close skater anywhere
+	-- in its front half, on the ground too (the owner's note; RC's Uppercuts at Video 24's 119.6 and 153.8 s).
 	Uppercut = {
 		phases = { windup = 0.05, active = 0.2, recovery = 0 },
 		cooldown = 1.2,
@@ -203,7 +204,7 @@ local defaults: ActionsConfig = {
 		hit = { range = 6, coneDeg = 90, aimUpDeg = 0, knockdownSeconds = 1.5 },
 		seek = {
 			snap = { range = 12, coneDeg = 90, aimUpDeg = 0 },
-			bend = { range = 31, coneDeg = 45, aimUpDeg = 90 },
+			bend = { range = 27, coneDeg = 45, aimUpDeg = 90 },
 			turnDegPerSecond = 360,
 		},
 		motion = { leapImpulse = 89.81 },

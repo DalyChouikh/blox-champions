@@ -5,6 +5,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect, afterEach = JestGlobals.describe, JestGlobals.it, JestGlobals.expect, JestGlobals.afterEach
 
+local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
 local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
@@ -140,6 +141,36 @@ describe("TaggedLayout.read", function()
 		glassFolder:Destroy()
 		surfaceFolder:Destroy()
 	end)
+
+	-- The review (#303): the client's skating and the server's look-down read a ground ray alike, in one place.
+	it(
+		"reads a ground ray's result into a ground: the smooth normal at its point, its distance, glass by its part",
+		function()
+			local glassFolder = Instance.new("Folder")
+			glassFolder:AddTag(Tags.Glass)
+			local pane = Instance.new("Part")
+			pane.Parent = glassFolder
+			local smooth = Vector3.new(0, 0.8, 0.6)
+			-- The arena's smooth shape at the ray's point, whatever face the ray met.
+			local function reader(position: Vector3, face: Vector3): Vector3
+				return if position == Vector3.new(1, 2, 3) and face == Vector3.xAxis then smooth else Vector3.zero
+			end
+			local ground: SkateTypes.Ground = { hit = false, normal = Vector3.yAxis, distance = 0 }
+			local result: any =
+				{ Position = Vector3.new(1, 2, 3), Normal = Vector3.xAxis, Distance = 2.5, Instance = pane }
+			TaggedLayout.readGround(ground, result, reader)
+			expect(ground.hit).toBe(true)
+			expect(ground.normal).toEqual(smooth)
+			expect(ground.distance).toBe(2.5)
+			expect(ground.glass).toBe(true)
+			result.Instance = Instance.new("Part")
+			TaggedLayout.readGround(ground, result, reader)
+			expect(ground.glass).toBe(false)
+			TaggedLayout.readGround(ground, nil, reader)
+			expect(ground.hit).toBe(false)
+			glassFolder:Destroy()
+		end
+	)
 
 	it("ignores tagged instances outside the root", function()
 		local root = arenaRoot()

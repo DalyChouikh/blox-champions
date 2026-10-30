@@ -464,7 +464,11 @@ describe("MatchEngine saves and knockdowns", function()
 			return table.find(names(engine:drainEvents()), "SaveMade") ~= nil
 		end
 		expect(blocks(SHORT_STREAK)).toBe(true)
-		expect(blocks({ Match = SHORT_STREAK.Match, World = { gravity = 196.2 } })).toBe(false)
+		-- At Roblox's gravity the Uppercut's leap reaches 25.3 studs by its strike's end, so its bend may not go past
+		-- that (Config's rule, Q89).
+		local roblox = { gravity = 196.2 }
+		local uppercut = { seek = { bend = { range = 25 } } }
+		expect(blocks({ Match = SHORT_STREAK.Match, World = roblox, Actions = { Uppercut = uppercut } })).toBe(false)
 	end)
 
 	it("drops a block when the ball still goes in", function()

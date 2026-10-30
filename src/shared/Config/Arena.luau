@@ -44,11 +44,12 @@ export type ArenaConfig = {
 	stripsPerSection: number,
 	-- Every surface part is a slab this thick behind the riding surface.
 	surfaceThickness: number,
-	-- The rideable glass (R5) rising from the inner bank's and the outer wall's tops up to `top` above the lower floor,
-	-- each wall curling inward at the top into a lip (R15): a quarter circle of `lipRadius` in `lipStrips` strips. Its
-	-- slabs are surfaceThickness thick behind its faces, outside the track; it never darkens the track. It looks like
-	-- `material` at `transparency`, as do a closed map's roof and the gate panels: clear plastic, because Roblox's
-	-- Glass material hides every non-opaque part behind it (the far glass, the gate panels, the carrier's beam).
+	-- The rideable glass (R5) rising from the inner bank's and the outer wall's tops up to `top` above the lowest
+	-- floor, each wall curling inward at the top into a lip (R15): a quarter circle of `lipRadius` in `lipStrips`
+	-- strips. Its slabs are surfaceThickness thick behind its faces, outside the track; it never darkens the track. It
+	-- looks like `material` at `transparency`, as do a closed map's roof and the gate panels: clear plastic, because
+	-- Roblox's Glass material hides every non-opaque part behind it (the far glass, the gate panels, the carrier's
+	-- beam).
 	glass: { top: number, lipRadius: number, lipStrips: number, transparency: number, material: Enum.Material },
 	-- The top that closes the arena, set per map (R14): a closed map's roof spans the walls' top between the lips'
 	-- ends; an open map's ceiling stands `ceilingAbove` higher, joined to the lips by strips. Either stops skaters and
@@ -68,7 +69,7 @@ export type ArenaConfig = {
 		-- Where the ring's centre hangs across the track (R7): a fraction of trackWidth from the inner glass's face.
 		across: number,
 		-- The decorative arm the ring hangs from (Arena spec §5.3): a post from the rim's top up to `height` above the
-		-- lower floor, then a beam at that height out to the outer glass's face, both `thickness` square.
+		-- lowest floor, then a beam at that height out to the outer glass's face, both `thickness` square.
 		arm: { thickness: number, height: number },
 	},
 	-- The glass panel at each gate (R18): a thin wall across the track, filling its whole cross-section from the
@@ -129,7 +130,6 @@ local size = Validate.number({ above = 0 })
 -- Sizes one part directly (the infield, a gate, a wall slab, a glass slab, a gate panel, the goal's panel and arm), so
 -- it must be a size Roblox builds as given instead of clamping.
 local partSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
-local nonNegative = Validate.number({ min = 0 })
 local fraction = Validate.number({ min = 0, max = 1 })
 local transparency = fraction
 local color = Validate.datatype("Color3")
@@ -147,9 +147,7 @@ local fields = Validate.record({
 		riseEnd = size,
 		riseHeight = size,
 		-- The incline's slope must stay finite.
-		inclineDeg = Validate.check(nonNegative, function(degrees: number): boolean
-			return degrees < 90
-		end, "must be < 90"),
+		inclineDeg = Validate.number({ min = 0, below = 90 }),
 		footRadius = size,
 	}),
 	curvedEnd = Validate.record({

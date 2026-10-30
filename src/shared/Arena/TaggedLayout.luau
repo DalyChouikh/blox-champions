@@ -1,15 +1,17 @@
 --!strict
 -- Reads an arena's tagged features (spec §9.2) back into what gameplay needs: the rules' ArenaLayout (gates and the
 -- goal's scoring disc), the goal panel to open and close, the corner markers, the spawn frames and the surfaces skaters
--- ride, which the server's own rays look for (a diver's touchdown, #221). Only tagged instances under `root` count, so
--- a leftover arena or an art model elsewhere in the place is ignored. Anything malformed fails fast, naming the tag at
--- fault: a mis-tagged arena must never silently miss laps or goals.
+-- ride, which the server's own rays look for (a diver's touchdown, #221); and what a skater's ground ray found there.
+-- Only tagged instances under `root` count, so a leftover arena or an art model elsewhere in the place is ignored.
+-- Anything malformed fails fast, naming the tag at fault: a mis-tagged arena must never silently miss laps or goals.
 
 local CollectionService = game:GetService("CollectionService")
 
 local Crossing = require(script.Parent.Parent.Rules.Crossing)
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 local MatchEngine = require(script.Parent.Parent.Rules.MatchEngine)
+local SkateTypes = require(script.Parent.Parent.Skate.Types)
+local SmoothNormals = require(script.Parent.Geometry.SmoothNormals)
 local Tags = require(script.Parent.Tags)
 local Team = require(script.Parent.Parent.Rules.Team)
 local Types = require(script.Parent.Geometry.Types)
@@ -210,6 +212,20 @@ end
 function TaggedLayout.isGlass(part: Instance): boolean
 	local folder = part.Parent
 	return folder ~= nil and folder:HasTag(Tags.Glass)
+end
+
+-- What a skater's ground ray found, into `ground`: the ride surface's direction at the point from the arena's smooth
+-- shape (`smoothNormal`, #294), how far it lies, and whether it is glass (#299); no result, no ground. The client's
+-- skating and the server's look-down read the ground alike (the review, #303).
+function TaggedLayout.readGround(ground: SkateTypes.Ground, result: RaycastResult?, smoothNormal: SmoothNormals.Reader)
+	if result == nil then
+		ground.hit = false
+		return
+	end
+	ground.hit = true
+	ground.normal = smoothNormal(result.Position, result.Normal)
+	ground.distance = result.Distance
+	ground.glass = TaggedLayout.isGlass(result.Instance)
 end
 
 return TaggedLayout

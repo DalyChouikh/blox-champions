@@ -2,11 +2,10 @@
 -- Names of the attributes the server sets on Player and character instances; Roblox replicates them to every
 -- client.
 
--- What KnockedDown holds: why the character is down. A strike's ("Hit") and a fall's ("Fall": a hard landing, or
--- touching down still posing, #245) knockdowns end once the skater has asked to get up (Get Up, #220) and
--- Actions.getUpAfter has passed, else after their seconds; a diver's own touchdown ("Dive") ends when the slide
--- stops (#242).
-export type Knockdown = "Hit" | "Fall" | "Dive"
+local SkateTypes = require(script.Parent.Parent.Skate.Types)
+
+-- What KnockedDown holds: why the character is down (the skating's own Knockdown).
+export type Knockdown = SkateTypes.Knockdown
 
 return table.freeze({
 	-- "Blue" or "Orange" while the player has a seat; absent while they spectate.

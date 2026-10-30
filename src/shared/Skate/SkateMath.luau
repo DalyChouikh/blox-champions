@@ -3,7 +3,6 @@
 -- time. Pure and deterministic. A step mutates the skater in place and allocates nothing (vectors are values), so
 -- the client can run it every physics step.
 
-local Attributes = require(script.Parent.Parent.Net.Attributes)
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Types)
 local Vectors = require(script.Parent.Parent.Util.Vectors)
@@ -14,11 +13,12 @@ local rotateToward = Vectors.rotateToward
 
 -- How many past steps on a surface the curvature window can reach back over: at hardCap a window of ten studs spans
 -- five, and at a crawl the window simply covers less road, where the contact rule's speed² makes the curve irrelevant.
+-- A window longer than these steps' travel (64 studs at hardCap, 60 steps a second) reads only them.
 local HISTORY = 32
--- A ground normal turning less than this in a step (radians) has not turned: float noise. Rays on one flat face
--- differed by up to 1.5e-4 (measured, #257); the arena's smooth shape reads within 2.2e-5 of exact (#294). A smooth
--- curve turns a step by its speed x dt / radius: round the round glass (a path of radius 22.5) a drift slower than
--- 1.35 studs/s reads no turn, far inside what its grip holds (#289).
+-- A ground normal turning less than this in a step (radians) has not turned: float noise, which comes per ray, so per
+-- step. Rays on one flat face differed by up to 1.5e-4 (measured, #257); the arena's smooth shape reads within 2.2e-5
+-- of exact (#294). A smooth curve turns a step by its speed x dt / radius: at 60 steps a second, round the round glass
+-- (a path of radius 22.5) a drift slower than 1.35 studs/s reads no turn, far inside what its grip holds (#289).
 local TURN_EPSILON = 1e-3
 -- The contact rule's slack for float noise, as a share of gravity: the arena's built glass reads up to 6.5e-5 past
 -- vertical (measured, #234), so a face leaning less than this past straight up still holds like a wall. The lips'
@@ -28,9 +28,8 @@ local CONTACT_SLACK = 1e-3
 -- upright (#234), so at hardCap and through a second of gravity under 0.03. A jump leaves at jumpImpulse (48.99), a
 -- bend turning away at several studs/s: neither is caught back (#258).
 local DRIFT_EPSILON = 0.1
--- What a knocked-down skater's input becomes, one for each kind of knockdown: no stick, pump, brake, jump or draft.
--- They only slide, for their kind's time (#252).
-local function locked(knockdown: Attributes.Knockdown): Types.SkateInput
+-- An input with nothing pressed: no stick, pump, brake, jump or draft.
+local function idle(knockdown: Types.Knockdown?, diving: boolean): Types.SkateInput
 	return table.freeze({
 		move = Vector3.zero,
 		pump = false,
@@ -39,22 +38,15 @@ local function locked(knockdown: Attributes.Knockdown): Types.SkateInput
 		jumpHeld = false,
 		draftAccel = 0,
 		knockdown = knockdown,
-		diving = false,
+		diving = diving,
 	})
 end
-local LOCKED = table.freeze({ Hit = locked("Hit"), Fall = locked("Fall"), Dive = locked("Dive") })
--- What a diver's input becomes until their touchdown's knockdown (#242): the same, but they glide, slowed by friction
--- and drag only, and in the air fly down the fall line (#241).
-local GLIDING: Types.SkateInput = table.freeze({
-	move = Vector3.zero,
-	pump = false,
-	brake = false,
-	jump = false,
-	jumpHeld = false,
-	draftAccel = 0,
-	knockdown = nil,
-	diving = true,
-})
+-- What a knocked-down skater's input becomes, one for each kind of knockdown: they only slide, for their kind's time
+-- (#252).
+local LOCKED = table.freeze({ Hit = idle("Hit", false), Fall = idle("Fall", false), Dive = idle("Dive", false) })
+-- What a diver's input becomes until their touchdown's knockdown (#242): they glide, slowed by friction and drag
+-- only, and in the air fly down the fall line (#241).
+local GLIDING = idle(nil, true)
 
 local SkateMath = {}
 SkateMath.__index = SkateMath
@@ -194,6 +186,12 @@ local function readingUp(self: Skater): Vector3
 	return if self.mode == "Airborne" then self._worldUp else self.up
 end
 
+-- The velocity across that plane, and its up.
+local function acrossReading(self: Skater): (Vector3, Vector3)
+	local up = readingUp(self)
+	return alongSurface(self.velocity, up), up
+end
+
 -- Turns widen with speed: turnRateLow at rest down to turnRateHigh at hardCap, and never faster than wallTurnRate on a
 -- wall (#239).
 local function turnRate(movement: Config.MovementConfig, speed: number, wall: boolean): number
@@ -213,7 +211,7 @@ local function pumpPush(self: Skater, downhillPull: number): number
 	return 0
 end
 
--- Steeper than wallAngle: a wall, where the skates only roll (#239).
+-- Steeper than wallAngle: a wall, where the stick never strides and the brake does nothing (#239).
 local function isWall(self: Skater, normal: Vector3): boolean
 	return normal:Dot(self._worldUp) < self._wallCos
 end
@@ -222,7 +220,7 @@ end
 -- timed from the slide's first step on the ground. Each step loses its share of the time left (dt over it), so on
 -- the flat the speed falls in a straight line to zero at the end; a slope's pull only bends the line, and after
 -- the end they lie still until up.
-local function slide(self: Skater, knockdown: Attributes.Knockdown, speed: number, dt: number): number
+local function slide(self: Skater, knockdown: Types.Knockdown, speed: number, dt: number): number
 	local left = self._slideLeft or self._movement.knockdownSlideSeconds[knockdown]
 	self._slideLeft = math.max(left - dt, 0)
 	return if left > dt then speed * (1 - dt / left) else 0
@@ -251,8 +249,8 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	local velocity = turnedOnto(self, self._lastNormal, normal)
 	local speed = velocity.Magnitude
 	local heading = if speed > EPSILON then velocity / speed else facingOn(self, normal)
-	-- On a wall the skates only roll (#239): the stick steers at most wallTurnRate and never strides, and the brake
-	-- does nothing. Gravity pulls along every surface at full strength (#256).
+	-- On a wall the stick steers at most wallTurnRate and never strides, and the brake does nothing (#239); up a
+	-- solid wall it only climbs (below). Gravity pulls along every surface at full strength (#256).
 	local wall = isWall(self, normal)
 	local brake = input.brake and not wall
 
@@ -303,7 +301,7 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	local direction = if speed > EPSILON then velocity / speed else heading
 	-- A knocked-down skater slides for their knockdown's time (#252); anyone else, a gliding diver too (#242), loses
 	-- friction and drag, the same whether keys are pressed or not (the owner, #288: real physics, Q67-Q70).
-	local knockdown: Attributes.Knockdown? = input.knockdown
+	local knockdown: Types.Knockdown? = input.knockdown
 	if knockdown ~= nil then
 		speed = slide(self, knockdown, speed, dt)
 	else
@@ -350,7 +348,10 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 		-- A slope or a wall pulling them the way they go carries them (#246).
 		turnFacing(self, normal, direction, wishDirection, gravityAlong:Dot(direction) > self._flatPull, dt)
 	else
-		self.forward = heading
+		-- Stopping (the brake, friction) is no turn: the facing stays (#246: never a snap), and a skater at rest rides
+		-- nothing backwards, so pushing off from there turns them round (Q23).
+		self.forward = facingOn(self, normal)
+		self._backwards = false
 	end
 end
 
@@ -629,7 +630,7 @@ local function resolveMode(
 end
 
 function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
-	local knockdown: Attributes.Knockdown? = input.knockdown
+	local knockdown: Types.Knockdown? = input.knockdown
 	local controls = if knockdown ~= nil then LOCKED[knockdown] elseif input.diving then GLIDING else input
 	if knockdown == nil then
 		-- On their feet: the next knockdown's slide is timed afresh (#252).
@@ -705,8 +706,7 @@ end
 
 -- A lunge's change (#241): `add` more speed along the facing, never past `ceiling`; a faster skater slows to it.
 function SkateMath.lungeChange(self: Skater, add: number, ceiling: number): Vector3
-	local up = readingUp(self)
-	local across = alongSurface(self.velocity, up)
+	local across, up = acrossReading(self)
 	local lunged = across + facingOn(self, up) * add
 	local speed = lunged.Magnitude
 	return (if speed > ceiling then lunged * (ceiling / speed) else lunged) - across
@@ -714,7 +714,7 @@ end
 
 -- The change that brings the speed down to `ceiling` if it is above (a lunge easing back, #241).
 function SkateMath.slowChange(self: Skater, ceiling: number): Vector3
-	local across = alongSurface(self.velocity, readingUp(self))
+	local across = acrossReading(self)
 	local speed = across.Magnitude
 	return if speed > ceiling then across * (ceiling / speed - 1) else Vector3.zero
 end
@@ -722,8 +722,7 @@ end
 -- The Dive's change (#241): `speed` along the way, or the skater's own if faster: along the facing on the ground,
 -- down the fall line in the air, where stepAirborne keeps a diver.
 function SkateMath.diveChange(self: Skater, speed: number): Vector3
-	local up = readingUp(self)
-	local across = alongSurface(self.velocity, up)
+	local across, up = acrossReading(self)
 	local target = math.max(across.Magnitude, speed)
 	if self.mode == "Airborne" then
 		return fallLine(self) * target - self.velocity
@@ -745,8 +744,7 @@ end
 -- The change that turns the speed across that same plane toward `way` by at most `maxAngle` radians, keeping it and
 -- what lies off the plane (a rise, the hover's pull): a strike turning its skater at the press (#277).
 function SkateMath.turnChange(self: Skater, way: Vector3, maxAngle: number): Vector3
-	local up = readingUp(self)
-	local across = alongSurface(self.velocity, up)
+	local across, up = acrossReading(self)
 	local toward = alongSurface(way, up)
 	local speed = across.Magnitude
 	if speed <= EPSILON or toward.Magnitude <= EPSILON then
@@ -818,7 +816,8 @@ end
 -- on walls and behind a teammate, without the hover's pull off it; across the ground in the air, so a standing jump
 -- reads 0 and a fall adds nothing.
 function SkateMath.shownSpeed(self: Skater): number
-	return alongSurface(self.velocity, readingUp(self)).Magnitude
+	local across = acrossReading(self)
+	return across.Magnitude
 end
 
 return SkateMath

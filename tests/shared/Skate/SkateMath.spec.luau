@@ -165,7 +165,7 @@ describe("SkateMath on the ground", function()
 		for _ = 1, 30 do
 			held:step(back, ground(), 1 / 60)
 		end
-		-- Then it strides the stick's way, 14.48 studs/s half a second later (s48 worked298.py).
+		-- Then it strides the stick's way, 14.48 studs/s half a second later (an independent replica of the step).
 		expect(held.velocity.Z).toBeCloseTo(14.48, 1)
 	end)
 
@@ -227,11 +227,9 @@ describe("SkateMath on the ground", function()
 	end)
 end)
 
--- The owner (#273, Q38): Roller Champions' skater crept up a bank at 1-5 km/h with W held (Video 20), where ours
--- stopped short of the outer wall's foot. Holding the stick up a slope gentler than crawlLimitDeg, the speed up it
--- never falls below crawlSpeed (3.33 studs/s, 4 km/h).
 -- The owner (#299, Q79-Q85): "I want the player to be able to climb all walls, just till they reach the glass then they
--- start dropping"; trial S4 kept. It replaces #273's crawl. Worked: s48 worked299.py.
+-- start dropping"; trial S4 kept. It replaced #273's crawl (Q38: at least 3.33 studs/s up slopes under 45 deg). The
+-- numbers come from an independent replica of the step.
 describe("SkateMath climbing", function()
 	-- A surface `deg` from flat falling toward -Z, and the way up it (where the stick +Z points).
 	local function slope(deg: number): (Vector3, Vector3)
@@ -312,7 +310,7 @@ describe("SkateMath climbing", function()
 		sliding:step(UP_IT, ground(normal), 0.1)
 		Fixtures.expectNear(sliding.velocity, uphill * -14.281)
 		-- Going up at 2 with the stick 95 deg off the way up (across, a little back): its part back brakes and the turn
-		-- (0.493 rad) brings the heading within 67 deg of the stick, yet no climb: they slide back (s48 worked299.py).
+		-- (0.493 rad) brings the heading within 67 deg of the stick, yet no climb: they slide back.
 		local across = skater(uphill * 2)
 		local aside = Vector3.xAxis * math.sin(math.rad(95)) + uphill * math.cos(math.rad(95))
 		across:step(input({ move = aside }), ground(normal), 0.1)
@@ -649,7 +647,7 @@ describe("SkateMath pushes and knockdowns", function()
 		expect(s.airPosing).toBe(true)
 		expect(position.X).toBeCloseTo(0, 6)
 		expect(position.Z).toBeCloseTo(0, 6)
-		-- Worked (s48 worked278.py, gravity and linear drag in closed form): up 0.2491 s to 6.096, the hop 0.1745 s
+		-- Worked independently (gravity and linear drag in closed form): up 0.2491 s to 6.096, the hop 0.1745 s
 		-- to 2.9895 more, down 0.3046 s: 0.7282 s, 43.69 steps; a step's press and landing each round up by one.
 		expect(math.abs(steps / 60 - 0.7282) <= 2 / 60).toBe(true)
 	end)
@@ -1489,6 +1487,30 @@ describe("SkateMath facing", function()
 			expect(Vectors.angleBetween(flying.forward, -Vector3.zAxis)).toBeCloseTo(STEP_TURN, 4)
 		end
 	)
+
+	-- The review of the Feel part (#303): stopping within a step snapped the facing to the way the skater had moved.
+	it("keeps its facing when it stops within a step, and turns round pushing off from that stop", function()
+		-- Rolling +Z facing -Z, the brake stops it within the step (120 / 60 = 2 studs/s a step).
+		local braked = skater(Vector3.new(0, 0, 1))
+		braked.forward = -Vector3.zAxis
+		braked:step(input({ brake = true }), ground(), 1 / 60)
+		expect(braked.velocity.Magnitude).toBeLessThan(1e-3)
+		Fixtures.expectNear(braked.forward, -Vector3.zAxis)
+		-- Rolling +Z halfway through a turn (facing +X), friction stops it within the step (4 / 60 = 0.067 studs/s).
+		local rolled = skater(Vector3.new(0, 0, 0.05))
+		rolled.forward = Vector3.xAxis
+		rolled:step(input(), ground(), 1 / 60)
+		Fixtures.expectNear(rolled.forward, Vector3.xAxis)
+		-- Riding backwards down the slope (0.2 + 1.62 studs/s), then on the flat the stick let go and the brake stop it
+		-- within one step: it rides nothing backwards at rest, so pushing off the way it rolled turns it round (Q23).
+		local s = rollingBack(0.2)
+		s:step(input({ move = DOWNHILL }), ground(SLOPE), 1 / 60)
+		s:step(input({ brake = true }), ground(), 1 / 60)
+		expect(s.velocity.Magnitude).toBeLessThan(1e-3)
+		Fixtures.expectNear(s.forward, Vector3.zAxis)
+		s:step(input({ move = -Vector3.zAxis }), ground(), 1 / 60)
+		expect(Vectors.angleBetween(s.forward, Vector3.zAxis)).toBeCloseTo(STEP_TURN, 4)
+	end)
 end)
 
 -- Loop physics (A3). A roof is an arc around the origin with the skater inside the tube, so its normal at angle phi

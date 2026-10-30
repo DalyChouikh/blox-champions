@@ -24,7 +24,8 @@ export type ControlLabels = {
 	Pass: string,
 	CallPass: string,
 	BallFocus: string,
-	-- The movement keys while knocked down: moving gets the skater up sooner (#220).
+	-- The Get Up prompt's label beside the movement keys while knocked down (#220): moving asks to get up, from
+	-- Actions.getUpAfter (the whole slide since #287); kept as RC shows it (the owner, #303, Q88).
 	GetUp: string,
 }
 

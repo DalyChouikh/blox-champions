@@ -29,6 +29,7 @@ local PlayerList = require(ReplicatedStorage.Shared.Util.PlayerList)
 local RateLimiter = require(ReplicatedStorage.Shared.Net.RateLimiter)
 local RideSurfaces = require(script.Parent.RideSurfaces)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
 local SkateTypes = require(ReplicatedStorage.Shared.Skate.Types)
 local SmoothNormals = require(ReplicatedStorage.Shared.Arena.Geometry.SmoothNormals)
@@ -63,7 +64,7 @@ export type SkateController = {
 	-- The last step's stick as a world direction (length 0..1).
 	move: Vector3,
 	-- Read each step: the character's KnockedDown attribute (why they are down, nil on their feet), whether they are
-	-- down, whether moving gets them up sooner (the Get Up prompt: not after a dive, #242), and whether the skater is
+	-- down, whether moving asks to get them up (the Get Up prompt: not after a dive, #242), and whether the skater is
 	-- held still: the root anchored (the kickoff freeze), or no arena on this client yet (RideSurfaces.ready), where
 	-- the skater would fall through the floor to come (#177).
 	knockdown: Attributes.Knockdown?,
@@ -88,7 +89,9 @@ export type SkateController = {
 	_inputController: InputController.InputController,
 	_camera: { CFrame: CFrame },
 	_skaters: () -> { SkaterView },
-	_sendSkateState: (pump: boolean, brake: boolean, airPose: boolean) -> (),
+	_sendSkateState: (state: Schemas.SkateState) -> (),
+	-- The record a send carries, reused.
+	_stateOut: Schemas.SkateState,
 	-- Keeps the sends within the server's rate limit for SkateState (os.clock; a fake in tests).
 	_stateLimiter: RateLimiter.RateLimiter,
 	_clock: () -> number,
@@ -238,17 +241,12 @@ end
 -- the surface is and the arena's smooth shape there is its direction (#294), so a strip's seam is no turn and the
 -- first ray onto new ground is trusted as it is (Q75).
 local function castGround(self: SkateController, root: BasePart, skater: SkateMath.Skater)
-	local ground = self._ground
 	local reach = skater:groundRay() * self._config.Movement.groundProbeLength
-	local result = self._raycast(root.Position, reach, self._surfaces.params)
-	if result == nil then
-		ground.hit = false
-		return
-	end
-	ground.hit = true
-	ground.normal = self._smoothNormal(result.Position, result.Normal)
-	ground.distance = result.Distance
-	ground.glass = TaggedLayout.isGlass(result.Instance)
+	TaggedLayout.readGround(
+		self._ground,
+		self._raycast(root.Position, reach, self._surfaces.params),
+		self._smoothNormal
+	)
 end
 
 local function moveSkater(self: SkateController, root: BasePart, skater: SkateMath.Skater, dt: number)
@@ -365,7 +363,9 @@ local function shareState(self: SkateController)
 	end
 	if self._statePending and self._stateLimiter:allow(Remotes.names.SkateState, self._clock()) then
 		self._statePending = false
-		self._sendSkateState(self.pumping, self.braking, self._airPosing)
+		local out = self._stateOut
+		out.pump, out.brake, out.airPose = self.pumping, self.braking, self._airPosing
+		self._sendSkateState(out)
 	end
 end
 
@@ -419,7 +419,8 @@ local SkateController: SkateController = {
 	_skaters = function(): { SkaterView }
 		return {}
 	end,
-	_sendSkateState = function(_pump: boolean, _brake: boolean, _airPose: boolean) end,
+	_sendSkateState = function(_state: Schemas.SkateState) end,
+	_stateOut = nil :: any,
 	_stateLimiter = nil :: any,
 	_clock = os.clock,
 	_statePending = false,
@@ -472,10 +473,10 @@ local SkateController: SkateController = {
 			return playersAround(self)
 		end
 		self._sendSkateState = deps.SendSkateState
-			or function(pump: boolean, brake: boolean, airPose: boolean)
-				Remotes.get(ReplicatedStorage, Remotes.names.SkateState)
-					:FireServer({ pump = pump, brake = brake, airPose = airPose })
+			or function(state: Schemas.SkateState)
+				Remotes.get(ReplicatedStorage, Remotes.names.SkateState):FireServer(state)
 			end
+		self._stateOut = { pump = false, brake = false, airPose = false }
 		self._stateLimiter = RateLimiter.new(config.Network.maxSkateStatesPerSecond)
 		self._clock = deps.Clock or os.clock
 		self._statePending = false
