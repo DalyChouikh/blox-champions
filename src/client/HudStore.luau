@@ -6,11 +6,13 @@
 -- over one remote at a time, in the order the handlers connected (probed in Play): here every waiting snapshot, then
 -- every waiting batch. So a batch from a frame the last snapshot already holds is dropped.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
+local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
@@ -33,9 +35,10 @@ local HudStore: HudStore = {
 	state = nil :: any,
 	_snapshotFrame = -math.huge,
 
+	-- deps.LocalId replaces the local player in tests.
 	init = function(self: HudStore, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
-		self.state = HudState.new(config)
+		self.state = HudState.new(config, deps.LocalId or PlayerIds.of(Players.LocalPlayer :: Player))
 		self._snapshotFrame = -math.huge
 	end,
 

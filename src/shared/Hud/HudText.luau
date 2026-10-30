@@ -80,6 +80,8 @@ function HudText.banner(self: HudText, banner: HudState.Banner): string
 	local kind = banner.kind
 	if kind == "Countdown" then
 		return tostring(banner.value)
+	elseif kind == "Go" then
+		return string.format(text.go, string.upper(self:team(banner.team :: Team.Team)))
 	elseif kind == "Goal" then
 		return text.goal
 	elseif kind == "Denied" then

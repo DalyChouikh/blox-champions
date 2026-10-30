@@ -125,7 +125,7 @@ describe("The generated arena", function()
 		local engine = MatchEngine.new({ config = config, arena = tagged.layout })
 		engine:addPlayer("B1", "Blue")
 		engine:start()
-		engine:tick(3)
+		engine:tick(config.Match.kickoffCountdownSeconds)
 		engine:pickedUp("B1", Vector3.zero, Vector3.zero)
 		local length = Centerline.length(config.Arena)
 		local middle = config.Arena.trackWidth / 2

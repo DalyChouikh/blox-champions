@@ -62,7 +62,7 @@ beforeEach(function()
 	ArenaParts:refresh()
 	RideSurfaces:init({})
 	BallCarrier:init({})
-	HudStore:init({ Config = config })
+	HudStore:init({ Config = config, LocalId = LOCAL_ID })
 	snapshot()
 	WorldMarkers:init({
 		Config = config,

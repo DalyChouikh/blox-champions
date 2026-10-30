@@ -71,7 +71,7 @@ beforeEach(function()
 	end
 	slides = {}
 	ArenaParts:init({})
-	HudStore:init({ Config = config })
+	HudStore:init({ Config = config, LocalId = "1" })
 	ArenaGlow:init({
 		Config = config,
 		HudStore = HudStore,

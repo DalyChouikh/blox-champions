@@ -6,8 +6,8 @@
 -- arena (Bounds.inArena, by more than guardOutsideMargin) is put back on its team's spawn: nothing else would ever
 -- bring it back (#177, #181). A carrier first lets go of the ball where they were last inside the arena (owner,
 -- 2026-10-25), so leaving the arena never takes the ball home. The ball is told of every move of a carrier, so none
--- counts as the ball crossing a gate. Anchored roots are reset, not judged, and every server placement starts the
--- skater over, so the server's own jumps and the kickoff freeze never count.
+-- counts as the ball crossing a gate. Every server placement starts the skater over, so the server's own jumps
+-- never count.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -106,7 +106,7 @@ local MovementGuard: MovementGuard = {
 			return characters:holders()
 		end
 		self._place = function(player: string)
-			characters:place(player, false)
+			characters:place(player)
 		end
 		self._clock = deps.Clock or os.clock
 		self._log = deps.Log or logLine
@@ -128,9 +128,7 @@ local MovementGuard: MovementGuard = {
 		for _, holder in self._holders() do
 			local player = holder.player
 			local position = holder.root.Position
-			if holder.root.Anchored then
-				self._check:reset(player, position, now)
-			elseif self._check:sample(player, position, now) == "Return" then
+			if self._check:sample(player, position, now) == "Return" then
 				returnToValid(self, holder)
 			elseif not Bounds.inArena(self._arena, position, self._outsideMargin) then
 				placeOutside(self, holder)

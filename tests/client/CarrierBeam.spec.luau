@@ -45,7 +45,7 @@ beforeEach(function()
 	part.Parent = folder
 	ball = part
 	BallCarrier:init({})
-	HudStore:init({ Config = config })
+	HudStore:init({ Config = config, LocalId = "1" })
 	snapshot()
 	CarrierBeam:init({
 		Config = config,

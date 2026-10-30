@@ -28,7 +28,7 @@ describe("Config defaults", function()
 		expect(m.overtimeSeconds).toBe(180)
 		expect(m.goalPointsByLap).toEqual({ 1, 3, 5 })
 		expect(m.celebrationSeconds).toBe(3)
-		expect(m.kickoffCountdownSeconds).toBe(3)
+		expect(m.kickoffCountdownSeconds).toBe(5)
 		expect(m.clockPausesDuringKickoff).toBe(true)
 		expect(m.postMatchSeconds).toBe(15)
 		expect(m.lastChance).toEqual({ enabled = true })
@@ -452,6 +452,7 @@ describe("Config defaults", function()
 			goalOpen = "%s goal is active",
 			scored = "%s scored!",
 			wins = "%s WINS",
+			go = "GO %s TEAM!",
 			draw = "DRAW",
 			mvp = "MVP",
 			scores = "SCORES",
@@ -480,6 +481,7 @@ describe("Config defaults", function()
 			titleSize = 32,
 			bannerSize = 96,
 			bannerSeconds = 2,
+			countdown = { textSize = 76, ringSize = 200, ringThickness = 8 },
 			feedSeconds = 6,
 			feedMaxEntries = 5,
 			glowThickness = 3,
@@ -488,7 +490,7 @@ describe("Config defaults", function()
 			screenMargin = 8,
 			layout = {
 				scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
-				banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(640, 110) },
+				banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(720, 110) },
 				feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
 				hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
 				speedometer = {
@@ -1467,6 +1469,13 @@ describe("Config.forMode", function()
 		end
 	end)
 
+	it("accepts a kickoff count whose digit just fits inside its ring", function()
+		-- 116 - 2 x 8 = 100: a 99 px digit fits.
+		local countdown =
+			Fixtures.config({ UI = { hud = { countdown = { textSize = 99, ringSize = 116 } } } }).UI.hud.countdown
+		expect(countdown).toEqual({ textSize = 99, ringSize = 116, ringThickness = 8 })
+	end)
+
 	it("rejects HUD text and settings that contradict themselves", function()
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			-- A text takes exactly as many values as the HUD gives it.
@@ -1519,6 +1528,16 @@ describe("Config.forMode", function()
 			},
 			{ overrides = { UI = { text = { touchMove = "" } } }, message = "UI.text.touchMove: must not be empty" },
 			{ overrides = { UI = { text = { draw = "" } } }, message = "UI.text.draw: must not be empty" },
+			{ overrides = { UI = { text = { go = "GO!" } } }, message = "UI.text.go: placeholder count must be 1" },
+			{
+				overrides = { UI = { hud = { countdown = { ringThickness = 0 } } } },
+				message = "UI.hud.countdown.ringThickness: must be > 0",
+			},
+			-- Inside the ring's stroke, 116 - 2 x 8 leaves 100 px: a 100 px digit would touch it.
+			{
+				overrides = { UI = { hud = { countdown = { textSize = 100, ringSize = 116 } } } },
+				message = "UI: the count's digit must fit inside its ring (textSize < ringSize - 2 × ringThickness)",
+			},
 			{
 				overrides = { UI = { hud = { layout = { getUp = { size = UDim2.fromScale(0.5, 0.1) } } } } },
 				message = "UI.hud.layout.getUp.size: must be in pixels (scales 0, offsets > 0)",

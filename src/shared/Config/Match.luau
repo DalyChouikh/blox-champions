@@ -36,7 +36,8 @@ local defaults: MatchConfig = {
 	-- they replace a goal of 1 after 4 laps and a streak point at 12.
 	goalPointsByLap = { 1, 3, 5 },
 	celebrationSeconds = 3,
-	kickoffCountdownSeconds = 3,
+	-- Roller Champions' 5, 4, 3, 2, 1, everyone free to skate and act (the owner, Q92, #307; was 3 s frozen).
+	kickoffCountdownSeconds = 5,
 	clockPausesDuringKickoff = true,
 	postMatchSeconds = 15,
 	respawnSeconds = 3,
