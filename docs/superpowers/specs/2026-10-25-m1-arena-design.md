@@ -289,7 +289,7 @@ As today, a gate spans the track at the start of each section, facing the travel
 ### 5.5 Spawns and the middle
 
 - **Team spawns:** on the lower floor's middle lane (u 22; u 26 since #217's 16-stud bank; since #268 the middle of a straight's spawn room, u 27, `Profile.spawnLane`).
-- **Ball spawns:** on the track's middle at each curved end's apex, `ballSpawnHeight` above the surface as built there (since #268: 2.74 + 6 over the bowl).
+- **Ball spawns:** on the track's middle at each curved end's apex, `ballSpawnHeight` above the surface as built there (since #268: 2.74 + 6 over the bowl). *Removed by #321: the ball drops in from above at a random spot round the loop (M1 spec §9.3 Entry); `BallSpawn`, `ballSpawnHeight` and `ballSpawnSize` are gone.*
 - **The middle:** a floor slab `surfaceThickness` thick, its top at the lowest floor's height, out to the inner glass slab's back: a block between the straights and a fan of prisms under each curved end, as today. It is not a ride surface.
 
 ---
@@ -306,7 +306,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 | `Geometry/Surface` | `build` sweeps the solid section; `rings` and `sweep` sweep the others. `section(arena, distance)` names the solid section at a distance (blended by `Centerline.straightness` there, #268), which the sweep, the goal's fit check, the gate walls and the ball's spawns share. |
 | `Geometry/Features` | `glass` and `top` (swept sections) replace `barriers`; `gatePanels` replaces `markers`; `gates` as tall as the top; the new `goal` with its arm and fit check; the middle behind the inner glass slab. |
 | `Geometry/Reach` | Removed (§2.3, 6). |
-| `Geometry/init` | `build(config)` returns `surface`, `glass`, `top`, `infield`, `gates`, `goal` (with `arm`), `gatePanels`, `teamSpawns`, `ballSpawns`. Gravity is no longer needed. |
+| `Geometry/init` | `build(config)` returns `surface`, `glass`, `top`, `infield`, `gates`, `goal` (with `arm`), `gatePanels`, `teamSpawns` (`ballSpawns` until #321). Gravity is no longer needed. |
 | `Geometry/Bounds` | `inArena` up to `Profile.topHeight`. |
 | `Geometry/Centerline` | `distanceOf(arena, position)`, the inverse of `frameAt`; and `pose(arena, distance, lateral, height)`, the point (a Vector3) and the heading (an angle), on which `frameAt` and `at` build. |
 | `Tags` | `Barrier` now marks the top; `RideSurface` covers the glass. |

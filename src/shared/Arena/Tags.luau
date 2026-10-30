@@ -9,7 +9,6 @@ local Tags = {
 	GoalHoop = "GoalHoop",
 	GoalPanel = "GoalPanel",
 	TeamSpawn = "TeamSpawn",
-	BallSpawn = "BallSpawn",
 	CornerMarker = "CornerMarker",
 	-- On the folders of surfaces skaters ride (the floors, the banks, the walls and the glass): the only things their
 	-- rays hit.

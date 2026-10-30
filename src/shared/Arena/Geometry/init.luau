@@ -24,7 +24,6 @@ export type ArenaGeometry = {
 	-- The thin glass walls across the track at the gates, by gate index.
 	gatePanels: { Types.GatePanel },
 	teamSpawns: Types.TeamSpawns,
-	ballSpawns: { CFrame },
 }
 
 local Geometry = {}
@@ -40,7 +39,6 @@ function Geometry.build(config: Config.GameConfig): ArenaGeometry
 		goal = Features.goal(arena),
 		gatePanels = Features.gatePanels(arena),
 		teamSpawns = Features.teamSpawns(arena, config.Match.teamSize),
-		ballSpawns = Features.ballSpawns(arena),
 	}
 end
 

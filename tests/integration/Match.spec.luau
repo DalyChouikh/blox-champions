@@ -177,10 +177,9 @@ local function eventsNamed(name: string): { any }
 	return found
 end
 
--- The distance along the centerline of the curved end's apex where the ball spawned.
+-- How far along the centerline the ball is.
 local function ballDistance(): number
-	local section = if BallService.part.Position.X < 0 then 2 else 4
-	return Centerline.gateDistance(config.Arena, section) + math.pi * config.Arena.endRadius / 2
+	return Centerline.distanceOf(config.Arena, BallService.part.Position)
 end
 
 -- Moves the rig along the middle of the track, one frame every 2 studs.
@@ -192,8 +191,12 @@ local function carry(rig: Model, from: number, to: number)
 	end
 end
 
+-- The ball lands on the middle of the track where it is (#321: it drops in high beside a wall), and `rig` catches it
+-- there.
 local function catchWith(rig: Model)
-	rig:PivotTo(CFrame.new(BallService.part.Position))
+	local landing = Centerline.at(config.Arena, ballDistance(), MIDDLE, 3)
+	BallService.part.CFrame = landing
+	rig:PivotTo(landing)
 	MatchService:step(FRAME)
 end
 
@@ -211,7 +214,7 @@ local function openGoal(count: number?): (Model, { Model })
 	local rigs = seat(count or 1)
 	kickoff()
 	local start = ballDistance()
-	carry(rigs[1], start, start)
+	catchWith(rigs[1])
 	lapFromGoalGate(rigs[1], start)
 	return rigs[1], rigs
 end
