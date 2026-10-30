@@ -4,6 +4,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
+local beforeAll, afterAll = JestGlobals.beforeAll, JestGlobals.afterAll
 local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local ActionService = require(ServerScriptService.Server.ActionService)
@@ -16,7 +17,11 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 local TeamService = require(ServerScriptService.Server.TeamService)
 
-local config = Fixtures.config()
+local defaults = Fixtures.config()
+-- Get Up's own tests ask for it sooner than the whole slide (#287), so its rules still show.
+local earlyGetUp = Fixtures.config({ Actions = { getUpAfter = 0.5 } })
+-- The config every service starts with (beforeEach).
+local config = defaults
 local throwSettings = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
 -- The Tackle's Dive (#240).
 local FOLLOW_UP = config.Actions.Tackle.followUp :: Config.FollowUp
@@ -306,35 +311,24 @@ describe("ActionService", function()
 		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
 	end)
 
-	-- Roller Champions' Get Up (#220): moving gets a knocked-down skater up sooner, the server deciding when.
-	it("gets a knocked-down skater up once they move, never before getUpAfter", function()
-		local b = orange[1]
-		-- Moving from their first frame down: down until getUpAfter, then up.
-		tackled(blue[1], b)
-		getUp(b)
-		advance(config.Actions.getUpAfter - 0.05)
-		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
-		advance(0.1)
-		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
-		-- Moving late in a knockdown: up on the next frame.
+	-- The owner (#287, Q62): every knockdown lasts the whole slide, keys or not, like RC's (Video 4: a tackled skater
+	-- slid 1.5 s and pushed off as the slide stopped; Video 7: posed falls the same).
+	it("keeps a struck or fallen skater who moves down for the whole slide", function()
+		local a, b = blue[1], orange[1]
 		tackled(blue[2], b)
-		advance(1)
-		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
 		getUp(b)
-		advance(DT)
-		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
-	end)
-
-	it("forgets a request to get up made on their feet", function()
-		local b = orange[1]
-		local hit = config.Actions.Tackle.hit :: Config.Hit
-		tackled(blue[1], b)
-		advance(hit.knockdownSeconds + 0.05)
-		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
-		getUp(b)
-		tackled(blue[2], b)
-		advance(config.Actions.getUpAfter + 0.1)
+		advance(1.4)
 		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
+		advance(0.15)
+		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
+		stand(a, above(config.Movement.hardLanding.drop + 0.5))
+		glide(a, Vector3.zero)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Fall")
+		getUp(a)
+		advance(1.4)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Fall")
+		advance(0.15)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 	end)
 
 	it("takes requests to get up in their own shape, within their own rate limit", function()
@@ -502,29 +496,6 @@ describe("ActionService", function()
 		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
 		advance(0.1)
 		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
-	end)
-
-	-- The owner (#242): RC's diver is up exactly when the slide stops (Videos 4 and 6), and moving changes nothing.
-	it("keeps a sliding diver down whatever the stick, up the frame the slide stops, that knockdown only", function()
-		local a = blue[1]
-		local landing = config.Actions.Dive.landing :: Config.Landing
-		stand(a, Vector3.zero)
-		slide(a, 30)
-		dive(a)
-		local phases = config.Actions.Dive.phases
-		advance(phases.windup + phases.active + 0.05)
-		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
-		getUp(a)
-		advance(config.Actions.getUpAfter + 0.1)
-		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
-		-- Under stopSpeed along the ground; the hover's pull off the floor is no slide.
-		Fixtures.root(rigs[a]).AssemblyLinearVelocity = Vector3.new(0, 5, -(landing.stopSpeed - 0.5))
-		advance(DT)
-		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
-		-- The next knockdown, a strike's, waits for Get Up however still they lie.
-		tackled(orange[1], a)
-		advance(config.Actions.getUpAfter + 0.1)
-		expect(attribute(a, Attributes.KnockedDown)).toBe("Hit")
 	end)
 
 	-- The server can't tell when a client left the ground (its view lags), so it takes the client's dive (#221).
@@ -798,5 +769,68 @@ describe("ActionService's front-half hits (#277)", function()
 		ActionService:request(a, { action = "Uppercut" })
 		expect(rejected(a)).toEqual({})
 		expect(advance(0.3)).toEqual({ `{a}>{b}` })
+	end)
+end)
+
+describe("ActionService's Get Up, sooner than the whole slide", function()
+	beforeAll(function()
+		config = earlyGetUp
+	end)
+	afterAll(function()
+		config = defaults
+	end)
+
+	-- Roller Champions' Get Up (#220): moving gets a knocked-down skater up sooner, the server deciding when.
+	it("gets a knocked-down skater up once they move, never before getUpAfter", function()
+		local b = orange[1]
+		-- Moving from their first frame down: down until getUpAfter, then up.
+		tackled(blue[1], b)
+		getUp(b)
+		advance(config.Actions.getUpAfter - 0.05)
+		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
+		advance(0.1)
+		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
+		-- Moving late in a knockdown: up on the next frame.
+		tackled(blue[2], b)
+		advance(1)
+		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
+		getUp(b)
+		advance(DT)
+		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
+	end)
+
+	it("forgets a request to get up made on their feet", function()
+		local b = orange[1]
+		local hit = config.Actions.Tackle.hit :: Config.Hit
+		tackled(blue[1], b)
+		advance(hit.knockdownSeconds + 0.05)
+		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
+		getUp(b)
+		tackled(blue[2], b)
+		advance(config.Actions.getUpAfter + 0.1)
+		expect(attribute(b, Attributes.KnockedDown)).toBe("Hit")
+	end)
+
+	-- The owner (#242): RC's diver is up exactly when the slide stops (Videos 4 and 6), and moving changes nothing.
+	it("keeps a sliding diver down whatever the stick, up the frame the slide stops, that knockdown only", function()
+		local a = blue[1]
+		local landing = config.Actions.Dive.landing :: Config.Landing
+		stand(a, Vector3.zero)
+		slide(a, 30)
+		dive(a)
+		local phases = config.Actions.Dive.phases
+		advance(phases.windup + phases.active + 0.05)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
+		getUp(a)
+		advance(config.Actions.getUpAfter + 0.1)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
+		-- Under stopSpeed along the ground; the hover's pull off the floor is no slide.
+		Fixtures.root(rigs[a]).AssemblyLinearVelocity = Vector3.new(0, 5, -(landing.stopSpeed - 0.5))
+		advance(DT)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+		-- The next knockdown, a strike's, waits for Get Up however still they lie.
+		tackled(orange[1], a)
+		advance(config.Actions.getUpAfter + 0.1)
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Hit")
 	end)
 end)

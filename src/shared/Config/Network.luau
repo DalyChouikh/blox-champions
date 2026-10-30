@@ -28,7 +28,7 @@ export type NetworkConfig = {
 	-- or the running action ends, and this far outside a follow-up's window (the Tackle's Dive).
 	actionTimingTolerance: number,
 	-- How many requests to get up a client may send (a burst of this many, refilled per second): an honest client
-	-- sends one per knockdown, and a knockdown lasts at least Actions.getUpAfter (0.5 s).
+	-- sends one per knockdown, and a knockdown lasts at least Actions.getUpAfter.
 	maxGetUpsPerSecond: number,
 	-- How long a client keeps reporting an Air Pose it touched down in (#245): the server judges that fall from the
 	-- report, but sees the touchdown behind this client's screen, and the character's physics and remote events reach

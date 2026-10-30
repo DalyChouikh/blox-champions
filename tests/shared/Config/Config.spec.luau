@@ -94,7 +94,7 @@ describe("Config defaults", function()
 		expect(Config.defaults().Actions).toEqual({
 			airMultiplier = 0.8,
 			callPassWindow = 3,
-			getUpAfter = 0.5,
+			getUpAfter = 1.5,
 			-- On the ground and in the air; its key dives from 0.1 to 1.0 s after it (#240: RC's "Dive" offer).
 			Tackle = {
 				phases = { windup = 0.05, active = 0.25, recovery = 0.35 },
