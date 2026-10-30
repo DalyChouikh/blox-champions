@@ -1,6 +1,6 @@
 --!strict
 -- Small validation DSL for config tables. Every validator returns all the errors it finds, each
--- prefixed with the exact config path (e.g. "Match.lapsToOpenGoal"), so a bad value is easy to locate.
+-- prefixed with the exact config path (e.g. "Match.pointsToWin"), so a bad value is easy to locate.
 
 export type Validator = (value: any, path: string) -> { string }
 

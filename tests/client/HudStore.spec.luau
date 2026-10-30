@@ -18,13 +18,13 @@ describe("HudStore", function()
 		HudStore:onSnapshot(Fixtures.matchSnapshot())
 		local state = HudStore.state
 		expect((state.match :: any).state).toBe("Live")
-		HudStore:onEvents(Fixtures.ruleEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } }))
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } }))
 		expect(state.banner and state.banner.kind).toBe("Goal")
 	end)
 
 	it("drops a batch from a frame the latest snapshot already holds", function()
 		-- What a joiner gets while it loads: the snapshots first, then the batches (one remote at a time).
-		local goal: { Types.Event } = { { name = "GoalScored", team = "Blue", scorer = "1" } }
+		local goal: { Types.Event } = { { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } }
 		HudStore:onSnapshot(Fixtures.matchSnapshot(nil, 5))
 		HudStore:onEvents(Fixtures.ruleEvents(goal, 4))
 		HudStore:onEvents(Fixtures.ruleEvents(goal, 5))

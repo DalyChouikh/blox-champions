@@ -12,7 +12,7 @@ local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
 local MatchEngine = require(ReplicatedStorage.Shared.Rules.MatchEngine)
 local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 
-local config = Fixtures.config({ Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2 } })
+local config = Fixtures.config()
 local root: Folder
 local arena: Model
 local buildSeconds = 0
@@ -144,6 +144,6 @@ describe("The generated arena", function()
 		expect(table.find(names, "GoalOpened")).never.toBeNil()
 		local goal = tagged.layout.goal.frame
 		engine:ballMoved(goal.Position - goal.LookVector * 2, goal.Position + goal.LookVector * 2)
-		expect(engine:drainEvents()[1]).toMatchObject({ name = "GoalScored", team = "Blue", scorer = "B1" })
+		expect(engine:drainEvents()[1]).toMatchObject({ name = "GoalScored", team = "Blue", scorer = "B1", points = 1 })
 	end)
 end)

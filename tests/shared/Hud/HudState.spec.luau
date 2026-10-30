@@ -79,13 +79,12 @@ describe("HudState", function()
 		expect(state.banner).toBeNil()
 	end)
 
-	it("shows GOAL!, STREAK POINT!, DENIED!, the clock warnings, LAST CHANCE and OVERTIME for bannerSeconds", function()
+	it("shows GOAL!, DENIED!, the clock warnings, LAST CHANCE and OVERTIME for bannerSeconds", function()
 		local seconds = config.UI.hud.bannerSeconds
 		local cases: { { event: Types.Event, banner: HudState.Banner } } = {
-			{ event = { name = "GoalScored", team = "Blue", scorer = "1" }, banner = { kind = "Goal", team = "Blue" } },
 			{
-				event = { name = "StreakPointScored", team = "Orange", holder = "2" },
-				banner = { kind = "StreakPoint", team = "Orange" },
+				event = { name = "GoalScored", team = "Blue", scorer = "1", points = 1 },
+				banner = { kind = "Goal", team = "Blue" },
 			},
 			{
 				event = { name = "SaveMade", player = "2", kind = "Block" },
@@ -108,7 +107,7 @@ describe("HudState", function()
 			expect(state.banner).toBeNil()
 		end
 		local replaced = liveState()
-		replaced:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } })
+		replaced:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
 		replaced:applyEvents({ { name = "OvertimeStarted" } })
 		expect(replaced.banner).toEqual({ kind = "Overtime" })
 	end)
@@ -116,7 +115,7 @@ describe("HudState", function()
 	it("holds GOAL! through the celebration, until the 3-2-1 replaces it", function()
 		local seconds = config.UI.hud.bannerSeconds
 		local state = liveState()
-		state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } })
+		state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
 		state:applySnapshot(Fixtures.matchSnapshot({ state = "Celebration", phaseSecondsLeft = seconds + 1 }))
 		state:step(seconds + 0.5)
 		expect(state.banner).toEqual({ kind = "Goal", team = "Blue" })
@@ -130,8 +129,8 @@ describe("HudState", function()
 			{ name = "PossessionChanged", team = "Blue", player = "1" },
 			{ name = "LapCompleted", team = "Blue", streak = 1, holder = "1" },
 			{ name = "GoalOpened", team = "Blue" },
-			{ name = "GoalScored", team = "Blue", scorer = "1" },
-			{ name = "StreakPointScored", team = "Orange", holder = "2" },
+			{ name = "GoalScored", team = "Blue", scorer = "1", points = 1 },
+			{ name = "GoalScored", team = "Orange", scorer = "2", points = 1 },
 			{ name = "PossessionChanged", team = "Orange", player = "2", previousTeam = "Blue" },
 		})
 		local kinds: { string } = {}
@@ -141,7 +140,7 @@ describe("HudState", function()
 			table.insert(ids, entry.id)
 		end
 		-- feedMaxEntries is 5: the oldest of the six is gone.
-		expect(kinds).toEqual({ "Lap", "GoalOpen", "Goal", "StreakPoint", "Possession" })
+		expect(kinds).toEqual({ "Lap", "GoalOpen", "Goal", "Goal", "Possession" })
 		expect(ids).toEqual({ 2, 3, 4, 5, 6 })
 		expect(state.feed[1].value).toBe(1)
 		expect(state.feed[3].player).toBe("1")
@@ -158,7 +157,7 @@ describe("HudState", function()
 
 	it("shows the end of the match until the next match starts", function()
 		local state = liveState()
-		state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1" } })
+		state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
 		local stats = (match(state) :: any).stats
 		state:applyEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } })
 		expect((state.ended :: HudState.Ended).winner).toBe("Blue")

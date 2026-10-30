@@ -10,9 +10,7 @@ local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 local ZERO = Vector3.zero
 local ON_TARGET_POSITION, ON_TARGET_VELOCITY = Vector3.new(190, 15, 0), Vector3.new(100, 0, 0)
-local SHORT_STREAK = { Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2 } }
 local DEFAULTS = Fixtures.config()
-local LAPS_TO_OPEN_GOAL = DEFAULTS.Match.lapsToOpenGoal
 -- Every streak starts at the goal's gate (spec §4.2), so a lap runs from it round to the gate before it.
 local GOAL_GATE = DEFAULTS.Arena.goalGateIndex
 local GATE_COUNT = Fixtures.GATE_COUNT
@@ -64,7 +62,7 @@ local function expectEvents(engine: MatchEngine.MatchEngine, expected: { Types.E
 	expect(engine:drainEvents()).toEqual(expected)
 end
 
--- Needs lapsToOpenGoal = 1: picks up, laps once, throws through the ring.
+-- Picks up, laps once (the goal opens: +1) and throws through the ring.
 local function scoreGoal(engine: MatchEngine.MatchEngine, player: string)
 	engine:pickedUp(player, ZERO, ZERO)
 	lap(engine)
@@ -78,7 +76,7 @@ end
 
 -- Orange leads 1-0, Blue has the ball, and the clock has just hit 0:00.
 local function lastChanceEngine(overrides: { [string]: any }?): MatchEngine.MatchEngine
-	local engine = liveEngine(overrides or SHORT_STREAK)
+	local engine = liveEngine(overrides)
 	scoreGoal(engine, "O1")
 	resumePlay(engine)
 	engine:pickedUp("B1", ZERO, ZERO)
@@ -89,7 +87,7 @@ end
 
 -- Blue's goal is open, B1 has thrown the ball at it, and O1 has blocked it; nothing is drained yet after the block.
 local function blockedEngine(): MatchEngine.MatchEngine
-	local engine = liveEngine(SHORT_STREAK)
+	local engine = liveEngine()
 	engine:pickedUp("B1", ZERO, ZERO)
 	lap(engine)
 	engine:thrown("B1")
@@ -295,28 +293,33 @@ describe("MatchEngine possession and laps", function()
 		engine:drainEvents()
 		lap(engine)
 		local events = engine:drainEvents()
-		expect(names(events)).toEqual({ "GateCrossed", "GateCrossed", "GateCrossed", "GateCrossed", "LapCompleted" })
+		expect(names(events)).toEqual({
+			"GateCrossed",
+			"GateCrossed",
+			"GateCrossed",
+			"GateCrossed",
+			"LapCompleted",
+			"GoalOpened",
+		})
 		expect(events[5]).toEqual({ name = "LapCompleted", team = "Blue", streak = 1, holder = "B2" })
 		expect(engine:stats().players[1]).toMatchObject({ player = "B2", score = 10 })
 	end)
 end)
 
 describe("MatchEngine goals and points", function()
-	it("opens the goal after lapsToOpenGoal laps and scores a goal through it with an assist", function()
+	-- The owner (#305): the goal opens after 4 markers, a lap from the goal's gate, and a goal then is worth +1.
+	it("opens the goal after a lap and scores a +1 goal through it with an assist", function()
 		local engine = liveEngine()
 		engine:pickedUp("B1", ZERO, ZERO)
 		engine:thrown("B1")
 		engine:pickedUp("B2", ZERO, ZERO)
-		for _ = 1, LAPS_TO_OPEN_GOAL - 1 do
-			lap(engine)
-		end
 		engine:drainEvents()
 		lap(engine)
 		local events = engine:drainEvents()
 		expect(events[#events]).toEqual({ name = "GoalOpened", team = "Blue" })
 		engine:ballMoved(Fixtures.throughRing())
 		expectEvents(engine, {
-			{ name = "GoalScored", team = "Blue", scorer = "B2", assister = "B1" },
+			{ name = "GoalScored", team = "Blue", scorer = "B2", assister = "B1", points = 1 },
 			{ name = "AssistAwarded", player = "B1" },
 			{ name = "GoalClosed" },
 		})
@@ -326,32 +329,29 @@ describe("MatchEngine goals and points", function()
 	end)
 
 	it("credits the attacking team when a defender deflects the ball in", function()
-		local engine = liveEngine(SHORT_STREAK)
+		local engine = liveEngine()
 		engine:pickedUp("B1", ZERO, ZERO)
 		lap(engine)
 		engine:touched("O1", ZERO, ZERO)
 		engine:drainEvents()
 		engine:ballMoved(Fixtures.throughRing())
-		expect(engine:drainEvents()[1]).toEqual({ name = "GoalScored", team = "Blue", scorer = "B1" })
+		expect(engine:drainEvents()[1]).toEqual({ name = "GoalScored", team = "Blue", scorer = "B1", points = 1 })
 	end)
 
 	-- The owner, 2026-10-27: the goal scores from behind as from the front.
 	it("scores a ball passing back-to-front through the open ring", function()
-		local engine = liveEngine(SHORT_STREAK)
+		local engine = liveEngine()
 		engine:pickedUp("B1", ZERO, ZERO)
 		lap(engine)
 		engine:drainEvents()
 		local from, to = Fixtures.throughRing()
 		engine:ballMoved(to, from)
-		expect(engine:drainEvents()[1]).toEqual({ name = "GoalScored", team = "Blue", scorer = "B1" })
+		expect(engine:drainEvents()[1]).toEqual({ name = "GoalScored", team = "Blue", scorer = "B1", points = 1 })
 	end)
 
 	it("judges the ring before the gates a segment crosses, so the lap that opens the goal cannot score", function()
 		local engine = liveEngine()
 		engine:pickedUp("B1", ZERO, ZERO)
-		for _ = 1, LAPS_TO_OPEN_GOAL - 1 do
-			lap(engine)
-		end
 		crossGates(engine, table.move(LAP, 1, GATE_COUNT - 1, 1, {}))
 		engine:drainEvents()
 		-- The lap ends at the gate before the goal's, and the ring hangs in the goal gate's plane: one segment from
@@ -362,7 +362,7 @@ describe("MatchEngine goals and points", function()
 		engine:ballMoved(Vector3.new(beforeLast.X, ringFrom.Y, ringFrom.Z), ringTo)
 		expectEvents(engine, {
 			{ name = "GateCrossed", team = "Blue", gateIndex = lastGate, progress = GATE_COUNT },
-			{ name = "LapCompleted", team = "Blue", streak = LAPS_TO_OPEN_GOAL, holder = "B1" },
+			{ name = "LapCompleted", team = "Blue", streak = 1, holder = "B1" },
 			{ name = "GoalOpened", team = "Blue" },
 			{ name = "GateCrossed", team = "Blue", gateIndex = GOAL_GATE, progress = 1 },
 		})
@@ -370,32 +370,45 @@ describe("MatchEngine goals and points", function()
 		expect(names(engine:drainEvents())).toEqual({ "GoalScored", "GoalClosed" })
 	end)
 
-	it("scores a streak point at lapsForStreakPoint and closes the goal", function()
-		local engine = liveEngine(SHORT_STREAK)
+	-- The owner (#305): +3 after 8 markers, +5 after 12 and more; laps alone score nothing (no streak point).
+	it("scores a goal at +3 after two laps and +5 after three or more, and never for laps alone", function()
+		local values = {}
+		for laps = 2, 4 do
+			local engine = liveEngine({ Match = { pointsToWin = 99 } })
+			engine:pickedUp("B1", ZERO, ZERO)
+			for _ = 1, laps do
+				lap(engine)
+			end
+			engine:drainEvents()
+			engine:ballMoved(Fixtures.throughRing())
+			local goal: any = engine:drainEvents()[1]
+			table.insert(values, goal.points)
+			expect(engine:snapshot().scores).toEqual({ Blue = goal.points, Orange = 0 })
+		end
+		expect(values).toEqual({ 3, 5, 5 })
+		local engine = liveEngine()
 		engine:pickedUp("B1", ZERO, ZERO)
-		lap(engine)
-		engine:drainEvents()
-		lap(engine)
-		local events = engine:drainEvents()
-		expect(names(events)).toEqual({
-			"GateCrossed",
-			"GateCrossed",
-			"GateCrossed",
-			"GateCrossed",
-			"LapCompleted",
-			"StreakPointScored",
-			"GoalClosed",
-		})
-		expect(events[6]).toEqual({ name = "StreakPointScored", team = "Blue", holder = "B1" })
-		expect(engine:snapshot().scores).toEqual({ Blue = 1, Orange = 0 })
-		expect(engine:stats().players[1]).toMatchObject({ player = "B1", score = 120 })
+		for _ = 1, 12 do
+			lap(engine)
+		end
+		expect(table.find(names(engine:drainEvents()), "GoalScored")).toBeNil()
+		expect(engine:snapshot()).toMatchObject({ state = "Live", scores = { Blue = 0, Orange = 0 } })
+	end)
+
+	-- The owner (#305), RC's "first team to 5 points wins instantly": one +5 goal does it from 0.
+	it("ends the match at once on a +5 goal from 0", function()
+		local engine = liveEngine()
+		engine:pickedUp("B1", ZERO, ZERO)
+		for _ = 1, 3 do
+			lap(engine)
+		end
+		engine:ballMoved(Fixtures.throughRing())
+		expect(lastEvent(engine)).toMatchObject({ name = "MatchEnded", winner = "Blue" })
 	end)
 
 	it("resets for a kickoff after the celebration and ignores play during it", function()
-		local engine = liveEngine(SHORT_STREAK)
-		engine:pickedUp("B1", ZERO, ZERO)
-		lap(engine)
-		lap(engine)
+		local engine = liveEngine()
+		scoreGoal(engine, "B1")
 		engine:drainEvents()
 		engine:pickedUp("O1", ZERO, ZERO)
 		engine:tick(2.5)
@@ -411,7 +424,7 @@ describe("MatchEngine goals and points", function()
 	end)
 
 	it("ends the match as soon as a team reaches pointsToWin", function()
-		local engine = liveEngine({ Match = { pointsToWin = 1, lapsToOpenGoal = 1, lapsForStreakPoint = 2 } })
+		local engine = liveEngine({ Match = { pointsToWin = 1 } })
 		engine:pickedUp("B1", ZERO, ZERO)
 		engine:thrown("B1")
 		engine:pickedUp("B2", ZERO, ZERO)
@@ -435,7 +448,7 @@ end)
 
 describe("MatchEngine saves and knockdowns", function()
 	it("holds a block until the danger has passed, counting one save however often defenders touch", function()
-		local engine = liveEngine(SHORT_STREAK)
+		local engine = liveEngine()
 		engine:pickedUp("B1", ZERO, ZERO)
 		lap(engine)
 		engine:thrown("B1")
@@ -463,12 +476,12 @@ describe("MatchEngine saves and knockdowns", function()
 			engine:tick(1.5)
 			return table.find(names(engine:drainEvents()), "SaveMade") ~= nil
 		end
-		expect(blocks(SHORT_STREAK)).toBe(true)
+		expect(blocks({})).toBe(true)
 		-- At Roblox's gravity the Uppercut's leap reaches 25.3 studs by its strike's end, so its bend may not go past
 		-- that (Config's rule, Q89).
 		local roblox = { gravity = 196.2 }
 		local uppercut = { seek = { bend = { range = 25 } } }
-		expect(blocks({ Match = SHORT_STREAK.Match, World = roblox, Actions = { Uppercut = uppercut } })).toBe(false)
+		expect(blocks({ World = roblox, Actions = { Uppercut = uppercut } })).toBe(false)
 	end)
 
 	it("drops a block when the ball still goes in", function()
@@ -489,24 +502,8 @@ describe("MatchEngine saves and knockdowns", function()
 		})
 	end)
 
-	it("confirms a block when a streak point stops play", function()
-		local engine = blockedEngine()
-		lap(engine)
-		local events = engine:drainEvents()
-		expect(names(events)).toEqual({
-			"GateCrossed",
-			"GateCrossed",
-			"GateCrossed",
-			"GateCrossed",
-			"LapCompleted",
-			"StreakPointScored",
-			"SaveMade",
-			"GoalClosed",
-		})
-	end)
-
 	it("confirms a block when the match ends at 0:00", function()
-		local engine = liveEngine(SHORT_STREAK)
+		local engine = liveEngine()
 		scoreGoal(engine, "B1")
 		resumePlay(engine)
 		scoreGoal(engine, "B1")
@@ -524,7 +521,7 @@ describe("MatchEngine saves and knockdowns", function()
 	end)
 
 	it("makes a defender's pickup at an open goal a steal save, counted once when it is also a block", function()
-		local engine = liveEngine(SHORT_STREAK)
+		local engine = liveEngine()
 		engine:pickedUp("B1", ZERO, ZERO)
 		lap(engine)
 		engine:drainEvents()
@@ -592,7 +589,7 @@ describe("MatchEngine players", function()
 	end)
 
 	it("ignores departed players, keeping their stats", function()
-		local engine = liveEngine(SHORT_STREAK)
+		local engine = liveEngine()
 		engine:knockedDown("O1", "B1")
 		engine:removePlayer("O1")
 		-- Blue's goal is open and a thrown ball is on target, so every input below would count if O1 were present.
@@ -619,7 +616,7 @@ end)
 
 describe("MatchEngine clock", function()
 	it("runs the clock only during live play by default", function()
-		local engine = newEngine(SHORT_STREAK)
+		local engine = newEngine()
 		engine:start()
 		engine:tick(3)
 		expect(engine:snapshot().secondsLeft).toBe(300)
@@ -647,7 +644,7 @@ end)
 
 describe("MatchEngine end of regulation", function()
 	it("goes to golden-goal overtime on a tie without a kickoff, and the next point wins", function()
-		local engine = liveEngine(SHORT_STREAK)
+		local engine = liveEngine()
 		engine:tick(300)
 		expect(names(engine:drainEvents())).toEqual({ "ClockWarning", "ClockWarning", "OvertimeStarted" })
 		local snapshot = engine:snapshot()
@@ -660,7 +657,7 @@ describe("MatchEngine end of regulation", function()
 	end)
 
 	it("lets the leader win at 0:00 when the trailing team does not have the ball", function()
-		local engine = liveEngine(SHORT_STREAK)
+		local engine = liveEngine()
 		scoreGoal(engine, "O1")
 		resumePlay(engine)
 		engine:drainEvents()
@@ -671,7 +668,7 @@ describe("MatchEngine end of regulation", function()
 	it(
 		"gives the trailing team with the ball a Last Chance; tying sends the match to overtime after a kickoff",
 		function()
-			local engine = liveEngine(SHORT_STREAK)
+			local engine = liveEngine()
 			scoreGoal(engine, "O1")
 			resumePlay(engine)
 			engine:pickedUp("B1", ZERO, ZERO)
@@ -713,8 +710,7 @@ describe("MatchEngine end of regulation", function()
 	end)
 
 	it("with maxDeficit 2, keeps Last Chance after a point that leaves the team behind", function()
-		local engine =
-			liveEngine({ Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2, lastChance = { maxDeficit = 2 } } })
+		local engine = liveEngine({ Match = { lastChance = { maxDeficit = 2 } } })
 		scoreGoal(engine, "O1")
 		resumePlay(engine)
 		scoreGoal(engine, "O1")
@@ -730,24 +726,22 @@ describe("MatchEngine end of regulation", function()
 	end)
 
 	it("lets the trailing team win when a Last Chance point puts it ahead", function()
-		-- Streak points are worth 1 and goals 2: Orange leads 1-0, then Blue's goal after 0:00 makes it 2-1.
-		local engine = liveEngine({
-			Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2, pointValue = { goal = 2, streak = 1 } },
-		})
-		engine:pickedUp("O1", ZERO, ZERO)
-		lap(engine)
-		lap(engine)
+		-- Orange leads 1-0, then Blue's +3 goal (two laps) after 0:00 makes it 3-1.
+		local engine = liveEngine()
+		scoreGoal(engine, "O1")
 		resumePlay(engine)
 		engine:pickedUp("B1", ZERO, ZERO)
 		engine:tick(300)
 		expect(engine:snapshot().period).toBe("LastChance")
-		scoreGoal(engine, "B1")
+		lap(engine)
+		lap(engine)
+		engine:ballMoved(Fixtures.throughRing())
 		expect(lastEvent(engine)).toMatchObject({ name = "MatchEnded", winner = "Blue" })
 	end)
 
 	it("resolves 0:00 during a kickoff when the clock keeps running", function()
 		local engine = liveEngine({
-			Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2, clockPausesDuringKickoff = false },
+			Match = { clockPausesDuringKickoff = false },
 		})
 		engine:tick(293) -- liveEngine's kickoff already used 3 s: 4 s left
 		scoreGoal(engine, "O1")
@@ -765,7 +759,7 @@ describe("MatchEngine 0:00 outside live play", function()
 		"judges 0:00 during a celebration with no possessing team, so the team that just scored gets no Last Chance",
 		function()
 			local engine = liveEngine({
-				Match = { lapsToOpenGoal = 1, lapsForStreakPoint = 2, clockPausesDuringKickoff = false },
+				Match = { clockPausesDuringKickoff = false },
 			})
 			scoreGoal(engine, "O1")
 			resumePlay(engine)
@@ -784,7 +778,7 @@ end)
 
 describe("MatchEngine performance", function()
 	it("keeps a live tick with ball movement far below the 1 ms server budget", function()
-		local engine = liveEngine(SHORT_STREAK)
+		local engine = liveEngine()
 		engine:pickedUp("B1", ZERO, ZERO)
 		lap(engine) -- opens the goal, so the ring is checked every tick too
 		engine:drainEvents()

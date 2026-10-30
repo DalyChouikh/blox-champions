@@ -48,13 +48,12 @@ export type TouchStyle = {
 export type UIText = {
 	-- The clock's minutes and seconds (two values).
 	clock: string,
-	-- The possessing team's completed laps, of Match.lapsToOpenGoal (two values).
+	-- The possessing team's completed laps (one value).
 	lap: string,
-	-- Their streak once the goal is open for them, of Match.lapsForStreakPoint (two values).
-	streak: string,
+	-- Their laps and what a goal is worth once the goal is open for them (two values).
+	goalWorth: string,
 	overtime: string,
 	goal: string,
-	streakPoint: string,
 	denied: string,
 	-- The seconds left (one value).
 	clockWarning: string,
@@ -69,8 +68,6 @@ export type UIText = {
 	goalOpen: string,
 	-- The scorer's name (one value).
 	scored: string,
-	-- The holder's name (one value).
-	scoredStreak: string,
 	-- The winning team's name (one value).
 	wins: string,
 	mvp: string,
@@ -225,11 +222,10 @@ local defaults: UIConfig = {
 	},
 	text = {
 		clock = "%d:%02d",
-		lap = "Lap %d/%d",
-		streak = "Streak %d/%d",
+		lap = "Lap %d",
+		goalWorth = "Lap %d: goal +%d",
 		overtime = "OVERTIME",
 		goal = "GOAL!",
-		streakPoint = "STREAK POINT!",
 		denied = "DENIED!",
 		clockWarning = "%d SECONDS",
 		lastChance = "LAST CHANCE",
@@ -238,7 +234,6 @@ local defaults: UIConfig = {
 		lapCompleted = "Lap %d completed",
 		goalOpen = "%s goal is active",
 		scored = "%s scored!",
-		scoredStreak = "%s scored a streak point!",
 		wins = "%s WINS",
 		mvp = "MVP",
 		scores = "SCORES",
@@ -440,11 +435,10 @@ local fields = Validate.record({
 	}),
 	text = Validate.record({
 		clock = template(2),
-		lap = template(2),
-		streak = template(2),
+		lap = template(1),
+		goalWorth = template(2),
 		overtime = label,
 		goal = label,
-		streakPoint = label,
 		denied = label,
 		clockWarning = template(1),
 		lastChance = label,
@@ -453,7 +447,6 @@ local fields = Validate.record({
 		lapCompleted = template(1),
 		goalOpen = template(1),
 		scored = template(1),
-		scoredStreak = template(1),
 		wins = template(1),
 		mvp = label,
 		scores = label,

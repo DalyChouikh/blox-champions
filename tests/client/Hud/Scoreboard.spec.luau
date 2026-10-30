@@ -92,21 +92,21 @@ describe("Scoreboard", function()
 	end)
 
 	it(
-		"fills a segment per gate crossed this lap, labels the lap or the streak, and glows while the goal is open",
+		"fills a segment per gate crossed this lap, labels laps or the goal's worth, glows while the goal is open",
 		function()
 			local mounted, rerender =
-				Fixtures.mount(board({ possessingTeam = "Blue", lapProgress = 2, streak = 1 }), folder)
+				Fixtures.mount(board({ possessingTeam = "Blue", lapProgress = 2, streak = 0 }), folder)
 			local lapBar = part(mounted, "LapBar")
 			local glow = part(mounted, "Glow")
 			local segments, full = filled(part(mounted, "Segments"), colors.Blue)
 			expect(lapBar.Visible).toBe(true)
 			expect(segments).toBe(4)
 			expect(full).toBe(2)
-			expect(part(mounted, "LapLabel").Text).toBe("Lap 1/4")
+			expect(part(mounted, "LapLabel").Text).toBe("Lap 0")
 			expect(glow.Enabled).toBe(false)
 
 			rerender(board({ possessingTeam = "Blue", streak = 5, goalOpenFor = "Blue" }))
-			expect(part(mounted, "LapLabel").Text).toBe("Streak 5/12")
+			expect(part(mounted, "LapLabel").Text).toBe("Lap 5: goal +5")
 			expect(glow.Enabled).toBe(true)
 			expect(glow.Color == colors.Blue).toBe(true)
 
