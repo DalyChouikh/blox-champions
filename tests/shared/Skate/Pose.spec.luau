@@ -20,7 +20,8 @@ local function still(): Pose.PoseInput
 		carrying = false,
 		lunging = false,
 		airPosing = false,
-		knockedDown = false,
+		knockdown = nil,
+		down = 0,
 		bodyOffset = 0,
 	}
 end
@@ -154,10 +155,67 @@ describe("Pose", function()
 		expect(out.root.Position.Y).toBe(0.5)
 
 		local knockedDown = still()
-		knockedDown.knockedDown = true
+		knockedDown.knockdown = "Hit"
+		knockedDown.down = 1
 		knockedDown.lunging = true
 		Pose.compute(pose, knockedDown, out)
 		expect(out.root.LookVector.Y).toBeCloseTo(math.sin(math.rad(pose.knockdownTiltDeg)), 6)
+		-- The owner (#243): flat on the back on the floor, not floating at standing height, the legs straight: only a
+		-- diver kneels.
+		expect(out.root.Position.Y).toBeCloseTo(-pose.knockdownSinkStuds, 6)
+		expect(anglesOf(out, "rightHip")[1]).toBeCloseTo(0, 4)
+		expect(anglesOf(out, "rightKnee")[1]).toBeCloseTo(0, 4)
+	end)
+
+	-- The owner (#243): every knockdown eases down and back up instead of snapping.
+	it("settles into a knockdown and back out evenly over knockdownEaseSeconds, never past either end", function()
+		local quarter = pose.knockdownEaseSeconds / 4
+		expect(Pose.settle(pose, 0, true, quarter)).toBeCloseTo(0.25, 6)
+		expect(Pose.settle(pose, 0.9, true, quarter)).toBe(1)
+		expect(Pose.settle(pose, 1, false, quarter)).toBeCloseTo(0.75, 6)
+		expect(Pose.settle(pose, 0.1, false, quarter)).toBe(0)
+	end)
+
+	it("blends the pose before into the knockdown's, gently at both ends", function()
+		local out = {} :: Pose.Frame
+		local input = still()
+		input.lunging = true
+		input.knockdown = "Hit"
+		local from, to = -pose.lungeDeg, pose.knockdownTiltDeg
+		-- Halfway down, smoothstep(0.5) = 0.5 of the way: -35 + 120 × 0.5 = 25 back.
+		input.down = 0.5
+		Pose.compute(pose, input, out)
+		expect(out.root.LookVector.Y).toBeCloseTo(math.sin(math.rad(from + (to - from) * 0.5)), 6)
+		-- A quarter down, smoothstep(0.25) = 0.15625 of the way: -35 + 120 × 0.15625 = -16.25.
+		input.down = 0.25
+		Pose.compute(pose, input, out)
+		expect(out.root.LookVector.Y).toBeCloseTo(math.sin(math.rad(from + (to - from) * 0.15625)), 6)
+	end)
+
+	-- The owner (#243): a diver lies face-down and forward, kneeling on the belly (RC, Video 4), not tipped back.
+	it("lays a diver's knockdown face-down: tipped forward, kneeling, sunk toward the ground", function()
+		local DOWN = -Vector3.yAxis
+		local out = {} :: Pose.Frame
+		local input = still()
+		input.bodyOffset = 0.5
+		input.knockdown = "Dive"
+		input.down = 1
+		Pose.compute(pose, input, out)
+		expect(out.root.LookVector.Y).toBeCloseTo(-math.sin(math.rad(pose.diveDeg)), 6)
+		expect(out.root.Position.Y).toBeCloseTo(0.5 - pose.diveSinkStuds, 6)
+		expect(anglesOf(out, "leftHip")[1]).toBeCloseTo(pose.diveHipDeg, 4)
+		expect(anglesOf(out, "rightHip")[1]).toBeCloseTo(pose.diveHipDeg, 4)
+		expect(anglesOf(out, "leftKnee")[1]).toBeCloseTo(-pose.diveKneeDeg, 4)
+		expect(anglesOf(out, "rightKnee")[1]).toBeCloseTo(-pose.diveKneeDeg, 4)
+		-- The thighs come forward under the tipped body, and the shins fold back along the ground.
+		expect((out.rightHip.Rotation * DOWN).Z).toBeLessThan(0)
+		expect((out.rightKnee.Rotation * DOWN).Z).toBeGreaterThan(0)
+		-- Halfway down: half the sink and half the bend (smoothstep(0.5) = 0.5).
+		input.down = 0.5
+		Pose.compute(pose, input, out)
+		expect(out.root.Position.Y).toBeCloseTo(0.5 - pose.diveSinkStuds / 2, 6)
+		expect(anglesOf(out, "leftHip")[1]).toBeCloseTo(pose.diveHipDeg / 2, 4)
+		expect(anglesOf(out, "leftKnee")[1]).toBeCloseTo(-pose.diveKneeDeg / 2, 4)
 	end)
 
 	it("writes the root as the lift, then the pitch, then the roll", function()

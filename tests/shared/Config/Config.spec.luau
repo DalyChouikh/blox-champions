@@ -219,9 +219,17 @@ describe("Config defaults", function()
 			carryArmDeg = 75,
 			airborneProbe = 1.5,
 			lungeDeg = 35,
-			knockdownTiltDeg = 60,
+			knockdownTiltDeg = 85,
 			airPoseDeg = 70,
 			airPoseArmDeg = 150,
+			-- The owner (#243): every knockdown eases down and up; a diver kneels on the belly (RC, Video 4),
+			-- anyone else lies flat on the back (was tipped 60° back, floating).
+			knockdownEaseSeconds = 0.3,
+			knockdownSinkStuds = 1.3,
+			diveDeg = 70,
+			diveHipDeg = 50,
+			diveKneeDeg = 110,
+			diveSinkStuds = 0.7,
 		})
 	end)
 
@@ -911,6 +919,27 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Network = { maxGetUpsPerSecond = 0 } })
 		end).toThrow("Network.maxGetUpsPerSecond: must be > 0 (got 0)")
+	end)
+
+	it("rejects a knockdown pose that snaps, bends past half a turn or sinks upward", function()
+		expect(function()
+			Fixtures.config({ Pose = { knockdownEaseSeconds = 0 } })
+		end).toThrow("Pose.knockdownEaseSeconds: must be > 0 (got 0)")
+		expect(function()
+			Fixtures.config({ Pose = { diveDeg = 181 } })
+		end).toThrow("Pose.diveDeg: must be <= 180 (got 181)")
+		expect(function()
+			Fixtures.config({ Pose = { diveHipDeg = -1 } })
+		end).toThrow("Pose.diveHipDeg: must be >= 0 (got -1)")
+		expect(function()
+			Fixtures.config({ Pose = { diveKneeDeg = 181 } })
+		end).toThrow("Pose.diveKneeDeg: must be <= 180 (got 181)")
+		expect(function()
+			Fixtures.config({ Pose = { diveSinkStuds = -0.5 } })
+		end).toThrow("Pose.diveSinkStuds: must be >= 0 (got -0.5)")
+		expect(function()
+			Fixtures.config({ Pose = { knockdownSinkStuds = -0.5 } })
+		end).toThrow("Pose.knockdownSinkStuds: must be >= 0 (got -0.5)")
 	end)
 
 	it("rejects a key bound to two actions", function()
