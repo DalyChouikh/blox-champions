@@ -292,7 +292,7 @@ describe("A match on the generated arena", function()
 		local goal = tagged().layout.goal.frame
 		-- A knocked-down defender beside the ring's approach: the ball touches them instead of being caught.
 		local defender = rigs[2]
-		defender:SetAttribute(Attributes.KnockedDown, true)
+		defender:SetAttribute(Attributes.KnockedDown, "Hit")
 		local approach = goal.Position - goal.LookVector * 2
 		defender:PivotTo(CFrame.new(approach + goal.RightVector * 3))
 		BallService:throw("1", goal.LookVector * 60)
@@ -323,7 +323,7 @@ describe("A match on the generated arena", function()
 		lineUp(rigs[1], rigs[2], 4)
 		ActionService:request("1", { action = "Tackle" })
 		frames(0.1)
-		expect(rigs[2]:GetAttribute(Attributes.KnockedDown)).toBe(true)
+		expect(rigs[2]:GetAttribute(Attributes.KnockedDown)).toBe("Hit")
 		expect(rigs[1]:GetAttribute(Attributes.Action)).toBe("Tackle")
 		for _ = 1, 60 do
 			if #eventsNamed("KickoffStarted") == 2 then

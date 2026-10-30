@@ -85,9 +85,10 @@ describe("Config defaults", function()
 				airMultiplier = 0.4,
 				followUp = { action = "Dive", from = 0.1, to = 1 },
 			},
-			-- Only as the Tackle's follow-up, ending on the belly at the first touch of the ground (#221, #240).
+			-- Only as the Tackle's follow-up, a 0.7 s glide, then on the belly at the first touch of the ground until
+			-- the slide stops (#221, #240, #242).
 			Dive = {
-				phases = { windup = 0, active = 0.35, recovery = 0.9 },
+				phases = { windup = 0, active = 0.7, recovery = 0.9 },
 				cooldown = 0.8,
 				requires = requires("without"),
 				effect = "Knockdown",
@@ -95,7 +96,7 @@ describe("Config defaults", function()
 				hit = { range = 11, coneDeg = 50, aimUpDeg = 0, knockdownSeconds = 1.5 },
 				-- 72 km/h along the way, or a faster skater's own speed (#241).
 				motion = { diveSpeed = 60 },
-				landing = { knockdownSeconds = 1.5 },
+				landing = { knockdownSeconds = 1.5, stopSpeed = 2 },
 			},
 			Dodge = {
 				phases = { windup = 0, active = 0.3, recovery = 0.2 },
@@ -861,6 +862,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { Dive = { landing = { knockdownSeconds = 0 } } },
 				message = "Actions.Dive.landing.knockdownSeconds: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Dive = { landing = { stopSpeed = 0 } } },
+				message = "Actions.Dive.landing.stopSpeed: must be > 0 (got 0)",
 			},
 			{
 				overrides = { Dodge = { hit = { range = 1, coneDeg = 1, aimUpDeg = 0, knockdownSeconds = 1 } } },

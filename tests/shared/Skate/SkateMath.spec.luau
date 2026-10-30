@@ -395,6 +395,24 @@ describe("SkateMath pushes and knockdowns", function()
 		expect(flying.velocity.X).toBeCloseTo(0, 6)
 	end)
 
+	-- The owner (#242): RC's dive glides ~0.3 s at ~70 km/h before the belly slide (Video 6).
+	it("glides a diver on the ground, slowed by friction and drag only, ignoring the stick, pump and jump", function()
+		local s = skater(Vector3.new(0, 0, -60))
+		s:step(input({ move = Vector3.xAxis, pump = true, jump = true, diving = true }), ground(), 0.5)
+		expect(s.mode).toBe("Grounded")
+		Fixtures.expectNear(s.forward, -Vector3.zAxis)
+		-- 60 − (4 + 0.02 × 60) × 0.5: no coastDecel, no knockdownDecel.
+		expect(s.velocity.Magnitude).toBeCloseTo(57.4, 2)
+	end)
+
+	-- A knockdown locks everything (SkateInput), a dive included.
+	it("slides a knocked-down diver as any knocked-down skater", function()
+		local s = skater(Vector3.new(0, 0, -80))
+		s:step(input({ knockedDown = true, diving = true }), ground(), 0.5)
+		-- 80 − (4 + 0.02 × 80) × 0.5 − 75 × 0.5
+		expect(s.velocity.Magnitude).toBeCloseTo(39.7, 2)
+	end)
+
 	it("stops a knocked-down skater at zero, never backwards", function()
 		local s = skater(Vector3.new(0, 0, -10))
 		s:step(input({ knockedDown = true }), ground(), 1)
@@ -484,7 +502,7 @@ describe("SkateMath lunges", function()
 		local function dived(speed: number, seconds: number): SkateMath.Skater
 			local s = airborne(LINE * speed)
 			for _ = 1, math.round(seconds * 60) do
-				s:step(input({ diving = true, knockedDown = true }), ground(FLAT, 0, false), 1 / 60)
+				s:step(input({ diving = true }), ground(FLAT, 0, false), 1 / 60)
 			end
 			return s
 		end
@@ -497,7 +515,7 @@ describe("SkateMath lunges", function()
 		-- Rising straight up a wall as they leave it: nothing of that goes down the line, so they start from rest on
 		-- it (one step's pull, 67.1 / 60 = 1.118, less drag).
 		local rising = airborne(Vector3.new(0, 60, 0))
-		rising:step(input({ diving = true, knockedDown = true }), ground(FLAT, 0, false), 1 / 60)
+		rising:step(input({ diving = true }), ground(FLAT, 0, false), 1 / 60)
 		Fixtures.expectNear(rising.velocity, LINE * 1.118)
 		-- Not diving: gravity straight down, as ever.
 		local falling = airborne(Vector3.new(0, 0, -60))

@@ -29,6 +29,17 @@ local LOCKED: Types.SkateInput = table.freeze({
 	knockedDown = true,
 	diving = false,
 })
+-- What a diver's input becomes until their touchdown's knockdown (#242): the same, but they glide, slowed by friction
+-- and drag only, and in the air fly down the fall line (#241).
+local GLIDING: Types.SkateInput = table.freeze({
+	move = Vector3.zero,
+	pump = false,
+	brake = false,
+	jump = false,
+	draftAccel = 0,
+	knockedDown = false,
+	diving = true,
+})
 
 local SkateMath = {}
 SkateMath.__index = SkateMath
@@ -189,9 +200,11 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	velocity = heading * speed + acceleration * dt
 	speed = velocity.Magnitude
 	local direction = if speed > EPSILON then velocity / speed else heading
-	-- Friction and drag, with more slowing on top for a knocked-down skater or one pressing nothing (#215).
+	-- Friction and drag, with more slowing on top for a knocked-down skater or one pressing nothing (#215); a diver
+	-- glides (#242).
 	local extra = if input.knockedDown
 		then movement.knockdownDecel
+		elseif input.diving then 0
 		elseif stick == 0 and not input.pump and not brake then movement.coastDecel
 		else 0
 	speed = math.max(0, speed - (movement.rollingFriction + extra + movement.airDrag * speed) * dt)
@@ -220,11 +233,11 @@ end
 
 -- Ballistic: gravity and drag, a little horizontal steering, and turning back upright. A diver flies down the fall
 -- line instead, gravity's pull along it speeding them up (#241).
-local function stepAirborne(self: Skater, input: Types.SkateInput, diving: boolean, dt: number)
+local function stepAirborne(self: Skater, input: Types.SkateInput, dt: number)
 	local movement = self._movement
 	local worldUp = self._worldUp
 	local velocity = self.velocity
-	if diving then
+	if input.diving then
 		local line = fallLine(self)
 		velocity = line * (math.max(velocity:Dot(line), 0) + self._linePull * dt)
 	else
@@ -368,7 +381,7 @@ local function resolveMode(self: Skater, input: Types.SkateInput, ground: Types.
 end
 
 function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Ground, dt: number)
-	local controls = if input.knockedDown then LOCKED else input
+	local controls = if input.knockedDown then LOCKED elseif input.diving then GLIDING else input
 	local travel, turn = 0, 0
 	if self.mode == "Grounded" and ground.hit then
 		travel, turn = measure(self, ground.normal, dt)
@@ -379,7 +392,7 @@ function SkateMath.step(self: Skater, input: Types.SkateInput, ground: Types.Gro
 		stepGrounded(self, controls, ground, dt)
 	else
 		forget(self)
-		stepAirborne(self, controls, input.diving, dt)
+		stepAirborne(self, controls, dt)
 	end
 end
 

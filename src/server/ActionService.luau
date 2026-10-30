@@ -3,14 +3,15 @@
 -- own ActionRunner and applied here, or refused with ActionRejected: a follow-up (the Tackle's Dive) only inside its
 -- window after a Tackle the server itself started. Throws and passes go through BallService. Strikes are judged each
 -- frame against the server's positions and knock down the nearest opponent they reach; every strike
--- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns, the
--- running action (until its recovery) and calls for a pass show as character attributes every client reads. A
--- knocked-down player whose client asks to get up (GetUp, sent when they move) is up once Actions.getUpAfter has passed
--- since the knockdown, never sooner; one who never asks, after the hit's knockdownSeconds. Each frame the server casts
--- its own ray along each skater's down: a hard landing (Skate/Fall) knocks them down, and so does a diver's first touch
--- of the ground past the dive's active phase (an action with a landing ends on the belly; nothing else starts
--- meanwhile). No one scores those knockdowns. A throw keeps no more of the carrier's speed than skating allows, and no
--- more charge than the ball was held for.
+-- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns (each with
+-- its kind, Attributes.Knockdown), the running action (until its recovery) and calls for a pass show as character
+-- attributes every client reads. Each frame the server casts its own ray along each skater's down: a hard landing
+-- (Skate/Fall) knocks them down, and so does a diver's first touch of the ground past the dive's active phase (an
+-- action with a landing ends on the belly; nothing else starts meanwhile). No one scores those knockdowns. A player
+-- knocked down by a strike or a hard landing whose client asks to get up (GetUp, sent when they move) is up once
+-- Actions.getUpAfter has passed since the knockdown, never sooner; a diver is up once their root slides slower than the
+-- landing's stopSpeed along the ground, whatever they ask (#242); anyone, at the latest after the knockdown's seconds.
+-- A throw keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held for.
 -- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
 -- sum of the frames it is stepped, so a request between frames counts as the last frame's.
 
@@ -54,6 +55,9 @@ type Record = {
 	-- When the last knockdown began (the service's clock), and whether they asked to get up since.
 	downSince: number,
 	getUp: boolean,
+	-- A diver's own knockdown: up once their slide is slower than this (their landing's stopSpeed); nil for a knockdown
+	-- that Get Up ends.
+	stopSpeed: number?,
 	-- The running action with a landing, until their touchdown knocks them down: nothing else starts meanwhile.
 	landing: Config.ActionName?,
 	-- Their fall, as the server's ray sees it each frame.
@@ -138,6 +142,7 @@ local function recordOf(self: ActionService, player: PlayerId): Record
 			knockdownLeft = 0,
 			downSince = 0,
 			getUp = false,
+			stopSpeed = nil,
 			landing = nil,
 			fall = Fall.new(self._config.Movement),
 			shown = nil,
@@ -209,21 +214,30 @@ local function addKnockdown(self: ActionService, attacker: PlayerId, victim: Pla
 	list[index] = knockdown
 end
 
--- Down for `seconds`: their action (a dive's landing with it) stops without a refund, and a carried ball drops with
--- their momentum. A request to get up made before it no longer counts. Only a knockdown someone dealt is listed for the
--- rules; a diver's own touchdown has no `attacker`.
-local function knockDown(self: ActionService, attacker: PlayerId?, victim: PlayerId, seconds: number)
+-- Down for `seconds` as `kind`: their action (a dive's landing with it) stops without a refund, and a carried ball
+-- drops with their momentum. A request to get up made before it no longer counts. A diver's own touchdown passes its
+-- landing's `stopSpeed`. Only a knockdown someone dealt is listed for the rules; a diver's own touchdown and a hard
+-- landing have no `attacker`.
+local function knockDown(
+	self: ActionService,
+	attacker: PlayerId?,
+	victim: PlayerId,
+	kind: Attributes.Knockdown,
+	seconds: number,
+	stopSpeed: number?
+)
 	local record = recordOf(self, victim)
 	record.knockdownLeft = seconds
 	record.downSince = self._now
 	record.getUp = false
+	record.stopSpeed = stopSpeed
 	record.landing = nil
 	local running: Config.ActionName? = record.runner.action
 	if running ~= nil then
 		record.runner:cancel(running, false)
 	end
 	show(self, victim, record)
-	setAttribute(self, victim, Attributes.KnockedDown, true)
+	setAttribute(self, victim, Attributes.KnockedDown, kind)
 	local holder = self._holderOf[victim]
 	if holder ~= nil and self._ball.state.carrier == victim then
 		self._ball:drop(holder.root.AssemblyLinearVelocity)
@@ -231,6 +245,22 @@ local function knockDown(self: ActionService, attacker: PlayerId?, victim: Playe
 	if attacker ~= nil then
 		addKnockdown(self, attacker, victim)
 	end
+end
+
+-- Whether a knocked-down player is up before their knockdown's seconds run out: a diver once their root slides slower
+-- than the landing's stopSpeed along the ground (the hover's pull off it is no slide), anyone else once they asked to
+-- get up and Actions.getUpAfter has passed since the knockdown.
+local function upEarly(self: ActionService, player: PlayerId, record: Record): boolean
+	local stopSpeed = record.stopSpeed
+	if stopSpeed == nil then
+		return record.getUp and self._now - record.downSince >= self._config.Actions.getUpAfter
+	end
+	local holder = self._holderOf[player]
+	if holder == nil then
+		return false
+	end
+	local root = holder.root
+	return Vectors.alongSurface(root.AssemblyLinearVelocity, root.CFrame.UpVector).Magnitude < stopSpeed
 end
 
 -- The server's own look at the ground under a skater, once a frame: a ray along their down as their skating casts it
@@ -255,9 +285,10 @@ local function lookDown(self: ActionService, holder: Holder)
 	local landing: Config.ActionName? = record.landing
 	local runner = record.runner
 	if hard then
-		knockDown(self, nil, player, movement.hardLanding.knockdownSeconds)
+		knockDown(self, nil, player, "Fall", movement.hardLanding.knockdownSeconds)
 	elseif landing ~= nil and (runner.action ~= landing or runner.phase == "Recovery") then
-		knockDown(self, nil, player, (self._config.Actions[landing].landing :: Config.Landing).knockdownSeconds)
+		local settings = self._config.Actions[landing].landing :: Config.Landing
+		knockDown(self, nil, player, "Dive", settings.knockdownSeconds, settings.stopSpeed)
 	end
 end
 
@@ -417,7 +448,8 @@ local ActionService: ActionService = {
 		show(self, player, record)
 	end,
 
-	-- Counted at the next step: the next knockdown forgets a request made on their feet.
+	-- Counted at the next step (upEarly): the next knockdown forgets a request made on their feet, and a diver's own
+	-- knockdown ignores it.
 	getUp = function(self: ActionService, player: PlayerId)
 		local record = self._records[player]
 		if record ~= nil then
@@ -429,8 +461,7 @@ local ActionService: ActionService = {
 		self._now += dt
 		table.clear(self._knockdowns)
 		refreshHolders(self)
-		local actions = self._config.Actions
-		local window = actions.callPassWindow
+		local window = self._config.Actions.callPassWindow
 		local carrier = self._ball.state.carrier
 		for player, at in self._calls do
 			if self._now - at > window or player == carrier then
@@ -443,8 +474,7 @@ local ActionService: ActionService = {
 			record.runner:step(dt)
 			if record.knockdownLeft > 0 then
 				record.knockdownLeft -= dt
-				local mayGetUp = record.getUp and self._now - record.downSince >= actions.getUpAfter
-				if record.knockdownLeft <= 0 or mayGetUp then
+				if record.knockdownLeft <= 0 or upEarly(self, player, record) then
 					record.knockdownLeft = 0
 					setAttribute(self, player, Attributes.KnockedDown, nil)
 				end
@@ -463,7 +493,7 @@ local ActionService: ActionService = {
 			if victim ~= nil then
 				record.hit = nil
 				record.struck = true
-				knockDown(self, player, victim, record.hitSeconds)
+				knockDown(self, player, victim, "Hit", record.hitSeconds)
 			end
 		end
 		return self._knockdowns

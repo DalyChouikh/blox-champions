@@ -175,7 +175,7 @@ local function poseOne(self: PoseController, tracked: Tracked, dt: number)
 		input.lunging = action ~= nil and self._config.Actions[action].pose == "Lunge"
 		input.airPosing = character:GetAttribute(Attributes.AirPosing) == true
 	end
-	input.knockedDown = character:GetAttribute(Attributes.KnockedDown) == true
+	input.knockedDown = character:GetAttribute(Attributes.KnockedDown) ~= nil
 	local playerId = tracked.playerId
 	input.carrying = playerId ~= nil and playerId == self._carrier.carrier
 

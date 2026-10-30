@@ -5,7 +5,7 @@ export type Mode = "Grounded" | "Airborne" | "Attached"
 
 -- One step's input: the stick as a world direction from the camera (length 0..1), the held buttons, a jump pressed
 -- since the last step, the draft's pull, whether the skater is knocked down (which locks all the rest), and whether
--- they dive (a diver in the air flies down the fall line, #241).
+-- they dive (which locks the rest too: a diver glides, and in the air flies down the fall line, #241, #242).
 export type SkateInput = {
 	move: Vector3,
 	pump: boolean,
