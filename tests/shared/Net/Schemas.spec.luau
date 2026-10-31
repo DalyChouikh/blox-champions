@@ -53,4 +53,13 @@ describe("Schemas", function()
 			expect(#Schemas.GetUp(payload, "GetUp") > 0).toBe(true)
 		end
 	end)
+
+	-- #310: the server judges whether the sender may switch, so the request carries nothing.
+	it("accepts a request to switch team with nothing in it, and nothing else", function()
+		expect(Schemas.SwitchTeam({}, "SwitchTeam")).toEqual({})
+		local malformed: { any } = { { team = "Blue" }, "x", true }
+		for _, payload in malformed do
+			expect(#Schemas.SwitchTeam(payload, "SwitchTeam") > 0).toBe(true)
+		end
+	end)
 end)

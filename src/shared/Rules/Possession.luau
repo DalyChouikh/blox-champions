@@ -10,7 +10,8 @@ Possession.__index = Possession
 
 type Fields = {
 	team: Team.Team?,
-	-- Always a player of `team`: anyone who picks up the ball either is on it or makes it theirs.
+	-- Who picked the ball up last for `team`: anyone who picks it up either is on it or makes it theirs. They may
+	-- have left or switched team since; a ball they threw still counts for `team`, its goal for them (Q119, #310).
 	lastHolder: Types.PlayerId?,
 }
 

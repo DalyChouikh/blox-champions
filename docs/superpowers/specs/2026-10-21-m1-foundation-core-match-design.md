@@ -195,7 +195,7 @@ A single pure state machine composing the modules above. States: `Waiting → Ki
 
 ### 5.4 After the match
 
-`MatchEnded` shows the end screen for `Match.postMatchSeconds` = 15, then a new match starts with auto-balanced teams.
+`MatchEnded` shows the end screen for `Match.postMatchSeconds` = 15, then a new match starts with everyone on the team they last played for (§10.1).
 
 ---
 
@@ -337,6 +337,7 @@ Tackle = {
 | Pass / Call Pass | R | ButtonY | Context button |
 | Attach (hold) | F | ButtonL1 | Appears only when behind a teammate |
 | Score tab | Tab | ButtonSelect | HUD button |
+| Switch team (while the score tab is open, #310) | T | DPadUp | The tab's button |
 
 The gamepad layout mirrors Roller Champions' console layout (Ball Focus / Charge Throw on L2, Pump R2, Brake R1, Jump, Tackle, Uppercut, Call Pass, Grapple on L1).
 
@@ -443,6 +444,8 @@ The arena follows the M1 overhaul's Arena spec (`docs/superpowers/specs/2026-10-
 ### 10.1 Teams (`server/TeamService`)
 
 - Teams **Blue** and **Orange** (colors in `Config/UI`). Max `Match.teamSize = 3` per team; joining players are auto-balanced (smaller team first; ties → random). Extra players spectate until a slot opens.
+- **Switch team (#310):** where the mode offers it (`Match.teamSwitching = true`: normal games; ranked, M7, never), a seated player switches to the other team from the score tab's **Switch team** button (§11.1): its key (`Input.switchTeam = { T, DPadUp }`, pressed while the tab is open) or a tap on touch sends `SwitchTeam`. The server (`Rules/TeamSwitch.allowed`) moves them whenever the other team has a free seat, even if that leaves the teams uneven, and never while they hold the ball. They go to the end of their new team's seat order, keep their numbers (the team scores keep each goal where it was scored), and stand on their new team's spawn at once, started over as at a kickoff (no action, knockdown or call left). A spectator waiting for the seat they freed takes it. A ball they threw before still counts for the team they left, and its goal for them; there is no cooldown. *The owner's issue list: "Team Switching"; Q97 ("only offered in normal games, and yes they switch by choice, and shouldn't have auto balance ... we should always keep the same team for next match, even if the other team is less players"), Q104 (any free seat, not with the ball, re-spawn at once), Q117 (a key on the button: on PC the tab shows only while Tab is held, with the mouse locked), Q118 (greyed while a switch can't happen), Q119 (a throw then a switch counts as earned), Q120 (no cooldown). A leaver replaced by a bot is M2's (from then a bot's seat counts as free).*
+- **The next match keeps everyone's team** (#310, Q97), in seat order, even when the teams are uneven: nothing balances them. Who left the last match is forgotten, and its spectators join as newcomers (the smaller team first).
 - A match starts when `Match.minPlayersToStart = 1` players are present (solo testing allowed; bots arrive in M2).
 
 ### 10.2 Remotes (`Net/Remotes` — every remote is defined here only)
@@ -453,6 +456,7 @@ The arena follows the M1 overhaul's Arena spec (`docs/superpowers/specs/2026-10-
 | `ActionRejected` | server → client | `{ action: string }` | The server refused the action; the client cancels it (§13). |
 | `SkateState` | client → server | `{ pump: boolean, brake: boolean, airPose: boolean }` | Sent when one changes; schema-validated; rate-limited per player (`Network.maxSkateStatesPerSecond = 20`); other clients pose from the attributes the server sets. `airPose` stays true for `Network.posedLandingTolerance` after a touchdown in the Air Pose, or until the knockdown (§7.2 Hard landing). |
 | `GetUp` | client → server | `{}` | A knocked-down player moved (§8.2), once per knockdown; schema-validated; rate-limited per player (`Network.maxGetUpsPerSecond = 2`: one per knockdown, each at least `getUpAfter` long). |
+| `SwitchTeam` | client → server | `{}` | The player asks to switch team (§10.1); schema-validated; rate-limited per player (`Network.maxTeamSwitchesPerSecond = 1`: no cooldown, Q120). |
 | `MatchSnapshot` | server → client | full match state | Sent on join and on resync. |
 | `RuleEvents` | server → client | ordered batch of §4.7 events | Drives HUD and feed. |
 | `BallCarrier` | server → client | `{ carrier: Player? }` | Ball physics replicates natively when loose. |
@@ -469,7 +473,7 @@ Samples each character every `Network.guardSampleSeconds = 0.25`. If the upward 
 
 React Luau (Roblox's `roblox/react` 17.3.13 + `roblox/react-roblox` 17.3.13, A5) components rendered from a client `HudStore` that applies `MatchSnapshot` and `RuleEvents`.
 
-- **Scoreboard (top center):** Blue score | timer | Orange score; `Match.pointsToWin` pips per team; ball-carrier name; **lap bar** for the possessing team — 4 segments per lap, "Lap n/4" until the goal opens, then "Streak n/12"; glows while the goal is open.
+- **Scoreboard (top center):** Blue score | timer | Orange score; `Match.pointsToWin` pips per team; ball-carrier name; **lap bar** for the possessing team — a segment per gate, filled for each gate crossed this lap, labelled "Lap n" (`UI.text.lap`, the laps of the streak) until the goal opens, then "Lap n: goal +p" (`UI.text.goalWorth`, what a goal is worth now, §4.2; corrected in #310: it read "Streak n/12" from before #305); glows while the goal is open.
 - **Banners (center):** the kickoff's 5-4-3-2-1 inside a ring (`UI.hud.countdown`), then GO <TEAM> TEAM! (`UI.text.go`), both in the player's own team colour (the owner, Q108-Q110, #307: RC's count is on the screen, not in the goal ring), GOAL!, DENIED! (on a save), 60/30 SECONDS, LAST CHANCE, OVERTIME.
 - **Event feed (bottom center):** possession changes, laps, goal open, scores.
 - **World UI:** ball indicator (§9.4), next-gate arrow for the carrier, call-pass hand over teammates, team-colored name tags.
@@ -477,7 +481,7 @@ React Luau (Roblox's `roblox/react` 17.3.13 + `roblox/react-roblox` 17.3.13, A5)
 - **Speedometer (bottom right):** the speed along the surface, or across the ground in the air (§7.2).
 - **Get Up prompt (bottom center, above the feed):** while the local skater is knocked down by a strike or a hard landing (not a diver's own slide), the movement keys as the device shows them (the keyboard's first composite, up, left, down, right, named by the player's own layout, e.g. Z Q S D on AZERTY; the gamepad's stick glyph; "Move" on touch) and "Get Up" (§8.2).
 - **Mobile controls:** laid out from `Config/Input`; context buttons appear only when usable.
-- **Score tab** (§6.4) and **end screen** (winner banner, or "DRAW" in the HUD's text colour; MVP card, team totals).
+- **Score tab** (§6.4) and **end screen** (winner banner, or "DRAW" in the HUD's text colour; MVP card, team totals). Under the score tab's table, where the mode offers switching and the match lists the player, a **Switch team** row (`UI.text.switchTeam`): its key as the device shows it (none on touch, where the row is tapped), greyed (`UI.hud.dimTransparency`) while a switch can't happen (§10.1). Not on the end screen's tab.
 
 ### 11.2 Text and colors
 

@@ -765,6 +765,41 @@ describe("ActionService", function()
 		expect(#fakeNet.sent).toBe(0)
 	end)
 
+	-- A switch of team (#310) starts the switcher over as a kickoff does, leaving everyone else as they are.
+	it("clears one player's action, knockdown and call", function()
+		local a, d = blue[1], blue[2]
+		local b = orange[1]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(0, 0, -3))
+		ActionService:request(a, { action = "Tackle" })
+		ActionService:request(d, { action = "CallPass" })
+		expect(advance(0.1)).toEqual({ `{a}>{b}` })
+		expect(attribute(b, Attributes.KnockedDown)).never.toBeNil()
+		ActionService:resetPlayer(b)
+		expect(attribute(b, Attributes.KnockedDown)).toBeNil()
+		expect(attribute(a, Attributes.Action)).toBe("Tackle")
+		expect(attribute(d, Attributes.CallingPass)).never.toBeNil()
+		ActionService:resetPlayer(d)
+		expect(attribute(d, Attributes.CallingPass)).toBeNil()
+		ActionService:resetPlayer(a)
+		expect(attribute(a, Attributes.Action)).toBeNil()
+		ActionService:request(b, { action = "Uppercut" })
+		ActionService:request(a, { action = "Tackle" })
+		expect(#fakeNet.sent).toBe(0)
+	end)
+
+	it("forgets the call of a player it clears, so it steers no pass", function()
+		local a, b = blue[1], blue[2]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(0, 0, -40))
+		giveBall(a)
+		ActionService:request(b, { action = "CallPass" })
+		ActionService:resetPlayer(b)
+		ActionService:request(a, { action = "Pass", aim = Vector3.xAxis })
+		local toCaller = (Fixtures.root(rigs[b]).Position - BallService.part.Position).Unit
+		expect(BallService.part.AssemblyLinearVelocity.Unit:Dot(toCaller)).toBeLessThan(0.5)
+	end)
+
 	it("forgets a player who leaves, and starts a respawned character clean", function()
 		local a, b = blue[1], orange[1]
 		stand(a, Vector3.zero)
