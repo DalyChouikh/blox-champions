@@ -607,13 +607,18 @@ describe("MatchEngine players", function()
 		engine:tick(1.5)
 		expectEvents(engine, {})
 		expect(engine:snapshot().possessingTeam).toBe("Blue")
-		local departed: Types.PlayerStats? = nil
-		for _, entry in engine:stats().players do
-			if entry.player == "O1" then
-				departed = entry
+		-- Off the score tab (#309) until they return, with their stats.
+		local function lineOf(player: string): Types.PlayerStats?
+			for _, entry in engine:stats().players do
+				if entry.player == player then
+					return entry
+				end
 			end
+			return nil
 		end
-		expect(departed).toMatchObject({ present = false, score = 10 })
+		expect(lineOf("O1")).toBeNil()
+		engine:addPlayer("O1", "Orange")
+		expect(lineOf("O1")).toMatchObject({ score = 10 })
 	end)
 end)
 

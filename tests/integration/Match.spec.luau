@@ -565,9 +565,10 @@ describe("A match on the generated arena", function()
 			local before = #firedNamed(Remotes.names.MatchSnapshot)
 			TeamService:leave(players[2])
 			expect(#firedNamed(Remotes.names.MatchSnapshot)).toBe(before + 1)
+			-- The leaver's row goes at once (#309); their name stays, for the feed.
 			local left = lastToEveryone()
 			expect(left.names["2"]).toBe("Name2")
-			expect(#left.match.stats.players).toBe(2)
+			expect(#left.match.stats.players).toBe(1)
 		end
 	)
 

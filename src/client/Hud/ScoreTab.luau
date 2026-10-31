@@ -1,8 +1,8 @@
 --!strict
 -- The score tab (spec §6.4, §11.1), in the middle of the HUD's stage while its key is held (or its touch button toggled
--- on), solid: every player who played this match, by team, then score (StatsTable). It draws over the end screen, which
--- it opens over on touch (Style.above). It shrinks to fit a small screen, as tall as its rows make it. A plain function
--- of its props.
+-- on), solid: every player still in the match (a leaver's row goes at once, #309), by team, then score (StatsTable).
+-- It draws over the end screen, which it opens over on touch (Style.above). It shrinks to fit a small screen, as tall
+-- as its rows make it. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

@@ -1,6 +1,7 @@
 --!strict
 -- Team scores and the score tab (spec §6.1, §6.4, §6.5), kept by applying the engine's events in order, so
--- the match score has a single source of truth. Players who leave keep their stats.
+-- the match score has a single source of truth. A player who leaves keeps their stats, off the score tab, until
+-- they return (#309).
 
 local Config = require(script.Parent.Parent.Config)
 local Team = require(script.Parent.Team)
@@ -8,13 +9,16 @@ local Types = require(script.Parent.Types)
 
 type PlayerStats = Types.PlayerStats
 
+-- A player's stats and whether they are still in the match: a leaver's entry waits for their return.
+export type Entry = { stats: PlayerStats, present: boolean }
+
 local ScoreKeeper = {}
 ScoreKeeper.__index = ScoreKeeper
 
 type Fields = {
 	_config: Config.GameConfig,
 	_scores: { [Team.Team]: number },
-	_players: { [Types.PlayerId]: PlayerStats },
+	_players: { [Types.PlayerId]: Entry },
 	_joined: number,
 }
 
@@ -53,12 +57,12 @@ local function ranksAbove(a: PlayerStats, b: PlayerStats): boolean
 	return a.joinOrder < b.joinOrder
 end
 
-local function entry(self: ScoreKeeper, player: Types.PlayerId): PlayerStats
-	local stats = self._players[player]
-	if stats == nil then
+local function entry(self: ScoreKeeper, player: Types.PlayerId): Entry
+	local known = self._players[player]
+	if known == nil then
 		error(`ScoreKeeper: unknown player "{player}"`, 0)
 	end
-	return stats
+	return known
 end
 
 function ScoreKeeper.new(config: Config.GameConfig): ScoreKeeper
@@ -80,23 +84,26 @@ function ScoreKeeper.addPlayer(self: ScoreKeeper, player: Types.PlayerId, team: 
 		if existing.present then
 			error(`ScoreKeeper: player "{player}" is already in the match`, 0)
 		end
-		if existing.team ~= team then
-			error(`ScoreKeeper: player "{player}" played for {existing.team} and can only return to {existing.team}`, 0)
+		local played: Team.Team = existing.stats.team
+		if played ~= team then
+			error(`ScoreKeeper: player "{player}" played for {played} and can only return to {played}`, 0)
 		end
 		existing.present = true
 		return
 	end
 	self._joined += 1
 	self._players[player] = {
-		player = player,
-		team = team,
-		joinOrder = self._joined,
+		stats = {
+			player = player,
+			team = team,
+			joinOrder = self._joined,
+			score = 0,
+			goals = 0,
+			assists = 0,
+			saves = 0,
+			steals = 0,
+		},
 		present = true,
-		score = 0,
-		goals = 0,
-		assists = 0,
-		saves = 0,
-		steals = 0,
 	}
 end
 
@@ -105,7 +112,7 @@ function ScoreKeeper.removePlayer(self: ScoreKeeper, player: Types.PlayerId)
 end
 
 -- The live entry (read-only by convention), or nil for a player never added.
-function ScoreKeeper.player(self: ScoreKeeper, player: Types.PlayerId): PlayerStats?
+function ScoreKeeper.player(self: ScoreKeeper, player: Types.PlayerId): Entry?
 	return self._players[player]
 end
 
@@ -113,25 +120,25 @@ function ScoreKeeper.apply(self: ScoreKeeper, event: Types.Event)
 	local points = self._config.Scoring.points
 	if event.name == "GoalScored" then
 		self._scores[event.team] += event.points
-		local scorer = entry(self, event.scorer)
+		local scorer = entry(self, event.scorer).stats
 		scorer.score += points.goal
 		scorer.goals += 1
 	elseif event.name == "AssistAwarded" then
-		local assister = entry(self, event.player)
+		local assister = entry(self, event.player).stats
 		assister.score += points.assist
 		assister.assists += 1
 	elseif event.name == "SaveMade" then
-		local saver = entry(self, event.player)
+		local saver = entry(self, event.player).stats
 		saver.score += points.save
 		saver.saves += 1
 	elseif event.name == "Steal" then
-		local stealer = entry(self, event.player)
+		local stealer = entry(self, event.player).stats
 		stealer.score += points.steal
 		stealer.steals += 1
 	elseif event.name == "LapCompleted" then
-		entry(self, event.holder).score += points.lapCompleted
+		entry(self, event.holder).stats.score += points.lapCompleted
 	elseif event.name == "TackleKnockdown" then
-		entry(self, event.attacker).score += points.tackleKnockdown
+		entry(self, event.attacker).stats.score += points.tackleKnockdown
 	end
 end
 
@@ -139,10 +146,13 @@ function ScoreKeeper.teamScores(self: ScoreKeeper): { [Team.Team]: number }
 	return table.clone(self._scores)
 end
 
+-- The score tab: every player still in the match (#309), by team, then score.
 function ScoreKeeper.stats(self: ScoreKeeper): Types.MatchStats
 	local players: { PlayerStats } = {}
-	for _, stats in self._players do
-		table.insert(players, table.clone(stats))
+	for _, known in self._players do
+		if known.present then
+			table.insert(players, table.clone(known.stats))
+		end
 	end
 	table.sort(players, scoreTabOrder)
 	return { scores = self:teamScores(), players = players }
@@ -151,8 +161,9 @@ end
 -- The best present player of the winning `team`, or of both teams after a draw (nil: ruling, #306).
 function ScoreKeeper.mvp(self: ScoreKeeper, team: Team.Team?): Types.PlayerId?
 	local best: PlayerStats? = nil
-	for _, stats in self._players do
-		local counts = stats.present and (team == nil or stats.team == team)
+	for _, known in self._players do
+		local stats = known.stats
+		local counts = known.present and (team == nil or stats.team == team)
 		if counts and (best == nil or ranksAbove(stats, best)) then
 			best = stats
 		end

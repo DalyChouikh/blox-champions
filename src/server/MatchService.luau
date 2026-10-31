@@ -6,7 +6,7 @@
 -- and call at a kickoff, placing characters on their spawns, opening and closing the goal — and sends them to clients,
 -- each frame's batch followed by the match's snapshot, which clients draw from, both marked with the frame's number. A
 -- snapshot also goes to everyone whenever a seat changes, and to each player who joins, marked with the last frame's
--- number; it names every player in the server and each who left during the match, so the score tab can name them. It
+-- number; it names every player in the server and each who left during the match, so the feed can still name them. It
 -- keeps the ball dead whenever play is not live, so the ball is only ever carried by the engine's last holder. After a
 -- match ends it waits postMatchSeconds and starts the next one with everyone reseated; once every player has left it
 -- starts over.

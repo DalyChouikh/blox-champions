@@ -14,11 +14,11 @@ export type Period = "Regulation" | "LastChance" | "Overtime"
 
 export type SaveKind = "Block" | "Steal"
 
+-- A player's line on the score tab and the end screen. Only players still in the match are listed (#309).
 export type PlayerStats = {
 	player: PlayerId,
 	team: Team,
 	joinOrder: number,
-	present: boolean,
 	score: number,
 	goals: number,
 	assists: number,

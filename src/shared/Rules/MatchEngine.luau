@@ -49,7 +49,7 @@ export type Snapshot = {
 	gateCount: number,
 	nextGate: number,
 	goalOpenFor: Team?,
-	-- The score tab: every player who played this match, by team, then score.
+	-- The score tab: every player still in the match (#309), by team, then score.
 	stats: Types.MatchStats,
 	-- Once the match has ended: the winning team (nil after a draw) and its MVP (nil if none of its players is still
 	-- in the match), as MatchEnded gave them, so a player who joins afterwards sees the result too.
@@ -133,18 +133,18 @@ local function emit(self: MatchEngine, event: Event)
 end
 
 -- An id that was never added is a wiring bug: fail fast.
-local function knownPlayer(self: MatchEngine, player: PlayerId): Types.PlayerStats
-	local stats = self._scores:player(player)
-	if stats == nil then
+local function knownPlayer(self: MatchEngine, player: PlayerId): ScoreKeeper.Entry
+	local known = self._scores:player(player)
+	if known == nil then
 		error(`MatchEngine: unknown player "{player}"`, 0)
 	end
-	return stats
+	return known
 end
 
 -- The player's team, or nil for a player who left.
 local function activeTeam(self: MatchEngine, player: PlayerId): Team?
-	local stats = knownPlayer(self, player)
-	return if stats.present then stats.team else nil
+	local known = knownPlayer(self, player)
+	return if known.present then known.stats.team else nil
 end
 
 local function closeGoal(self: MatchEngine)
