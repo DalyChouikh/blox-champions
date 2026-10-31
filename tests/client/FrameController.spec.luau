@@ -30,7 +30,7 @@ beforeEach(function()
 		SkateController = recorder("skate"),
 		ActionController = recorder("actions"),
 		PoseController = recorder("poses"),
-		BallPull = recorder("ballPull"),
+		BallView = recorder("ballView"),
 		CameraController = recorder("camera"),
 		TouchControls = recorder("touch"),
 		HudStore = recorder("hudStore"),
@@ -43,18 +43,19 @@ beforeEach(function()
 end)
 
 describe("FrameController", function()
-	it("steps the skating, then the actions, then the poses, then a caught ball's pull", function()
+	it("steps the skating, then the actions, then the poses", function()
 		FrameController:step(0.5)
-		expect(order).toEqual({ "skate 0.5", "actions 0.5", "poses 0.5", "ballPull 0.5" })
+		expect(order).toEqual({ "skate 0.5", "actions 0.5", "poses 0.5" })
 	end)
 
 	it(
-		"checks Roblox's overlays, then renders the camera, touch controls, HUD state, HUD, world markers, "
-			.. "arena glow, carrier's beam and name tags before each frame",
+		"checks Roblox's overlays, then draws the ball, then renders the camera, touch controls, HUD state, HUD, "
+			.. "world markers, arena glow, carrier's beam and name tags before each frame",
 		function()
 			FrameController:render(0.25)
 			expect(order).toEqual({
 				"overlays",
+				"ballView 0.25",
 				"camera 0.25",
 				"touch 0.25",
 				"hudStore 0.25",
