@@ -26,7 +26,7 @@ describe("HudState", function()
 	it("starts from a snapshot taken mid-match, names and score tab included", function()
 		local snapshot = Fixtures.matchSnapshot({ secondsLeft = 120.5 })
 		snapshot.names["9"] = "Gone"
-		table.insert(snapshot.match.stats.players, Fixtures.playerStats("9", "Blue", false))
+		table.insert(snapshot.match.stats.players, Fixtures.playerStats("9", "Blue"))
 		local state = HudState.new(config, VIEWER)
 		state:applySnapshot(snapshot)
 		expect(state.names["9"]).toBe("Gone")

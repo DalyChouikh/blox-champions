@@ -6,7 +6,7 @@ local MatchEngine = require(script.Parent.Parent.Rules.MatchEngine)
 local Types = require(script.Parent.Parent.Rules.Types)
 
 -- MatchSnapshot: the server frame it was taken on (after that frame's events), the match, and the name of every player
--- in the server and of each who left during the match (the score tab still lists them).
+-- in the server and of each who left during the match (the feed may still name them).
 export type MatchSnapshot = { frame: number, match: MatchEngine.Snapshot, names: { [Types.PlayerId]: string } }
 
 -- RuleEvents: one server frame's rule events, in order, and that frame's number.

@@ -20,16 +20,15 @@ local folder: Folder
 -- The HUD's area, as the Hud's binding gives it.
 local area: React.Binding<Vector2>, setArea: (Vector2) -> ()
 
--- Ana (Blue) leads with 5, Kai (Blue) has 2, Rex (Orange) 4, and Gone (Blue) left: by team, then score.
+-- Ana (Blue) leads with 5, Kai (Blue) has 2, Rex (Orange) 4: by team, then score.
 local function stats(): Types.MatchStats
-	local ana = Fixtures.playerStats("1", "Blue", true)
+	local ana = Fixtures.playerStats("1", "Blue")
 	ana.score, ana.goals, ana.assists, ana.saves, ana.steals = 5, 2, 1, 0, 3
-	local kai = Fixtures.playerStats("3", "Blue", true)
+	local kai = Fixtures.playerStats("3", "Blue")
 	kai.score = 2
-	local gone = Fixtures.playerStats("9", "Blue", false)
-	local rex = Fixtures.playerStats("2", "Orange", true)
+	local rex = Fixtures.playerStats("2", "Orange")
 	rex.score, rex.saves = 4, 2
-	return { scores = { Blue = 3, Orange = 1 }, players = { ana, kai, gone, rex } }
+	return { scores = { Blue = 3, Orange = 1 }, players = { ana, kai, rex } }
 end
 
 -- The tab of `listed` (default: stats()), mounted.
@@ -78,10 +77,10 @@ describe("ScoreTab", function()
 		expect(cell(frame, "2", "Saves").Text).toBe("2")
 		expect(cell(frame, "2", "Name").TextColor3 == colors.Orange).toBe(true)
 		local orders: { number } = {}
-		for _, id in { "1", "3", "9", "2" } do
+		for _, id in { "1", "3", "2" } do
 			table.insert(orders, (frame:FindFirstChild(id, true) :: Frame).LayoutOrder)
 		end
-		expect(orders).toEqual({ 1, 2, 3, 4 })
+		expect(orders).toEqual({ 1, 2, 3 })
 		-- Solid, and drawn over the end screen (ZIndex 1), which it opens over on touch.
 		expect(frame.BackgroundTransparency).toBe(config.UI.hud.overlayTransparency)
 		expect(frame.ZIndex).toBe(2)
@@ -106,11 +105,11 @@ describe("ScoreTab", function()
 		expect(fit.Scale).toBeCloseTo((323 - 2 * hud.screenMargin) / tall, 4)
 	end)
 
-	it("dims players who left and marks the local player", function()
+	-- The owner (Q96, #309): a leaver is off the tab, so every row it shows is solid.
+	it("shows every row solid and marks the local player", function()
 		local frame = tab()
-		expect(cell(frame, "9", "Name").TextTransparency).toBeCloseTo(config.UI.hud.dimTransparency, 5)
-		expect(cell(frame, "9", "Score").TextTransparency).toBeCloseTo(config.UI.hud.dimTransparency, 5)
 		expect(cell(frame, "3", "Name").TextTransparency).toBe(0)
+		expect(cell(frame, "3", "Score").TextTransparency).toBe(0)
 		expect((frame:FindFirstChild("1", true) :: Frame):FindFirstChild("You") ~= nil).toBe(true)
 		expect((frame:FindFirstChild("3", true) :: Frame):FindFirstChild("You")).toBeNil()
 	end)
