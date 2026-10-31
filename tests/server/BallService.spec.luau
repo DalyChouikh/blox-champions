@@ -37,6 +37,8 @@ local folder: Folder
 -- The arena's parts in a test: what a resting ball lies on (#308) and what no ball may pass through (#311). The rigs
 -- stand outside it, in `folder`, as characters stand outside the real arena.
 local arena: Folder
+-- The server's time the ball's states carry (#316).
+local serverNow = 0
 beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "BallServiceTest"
@@ -44,8 +46,16 @@ beforeEach(function()
 	arena = Instance.new("Folder")
 	arena.Name = "Arena"
 	arena.Parent = folder
+	serverNow = 0
 	-- The drops' spots repeat (#321).
-	BallService:init({ Config = config, ArenaService = { model = arena }, Random = Random.new(1) })
+	BallService:init({
+		Config = config,
+		ArenaService = { model = arena },
+		Random = Random.new(1),
+		ServerClock = function(): number
+			return serverNow
+		end,
+	})
 end)
 afterEach(function()
 	BallService:destroy()
@@ -625,7 +635,7 @@ describe("BallService", function()
 	end)
 
 	-- The owner (Q91, #311): a loose ball within a body length of a skater's middle is theirs at once (the server
-	-- decides; each screen draws the pull into the hand, BallPull).
+	-- decides; each screen draws the pull into the hand, BallView).
 	it(
 		"hands a loose ball to a skater within reach of their middle, on the floor and in the air, never beyond",
 		function()
@@ -754,5 +764,56 @@ describe("BallService", function()
 		BallService:step(1 / 60, {})
 		Fixtures.expectNear(Fixtures.root(rig).Position, ON_TRACK - Vector3.new(0, 4, 0))
 		Fixtures.expectNear(ball.Position, Fixtures.root(rig).CFrame * config.Ball.carryOffset)
+	end)
+end)
+
+-- #316 (Q101): the server-owned ball reached each screen 0.19 s late and unevenly (measured); every screen now draws
+-- the loose ball from the server's own states.
+describe("BallService: the loose ball's state for every screen", function()
+	local FRAME = 1 / 60
+	local REST = config.Network.ballStream.restSeconds
+
+	it("gives the loose ball's state each frame it moves: where, how fast, weightless or not, and when", function()
+		-- Parked until it spawns: nothing to draw.
+		expect(BallService:streamState(FRAME)).toBeNil()
+		BallService:spawn()
+		BallService:step(FRAME, {})
+		serverNow = 42.5
+		local state = BallService:streamState(FRAME) :: BallService.BallStream
+		Fixtures.expectNear(state.position, BallService.part.Position)
+		Fixtures.expectNear(state.velocity, BallService.part.AssemblyLinearVelocity)
+		-- A drop-in falls with its weight cancelled (#321).
+		expect(state.lifted).toBe(true)
+		expect(state.time).toBe(42.5)
+		expect(BallService:streamState(FRAME)).never.toBeNil()
+		BallService:hide()
+		expect(BallService:streamState(FRAME)).toBeNil()
+	end)
+
+	it("gives a resting ball's state every ballStream.restSeconds, and none between", function()
+		spawnResting(true)
+		BallService:step(FRAME, {})
+		local state = BallService:streamState(FRAME) :: BallService.BallStream
+		expect(state.lifted).toBe(false)
+		expect(BallService:streamState(REST / 2)).toBeNil()
+		expect(BallService:streamState(REST / 2)).never.toBeNil()
+		-- Rolling a little slower than Ball.restSpeed is resting; at it, moving.
+		BallService.part.AssemblyLinearVelocity = Vector3.new(config.Ball.restSpeed * 0.99, 0, 0)
+		expect(BallService:streamState(FRAME)).toBeNil()
+		BallService.part.AssemblyLinearVelocity = Vector3.new(config.Ball.restSpeed, 0, 0)
+		expect(BallService:streamState(FRAME)).never.toBeNil()
+	end)
+
+	it("gives nothing while the ball is carried, and its state at once when it is let go, even still", function()
+		spawnResting(true)
+		BallService:step(FRAME, {})
+		expect(BallService:streamState(FRAME)).never.toBeNil()
+		local rig = Fixtures.rig(folder, "A", CFrame.new(ON_TRACK))
+		BallService:step(FRAME, { holder("A", rig) })
+		expect(BallService.state.carrier).toBe("A")
+		expect(BallService:streamState(FRAME)).toBeNil()
+		BallService:dropAt(ON_TRACK)
+		BallService:step(FRAME, {})
+		expect(BallService:streamState(FRAME)).never.toBeNil()
 	end)
 end)

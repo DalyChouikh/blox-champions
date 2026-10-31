@@ -7,7 +7,7 @@
 -- Each frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose body it
 -- touched. Jumps the server makes (a drop-in's start, the snap into a catcher's hand, a carrier it moves, a drop it
 -- places) are never reported as movement, so they can never cross a gate or the ring; each screen draws the catch's
--- flight into the hand itself (Client/BallPull). A pass flies flat, its weight cancelled, and homes on its target,
+-- flight into the hand itself (Client/BallView). A pass flies flat, its weight cancelled, and homes on its target,
 -- until it touches anything or anyone or the target can no longer catch; a drop-in falls steadily the lap's way, its
 -- weight cancelled too, until it touches anything or anyone; then either falls like any ball. A ball passes through
 -- the player who let go of it until it is clear of them. A loose ball slows rolling as a coasting skater does (#311,
@@ -53,6 +53,11 @@ export type BallFrame = {
 	respawned: boolean,
 }
 
+-- The loose ball as every screen needs it (#316): where it is and how fast, whether its weight is cancelled (a pass
+-- or a drop-in flying flat), and the server's time then (workspace:GetServerTimeNow), so each screen carries it on to
+-- its own now.
+export type BallStream = { position: Vector3, velocity: Vector3, lifted: boolean, time: number }
+
 -- Spelled out so the module is a Loader.LoadableModule (whose start is optional) and callers see its methods.
 export type BallService = {
 	name: string,
@@ -78,6 +83,10 @@ export type BallService = {
 	jumped: (self: BallService) -> (),
 	onTouched: (self: BallService, hit: BasePart) -> (),
 	step: (self: BallService, dt: number, holders: { Holder }) -> BallFrame,
+	-- The loose ball's state for every screen, after a step `dt` long (#316): each frame it moves, and every
+	-- Network.ballStream.restSeconds while it rests; nil while it is carried or parked, and between rest states. One
+	-- record, reused: a remote copies what it sends at once.
+	streamState: (self: BallService, dt: number) -> BallStream?,
 	destroy: (self: BallService) -> (),
 	_config: Config.GameConfig,
 	_random: Random,
@@ -120,6 +129,11 @@ export type BallService = {
 	_candidates: { Pickup.Candidate },
 	_catchers: { [PlayerId]: boolean },
 	_frame: BallFrame,
+	_stream: BallStream,
+	-- Since the last state given; endless while carried or parked, so the first loose frame always gives one.
+	_sinceStreamed: number,
+	-- The server's time the states carry (workspace:GetServerTimeNow; a fake in tests).
+	_serverTime: () -> number,
 }
 
 local function newBallPart(config: Config.GameConfig): Part
@@ -229,7 +243,7 @@ local function release(self: BallService)
 end
 
 -- Welds the ball in the carrier's hand at once (Ball.carryOffset in their root's frame): the server decides the catch
--- then, so nobody steals it mid-pull, and each screen draws its flight into the hand (Client/BallPull). A Weld with an
+-- then, so nobody steals it mid-pull, and each screen draws its flight into the hand (Client/BallView). A Weld with an
 -- explicit offset puts it in the same place on every machine; while carried it is weightless and touches nothing.
 local function attach(self: BallService, holder: Holder)
 	endGuidance(self)
@@ -438,8 +452,13 @@ local BallService: BallService = {
 		return false
 	end,
 	_frame = nil :: any,
+	_stream = nil :: any,
+	_sinceStreamed = math.huge,
+	_serverTime = function(): number
+		return 0
+	end,
 
-	-- deps.Random makes the drop-ins' spots repeatable in tests.
+	-- deps.Random makes the drop-ins' spots repeatable in tests; deps.ServerClock replaces the server's time.
 	init = function(self: BallService, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -459,6 +478,11 @@ local BallService: BallService = {
 		self._arenaParams = arenaParams
 		self._groundReach = Vector3.new(0, -2 * config.Ball.radius, 0)
 		self._strandedSeconds = 0
+		self._stream = { position = Vector3.zero, velocity = Vector3.zero, lifted = false, time = 0 }
+		self._sinceStreamed = math.huge
+		self._serverTime = deps.ServerClock or function(): number
+			return workspace:GetServerTimeNow()
+		end
 		self._canPickUp = function(player: PlayerId): boolean
 			return self._catchers[player] == true and self.state:canPickUp(player)
 		end
@@ -635,6 +659,28 @@ local BallService: BallService = {
 		holdDropIn(self, position)
 		slowRolling(self, ground, dt)
 		return frame
+	end,
+
+	streamState = function(self: BallService, dt: number): BallStream?
+		if self._hidden or self.state.status == "Carried" then
+			self._sinceStreamed = math.huge
+			return nil
+		end
+		local part = self.part
+		local velocity = part.AssemblyLinearVelocity
+		self._sinceStreamed += dt
+		-- A pass or a drop-in always moves faster than this.
+		local resting = velocity.Magnitude < self._config.Ball.restSpeed
+		if resting and self._sinceStreamed < self._config.Network.ballStream.restSeconds then
+			return nil
+		end
+		self._sinceStreamed = 0
+		local stream = self._stream
+		stream.position = part.Position
+		stream.velocity = velocity
+		stream.lifted = self._lift.Enabled
+		stream.time = self._serverTime()
+		return stream
 	end,
 
 	destroy = function(self: BallService)
