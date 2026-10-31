@@ -292,6 +292,52 @@ describe("BallService", function()
 		end).toThrow("BallService: only the carrier can throw (carrier: A, thrower: B)")
 	end)
 
+	-- Roll Ball (#312): a throw along the floor. It leaves from the floor under the hand (the hand's spot across the
+	-- root's frame, a radius above the floor the root hovers over), already rolling: its bottom, on the floor, still.
+	it("rolls a carried ball from the floor under the hand, spinning as it rolls, as a jump the server made", function()
+		local rig = caughtBy("A")
+		-- The catch's own jump is spent first: the roll must mark its own.
+		BallService:step(1 / 60, {})
+		-- Turned a quarter left: the root's right is world -Z, its back world +X.
+		rig:PivotTo(CFrame.new(ON_TRACK) * CFrame.Angles(0, math.rad(90), 0))
+		local velocity = Vector3.new(-30, 0, 0)
+		BallService:roll("A", velocity)
+		expect(BallService.state.status).toBe("Flying")
+		expect(BallService.state.carrier).toBeNil()
+		expect(BallService.part.CanCollide).toBe(true)
+		local ball, offset = config.Ball, config.Ball.carryOffset
+		local floor = ball.radius - config.Movement.hoverHeight
+		Fixtures.expectNear(BallService.part.Position, ON_TRACK + Vector3.new(offset.Z, floor, -offset.X))
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, velocity)
+		local spin = BallService.part.AssemblyAngularVelocity
+		Fixtures.expectNear(velocity + spin:Cross(-Vector3.yAxis * ball.radius), Vector3.zero)
+		local frame = BallService:step(1 / 60, { holder("A", rig) })
+		expect(frame.moved).toBe(false)
+		expect(frame.thrower).toBe("A")
+		expect(function()
+			BallService:roll("B", velocity)
+		end).toThrow("BallService: only the carrier can throw (carrier: none, thrower: B)")
+	end)
+
+	-- On a bank, 30 deg about the track's line: the floor under the hand lies along the root's own up (its right is
+	-- (cos 30, sin 30, 0), its up (-sin 30, cos 30, 0)), and the ball rolls on that floor.
+	it("rolls along a banked floor from under the hand, spinning about that floor", function()
+		local rig = caughtBy("A")
+		local bank = math.rad(30)
+		rig:PivotTo(CFrame.new(ON_TRACK) * CFrame.Angles(0, 0, bank))
+		local right = Vector3.new(math.cos(bank), math.sin(bank), 0)
+		local up = Vector3.new(-math.sin(bank), math.cos(bank), 0)
+		-- Along the bank's line.
+		local velocity = Vector3.new(0, 0, -30)
+		BallService:roll("A", velocity)
+		local ball, offset = config.Ball, config.Ball.carryOffset
+		local floor = ball.radius - config.Movement.hoverHeight
+		local spot = ON_TRACK + right * offset.X + up * floor + Vector3.zAxis * offset.Z
+		Fixtures.expectNear(BallService.part.Position, spot)
+		local spin = BallService.part.AssemblyAngularVelocity
+		Fixtures.expectNear(velocity + spin:Cross(-up * ball.radius), Vector3.zero)
+	end)
+
 	it("respawns a ball that leaves the arena, without reporting the jump", function()
 		BallService:spawn()
 		BallService:step(1 / 60, {})

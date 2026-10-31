@@ -827,6 +827,31 @@ describe("SkateController", function()
 		Fixtures.expectNear(velocityOf(rig), before)
 	end)
 
+	-- RC greys Pump while a throw charges (#312, Q106): ActionController says when one does, and meanwhile the pump key
+	-- neither speeds the skater up nor counts as pumping, here or on the server.
+	it("pumps nothing while a throw charges, and tells the server it is not pumping", function()
+		local pump = Fixtures.scriptedBinding(InputController.context, "Pump")
+		pump:Fire(true)
+		SkateController.charging = true
+		for _ = 1, 30 do
+			SkateController:step(1 / 60)
+		end
+		expect(SkateController.pumping).toBe(false)
+		expect(sent).toEqual({})
+		expect(velocityOf(rig).Magnitude).toBeCloseTo(0, 3)
+		SkateController.charging = false
+		SkateController:step(1 / 60)
+		expect(SkateController.pumping).toBe(true)
+		expect(sent).toEqual({ { true, false, false } })
+		expect(velocityOf(rig).Magnitude > 0).toBe(true)
+	end)
+
+	it("starts a new character not charging", function()
+		SkateController.charging = true
+		SkateController:bind(skaterAt("Respawned", Vector3.new(20, 0, 0)))
+		expect(SkateController.charging).toBe(false)
+	end)
+
 	it("tells the server about pump and brake only when they change", function()
 		local pump = Fixtures.scriptedBinding(InputController.context, "Pump")
 		pump:Fire(true)

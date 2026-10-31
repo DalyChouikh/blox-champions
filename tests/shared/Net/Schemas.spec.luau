@@ -28,6 +28,8 @@ describe("Schemas", function()
 			{ action = "CallPass" },
 			{ action = "Pass", aim = Vector3.new(0, 0, -1) },
 			{ action = "ChargeThrow", aim = Vector3.new(1, 0, 0), charge = 0.5 },
+			-- Roll Ball spends the charge like a throw (#312).
+			{ action = "RollBall", aim = Vector3.new(0, 0.3, -1), charge = 1 },
 		}
 		for _, payload in accepted do
 			expect(Schemas.ActionRequest(payload, "ActionRequest")).toEqual({})
@@ -38,6 +40,9 @@ describe("Schemas", function()
 			{ action = "Pass", aim = Vector3.zero },
 			{ action = "ChargeThrow", aim = Vector3.new(0 / 0, 0, 0), charge = 0.5 },
 			{ action = "ChargeThrow", aim = Vector3.xAxis, charge = 5 },
+			{ action = "RollBall", aim = Vector3.xAxis },
+			{ action = "RollBall", aim = Vector3.zero, charge = 0.5 },
+			{ action = "RollBall", aim = Vector3.xAxis, charge = -0.1 },
 			{ action = "Fly" },
 			"Tackle",
 		}

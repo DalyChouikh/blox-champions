@@ -85,6 +85,25 @@ function Style.corner(config: Config.GameConfig): React.ReactElement
 	return React.createElement("UICorner", { CornerRadius = config.UI.hud.corner })
 end
 
+-- Rounds a square frame all the way: a disc.
+function Style.round(): React.ReactElement
+	return React.createElement("UICorner", { CornerRadius = UDim.new(0.5, 0) })
+end
+
+-- A ring: a see-through disc frame (`props` place and size it) outlined `thickness` pixels wide in `color`. `stroke`
+-- holds what acts on the outline itself (a gradient).
+function Style.ring(
+	color: Color3,
+	thickness: number,
+	props: Props,
+	stroke: { [string]: React.Node }?
+): React.ReactElement
+	return React.createElement("Frame", over({ BackgroundTransparency = 1 }, props), {
+		Corner = Style.round(),
+		Stroke = React.createElement("UIStroke", { Color = color, Thickness = thickness }, stroke),
+	})
+end
+
 -- Shrinks a part to fit the HUD's area (a binding), screenMargin inside each edge (Fit). The part is `size`, or, for a
 -- panel that grows to fit its parts (AutomaticSize Y), as tall as they need where that is taller: `content` pixels
 -- inside Style.padding.

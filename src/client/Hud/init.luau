@@ -1,23 +1,23 @@
 --!strict
 -- The HUD on screen (spec §11.1), drawn with React Luau through a legacy root, which renders at once. Its panels sit in
 -- the ScreenGui "Hud", below Roblox's own top bar; the reticle sits in "HudCentre", which spans the whole screen, so
--- its centre is where the camera aims (App draws it there through a portal). Before each frame is drawn
--- (FrameController), after HudStore has counted the clocks, the Hud renders App again only when something App shows has
--- changed: the HUD state's version, the device, the carrier, whether the local player has a skater, whether it shows
--- the Get Up prompt, or whether the score tab is open. What changes every frame (the clock, the speed, what each
--- control does now) goes through bindings instead, each set only when its text changes; the texts come from caches and
--- the config, so a quiet frame allocates nothing. Hints name each key as the device shows it: on a gamepad Roblox's
--- glyph, otherwise the name the player's own keyboard layout gives it, else Config.UI.keyNames, else the KeyCode's
--- name. There are none on touch, where the buttons carry the labels. The Get Up prompt (a skater knocked down by a
--- strike or a fall: SkateController.promptsGetUp, #242) names the movement keys the same way: the first
--- composite's four keys, the gamepad's stick, or on touch Config.UI.text's name for the stick. The score tab shows
--- while its key is held; on touch a button toggles it, and the toggle clears once the device is not touch and whenever
--- the end screen appears or goes, so the tab never pops open unasked. While the tab shows its Switch team button
--- (HudState.switchOffer, #310), the button's key, or a tap on touch, asks the server for a switch when one works.
--- The banner, the feed, the score tab and the end screen centre and fit in the HUD's stage, a binding: on touch the
--- part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that GuiService gives),
--- elsewhere the whole of it. It is measured again when the screen's size changes (from start on) and when the device
--- does.
+-- its place there is the screen point throws and passes aim through (App draws it there through a portal, #312).
+-- Before each frame is drawn (FrameController), after HudStore has counted the clocks, the Hud renders App again only
+-- when something App shows has changed: the HUD state's version, the device, the carrier, whether the local player has
+-- a skater, whether it shows the Get Up prompt, or whether the score tab is open. What changes every frame (the clock,
+-- the speed, what each control does now, how far a throw has charged) goes through bindings instead, each set only when
+-- it changes; the texts come from caches and the config, so a quiet frame allocates nothing. Hints name each key as the
+-- device shows it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout gives it, else
+-- Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the labels. The Get Up
+-- prompt (a skater knocked down by a strike or a fall: SkateController.promptsGetUp, #242) names the movement keys the
+-- same way: the first composite's four keys, the gamepad's stick, or on touch Config.UI.text's name for the stick.
+-- The score tab shows while its key is held; on touch a button toggles it, and the toggle clears once the device is
+-- not touch and whenever the end screen appears or goes, so the tab never pops open unasked. While the tab shows its
+-- Switch team button (HudState.switchOffer, #310), the button's key, or a tap on touch, asks the server for a switch
+-- when one works. The banner, the feed, the score tab and the end screen centre and fit in the HUD's stage, a
+-- binding: on touch the part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that
+-- GuiService gives), elsewhere the whole of it. It is measured again when the screen's size changes (from start on)
+-- and when the device does.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -45,8 +45,8 @@ local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
 
--- A text shown through a binding: its setter, and the value last set.
-type Shown = { binding: React.Binding<string>, set: (text: string) -> (), value: string }
+-- A value shown through a binding: its setter, and the value last set.
+type Shown<T> = { binding: React.Binding<T>, set: (value: T) -> (), value: T }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its members.
 export type Hud = {
@@ -84,9 +84,10 @@ export type Hud = {
 	_insetArea: (insets: Enum.ScreenInsets) -> Rect,
 	_root: ReactRoblox.RootType,
 	_bindings: App.HudBindings,
-	_clock: Shown,
-	_speed: Shown,
-	_labels: { [string]: Shown },
+	_clock: Shown<string>,
+	_speed: Shown<string>,
+	_labels: { [string]: Shown<string> },
+	_charge: Shown<number>,
 	-- The stage last set on its binding, and the setter.
 	_stage: Vector2,
 	_setStage: (stage: Vector2) -> (),
@@ -108,15 +109,15 @@ export type Hud = {
 	_scoreTabOpen: boolean,
 }
 
-local function newShown(text: string): Shown
-	local binding, set = React.createBinding(text)
-	return { binding = binding, set = set, value = text }
+local function newShown<T>(value: T): Shown<T>
+	local binding, set = React.createBinding(value)
+	return { binding = binding, set = set, value = value }
 end
 
-local function show(shown: Shown, text: string)
-	if text ~= shown.value then
-		shown.value = text
-		shown.set(text)
+local function show<T>(shown: Shown<T>, value: T)
+	if value ~= shown.value then
+		shown.value = value
+		shown.set(value)
 	end
 end
 
@@ -223,6 +224,7 @@ local Hud: Hud = {
 	_clock = nil :: any,
 	_speed = nil :: any,
 	_labels = {},
+	_charge = nil :: any,
 	_stage = Vector2.zero,
 	_setStage = function(_stage: Vector2) end,
 	_onScoreButton = function() end,
@@ -287,7 +289,7 @@ local Hud: Hud = {
 
 		self._clock = newShown(self._text:clock(self._store.state:clockSeconds()))
 		self._speed = newShown("")
-		local labels: { [string]: Shown } = {}
+		local labels: { [string]: Shown<string> } = {}
 		local labelBindings: ControlHints.HintLabels = {}
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
 			local shown = newShown("")
@@ -295,11 +297,17 @@ local Hud: Hud = {
 			labelBindings[control] = shown.binding
 		end
 		self._labels = labels
+		self._charge = newShown(0)
 		local stage, setStage = React.createBinding(Vector2.zero)
 		self._stage = Vector2.zero
 		self._setStage = setStage
-		self._bindings =
-			{ clock = self._clock.binding, speed = self._speed.binding, labels = labelBindings, stage = stage }
+		self._bindings = {
+			clock = self._clock.binding,
+			speed = self._speed.binding,
+			labels = labelBindings,
+			stage = stage,
+			charge = self._charge.binding,
+		}
 
 		local parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
 		-- Both are kept across respawns.
@@ -408,6 +416,7 @@ local Hud: Hud = {
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
 			show(self._labels[control], ControlLabels.label(control, config, actions, skate) or "")
 		end
+		show(self._charge, actions:chargeProgress() or 0)
 	end,
 }
 

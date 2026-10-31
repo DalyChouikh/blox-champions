@@ -59,8 +59,9 @@ export type InputConfig = {
 	pump: { Enum.KeyCode },
 	brake: { Enum.KeyCode },
 	attach: { Enum.KeyCode },
-	-- A Tackle, a Dive just after one (#240), or a Dodge with the ball.
+	-- A Tackle, a Dive just after one (#240), or a Dodge with the ball, which drops a charge (Cancel & Dodge, #312).
 	tackle: { Enum.KeyCode },
+	-- An Uppercut without the ball, Roll Ball while a throw charges (#312).
 	uppercut: { Enum.KeyCode },
 	-- A Pass with the ball, a Call Pass without.
 	pass: { Enum.KeyCode },
@@ -120,7 +121,7 @@ local defaults: InputConfig = {
 	switchTeam = { Enum.KeyCode.T, Enum.KeyCode.DPadUp },
 	actions = {
 		tackle = { "Dive", "Tackle", "Dodge" },
-		uppercut = { "Uppercut" },
+		uppercut = { "Uppercut", "RollBall" },
 		pass = { "Pass", "CallPass" },
 		throw = { "ChargeThrow" },
 	},

@@ -247,6 +247,52 @@ describe("ActionService", function()
 		expect(rejected(a)).toEqual({})
 	end)
 
+	-- RC's Roll Ball (#312, Q100; Video 31 at 1:19.4): the charge spent along the floor. Aimed (3, 4, -4) from a
+	-- skater facing -Z on the flat: (3, 0, -4) / 5 x maxSpeed across the ground, from the floor under the hand.
+	it("rolls the ball from the floor under the hand, the aim's way along the floor, at the charged speed", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
+		fakeNet.handlers[Remotes.names.ActionRequest](
+			a,
+			{ action = "RollBall", aim = Vector3.new(3, 4, -4), charge = 1 }
+		)
+		expect(rejected(a)).toEqual({})
+		expect(BallService.state.status).toBe("Flying")
+		expect(BallService.state.carrier).toBeNil()
+		local rolling = Vector3.new(0.6, 0, -0.8) * throwSettings.maxSpeed
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, rolling)
+		-- The root stands unturned: the hand's spot across its frame is a plain offset.
+		local ball, offset = config.Ball, config.Ball.carryOffset
+		local floor = ball.radius - config.Movement.hoverHeight
+		Fixtures.expectNear(BallService.part.Position, ON_TRACK + Vector3.new(offset.X, floor, offset.Z))
+	end)
+
+	-- On a bank (30 deg) and turned a quarter left, aimed straight off the floor (the camera under the skater): along
+	-- their facing, -X, across their own floor, whose up is (0, cos 30, sin 30) there.
+	it("rolls along the carrier's facing on their own floor when aimed straight off it", function()
+		local a = blue[1]
+		local bank = math.rad(30)
+		rigs[a]:PivotTo(CFrame.new(ON_TRACK) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(0, 0, bank))
+		CharacterService.placed:Fire(a)
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
+		local up = Vector3.new(0, math.cos(bank), math.sin(bank))
+		ActionService:request(a, { action = "RollBall", aim = up, charge = 1 })
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(-throwSettings.maxSpeed, 0, 0))
+	end)
+
+	it("rolls no faster than the ball was held for, as a throw", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds / 2, CharacterService:holders())
+		ActionService:request(a, { action = "RollBall", aim = Vector3.new(0, 0, -1), charge = 1 })
+		local half = (throwSettings.minSpeed + throwSettings.maxSpeed) / 2
+		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(half, 3)
+	end)
+
 	it("bounds a throw's charge by how long the thrower has held the ball", function()
 		local a = blue[1]
 		stand(a, Vector3.zero)
@@ -406,7 +452,8 @@ describe("ActionService", function()
 		giveBall(c)
 
 		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.xAxis, charge = 1 })
-		expect(rejected(a)).toEqual({ "ChargeThrow" })
+		ActionService:request(a, { action = "RollBall", aim = Vector3.xAxis, charge = 1 })
+		expect(rejected(a)).toEqual({ "ChargeThrow", "RollBall" })
 		expect(BallService.state.carrier).toBe(c)
 
 		ActionService:request(c, { action = "Tackle" })
@@ -421,7 +468,7 @@ describe("ActionService", function()
 		-- The first tackle ended at 0.65 s; its cooldown runs to 1 s.
 		advance(0.47)
 		ActionService:request(a, { action = "Tackle" })
-		expect(rejected(a)).toEqual({ "ChargeThrow", "Tackle" })
+		expect(rejected(a)).toEqual({ "ChargeThrow", "RollBall", "Tackle" })
 		expect(attribute(a, Attributes.Action)).toBeNil()
 	end)
 

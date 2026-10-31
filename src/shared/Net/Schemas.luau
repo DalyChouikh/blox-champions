@@ -14,18 +14,19 @@ local aim = Validate.check(
 	"must not be zero"
 )
 
--- One shape per action, by what it does: a throw carries its aim and charge, a pass its aim, the rest nothing. The
--- shape follows each action's effect, which modes never change.
+-- One shape per action, by what it does: an action that lets go of the ball carries its aim, one that spends the
+-- charge (a throw, a roll) its charge too, the rest nothing. The shape follows each action's effect, which modes never
+-- change.
 local function actionRequest(): Validate.Validator
 	local variants: { [string]: Validate.Validator } = {}
 	for _, name: Actions.ActionName in Actions.names do
 		local effect = Actions.defaults[name].effect
 		local fields: { [string]: Validate.Validator } = { action = Validate.string() }
-		if effect == "Throw" then
+		if Actions.releasesBall(effect) then
 			fields.aim = aim
+		end
+		if Actions.spendsCharge(effect) then
 			fields.charge = Validate.number({ min = 0, max = 1 })
-		elseif effect == "Pass" then
-			fields.aim = aim
 		end
 		variants[name] = Validate.record(fields)
 	end

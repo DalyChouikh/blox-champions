@@ -10,8 +10,18 @@ local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 
 local actions = Config.defaults().Actions
 
-local function context(hasBall: boolean?, airborne: boolean?, knockedDown: boolean?): ActionRunner.Context
-	return { hasBall = hasBall == true, airborne = airborne == true, knockedDown = knockedDown == true }
+local function context(
+	hasBall: boolean?,
+	airborne: boolean?,
+	knockedDown: boolean?,
+	charging: boolean?
+): ActionRunner.Context
+	return {
+		hasBall = hasBall == true,
+		airborne = airborne == true,
+		knockedDown = knockedDown == true,
+		charging = charging == true,
+	}
 end
 
 describe("ActionRunner", function()
@@ -81,6 +91,31 @@ describe("ActionRunner", function()
 		local airborne = Fixtures.config({ Actions = { Uppercut = { requires = { grounded = "airborne" } } } })
 		expect(ActionRunner.new(airborne.Actions):start("Uppercut", context(false, false))).toBe("NotAllowed")
 		expect(ActionRunner.new(airborne.Actions):start("Uppercut", context(false, true))).toBe("Started")
+	end)
+
+	-- #312: the uppercut key rolls the ball only while a throw charges, on a surface (Q100); a pass never starts while
+	-- one charges (Q140); the throw itself and the Dodge (Cancel & Dodge) start either way.
+	it("starts Roll Ball only while a throw charges, and a pass only while none does", function()
+		local function verdict(name: Config.ActionName, airborne: boolean, charging: boolean): ActionRunner.Verdict
+			return ActionRunner.new(actions):start(name, context(true, airborne, false, charging))
+		end
+		expect(verdict("RollBall", false, false)).toBe("NotAllowed")
+		expect(verdict("RollBall", false, true)).toBe("Started")
+		expect(verdict("RollBall", true, true)).toBe("NotAllowed")
+		expect(verdict("Pass", false, true)).toBe("NotAllowed")
+		expect(verdict("Pass", false, false)).toBe("Started")
+		for _, charging in { false, true } do
+			expect(verdict("ChargeThrow", false, charging)).toBe("Started")
+			expect(verdict("Dodge", false, charging)).toBe("Started")
+		end
+		expect(ActionRunner.new(actions):start("RollBall", context(false, false, false, true))).toBe("NotAllowed")
+	end)
+
+	-- The server never sees the throw key: either starts there, as the ball and the timing still decide.
+	it("lets a context that cannot tell whether a throw charges start either", function()
+		local unseen: ActionRunner.Context = { hasBall = true, airborne = false, knockedDown = false, charging = nil }
+		expect(ActionRunner.new(actions):start("RollBall", unseen)).toBe("Started")
+		expect(ActionRunner.new(actions):start("Pass", unseen)).toBe("Started")
 	end)
 
 	it("refuses a second action while one runs", function()

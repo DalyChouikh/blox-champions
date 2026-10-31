@@ -26,8 +26,14 @@ local FOLLOW_UP = config.Actions.Tackle.followUp :: Config.FollowUp
 -- The line a diver facing -Z flies along (#241): fallLineDeg below the facing.
 local FALL_LINE = Vector3.new(0, -math.sin(math.rad(movement.fallLineDeg)), -math.cos(math.rad(movement.fallLineDeg)))
 local DT = 1 / 60
+-- One charge, ChargeThrow's: a roll spends it too (#312).
+local THROW = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
+-- The crosshair's height on the screen, as a share of it from the top (#312).
+local CROSSHAIR = config.UI.hud.layout.reticle.height
+-- Where the camera's ray through the crosshair goes: above its look, unlike any of its own axes.
+local AIM = Vector3.new(0, 0.26, -0.97)
 -- Looking toward -Z from behind the skater, so the skater's right is the camera's right, +X.
-local CAMERA = { CFrame = CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)) }
+local CAMERA = Fixtures.camera(CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)), AIM)
 local LOCAL_ID = "1"
 -- The other skaters the skating sees (SkateController's views), reset before each test.
 local others: { any } = {}
@@ -170,6 +176,36 @@ local function dive(step: () -> ())
 	step()
 end
 
+-- The local player holds the ball and the throw key, charging for `frames` steps (#312).
+local function charging(frames: number): InputBinding
+	BallCarrier:set(LOCAL_ID)
+	frame() -- the throw key seen up while holding the ball
+	local throw = bindingOf("Throw")
+	throw:Fire(true)
+	for _ = 1, frames do
+		frame()
+	end
+	return throw
+end
+
+-- What each action key would start now, by key ("none" for nothing).
+local function names(): { [string]: string }
+	local found: { [string]: string } = {}
+	for _, key: Config.ActionKey in { "tackle", "uppercut", "pass", "throw" } :: { Config.ActionKey } do
+		found[key] = ActionController:keyAction(key) or "none"
+	end
+	return found
+end
+
+-- A request's aim went through the crosshair (#312, Q123/Q127): the camera's ray through the screen's point
+-- centred across it and the crosshair's height down it.
+local function expectAimedThroughCrosshair(request: { [string]: any })
+	local asked = CAMERA.asked[#CAMERA.asked]
+	expect(asked.X).toBeCloseTo(0.5 * CAMERA.ViewportSize.X, 3)
+	expect(asked.Y).toBeCloseTo(CROSSHAIR * CAMERA.ViewportSize.Y, 3)
+	Fixtures.expectNear(request.aim, AIM, 1e-6)
+end
+
 beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "ActionControllerTest"
@@ -177,6 +213,7 @@ beforeEach(function()
 	requests = {}
 	bindings = {}
 	others = {}
+	table.clear(CAMERA.asked)
 end)
 afterEach(function()
 	InputController:destroy()
@@ -442,50 +479,167 @@ describe("ActionController", function()
 		expect(SkateController.diving).toBe(false)
 	end)
 
-	it("charges a throw for as long as it is held", function()
+	-- Through the crosshair above the skater (#312, Q123/Q127), so aiming forward or up never drops the camera to the
+	-- skater's feet.
+	it("charges a throw for as long as it is held, and throws it through the crosshair", function()
 		setup()
-		BallCarrier:set(LOCAL_ID)
-		frame() -- the throw key seen up while holding the ball
-		local throw = bindingOf("Throw")
-		throw:Fire(true)
-		for _ = 1, 30 do
-			frame()
-		end
+		local half = math.round(THROW.chargeMaxSeconds / 2 / DT)
+		local throw = charging(half)
 		expect(#requests).toBe(0)
 		throw:Fire(false)
 		frame()
 		expect(#requests).toBe(1)
 		local request = requests[1]
 		expect(request.action).toBe("ChargeThrow")
-		Fixtures.expectNear(request.aim, CAMERA.CFrame.LookVector, 1e-6)
-		expect(request.charge).toBeCloseTo(0.5, 6)
+		expectAimedThroughCrosshair(request)
+		expect(request.charge).toBeCloseTo(half * DT / THROW.chargeMaxSeconds, 6)
 	end)
 
-	it("keeps a throw released during a dodge for when the dodge ends", function()
+	it("charges no further than a full charge, however long the throw is held", function()
+		setup()
+		local throw = charging(math.round(2 * THROW.chargeMaxSeconds / DT))
+		expect(ActionController:chargeProgress()).toBe(1)
+		throw:Fire(false)
+		frame()
+		expect(requests[1].charge).toBe(1)
+	end)
+
+	-- What the crosshair's ring shows (#312): the charge's share of a full one, from the press.
+	it("tells how far a throw has charged while it charges, and nothing otherwise", function()
+		setup()
+		expect(ActionController:chargeProgress()).toBeNil()
+		local throw = charging(6)
+		expect(ActionController:chargeProgress()).toBeCloseTo(6 * DT / THROW.chargeMaxSeconds, 6)
+		throw:Fire(false)
+		frame()
+		expect(ActionController:chargeProgress()).toBeNil()
+	end)
+
+	it("keeps a throw charged and let go during a dodge for when the dodge ends", function()
 		setup()
 		BallCarrier:set(LOCAL_ID)
 		frame() -- the throw key seen up while holding the ball
-		local throw = bindingOf("Throw")
-		throw:Fire(true)
-		for _ = 1, 15 do
-			frame()
-		end
-		-- A dodge, the throw still held for its first step.
 		press("Tackle")
 		frame()
 		expect(requests).toEqual({ { action = "Dodge" } })
+		-- Charged and let go while the dodge runs (0.5 s, 30 steps).
+		local throw = bindingOf("Throw")
+		throw:Fire(true)
+		for _ = 1, 10 do
+			frame()
+		end
 		throw:Fire(false)
-		-- The dodge runs 0.5 s (30 steps).
-		for _ = 1, 28 do
+		for _ = 1, 17 do
 			frame()
 		end
 		expect(#requests).toBe(1)
-		for _ = 1, 5 do
+		for _ = 1, 6 do
 			frame()
 		end
 		expect(#requests).toBe(2)
 		expect(requests[2].action).toBe("ChargeThrow")
-		expect(requests[2].charge).toBeCloseTo(16 * DT, 6)
+		expect(requests[2].charge).toBeCloseTo(10 * DT / THROW.chargeMaxSeconds, 6)
+	end)
+
+	-- RC's Cancel & Dodge (#312, Q100; Videos 32 and 33): the tackle key while charging drops the charge and dodges.
+	it("drops the charge when it dodges while a throw charges: letting go then throws nothing", function()
+		setup()
+		local throw = charging(10)
+		press("Tackle")
+		frame()
+		expect(requests).toEqual({ { action = "Dodge" } })
+		expect(ActionController:chargeProgress()).toBeNil()
+		-- Still held through the dodge, then let go after it: nothing.
+		for _ = 1, 40 do
+			frame()
+		end
+		expect(ActionController:chargeProgress()).toBeNil()
+		throw:Fire(false)
+		frame()
+		expect(requests).toEqual({ { action = "Dodge" } })
+		-- A new press charges again.
+		throw:Fire(true)
+		frame()
+		throw:Fire(false)
+		frame()
+		expect(#requests).toBe(2)
+		expect(requests[2].action).toBe("ChargeThrow")
+	end)
+
+	-- RC's Roll Ball (#312, Q100; Video 31 at 1:19.4): the uppercut key while charging puts the ball on the floor
+	-- rolling ahead at the charge's speed; the server places it and spends the charge.
+	it("rolls the ball with the uppercut key while charging, spending the charge, through the crosshair", function()
+		setup()
+		charging(12)
+		press("Uppercut")
+		frame()
+		expect(#requests).toBe(1)
+		local request = requests[1]
+		expect(request.action).toBe("RollBall")
+		expectAimedThroughCrosshair(request)
+		-- Twelve steps held, and the press's own: the throw key is still down.
+		expect(request.charge).toBeCloseTo(13 * DT / THROW.chargeMaxSeconds, 6)
+		-- The ball leaves at once, as a throw's does; no leap.
+		expect(BallCarrier.carrier).toBeNil()
+		expect(skater().mode).toBe("Grounded")
+		expect(ActionController:chargeProgress()).toBeNil()
+		-- Refused: the ball is back.
+		ActionController:rejected({ action = "RollBall" })
+		expect(BallCarrier.carrier).toBe(LOCAL_ID)
+	end)
+
+	-- The uppercut key does nothing in the air (#262), with the ball or charging alike.
+	it("never rolls the ball in the air", function()
+		setup()
+		BallCarrier:set(LOCAL_ID)
+		flying(Vector3.new(0, -10, -30))
+		ActionController:step(DT)
+		bindingOf("Throw"):Fire(true)
+		ActionController:step(DT)
+		press("Uppercut")
+		ActionController:step(DT)
+		expect(requests).toEqual({})
+		expect(BallCarrier.carrier).toBe(LOCAL_ID)
+	end)
+
+	-- RC greys Magnetic Pass while a throw charges (Q140, Video 32 at 2.6-3.2 s): the pass key does nothing.
+	it("never passes while a throw charges, and the charge goes on", function()
+		setup()
+		charging(5)
+		press("Pass")
+		frame()
+		expect(requests).toEqual({})
+		expect(BallCarrier.carrier).toBe(LOCAL_ID)
+		expect(ActionController:chargeProgress()).toBeCloseTo(6 * DT / THROW.chargeMaxSeconds, 6)
+	end)
+
+	-- RC greys Pump while a throw charges (Q106; Videos 13, 31, 32): the skating ignores the pump key meanwhile.
+	it("holds the pump off while a throw charges, from the press until it ends however it ends", function()
+		setup()
+		expect(SkateController.charging).toBe(false)
+		local throw = charging(1)
+		expect(SkateController.charging).toBe(true)
+		throw:Fire(false)
+		frame()
+		expect(SkateController.charging).toBe(false)
+		-- Cancelled by a dodge.
+		charging(1)
+		press("Tackle")
+		frame()
+		expect(SkateController.charging).toBe(false)
+		throw:Fire(false)
+		-- The ball lost (a knockdown takes it).
+		ActionController.runner:reset()
+		charging(1)
+		BallCarrier:set(nil)
+		frame()
+		expect(SkateController.charging).toBe(false)
+		throw:Fire(false)
+		-- Held still (a kickoff's placement).
+		charging(1)
+		Fixtures.root(rig).Anchored = true
+		frame()
+		expect(SkateController.charging).toBe(false)
 	end)
 
 	it("starts a charge only from a press made while holding the ball", function()
@@ -510,7 +664,7 @@ describe("ActionController", function()
 		frame()
 		expect(#requests).toBe(1)
 		expect(requests[1].action).toBe("ChargeThrow")
-		expect(requests[1].charge).toBeCloseTo(10 * DT, 6)
+		expect(requests[1].charge).toBeCloseTo(10 * DT / THROW.chargeMaxSeconds, 6)
 	end)
 
 	it("drops a charge, without throwing, when Roblox's menu opens", function()
@@ -561,7 +715,7 @@ describe("ActionController", function()
 		frame()
 		expect(#requests).toBe(2)
 		expect(requests[1].action).toBe("Pass")
-		Fixtures.expectNear(requests[1].aim, CAMERA.CFrame.LookVector, 1e-6)
+		expectAimedThroughCrosshair(requests[1])
 		expect(requests[2]).toEqual({ action = "CallPass" })
 	end)
 
@@ -643,13 +797,6 @@ describe("ActionController", function()
 
 	it("names the action each key would start now", function()
 		setup()
-		local function names(): { [string]: string }
-			local found: { [string]: string } = {}
-			for _, key: Config.ActionKey in { "tackle", "uppercut", "pass", "throw" } :: { Config.ActionKey } do
-				found[key] = ActionController:keyAction(key) or "none"
-			end
-			return found
-		end
 		expect(names()).toEqual({ tackle = "Tackle", uppercut = "Uppercut", pass = "CallPass", throw = "none" })
 		BallCarrier:set(LOCAL_ID)
 		expect(names()).toEqual({ tackle = "Dodge", uppercut = "none", pass = "Pass", throw = "ChargeThrow" })
@@ -660,6 +807,16 @@ describe("ActionController", function()
 		expect(names()).toEqual({ tackle = "Dodge", uppercut = "none", pass = "Pass", throw = "ChargeThrow" })
 		BallCarrier:set(nil)
 		expect(names()).toEqual({ tackle = "Tackle", uppercut = "none", pass = "CallPass", throw = "none" })
+	end)
+
+	-- RC's hints while a throw charges (#312, Video 32 at 3.2 s): Throw, Cancel & Dodge (the Dodge, which drops the
+	-- charge) and Roll Ball; Magnetic Pass greyed (Q140). In the air the uppercut key rolls nothing (#262).
+	it("names the dodge, Roll Ball and the throw for the keys while a throw charges, and no pass", function()
+		setup()
+		charging(3)
+		expect(names()).toEqual({ tackle = "Dodge", uppercut = "RollBall", pass = "none", throw = "ChargeThrow" })
+		skater().mode = "Airborne"
+		expect(names()).toEqual({ tackle = "Dodge", uppercut = "none", pass = "none", throw = "ChargeThrow" })
 	end)
 
 	-- Roller Champions (the owner's Video 4): "Dive" replaces "Tackle" 0.1-0.2 s after the press, and "Tackle" is back

@@ -21,6 +21,9 @@ export type ControlLabels = {
 	Dodge: string,
 	Uppercut: string,
 	ChargeThrow: string,
+	RollBall: string,
+	-- The Dodge while a throw charges: it drops the charge (#312), as RC's hint names it (Video 32 at 3.2 s).
+	CancelDodge: string,
 	Pass: string,
 	CallPass: string,
 	BallFocus: string,
@@ -98,7 +101,10 @@ export type HudLayout = {
 	-- position is the bottom-right corner's; on touch, touchPosition is the top-left corner's, clear of the touch
 	-- buttons and the score button.
 	speedometer: { position: UDim2, touchPosition: UDim2, size: UDim2 },
-	reticle: { size: number },
+	-- The crosshair (#312): its dot `size` pixels across, centred across the screen and `height` of the way down it
+	-- (throws and passes aim through it); while a throw charges, a ring ringSize pixels across with a ringThickness
+	-- stroke, its halves ringGap pixels apart at the top and the bottom.
+	reticle: { size: number, height: number, ringSize: number, ringThickness: number, ringGap: number },
 	-- columnWidth: each number column; the name column takes the rest.
 	scoreTab: { position: UDim2, size: UDim2, rowHeight: number, columnWidth: number },
 	-- The touch button that opens the score tab.
@@ -200,6 +206,9 @@ local defaults: UIConfig = {
 		Dodge = "Dodge",
 		Uppercut = "Uppercut",
 		ChargeThrow = "Throw",
+		-- RC's hints while a throw charges (#312; Video 32 at 3.2 s).
+		RollBall = "Roll Ball",
+		CancelDodge = "Cancel & Dodge",
 		Pass = "Pass",
 		CallPass = "Call",
 		BallFocus = "Focus",
@@ -295,7 +304,10 @@ local defaults: UIConfig = {
 				touchPosition = UDim2.fromOffset(16, 8),
 				size = UDim2.fromOffset(160, 40),
 			},
-			reticle = { size = 6 },
+			-- RC's crosshair (#312): above the skater, 31.5% down the screen (Video 32 at 2.0-4.4 s, Video 13 at 99.0
+			-- s; the owner kept it in trial #311, Q123/Q127); its ring, read at 1918 x 1078 (Video 32 at 3.2 s), 130 px
+			-- across with a ~4 px stroke, its halves ~29 px apart at the bottom; white, the HUD's text colour (Q141).
+			reticle = { size = 6, height = 0.315, ringSize = 130, ringThickness = 4, ringGap = 29 },
 			scoreTab = {
 				position = UDim2.fromScale(0.5, 0.5),
 				size = UDim2.fromOffset(640, 360),
@@ -430,6 +442,8 @@ local fields = Validate.record({
 		Dodge = label,
 		Uppercut = label,
 		ChargeThrow = label,
+		RollBall = label,
+		CancelDodge = label,
 		Pass = label,
 		CallPass = label,
 		BallFocus = label,
@@ -504,7 +518,14 @@ local fields = Validate.record({
 			feed = list,
 			hints = list,
 			speedometer = Validate.record({ position = udim2, touchPosition = udim2, size = pixels }),
-			reticle = Validate.record({ size = positive }),
+			reticle = Validate.record({
+				size = positive,
+				-- On the screen, never on its top or bottom edge.
+				height = Validate.number({ above = 0, below = 1 }),
+				ringSize = positive,
+				ringThickness = positive,
+				ringGap = Validate.number({ min = 0 }),
+			}),
 			scoreTab = columns,
 			scoreButton = place,
 			endScreen = place,
@@ -555,6 +576,22 @@ local schema = Validate.checkAll(fields, {
 		message = "the Get Up prompt must be taller than its padding (2 × hud.spacing)",
 		holds = function(ui: UIConfig): boolean
 			return ui.hud.layout.getUp.size.Y.Offset > 2 * ui.hud.spacing
+		end,
+	},
+	-- The crosshair's ring builds round its dot (#312).
+	{
+		message = "the reticle's dot must fit inside its ring (size < ringSize - 2 × ringThickness)",
+		holds = function(ui: UIConfig): boolean
+			local reticle = ui.hud.layout.reticle
+			return reticle.size < reticle.ringSize - 2 * reticle.ringThickness
+		end,
+	},
+	-- Each half is the ring clipped to its side of the gap (Hud/Reticle): a gap as wide as the ring leaves nothing.
+	{
+		message = "the reticle ring's gap must leave its halves some arc (ringGap < ringSize)",
+		holds = function(ui: UIConfig): boolean
+			local reticle = ui.hud.layout.reticle
+			return reticle.ringGap < reticle.ringSize
 		end,
 	},
 })

@@ -89,4 +89,26 @@ describe("ControlLabels", function()
 			expect(now(control)).toBeNil()
 		end
 	end)
+
+	-- RC's hints while a throw charges (#312, Video 32 at 3.2 s): Throw, Cancel & Dodge and Roll Ball, with Pump and
+	-- Magnetic Pass greyed (Q106, Q140); ours shows nothing for a control that does nothing.
+	it("names Cancel & Dodge and Roll Ball while a throw charges, and nothing for the pump and the pass", function()
+		BallCarrier:set(LOCAL_ID)
+		ActionController:step(1 / 60) -- the throw key seen up while holding the ball
+		Fixtures.scriptedBinding(InputController.context, "Throw"):Fire(true)
+		ActionController:step(1 / 60)
+		expect(ActionController:chargeProgress() ~= nil).toBe(true)
+		expect(now("throw")).toBe(labels.ChargeThrow)
+		expect(now("tackle")).toBe(labels.CancelDodge)
+		expect(now("uppercut")).toBe(labels.RollBall)
+		expect(now("pass")).toBeNil()
+		expect(now("pump")).toBeNil()
+		expect(now("jump")).toBe(labels.Jump)
+		expect(now("brake")).toBe(labels.Brake)
+		-- In the air the uppercut key rolls nothing (#262).
+		local skater = SkateController.skater :: any
+		skater.mode = "Airborne"
+		expect(now("uppercut")).toBeNil()
+		expect(now("tackle")).toBe(labels.CancelDodge)
+	end)
 end)

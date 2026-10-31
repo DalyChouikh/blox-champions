@@ -12,9 +12,10 @@
 -- soon as the stick moves: the server decides when.
 -- A diver's own knockdown ends when the slide stops (the server sees it, #242). A diver (`diving`) lets go of any
 -- attach too and glides until that knockdown. While Roblox's menu holds the keys the skater lets go of any attach too,
--- with no release boost. Actions push the skater through `push`. Pump, brake and the Air Pose go to the server
--- (SkateState); a pose held into the ground is a fall the server judges from that report, so it is still reported for
--- Network.posedLandingTolerance after the touchdown, or until the knockdown (#245).
+-- with no release boost. Actions push the skater through `push`; the pump does nothing while a throw charges
+-- (`charging`, #312). Pump, brake and the Air Pose go to the server (SkateState); a pose held into the ground is a fall
+-- the server judges from that report, so it is still reported for Network.posedLandingTolerance after the touchdown,
+-- or until the knockdown (#245).
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
 -- humanoid's state machine off here, on the owning client only: the server keeps it on so deaths still fire Died.
 
@@ -78,6 +79,9 @@ export type SkateController = {
 	-- the server's rule for that knockdown's end holds (#286). Meanwhile they glide, slowed by friction and drag only
 	-- (#242), and in the air fly down the fall line (SkateMath, #241).
 	diving: boolean,
+	-- Set by ActionController each step while a throw charges (#312): the pump key does nothing then and is not
+	-- reported as pumping (the owner, Q106: RC greys Pump while charging). A new character starts without it.
+	charging: boolean,
 	-- Set each step: attached, or right behind a teammate with no cooldown, so holding Attach would attach.
 	attachable: boolean,
 	-- Every other player's skater as this one sees them (a reused list): who the local player's strikes home onto
@@ -354,13 +358,19 @@ local function apply(self: SkateController, skater: SkateMath.Skater)
 	end
 end
 
+-- The pump as the skating takes it: its key, unless a throw charges (the owner, Q106).
+local function pumps(self: SkateController): boolean
+	return self._keys.pump and not self.charging
+end
+
 -- Sends pump, brake and the Air Pose when they change, within the server's rate limit: a change the limit holds back
 -- goes out as the latest state once it may, since the server would drop it and nothing would send it again.
 local function shareState(self: SkateController)
 	local keys = self._keys
+	local pump = pumps(self)
 	local posing = (self.skater :: SkateMath.Skater).airPosing or self._posedLandingLeft > 0
-	if keys.pump ~= self.pumping or keys.brake ~= self.braking or posing ~= self._airPosing then
-		self.pumping = keys.pump
+	if pump ~= self.pumping or keys.brake ~= self.braking or posing ~= self._airPosing then
+		self.pumping = pump
 		self.braking = keys.brake
 		self._airPosing = posing
 		self._statePending = true
@@ -416,6 +426,7 @@ local SkateController: SkateController = {
 	promptsGetUp = false,
 	frozen = false,
 	diving = false,
+	charging = false,
 	attachable = false,
 	_config = nil :: any,
 	_inputController = nil :: any,
@@ -536,6 +547,7 @@ local SkateController: SkateController = {
 		self.promptsGetUp = false
 		self.frozen = false
 		self.diving = false
+		self.charging = false
 		self.attachable = false
 	end,
 
@@ -575,6 +587,7 @@ local SkateController: SkateController = {
 		self.pumping = false
 		self.braking = false
 		self.diving = false
+		self.charging = false
 		self._airPosing = false
 		self._posedLandingLeft = 0
 		self._statePending = false
@@ -614,7 +627,7 @@ local SkateController: SkateController = {
 		self._inputController:read(keys)
 		local input = self._input
 		input.move = stickDirection(self, keys.move, skater.up)
-		input.pump = keys.pump
+		input.pump = pumps(self)
 		input.brake = keys.brake
 		input.jump = keys.jump
 		input.jumpHeld = keys.jumpHeld

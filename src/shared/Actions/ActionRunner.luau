@@ -7,8 +7,9 @@ local Actions = require(script.Parent.Parent.Config.Actions)
 
 export type Phase = "Windup" | "Active" | "Recovery"
 -- What the player is doing as an action starts. `airborne` is nil where the air can't be told from the ground (the
--- server, whose view of a jump lags the client's): an action needing either may start.
-export type Context = { hasBall: boolean, airborne: boolean?, knockedDown: boolean }
+-- server, whose view of a jump lags the client's), and `charging` (a throw charges, #312) where the throw key is not
+-- seen (the server): an action needing either may start.
+export type Context = { hasBall: boolean, airborne: boolean?, knockedDown: boolean, charging: boolean? }
 export type Verdict = "Started" | "Busy" | "CoolingDown" | "NotAllowed"
 
 local ActionRunner = {}
@@ -68,6 +69,12 @@ function ActionRunner.ballFits(ball: Actions.BallRequirement, hasBall: boolean):
 	return ball == "any" or (ball == "with") == hasBall
 end
 
+-- Whether a three-way requirement (`yes`, its opposite, or "any") lets an action start in a state that is `yes` or
+-- not, or that this side can't tell (nil): then either may.
+local function fits(requirement: string, yes: string, state: boolean?): boolean
+	return requirement == "any" or state == nil or (requirement == yes) == state
+end
+
 -- Whether an action with these requirements may start in this context.
 local function allows(requires: Actions.Requires, context: Context): boolean
 	if requires.notKnockedDown and context.knockedDown then
@@ -76,8 +83,7 @@ local function allows(requires: Actions.Requires, context: Context): boolean
 	if not ActionRunner.ballFits(requires.ball, context.hasBall) then
 		return false
 	end
-	local grounded, airborne = requires.grounded, context.airborne
-	return grounded == "any" or airborne == nil or (grounded == "airborne") == airborne
+	return fits(requires.grounded, "airborne", context.airborne) and fits(requires.charge, "charging", context.charging)
 end
 
 local function stop(self: Runner)

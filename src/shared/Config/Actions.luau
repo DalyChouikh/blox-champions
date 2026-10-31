@@ -6,9 +6,10 @@
 
 local Validate = require(script.Parent.Validate)
 
-export type ActionName = "Tackle" | "Dive" | "Dodge" | "Uppercut" | "ChargeThrow" | "Pass" | "CallPass"
--- What the server does with an action: knock down who it reaches, make the player immune, throw, pass or call.
-export type Effect = "Knockdown" | "Dodge" | "Throw" | "Pass" | "CallPass"
+export type ActionName = "Tackle" | "Dive" | "Dodge" | "Uppercut" | "ChargeThrow" | "RollBall" | "Pass" | "CallPass"
+-- What the server does with an action: knock down who it reaches, make the player immune, throw, roll the ball along
+-- the floor, pass or call.
+export type Effect = "Knockdown" | "Dodge" | "Throw" | "Roll" | "Pass" | "CallPass"
 -- How a skater is posed while the action winds up and strikes.
 export type PoseName = "Lunge" | "None"
 
@@ -17,9 +18,13 @@ export type Phases = { windup: number, active: number, recovery: number }
 export type BallRequirement = "with" | "without" | "any"
 -- Whether an action starts only on the ground, only in the air, or either.
 export type Grounded = "grounded" | "airborne" | "any"
+-- Whether an action starts only while a throw charges (the throw key held with the ball, #312), only while none does,
+-- or either.
+export type ChargeRequirement = "charging" | "notCharging" | "any"
 export type Requires = {
 	ball: BallRequirement,
 	grounded: Grounded,
+	charge: ChargeRequirement,
 	notKnockedDown: boolean,
 }
 -- Who a strike reaches: within range, and within coneDeg of the facing pitched up by aimUpDeg.
@@ -101,12 +106,13 @@ export type ActionsConfig = {
 	Dodge: ActionConfig,
 	Uppercut: ActionConfig,
 	ChargeThrow: ActionConfig,
+	RollBall: ActionConfig,
 	Pass: ActionConfig,
 	CallPass: ActionConfig,
 }
 
 -- Every action, in a fixed order.
-local names: { ActionName } = { "Tackle", "Dive", "Dodge", "Uppercut", "ChargeThrow", "Pass", "CallPass" }
+local names: { ActionName } = { "Tackle", "Dive", "Dodge", "Uppercut", "ChargeThrow", "RollBall", "Pass", "CallPass" }
 table.freeze(names)
 
 -- The action called `name`, or nil: a name read back as a plain string (an attribute, a message) typed again.
@@ -119,9 +125,22 @@ local function nameOf(name: string?): ActionName?
 	return nil
 end
 
--- On the ground or in the air alike, unless `grounded` says otherwise (a mode can too, through requires.grounded).
-local function requires(ball: BallRequirement, grounded: Grounded?): Requires
-	return { ball = ball, grounded = grounded or "any", notKnockedDown = true }
+-- Whether an action with this effect lets go of the ball: a throw, a roll or a pass leaves the hands, so the client
+-- sends its aim and predicts the ball leaving.
+local function releasesBall(effect: Effect): boolean
+	return effect == "Throw" or effect == "Roll" or effect == "Pass"
+end
+
+-- Whether an action with this effect spends the charge: a throw and a roll go at its speed (#312), so the client sends
+-- it.
+local function spendsCharge(effect: Effect): boolean
+	return effect == "Throw" or effect == "Roll"
+end
+
+-- On the ground or in the air alike, charging or not, unless `grounded` or `charge` says otherwise (a mode can too,
+-- through requires).
+local function requires(ball: BallRequirement, grounded: Grounded?, charge: ChargeRequirement?): Requires
+	return { ball = ball, grounded = grounded or "any", charge = charge or "any", notKnockedDown = true }
 end
 
 local INSTANT: Phases = { windup = 0, active = 0, recovery = 0 }
@@ -209,18 +228,35 @@ local defaults: ActionsConfig = {
 		},
 		motion = { leapImpulse = 89.81 },
 	},
+	-- Held with the ball to charge, let go to throw. A full charge in 0.5 s (the owner, Q99, kept in trial #311, Q133;
+	-- was 1 s): RC's crosshair closes 0.4-0.6 s after the press (Video 4 at 6:05.9-6:06.4, Video 3 at 36:58, Video 32
+	-- at 2.6-3.2 s). The speeds stay 60 at a tap and 160 at a full charge (10-27 body lengths a second).
 	ChargeThrow = {
 		phases = INSTANT,
 		cooldown = 0,
 		requires = requires("with"),
 		effect = "Throw",
 		pose = "None",
-		throw = { chargeMaxSeconds = 1, minSpeed = 60, maxSpeed = 160, inheritCarrierVelocity = 0.5 },
+		throw = { chargeMaxSeconds = 0.5, minSpeed = 60, maxSpeed = 160, inheritCarrierVelocity = 0.5 },
 	},
+	-- RC's Roll Ball (the owner, Q100; Video 31 at 1:19.4: the ball drops to the floor beside the skater and rolls
+	-- away ahead): the uppercut key while a throw charges puts the ball on the floor under the hand, rolling the
+	-- aim's way across it at the charge's speed. It spends ChargeThrow's charge at ChargeThrow's speeds (one charge,
+	-- one speed range), so it has no throw settings of its own. Only from a surface: in the air the uppercut key does
+	-- nothing (#262, RC greys it there).
+	RollBall = {
+		phases = INSTANT,
+		cooldown = 0,
+		requires = requires("with", "grounded", "charging"),
+		effect = "Roll",
+		pose = "None",
+	},
+	-- Never while a throw charges (the owner, Q140: RC greys Magnetic Pass then, Video 32 at 2.6-3.2 s): letting go of
+	-- the throw, Cancel & Dodge or Roll Ball are the ways out of a charge.
 	Pass = {
 		phases = INSTANT,
 		cooldown = 0,
-		requires = requires("with"),
+		requires = requires("with", nil, "notCharging"),
 		effect = "Pass",
 		pose = "None",
 		pass = { speed = 90, homingAccel = 60, coneDeg = 70, maxRange = 120, angleWeight = 0.6, distanceWeight = 0.4 },
@@ -243,6 +279,7 @@ local phases = Validate.record({ windup = nonNegative, active = nonNegative, rec
 local requiresSchema = Validate.record({
 	ball = Validate.string({ oneOf = { "with", "without", "any" } }),
 	grounded = Validate.string({ oneOf = { "grounded", "airborne", "any" } }),
+	charge = Validate.string({ oneOf = { "charging", "notCharging", "any" } }),
 	notKnockedDown = Validate.boolean(),
 })
 local aimUp = Validate.number({ min = 0, max = 90 })
@@ -342,6 +379,7 @@ local schema = Validate.record({
 		motion = Validate.record({ leapImpulse = positive }),
 	}),
 	ChargeThrow = action(defaults.ChargeThrow, { throw = throw }),
+	RollBall = action(defaults.RollBall, {}),
 	Pass = action(defaults.Pass, { pass = pass }),
 	CallPass = action(defaults.CallPass, {}),
 })
@@ -351,4 +389,6 @@ return {
 	schema = schema,
 	names = names,
 	nameOf = nameOf,
+	releasesBall = releasesBall,
+	spendsCharge = spendsCharge,
 }
