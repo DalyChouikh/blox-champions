@@ -18,12 +18,15 @@ afterEach(function()
 end)
 
 describe("Remotes", function()
-	it("creates one RemoteEvent per name in a Remotes folder", function()
+	it("creates one RemoteEvent per name and one UnreliableRemoteEvent per stream in a Remotes folder", function()
 		local folder = Remotes.create(parent)
 		expect(folder.Name).toBe("Remotes")
-		expect(#folder:GetChildren()).toBe(8)
+		expect(#folder:GetChildren()).toBe(9)
 		for _, name in Remotes.names do
 			expect((folder:FindFirstChild(name) :: Instance).ClassName).toBe("RemoteEvent")
+		end
+		for _, name in Remotes.streams do
+			expect((folder:FindFirstChild(name) :: Instance).ClassName).toBe("UnreliableRemoteEvent")
 		end
 	end)
 
@@ -43,5 +46,14 @@ describe("Remotes", function()
 		expect(function()
 			Remotes.get(parent, "Ghost")
 		end).toThrow('Remotes: unknown remote "Ghost"')
+	end)
+
+	-- #316: the loose ball's state each frame it moves; a lost one is followed by the next, so it is unreliable.
+	it("finds a stream by name and rejects an unknown one", function()
+		Remotes.create(parent)
+		expect(Remotes.getStream(parent, Remotes.streams.BallState).Name).toBe("BallState")
+		expect(function()
+			Remotes.getStream(parent, Remotes.names.BallCarrier)
+		end).toThrow('Remotes: unknown stream "BallCarrier"')
 	end)
 end)

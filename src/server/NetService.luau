@@ -28,6 +28,8 @@ export type NetService = {
 	start: (self: NetService) -> (),
 	fireAll: (self: NetService, name: string, payload: any) -> (),
 	fireTo: (self: NetService, player: PlayerId, name: string, payload: any) -> (),
+	-- Sends plain values to every client on a stream (Remotes.streams, unreliable): no table to build each frame.
+	streamAll: (self: NetService, name: string, ...any) -> (),
 	listen: (
 		self: NetService,
 		name: string,
@@ -43,6 +45,7 @@ export type NetService = {
 	destroy: (self: NetService) -> (),
 	_folder: Folder?,
 	_events: { [string]: RemoteEvent },
+	_streams: { [string]: UnreliableRemoteEvent },
 	_listeners: { [string]: Listener },
 	_drops: { [PlayerId]: number },
 	-- Seconds, for the rate limits (os.clock; a fake in tests).
@@ -61,6 +64,7 @@ local NetService: NetService = {
 	name = "NetService",
 	dependencies = {},
 	_events = {},
+	_streams = {},
 	_listeners = {},
 	_drops = {},
 	_clock = os.clock,
@@ -72,6 +76,10 @@ local NetService: NetService = {
 		self._events = {}
 		for _, name in Remotes.names do
 			self._events[name] = folder:FindFirstChild(name) :: RemoteEvent
+		end
+		self._streams = {}
+		for _, name in Remotes.streams do
+			self._streams[name] = folder:FindFirstChild(name) :: UnreliableRemoteEvent
 		end
 		self._listeners = {}
 		self._drops = {}
@@ -95,6 +103,14 @@ local NetService: NetService = {
 		if target ~= nil then
 			remote:FireClient(target, payload)
 		end
+	end,
+
+	streamAll = function(self: NetService, name: string, ...: any)
+		local stream: UnreliableRemoteEvent? = self._streams[name]
+		if stream == nil then
+			error(`NetService: unknown stream "{name}"`, 0)
+		end
+		stream:FireAllClients(...)
 	end,
 
 	listen = function(
@@ -141,6 +157,7 @@ local NetService: NetService = {
 			self._folder = nil
 		end
 		self._events = {}
+		self._streams = {}
 	end,
 }
 

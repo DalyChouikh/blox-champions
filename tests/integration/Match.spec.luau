@@ -61,6 +61,13 @@ local fakeNet = {
 	fireTo = function(_self: any, to: string, name: string, payload: any)
 		table.insert(fired, { name = name, payload = payload, to = to })
 	end,
+	-- The ball's state (#316) goes out as plain values; kept as one record here.
+	streamAll = function(_self: any, name: string, position: Vector3, velocity: Vector3, lifted: boolean, time: number)
+		table.insert(
+			fired,
+			{ name = name, payload = { position = position, velocity = velocity, lifted = lifted, time = time } }
+		)
+	end,
 }
 
 beforeAll(function()
@@ -722,6 +729,25 @@ describe("A match on the generated arena", function()
 		BallService:throw("1", Vector3.new(0, 20, 0))
 		frames(FRAME)
 		expect(lastFired(Remotes.names.BallCarrier).payload).toEqual({})
+	end)
+
+	-- #316 (Q101): every screen draws the loose ball from the server's own states.
+	it("sends everyone the loose ball's state each frame it moves, and none while it is carried", function()
+		setup()
+		local rigs = seat(1)
+		kickoff()
+		frames(FRAME)
+		local state = lastFired(Remotes.streams.BallState).payload
+		Fixtures.expectNear(state.position, BallService.part.Position)
+		-- It drops in with its weight cancelled (#321).
+		expect(state.lifted).toBe(true)
+		local sent = #firedNamed(Remotes.streams.BallState)
+		frames(FRAME)
+		expect(#firedNamed(Remotes.streams.BallState)).toBe(sent + 1)
+		catchWith(rigs[1])
+		sent = #firedNamed(Remotes.streams.BallState)
+		frames(5 * FRAME)
+		expect(#firedNamed(Remotes.streams.BallState)).toBe(sent)
 	end)
 
 	it("runs a frame for six players in under a millisecond", function()

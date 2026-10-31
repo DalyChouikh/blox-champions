@@ -8,6 +8,9 @@
 --   ActionRejected server → client   { action } when the server refuses it, so the client cancels it
 --   GetUp          client → server   {} once per knockdown, when the knocked-down player moves (Net/Schemas)
 --   SwitchTeam     client → server   {} when a player asks to switch to the other team (#310; Net/Schemas)
+-- Streams are UnreliableRemoteEvents: each message soon makes the last one stale, so a lost one is not resent.
+--   BallState      server → clients  position, velocity, lifted, serverTime: the loose ball each frame it moves and
+--                                    every Network.ballStream.restSeconds at rest (#316; Client/BallView draws it)
 
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 
@@ -28,8 +31,13 @@ local names: { [string]: string } = {
 }
 Remotes.names = Freeze.deep(names)
 
-local function isName(name: string): boolean
-	for _, known in Remotes.names do
+local streams: { [string]: string } = {
+	BallState = "BallState",
+}
+Remotes.streams = Freeze.deep(streams)
+
+local function isIn(list: { [string]: string }, name: string): boolean
+	for _, known in list do
 		if known == name then
 			return true
 		end
@@ -48,16 +56,29 @@ function Remotes.create(parent: Instance): Folder
 		remote.Name = name
 		remote.Parent = folder
 	end
+	for _, name in Remotes.streams do
+		local stream = Instance.new("UnreliableRemoteEvent")
+		stream.Name = name
+		stream.Parent = folder
+	end
 	folder.Parent = parent
 	return folder
 end
 
 -- Waits until the server has created the remote.
 function Remotes.get(parent: Instance, name: string): RemoteEvent
-	if not isName(name) then
+	if not isIn(Remotes.names, name) then
 		error(`Remotes: unknown remote "{name}"`, 0)
 	end
 	return parent:WaitForChild(Remotes.FOLDER):WaitForChild(name) :: RemoteEvent
+end
+
+-- Waits until the server has created the stream.
+function Remotes.getStream(parent: Instance, name: string): UnreliableRemoteEvent
+	if not isIn(Remotes.streams, name) then
+		error(`Remotes: unknown stream "{name}"`, 0)
+	end
+	return parent:WaitForChild(Remotes.FOLDER):WaitForChild(name) :: UnreliableRemoteEvent
 end
 
 return table.freeze(Remotes)

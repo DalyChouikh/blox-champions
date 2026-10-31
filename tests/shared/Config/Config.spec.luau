@@ -39,14 +39,14 @@ describe("Config defaults", function()
 	it("match the spec's ball and network values", function()
 		local d = Config.defaults()
 		-- The owner's trial #311 (Q121-Q133): a 2-stud ball carried low in the right hand, the magnet at 6 studs with
-		-- a 0.3 s pull into the hand.
+		-- a pull into the hand, 0.2 s since the smooth ball (Q139, #316).
 		expect(d.Ball).toEqual({
 			radius = 1,
 			density = 0.7,
 			friction = 0.3,
 			elasticity = 0.5,
 			pickupRadius = 6,
-			pickupPullSeconds = 0.3,
+			pickupPullSeconds = 0.2,
 			rethrowPickupDelay = 0.4,
 			strandedSeconds = 5,
 			restSpeed = 1,
@@ -68,6 +68,8 @@ describe("Config defaults", function()
 			maxGetUpsPerSecond = 2,
 			posedLandingTolerance = 0.3,
 			maxTeamSwitchesPerSecond = 1,
+			-- #316: each screen draws the loose ball from the server's states (measured in a 2-player test).
+			ballStream = { correctionSeconds = 0.08, snapStuds = 10, maxAgeSeconds = 0.3, restSeconds = 0.25 },
 		})
 	end)
 
@@ -986,12 +988,46 @@ describe("Config.forMode", function()
 		expect(ball.restSpeed).toBe(0.01)
 	end)
 
-	-- The owner (Q91, Q132, #311): a caught ball flies into the hand over 0.3 s on every screen.
+	-- The owner (Q91, Q132, Q139, #311, #316): a caught ball flies into the hand over 0.2 s on every screen.
 	it("rejects a pull into the hand that takes negative time, and accepts none (a snap)", function()
 		expect(function()
 			Fixtures.config({ Ball = { pickupPullSeconds = -0.1 } })
 		end).toThrow("Ball.pickupPullSeconds: must be >= 0 (got -0.1)")
 		expect(Fixtures.config({ Ball = { pickupPullSeconds = 0 } }).Ball.pickupPullSeconds).toBe(0)
+	end)
+
+	-- #316 (Q101): the server's states of the loose ball and how each screen draws it between them.
+	it("rejects ball stream settings outside their limits", function()
+		local cases = {
+			{ field = "correctionSeconds", value = 0 },
+			{ field = "snapStuds", value = 0 },
+			{ field = "maxAgeSeconds", value = 0 },
+			{ field = "restSeconds", value = 0 },
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config({ Network = { ballStream = { [case.field] = case.value } } })
+			end).toThrow(`Network.ballStream.{case.field}: must be > 0 (got 0)`)
+		end
+	end)
+
+	it("accepts ball stream settings just inside their limits", function()
+		local stream = Fixtures.config({
+			Network = {
+				ballStream = {
+					correctionSeconds = 0.001,
+					snapStuds = 0.001,
+					maxAgeSeconds = 0.001,
+					restSeconds = 0.001,
+				},
+			},
+		}).Network.ballStream
+		expect(stream).toEqual({
+			correctionSeconds = 0.001,
+			snapStuds = 0.001,
+			maxAgeSeconds = 0.001,
+			restSeconds = 0.001,
+		})
 	end)
 
 	it("rejects the old idle respawn as unknown", function()

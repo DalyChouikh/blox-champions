@@ -26,7 +26,7 @@ export type BallConfig = {
 	elasticity: number,
 	-- A player whose root is this close to the ball's center catches it (plus Network.pickupLagToleranceStuds).
 	pickupRadius: number,
-	-- How long a caught ball takes to fly into the hand on every screen (Client/BallPull); the server hands it over
+	-- How long a caught ball takes to fly into the hand on every screen (Client/BallView); the server hands it over
 	-- at once. None is a snap.
 	pickupPullSeconds: number,
 	-- How long a thrower must wait before catching their own throw.
@@ -54,8 +54,9 @@ local defaults: BallConfig = {
 	elasticity = 0.5,
 	-- The owner (Q91, #311): a loose ball within a body length of a skater's middle is theirs at once.
 	pickupRadius = 6,
-	-- The owner (Q129, Q132, #311): RC pulls a ball into the hand in ~0.2 s (Video 13 at 1:36.8); 0.3 felt right.
-	pickupPullSeconds = 0.3,
+	-- The owner (Q129, Q132, #311): RC pulls a ball into the hand in ~0.2 s (Video 13 at 1:36.8); 0.3 was kept, then
+	-- 0.2 on the smooth ball (Q138, Q139, #316).
+	pickupPullSeconds = 0.2,
 	rethrowPickupDelay = 0.4,
 	-- The owner (Q93, #308): no idle respawn; only a ball resting 5 s on something nobody skates respawns.
 	strandedSeconds = 5,

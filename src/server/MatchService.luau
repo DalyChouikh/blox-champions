@@ -4,14 +4,14 @@
 -- then reports the ball's movement, a throw, a catch, a body touch and each knockdown to the rules engine in the order
 -- the engine documents, ticks it, reacts to its events — hiding and spawning the ball, clearing every action, knockdown
 -- and call at a kickoff, placing characters on their spawns, opening and closing the goal — and sends them to clients,
--- each frame's batch followed by the match's snapshot, which clients draw from, both marked with the frame's number. A
--- snapshot also goes to everyone whenever a seat changes, and to each player who joins, marked with the last frame's
--- number; it names every player in the server and each who left during the match, so the feed can still name them. It
--- keeps the ball dead whenever play is not live, so the ball is only ever carried by the engine's last holder. A
--- player's request to switch team (SwitchTeam, #310) moves them to the other team's free seat when TeamSwitch allows
--- it, their numbers with them, and stands them on its spawn at once, started over. After a match ends it waits
--- postMatchSeconds and starts the next one with everyone on the team they last played for; once every player has
--- left it starts over.
+-- each frame's batch followed by the match's snapshot, which clients draw from, both marked with the frame's number,
+-- then who carries the ball and the loose ball's state (#316). A snapshot also goes to everyone whenever a seat
+-- changes, and to each player who joins, marked with the last frame's number; it names every player in the server and
+-- each who left during the match, so the feed can still name them. It keeps the ball dead whenever play is not live, so
+-- the ball is only ever carried by the engine's last holder. A player's request to switch team (SwitchTeam, #310) moves
+-- them to the other team's free seat when TeamSwitch allows it, their numbers with them, and stands them on its spawn
+-- at once, started over. After a match ends it waits postMatchSeconds and starts the next one with everyone on the team
+-- they last played for; once every player has left it starts over.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -306,6 +306,11 @@ local MatchService: MatchService = {
 			self._carrier = carrier
 			local told: Payloads.BallCarrier = { carrier = carrier }
 			self._net:fireAll(Remotes.names.BallCarrier, told)
+		end
+		-- The loose ball for every screen to draw (#316), as this frame left it.
+		local stream = self._ball:streamState(dt)
+		if stream ~= nil then
+			self._net:streamAll(Remotes.streams.BallState, stream.position, stream.velocity, stream.lifted, stream.time)
 		end
 
 		local postMatchLeft = self._postMatchLeft
