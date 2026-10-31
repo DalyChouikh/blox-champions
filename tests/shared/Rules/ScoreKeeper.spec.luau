@@ -120,6 +120,41 @@ describe("ScoreKeeper", function()
 		expect(back[1]).toMatchObject({ player = "B1", score = 100, goals = 1 })
 	end)
 
+	-- The owner (Q104, #310): the row and its numbers move with the switcher; each goal stays with the team it scored
+	-- for.
+	it("moves a switching player's row and numbers to the other team", function()
+		local scores = keeper()
+		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B1", points = 3 })
+		scores:switchTeam("B1", "Orange")
+		expect(line(scores, "B1")).toMatchObject({ team = "Orange", joinOrder = 1, score = 100, goals = 1 })
+		expect(scores:teamScores()).toEqual({ Blue = 3, Orange = 0 })
+		local order: { string } = {}
+		for _, entry in scores:stats().players do
+			table.insert(order, entry.player)
+		end
+		expect(order).toEqual({ "B2", "B1", "O1" })
+		-- After a leave they may come back only to the team they last played for.
+		scores:removePlayer("B1")
+		expect(function()
+			scores:addPlayer("B1", "Blue")
+		end).toThrow('ScoreKeeper: player "B1" played for Orange and can only return to Orange')
+		scores:addPlayer("B1", "Orange")
+	end)
+
+	it("rejects a switch by an unknown player or a leaver, or to an unknown team", function()
+		local scores = keeper()
+		expect(function()
+			scores:switchTeam("X", "Blue")
+		end).toThrow('ScoreKeeper: unknown player "X"')
+		expect(function()
+			scores:switchTeam("B1", "Red" :: any)
+		end).toThrow('ScoreKeeper: unknown team "Red"')
+		scores:removePlayer("B2")
+		expect(function()
+			scores:switchTeam("B2", "Orange")
+		end).toThrow('ScoreKeeper: player "B2" is not in the match')
+	end)
+
 	it("rejects duplicate and unknown players, unknown teams, and a returning player on another team", function()
 		local scores = keeper()
 		expect(function()

@@ -57,6 +57,12 @@ local function ranksAbove(a: PlayerStats, b: PlayerStats): boolean
 	return a.joinOrder < b.joinOrder
 end
 
+local function checkTeam(team: Team.Team)
+	if not Team.is(team) then
+		error(`ScoreKeeper: unknown team "{tostring(team)}"`, 0)
+	end
+end
+
 local function entry(self: ScoreKeeper, player: Types.PlayerId): Entry
 	local known = self._players[player]
 	if known == nil then
@@ -76,9 +82,7 @@ end
 -- Adds a player, or brings back one who left, keeping their stats and join order. A returning player must
 -- rejoin the team they played for: their stats, and any ball they last held, belong to that team.
 function ScoreKeeper.addPlayer(self: ScoreKeeper, player: Types.PlayerId, team: Team.Team)
-	if not Team.is(team) then
-		error(`ScoreKeeper: unknown team "{tostring(team)}"`, 0)
-	end
+	checkTeam(team)
 	local existing = self._players[player]
 	if existing ~= nil then
 		if existing.present then
@@ -109,6 +113,17 @@ end
 
 function ScoreKeeper.removePlayer(self: ScoreKeeper, player: Types.PlayerId)
 	entry(self, player).present = false
+end
+
+-- Moves a player still in the match to `team`, their numbers with them; the team scores keep each goal where it was
+-- scored (the owner, Q104, Q119, #310).
+function ScoreKeeper.switchTeam(self: ScoreKeeper, player: Types.PlayerId, team: Team.Team)
+	checkTeam(team)
+	local known = entry(self, player)
+	if not known.present then
+		error(`ScoreKeeper: player "{player}" is not in the match`, 0)
+	end
+	known.stats.team = team
 end
 
 -- The live entry (read-only by convention), or nil for a player never added.

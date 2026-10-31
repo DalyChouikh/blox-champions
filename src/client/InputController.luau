@@ -7,7 +7,8 @@
 -- pad and buttons in here. Every key stops while Roblox's menu or its Developer Console is open (also when the menu is
 -- open as this starts): the keys fire then too (measured), and a hold lets go. The menu has signals; the console has
 -- none, so watchOverlays reads it once a frame. `paused` tells the skating and the actions that a hold let go because
--- of Roblox's menu or console, not the player, and the camera to free the cursor.
+-- of Roblox's menu or console, not the player, and the camera to free the cursor. The HUD reads the score tab's key as
+-- held, and Switch team's as a press (#310).
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -32,8 +33,8 @@ export type ActionKeys = { tackle: boolean, uppercut: boolean, pass: boolean, th
 export type CameraKeys = { look: Vector2, ballFocus: boolean, ballFocusPressed: boolean }
 
 -- The pressed (not held) buttons, each counted on its own.
-type Presses = { jump: number, tackle: number, uppercut: number, pass: number, ballFocus: number }
-type Pressed = "jump" | "tackle" | "uppercut" | "pass" | "ballFocus"
+type Presses = { jump: number, tackle: number, uppercut: number, pass: number, ballFocus: number, switchTeam: number }
+type Pressed = "jump" | "tackle" | "uppercut" | "pass" | "ballFocus" | "switchTeam"
 type LookBindings = { mouse: InputBinding, stick: InputBinding, touch: InputBinding }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
@@ -61,6 +62,8 @@ export type InputController = {
 	watchOverlays: (self: InputController) -> (),
 	-- The score tab's key (Tab, or Select) held now.
 	scoreTabHeld: (self: InputController) -> boolean,
+	-- Whether Switch team's key (T, or D-pad Up) was pressed since its last read.
+	switchTeamPressed: (self: InputController) -> boolean,
 	-- Roblox's menu or Developer Console is open: every key is stopped.
 	paused: boolean,
 	destroy: (self: InputController) -> (),
@@ -89,6 +92,11 @@ export type InputController = {
 	-- StarterGui:GetCore, which errors for a key Roblox's own scripts have not registered yet.
 	_getCore: (key: string) -> any,
 }
+
+-- No presses counted yet.
+local function noPresses(): Presses
+	return { jump = 0, tackle = 0, uppercut = 0, pass = 0, ballFocus = 0, switchTeam = 0 }
+end
 
 local function getCore(key: string): any
 	return StarterGui:GetCore(key)
@@ -123,6 +131,7 @@ local NAMES = {
 	look = "Look",
 	ballFocus = "BallFocus",
 	scoreTab = "ScoreTab",
+	switchTeam = "SwitchTeam",
 	touchMove = "TouchMove",
 	touchStick = "TouchStick",
 }
@@ -212,7 +221,7 @@ local InputController: InputController = {
 	_scoreTab = nil :: any,
 	_lookBindings = nil :: any,
 	_stick = nil :: any,
-	_presses = { jump = 0, tackle = 0, uppercut = 0, pass = 0, ballFocus = 0 },
+	_presses = noPresses(),
 	_connections = {},
 	_lookSettings = function(): (number, number, boolean)
 		return 1, 1, false
@@ -234,7 +243,7 @@ local InputController: InputController = {
 		context.Priority = input.contextPriority
 		context.Sink = true
 		self.context = context
-		self._presses = { jump = 0, tackle = 0, uppercut = 0, pass = 0, ballFocus = 0 }
+		self._presses = noPresses()
 		self._connections = {}
 		self._lookSettings = deps.LookSettings or lookSettingsOf(UserSettings():GetService("UserGameSettings"))
 
@@ -264,6 +273,7 @@ local InputController: InputController = {
 		self._throw = newButton(context, NAMES.throw, input.throw)
 		self._ballFocus = newPressButton(self, NAMES.ballFocus, input.ballFocus, "ballFocus")
 		self._scoreTab = newButton(context, NAMES.scoreTab, input.scoreTab)
+		newPressButton(self, NAMES.switchTeam, input.switchTeam, "switchTeam")
 
 		local look = newAction(context, NAMES.look, Enum.InputActionType.Direction2D)
 		self._look = look
@@ -367,6 +377,10 @@ local InputController: InputController = {
 
 	scoreTabHeld = function(self: InputController): boolean
 		return self._scoreTab:GetState() :: boolean
+	end,
+
+	switchTeamPressed = function(self: InputController): boolean
+		return takePress(self, "switchTeam")
 	end,
 
 	watchOverlays = function(self: InputController)

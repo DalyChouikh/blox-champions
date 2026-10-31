@@ -16,6 +16,7 @@ local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local MatchService = require(ServerScriptService.Server.MatchService)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 local TeamService = require(ServerScriptService.Server.TeamService)
 local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 
@@ -45,8 +46,15 @@ local function ballAt(): string?
 	return if parent ~= nil then parent.Name else nil
 end
 
+-- What each remote's listener does, and the shape and rate limit NetService holds its messages to.
+local handlers: { [string]: (player: string, payload: any) -> () } = {}
+local limits: { [string]: { schema: any, perSecond: number } } = {}
+
 local fakeNet = {
-	listen = function() end,
+	listen = function(_self: any, name: string, schema: any, perSecond: number, handler: (string, any) -> ())
+		handlers[name] = handler
+		limits[name] = { schema = schema, perSecond = perSecond }
+	end,
 	fireAll = function(_self: any, name: string, payload: any)
 		table.insert(fired, { name = name, payload = payload, ballAt = ballAt() })
 	end,
@@ -244,6 +252,21 @@ local function lineUp(attacker: Model, victim: Model, gap: number): CFrame
 	attacker:PivotTo(frame)
 	victim:PivotTo(frame * CFrame.new(0, 0, -gap))
 	return frame
+end
+
+-- A client's Switch team request from `player`, as NetService hands a valid one over.
+local function switchTeam(player: string)
+	handlers[Remotes.names.SwitchTeam](player, {})
+end
+
+-- The team `player` plays for in a snapshot's score tab.
+local function listedTeam(snapshot: any, player: string): string?
+	for _, entry in snapshot.match.stats.players do
+		if entry.player == player then
+			return entry.team
+		end
+	end
+	return nil
 end
 
 describe("A match on the generated arena", function()
@@ -571,6 +594,86 @@ describe("A match on the generated arena", function()
 			expect(#left.match.stats.players).toBe(1)
 		end
 	)
+
+	-- The owner (Q104, Q117, Q120, #310).
+	it("switches a player into the other team's free seat at once, numbers and all, onto its spawn", function()
+		setup()
+		local rigs = seat(2)
+		local other = TeamService:teamOf("2")
+		kickoff()
+		local placed = (rigs[1]:GetAttribute(Attributes.Placed) :: number?) or 0
+		local snapshots = #firedNamed(Remotes.names.MatchSnapshot)
+		local resets = jest.spyOn(ActionService, "resetPlayer")
+		switchTeam("1")
+		expect(#resets.mock.calls).toBe(1)
+		expect(resets.mock.calls[1][2]).toBe("1")
+		resets:mockRestore()
+		expect(TeamService:teamOf("1")).toBe(other)
+		expect(#firedNamed(Remotes.names.MatchSnapshot)).toBe(snapshots + 1)
+		expect(listedTeam(lastFired(Remotes.names.MatchSnapshot).payload, "1")).toBe(other)
+		-- Standing on the new team's spawn, the slot after its one player's.
+		local spawns: any = tagged().teamSpawns
+		local spawn = spawns[other][2] * CFrame.new(0, config.Movement.hoverHeight, 0)
+		Fixtures.expectNear(Fixtures.root(rigs[1]).Position, spawn.Position)
+		expect(rigs[1]:GetAttribute(Attributes.Placed)).toBe(placed + 1)
+	end)
+
+	it("takes switch requests in their own shape, within their own rate limit", function()
+		setup()
+		local limit = limits[Remotes.names.SwitchTeam]
+		expect(limit.schema == Schemas.SwitchTeam).toBe(true)
+		expect(limit.perSecond).toBe(config.Network.maxTeamSwitchesPerSecond)
+	end)
+
+	-- The owner (Q104, Q119): never with the ball, but nothing holds a switch back after a throw.
+	it("refuses a switch with the ball, and switches once it is thrown", function()
+		setup()
+		local rigs = seat(2)
+		local team = TeamService:teamOf("1")
+		kickoff()
+		catchWith(rigs[1])
+		switchTeam("1")
+		expect(TeamService:teamOf("1")).toBe(team)
+		BallService:throw("1", Vector3.new(0, 20, 0))
+		frames(FRAME)
+		switchTeam("1")
+		expect(TeamService:teamOf("1")).never.toBe(team)
+	end)
+
+	it("refuses a switch into a full team, and ignores one from a spectator", function()
+		setup({ teamSize = 1 })
+		seat(3)
+		local team = TeamService:teamOf("1")
+		switchTeam("1")
+		expect(TeamService:teamOf("1")).toBe(team)
+		switchTeam("3")
+		expect(TeamService:teamOf("3")).toBeNil()
+	end)
+
+	-- The owner (Q97): ranked (M7) never offers it.
+	it("refuses a switch where the mode has no switching", function()
+		setup({ teamSwitching = false })
+		seat(2)
+		local team = TeamService:teamOf("1")
+		switchTeam("1")
+		expect(TeamService:teamOf("1")).toBe(team)
+	end)
+
+	-- The owner (Q97, #310): the next match keeps everyone's team, even uneven.
+	it("keeps everyone's team for the next match, where a switch after the end counts", function()
+		setup({ pointsToWin = 1, postMatchSeconds = 2 })
+		scoreOnce(2)
+		local first = TeamService:teamOf("1")
+		local second = TeamService:teamOf("2")
+		switchTeam("2")
+		expect(TeamService:teamOf("2")).toBe(first)
+		-- The ended match's tab keeps the team they played it for.
+		expect(listedTeam(lastFired(Remotes.names.MatchSnapshot).payload, "2")).toBe(second)
+		frames(2.05)
+		local next = lastFired(Remotes.names.MatchSnapshot).payload
+		expect(listedTeam(next, "1")).toBe(first)
+		expect(listedTeam(next, "2")).toBe(first)
+	end)
 
 	it("forgets, when the next match starts, the names of players no longer in the server", function()
 		setup({ pointsToWin = 1, postMatchSeconds = 2 })

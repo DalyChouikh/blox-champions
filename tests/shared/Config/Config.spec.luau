@@ -33,6 +33,7 @@ describe("Config defaults", function()
 		expect(m.postMatchSeconds).toBe(15)
 		expect(m.lastChance).toEqual({ enabled = true })
 		expect(m.respawnSeconds).toBe(3)
+		expect(m.teamSwitching).toBe(true)
 	end)
 
 	it("match the spec's ball and network values", function()
@@ -63,6 +64,7 @@ describe("Config defaults", function()
 			actionTimingTolerance = 0.1,
 			maxGetUpsPerSecond = 2,
 			posedLandingTolerance = 0.3,
+			maxTeamSwitchesPerSecond = 1,
 		})
 	end)
 
@@ -323,6 +325,7 @@ describe("Config defaults", function()
 		expect(input.ballFocusMode).toBe("Hold")
 		expect(input.touchBallFocusMode).toBe("Toggle")
 		expect(input.scoreTab).toEqual({ Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect })
+		expect(input.switchTeam).toEqual({ Enum.KeyCode.T, Enum.KeyCode.DPadUp })
 		expect(input.actions).toEqual({
 			tackle = { "Dive", "Tackle", "Dodge" },
 			uppercut = { "Uppercut" },
@@ -470,6 +473,7 @@ describe("Config defaults", function()
 			-- A raised hand.
 			callPass = "\u{270B}",
 			touchMove = "Move",
+			switchTeam = "Switch team",
 		})
 		expect(ui.hud).toEqual({
 			font = Enum.Font.BuilderSansBold,
@@ -1269,6 +1273,35 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Network = { maxGetUpsPerSecond = 0 } })
 		end).toThrow("Network.maxGetUpsPerSecond: must be > 0 (got 0)")
+	end)
+
+	-- The owner (Q97, Q117, Q120, #310).
+	it("rejects a non-boolean switching flag, a switch key bound twice, and no switch requests", function()
+		expect(function()
+			Fixtures.config({ Match = { teamSwitching = "yes" } })
+		end).toThrow("Match.teamSwitching: expected boolean, got string")
+		expect(function()
+			Fixtures.config({ Input = { switchTeam = { Enum.KeyCode.E } } })
+		end).toThrow("Input: E is bound to more than one action")
+		expect(function()
+			Fixtures.config({ Network = { maxTeamSwitchesPerSecond = 0 } })
+		end).toThrow("Network.maxTeamSwitchesPerSecond: must be > 0 (got 0)")
+		expect(function()
+			Fixtures.config({ UI = { text = { switchTeam = "" } } })
+		end).toThrow("UI.text.switchTeam: must not be empty")
+	end)
+
+	it("accepts team switching settings just inside their limits", function()
+		local config = Fixtures.config({
+			Match = { teamSwitching = false },
+			Input = { switchTeam = {} },
+			Network = { maxTeamSwitchesPerSecond = 0.01 },
+			UI = { text = { switchTeam = "S" } },
+		})
+		expect(config.Match.teamSwitching).toBe(false)
+		expect(config.Input.switchTeam).toEqual({})
+		expect(config.Network.maxTeamSwitchesPerSecond).toBe(0.01)
+		expect(config.UI.text.switchTeam).toBe("S")
 	end)
 
 	-- The review (#303): a knockdown lasts at least getUpAfter (Network.maxGetUpsPerSecond's honest client), and a

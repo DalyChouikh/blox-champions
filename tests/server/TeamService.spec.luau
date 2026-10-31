@@ -7,6 +7,7 @@ local beforeEach = JestGlobals.beforeEach
 
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local TeamService = require(game:GetService("ServerScriptService").Server.TeamService)
 
 beforeEach(function()
@@ -53,10 +54,15 @@ describe("TeamService", function()
 		expect(c:GetAttribute(Attributes.Team)).toBe(aTeam)
 	end)
 
-	it("reseats everyone for a new match and announces every seat", function()
+	-- The owner (Q97, #310): the next match keeps everyone's team, even uneven.
+	it("keeps everyone's team for a new match, even uneven, and announces every seat", function()
+		TeamService:init({ Config = Fixtures.config({ Match = { teamSize = 2 } }) })
 		local a, b = Fixtures.stubPlayer(1), Fixtures.stubPlayer(2)
 		TeamService:join(a)
 		TeamService:join(b)
+		TeamService:switch("1")
+		local team = TeamService:teamOf("2")
+		expect(TeamService:teamOf("1")).toBe(team)
 		local seated: { string }, unseated: { string } = {}, {}
 		TeamService.seated:Connect(function(id: string)
 			table.insert(seated, id)
@@ -69,7 +75,53 @@ describe("TeamService", function()
 		expect(seated).toEqual({ "1", "2" })
 		-- Everyone seated before still fits: a new match never takes a seat away.
 		expect(unseated).toEqual({})
-		expect(a:GetAttribute(Attributes.Team)).toBe(TeamService:teamOf("1"))
+		expect(TeamService:teamOf("1")).toBe(team)
+		expect(TeamService:teamOf("2")).toBe(team)
+		expect(a:GetAttribute(Attributes.Team)).toBe(team)
+	end)
+
+	-- The owner (Q104, #310).
+	it("switches a seated player to the other team's free seat, marks it on the player and announces it", function()
+		TeamService:init({ Config = Fixtures.config({ Match = { teamSize = 2 } }) })
+		local a, b = Fixtures.stubPlayer(1), Fixtures.stubPlayer(2)
+		TeamService:join(a)
+		TeamService:join(b)
+		local before: Team.Team = TeamService:teamOf("1") :: Team.Team
+		local other: Team.Team = TeamService:teamOf("2") :: Team.Team
+		local switched: { string } = {}
+		TeamService.switched:Connect(function(id: string, team: string)
+			table.insert(switched, `{id}:{team}`)
+		end)
+		expect(TeamService:seatedOn(other)).toBe(1)
+		TeamService:switch("1")
+		expect(TeamService:teamOf("1")).toBe(other)
+		expect(a:GetAttribute(Attributes.Team)).toBe(other)
+		expect(switched).toEqual({ `1:{other}` })
+		expect(TeamService:seatedOn(other)).toBe(2)
+		expect(TeamService:seatedOn(before)).toBe(0)
+		local team, slot = TeamService:slotOf("1")
+		expect(team).toBe(other)
+		expect(slot).toBe(2)
+	end)
+
+	it("gives the seat a switch frees to a spectator waiting for it, and announces it", function()
+		local a, b, c = Fixtures.stubPlayer(1), Fixtures.stubPlayer(2), Fixtures.stubPlayer(3)
+		TeamService:join(a)
+		TeamService:join(b)
+		local first = TeamService:teamOf("1")
+		-- 3 takes 1's seat; back, 1 waits for it, as the seat 2 frees is on the other team.
+		TeamService:leave(a)
+		TeamService:join(c)
+		TeamService:join(a)
+		TeamService:leave(b)
+		expect(TeamService:teamOf("1")).toBeNil()
+		local seated: { string } = {}
+		TeamService.seated:Connect(function(id: string, team: string)
+			table.insert(seated, `{id}:{team}`)
+		end)
+		TeamService:switch("3")
+		expect(seated).toEqual({ `1:{first}` })
+		expect(a:GetAttribute(Attributes.Team)).toBe(first)
 	end)
 
 	it("lets a new session of the same user replace the old one, whose late leave changes nothing", function()

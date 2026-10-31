@@ -244,3 +244,39 @@ describe("HudState", function()
 		expect(match(state).secondsLeft).toBe(60)
 	end)
 end)
+
+describe("HudState:switchOffer", function()
+	-- Ana alone on Blue; Orange full with Rex, "3" and "4".
+	local function orangeFull(): Types.MatchStats
+		local players: { Types.PlayerStats } = { Fixtures.playerStats("1", "Blue") }
+		for _, id in { "2", "3", "4" } do
+			table.insert(players, Fixtures.playerStats(id, "Orange"))
+		end
+		return { scores = { Blue = 0, Orange = 0 }, players = players }
+	end
+
+	-- The owner (Q104, Q118, #310): the score tab's button works while the other team has a free seat and the viewer
+	-- lacks the ball, and stays greyed otherwise.
+	it("offers the viewer the button, open with a free seat on the other team and no ball", function()
+		local state = liveState()
+		expect(state:switchOffer(nil)).toBe(true)
+		expect(state:switchOffer("2")).toBe(true)
+		expect(state:switchOffer(VIEWER)).toBe(false)
+		expect(liveState({ stats = orangeFull() }):switchOffer(nil)).toBe(false)
+		-- Rex may still go over to Blue's free seats.
+		local rex = HudState.new(config, "2")
+		rex:applySnapshot(Fixtures.matchSnapshot({ stats = orangeFull() }))
+		expect(rex:switchOffer(nil)).toBe(true)
+	end)
+
+	it("offers none where the mode has no switching, to a viewer the match doesn't list, or once it ends", function()
+		local closed = HudState.new(Fixtures.config({ Match = { teamSwitching = false } }), VIEWER)
+		closed:applySnapshot(Fixtures.matchSnapshot())
+		expect(closed:switchOffer(nil)).toBeNil()
+		local stranger = HudState.new(config, "9")
+		stranger:applySnapshot(Fixtures.matchSnapshot())
+		expect(stranger:switchOffer(nil)).toBeNil()
+		expect(HudState.new(config, VIEWER):switchOffer(nil)).toBeNil()
+		expect(liveState({ state = "Ended" }):switchOffer(nil)).toBeNil()
+	end)
+end)

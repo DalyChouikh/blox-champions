@@ -14,6 +14,7 @@ local MatchClock = require(script.Parent.Parent.Rules.MatchClock)
 local MatchEngine = require(script.Parent.Parent.Rules.MatchEngine)
 local Payloads = require(script.Parent.Parent.Net.Payloads)
 local Team = require(script.Parent.Parent.Rules.Team)
+local TeamSwitch = require(script.Parent.Parent.Rules.TeamSwitch)
 local Types = require(script.Parent.Parent.Rules.Types)
 
 type Team = Team.Team
@@ -114,6 +115,27 @@ end
 -- The viewer's team in the current match, nil while it does not list them.
 local function viewerTeam(self: HudState): Team?
 	return HudState.teamOf(self.match, self._viewer)
+end
+
+-- The score tab's Switch team button (spec §10.1; the owner, Q104, Q118, #310): nil while it has none (the mode offers
+-- no switching, the match doesn't list the viewer, or it is over), else whether a switch works now, with `carrier`
+-- holding the ball; greyed while it doesn't. The match lists exactly the players with a seat (#309), so its rows count
+-- the other team's seats.
+function HudState.switchOffer(self: HudState, carrier: PlayerId?): boolean?
+	local rules = self._config.Match
+	local match = self.match
+	local team: Team? = viewerTeam(self)
+	if not rules.teamSwitching or self.ended ~= nil or match == nil or team == nil then
+		return nil
+	end
+	local other: Team = Team.opponent(team)
+	local seated = 0
+	for _, stats in match.stats.players do
+		if stats.team == other then
+			seated += 1
+		end
+	end
+	return TeamSwitch.allowed(rules, seated, carrier == self._viewer)
 end
 
 -- The kickoff's count at `secondsLeft`, in the viewer's team's colour (the owner, Q110).

@@ -107,17 +107,22 @@ function Style.fit(
 end
 
 -- A key `height` pixels tall at `order` in its row: Roblox's glyph, or its name on a key cap that a long name ("Shift")
--- widens, keeping `spacing` at each side. Returns what its row calls it ("Glyph" or "Key") and the key.
+-- widens, keeping `spacing` at each side, faded by `fade` on a greyed button. Returns what its row calls it ("Glyph" or
+-- "Key") and the key.
 function Style.key(
 	config: Config.GameConfig,
 	view: KeyView,
 	height: number,
-	order: number
+	order: number,
+	fade: number?
 ): (string, React.ReactElement)
 	local size = UDim2.fromOffset(height, height)
 	if view.image ~= nil then
 		return "Glyph",
-			React.createElement("ImageLabel", Style.holder({ LayoutOrder = order, Size = size, Image = view.image }))
+			React.createElement(
+				"ImageLabel",
+				Style.holder({ LayoutOrder = order, Size = size, Image = view.image, ImageTransparency = fade })
+			)
 	end
 	local spacing = UDim.new(0, config.UI.hud.spacing)
 	return "Key",
@@ -130,6 +135,7 @@ function Style.key(
 					Size = size,
 					AutomaticSize = Enum.AutomaticSize.X,
 					Text = view.text or "",
+					TextTransparency = fade,
 				})
 			),
 			{
@@ -139,8 +145,14 @@ function Style.key(
 		)
 end
 
--- A key's label: as tall as its row, as wide as its text (a string or a binding), at `order` in the row.
-function Style.label(config: Config.GameConfig, text: string | React.Binding<string>, order: number): React.ReactElement
+-- A key's label: as tall as its row, as wide as its text (a string or a binding), at `order` in the row, faded by
+-- `fade` on a greyed button.
+function Style.label(
+	config: Config.GameConfig,
+	text: string | React.Binding<string>,
+	order: number,
+	fade: number?
+): React.ReactElement
 	return React.createElement(
 		"TextLabel",
 		Style.text(config, {
@@ -148,6 +160,7 @@ function Style.label(config: Config.GameConfig, text: string | React.Binding<str
 			AutomaticSize = Enum.AutomaticSize.X,
 			Size = UDim2.fromScale(0, 1),
 			Text = text,
+			TextTransparency = fade,
 		})
 	)
 end

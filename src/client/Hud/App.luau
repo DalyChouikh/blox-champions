@@ -58,6 +58,8 @@ export type AppProps = {
 	-- Its key held, or its touch button toggled on.
 	scoreTabOpen: boolean,
 	onScoreButton: () -> (),
+	-- The score tab's Switch team button; nil where it has none (#310).
+	switchTeam: ScoreTab.SwitchTeam?,
 	bindings: HudBindings,
 	-- The full-screen gui the reticle is drawn in (a portal): the HUD's own sits below Roblox's top bar.
 	centre: ScreenGui,
@@ -121,6 +123,7 @@ local function App(props: AppProps): React.ReactElement
 						names = state.names,
 						localId = props.localId,
 						area = bindings.stage,
+						switchTeam = props.switchTeam,
 					})
 					else nil,
 				EndScreen = if ended ~= nil

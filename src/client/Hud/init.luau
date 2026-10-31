@@ -12,7 +12,8 @@
 -- strike or a fall: SkateController.promptsGetUp, #242) names the movement keys the same way: the first
 -- composite's four keys, the gamepad's stick, or on touch Config.UI.text's name for the stick. The score tab shows
 -- while its key is held; on touch a button toggles it, and the toggle clears once the device is not touch and whenever
--- the end screen appears or goes, so the tab never pops open unasked.
+-- the end screen appears or goes, so the tab never pops open unasked. While the tab shows its Switch team button
+-- (HudState.switchOffer, #310), the button's key, or a tap on touch, asks the server for a switch when one works.
 -- The banner, the feed, the score tab and the end screen centre and fit in the HUD's stage, a binding: on touch the
 -- part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that GuiService gives),
 -- elsewhere the whole of it. It is measured again when the screen's size changes (from start on) and when the device
@@ -35,6 +36,8 @@ local InputController = require(script.Parent.InputController)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local React = require(ReplicatedStorage.Packages.React)
 local ReactRoblox = require(ReplicatedStorage.Packages.ReactRoblox)
+local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local ScoreTab = require(script.ScoreTab)
 local SkateController = require(script.Parent.SkateController)
 local Style = require(script.Style)
 local TouchArea = require(ReplicatedStorage.Shared.Input.TouchArea)
@@ -54,6 +57,8 @@ export type Hud = {
 	step: (self: Hud, dt: number) -> (),
 	-- What the touch score button does: opens the score tab, or closes it.
 	toggleScoreTab: (self: Hud) -> (),
+	-- What the Switch team button does (a tap on touch, its key elsewhere): asks for a switch while one works.
+	switchTeam: (self: Hud) -> (),
 	-- The screen's size changed (the gui's AbsoluteSize): the stage is measured again.
 	resize: (self: Hud) -> (),
 	-- Unmounts the React root, the reticle with it (tests).
@@ -87,6 +92,9 @@ export type Hud = {
 	_setStage: (stage: Vector2) -> (),
 	-- The score button's handler, made once.
 	_onScoreButton: () -> (),
+	-- The Switch team button's handler, made once, and the request it sends (or a fake).
+	_onSwitchTeam: () -> (),
+	_sendSwitchTeam: () -> (),
 	-- The score tab toggled on by its touch button.
 	_touchToggled: boolean,
 	-- Whether the match was over at the last step.
@@ -171,6 +179,19 @@ local function hintKeys(self: Hud, device: Enum.PreferredInput, hasSkater: boole
 	return keys
 end
 
+-- The score tab's Switch team button on `device`: nil while it has none, else whether it works now (`carrier` holding
+-- the ball), its key (none on touch, where it is tapped) and what a tap does.
+local function switchTeamView(self: Hud, device: Enum.PreferredInput, carrier: PlayerId?): ScoreTab.SwitchTeam?
+	local open = self._store.state:switchOffer(carrier)
+	if open == nil then
+		return nil
+	end
+	local key: Style.KeyView? = if device == Enum.PreferredInput.Touch
+		then nil
+		else keyView(self, self._config.Input.switchTeam, device == Enum.PreferredInput.Gamepad)
+	return { open = open, key = key, onActivated = self._onSwitchTeam }
+end
+
 local Hud: Hud = {
 	name = "Hud",
 	dependencies = { "Config", "HudStore", "InputController", "SkateController", "ActionController", "BallCarrier" },
@@ -205,6 +226,8 @@ local Hud: Hud = {
 	_stage = Vector2.zero,
 	_setStage = function(_stage: Vector2) end,
 	_onScoreButton = function() end,
+	_onSwitchTeam = function() end,
+	_sendSwitchTeam = function() end,
 	_touchToggled = false,
 	_over = false,
 	_version = nil,
@@ -215,7 +238,7 @@ local Hud: Hud = {
 	_scoreTabOpen = false,
 
 	-- deps.Parent keeps the guis out of the local player's PlayerGui in tests; deps.PreferredInput, deps.LocalId,
-	-- deps.KeyString, deps.KeyImage and deps.InsetArea replace the live game there.
+	-- deps.KeyString, deps.KeyImage, deps.InsetArea and deps.SendSwitchTeam replace the live game there.
 	init = function(self: Hud, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -254,6 +277,13 @@ local Hud: Hud = {
 		self._onScoreButton = function()
 			self:toggleScoreTab()
 		end
+		self._onSwitchTeam = function()
+			self:switchTeam()
+		end
+		self._sendSwitchTeam = deps.SendSwitchTeam
+			or function()
+				Remotes.get(ReplicatedStorage, Remotes.names.SwitchTeam):FireServer({})
+			end
 
 		self._clock = newShown(self._text:clock(self._store.state:clockSeconds()))
 		self._speed = newShown("")
@@ -301,6 +331,12 @@ local Hud: Hud = {
 		self._touchToggled = not self._touchToggled
 	end,
 
+	switchTeam = function(self: Hud)
+		if self._store.state:switchOffer(self._carrier.carrier) == true then
+			self._sendSwitchTeam()
+		end
+	end,
+
 	destroy = function(self: Hud)
 		self._root:unmount()
 	end,
@@ -326,6 +362,10 @@ local Hud: Hud = {
 			self._over = over
 		end
 		local scoreTabOpen = self._input:scoreTabHeld() or self._touchToggled
+		-- Switch team's key counts only while the tab shows the button (the owner, Q117).
+		if self._input:switchTeamPressed() and scoreTabOpen then
+			self:switchTeam()
+		end
 		if
 			state.version ~= self._version
 			or device ~= self._device
@@ -353,6 +393,7 @@ local Hud: Hud = {
 				getUpKeys = if promptsGetUp then moveKeys(self, device) else nil,
 				scoreTabOpen = scoreTabOpen,
 				onScoreButton = self._onScoreButton,
+				switchTeam = switchTeamView(self, device, carrier),
 				bindings = self._bindings,
 				centre = self.centre,
 			}))

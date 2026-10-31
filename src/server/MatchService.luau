@@ -7,9 +7,11 @@
 -- each frame's batch followed by the match's snapshot, which clients draw from, both marked with the frame's number. A
 -- snapshot also goes to everyone whenever a seat changes, and to each player who joins, marked with the last frame's
 -- number; it names every player in the server and each who left during the match, so the feed can still name them. It
--- keeps the ball dead whenever play is not live, so the ball is only ever carried by the engine's last holder. After a
--- match ends it waits postMatchSeconds and starts the next one with everyone reseated; once every player has left it
--- starts over.
+-- keeps the ball dead whenever play is not live, so the ball is only ever carried by the engine's last holder. A
+-- player's request to switch team (SwitchTeam, #310) moves them to the other team's free seat when TeamSwitch allows
+-- it, their numbers with them, and stands them on its spawn at once, started over. After a match ends it waits
+-- postMatchSeconds and starts the next one with everyone on the team they last played for; once every player has
+-- left it starts over.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -25,9 +27,11 @@ local NetService = require(script.Parent.NetService)
 local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
 local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local TeamService = require(script.Parent.TeamService)
+local TeamSwitch = require(ReplicatedStorage.Shared.Rules.TeamSwitch)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
@@ -128,10 +132,22 @@ local function react(self: MatchService, event: Types.Event)
 	end
 end
 
+-- A request to switch team: honoured when TeamSwitch allows it; a spectator has no team to leave.
+local function requestSwitch(self: MatchService, player: PlayerId)
+	local team: Team.Team? = self._teams:teamOf(player)
+	if team == nil then
+		return
+	end
+	local otherSeated = self._teams:seatedOn(Team.opponent(team))
+	if TeamSwitch.allowed(self._config.Match, otherSeated, self._ball.state.carrier == player) then
+		self._teams:switch(player)
+	end
+end
+
 local function nextMatch(self: MatchService)
 	newEngine(self)
 	self._ball:hide()
-	-- Reseating announces every seat, which adds each player to the new engine.
+	-- The new match announces every seat, which adds each player to the new engine.
 	self._teams:newMatch()
 	sendSnapshot(self)
 end
@@ -214,9 +230,27 @@ local MatchService: MatchService = {
 			end
 			sendSnapshot(self)
 		end)
+		self._teams.switched:Connect(function(player: PlayerId, team: Team.Team)
+			-- After the match the next one seats everyone on their team (TeamService.newMatch).
+			if self._postMatchLeft == nil then
+				self.engine:switchTeam(player, team)
+			end
+			-- On the new team's spawn at once, started over as a kickoff starts everyone.
+			self._actions:resetPlayer(player)
+			self._characters:place(player)
+			sendSnapshot(self)
+		end)
 		self._characters.characterRemoved:Connect(function(player: PlayerId)
 			dropIfCarrier(self, player)
 		end)
+		self._net:listen(
+			Remotes.names.SwitchTeam,
+			Schemas.SwitchTeam,
+			self._config.Network.maxTeamSwitchesPerSecond,
+			function(player: PlayerId)
+				requestSwitch(self, player)
+			end
+		)
 	end,
 
 	start = function(self: MatchService)

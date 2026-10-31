@@ -306,6 +306,13 @@ function MatchEngine.removePlayer(self: MatchEngine, player: PlayerId)
 	self._scores:removePlayer(player)
 end
 
+-- The player plays for `team` from now on, their numbers with them (#310). A ball they threw before still counts for
+-- the team they left, and its goal for them (the owner, Q119).
+function MatchEngine.switchTeam(self: MatchEngine, player: PlayerId, team: Team)
+	knownPlayer(self, player)
+	self._scores:switchTeam(player, team)
+end
+
 function MatchEngine.start(self: MatchEngine)
 	if self._state ~= "Waiting" then
 		error(`MatchEngine: start() called in state {self._state}`, 0)

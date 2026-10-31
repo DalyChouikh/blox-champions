@@ -1189,6 +1189,17 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   RC's did on a flatter floor). Said before playing: the steady fall replaces Q113's quarter of gravity. The owner
   played it (re-dropped every 12 s while nobody held the ball): **Q116 "Keep it as it is"** (build it test-first as
   trialled). Not chosen: landing in the low lane beside the inner bank; other numbers.
+- **#310 switch team, Q117-Q120** (session 53, all recommended; RC frames not used: the switch is the owner's own
+  request, Q97/Q104). **Q117 how to press it:** on PC the score tab shows only while Tab is held and the mouse stays
+  locked, so the "Switch team" button shows a key: **T** on the keyboard, **D-pad Up** on a gamepad, pressed while the
+  tab is open; on phones the button is tapped (the touch score button keeps the tab open). The switch is at once. Not
+  chosen: freeing the mouse cursor while Tab is held. **Q118 unavailable:** while a switch can't happen (the other team
+  has no free seat, or the player holds the ball) the button **stays, greyed** (the pips' fade), and its key does
+  nothing. Not chosen: hidden. **Q119 throw then switch:** a ball the switcher threw that then scores for their old
+  team **counts as earned**: the point to the old team, the goal in the switcher's numbers, which move with them (as a
+  leaver's does today); nothing blocks a switch after a throw. Not chosen: greyed until a pickup or a kickoff.
+  **Q120 cooldown:** **none**; each switch puts the player back on the new team's spawn, and the server drops spam (at
+  most one request a second). Not chosen: a cooldown between switches.
 
 ## Roller Champions
 

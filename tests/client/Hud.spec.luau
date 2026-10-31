@@ -25,10 +25,14 @@ local PHONE, BIG = Fixtures.PHONE, Fixtures.BIG_SCREEN
 local folder: Folder
 local preferred: Enum.PreferredInput
 local screen: Fixtures.Screen
+-- The Switch team requests the Hud sent.
+local switches = 0
 
--- A gamepad's button or stick: Roblox names each by its KeyCode and gives it a glyph (probed).
+-- A gamepad's button, D-pad or stick: Roblox names each by its KeyCode and gives it a glyph (probed).
 local function gamepadKey(name: string): boolean
-	return string.sub(name, 1, 6) == "Button" or string.sub(name, 1, 10) == "Thumbstick"
+	return string.sub(name, 1, 6) == "Button"
+		or string.sub(name, 1, 4) == "DPad"
+		or string.sub(name, 1, 10) == "Thumbstick"
 end
 
 -- Roblox's key names, as GetStringForKeyCode gives them: a letter key its letter, Space a space, a gamepad's button or
@@ -73,6 +77,7 @@ beforeEach(function()
 	folder.Parent = workspace
 	preferred = Enum.PreferredInput.KeyboardAndMouse
 	screen = PHONE
+	switches = 0
 	Fixtures.startSkating(folder, config, LOCAL_ID)
 	HudStore:init({ Config = config, LocalId = LOCAL_ID })
 	HudStore:onSnapshot(Fixtures.matchSnapshot())
@@ -90,6 +95,9 @@ beforeEach(function()
 		end,
 		KeyString = keyString,
 		KeyImage = keyImage,
+		SendSwitchTeam = function()
+			switches += 1
+		end,
 		InsetArea = function(insets: Enum.ScreenInsets): Rect
 			if insets == Enum.ScreenInsets.CoreUISafeInsets then
 				return screen.hud
@@ -282,6 +290,94 @@ describe("Hud", function()
 		Hud:step(0)
 		expect(part("ScoreTab")).toBeNil()
 		expect(part("ScoreButton")).toBeNil()
+	end)
+
+	-- The owner (Q104, Q117, #310): the open score tab offers Switch team with the device's key; the key (or a tap on
+	-- touch) asks for a switch.
+	it("offers Switch team on the open score tab with the device's key, and asks for a switch on it", function()
+		local held = Fixtures.scriptedBinding(InputController.context, "ScoreTab")
+		local press = Fixtures.scriptedBinding(InputController.context, "SwitchTeam")
+		local function pressKey()
+			press:Fire(true)
+			task.wait() -- Pressed is deferred
+			Hud:step(0)
+			press:Fire(false)
+		end
+		-- With the tab closed, the key asks nothing.
+		pressKey()
+		expect(part("SwitchTeam")).toBeNil()
+		expect(switches).toBe(0)
+		held:Fire(true)
+		Hud:step(0)
+		local button = part("SwitchTeam") :: TextButton
+		expect(button.Selectable).toBe(false)
+		expect((button:FindFirstChild("Key") :: TextLabel).Text).toBe("T")
+		expect((button:FindFirstChild("Label") :: TextLabel).Text).toBe(config.UI.text.switchTeam)
+		pressKey()
+		expect(switches).toBe(1)
+		preferred = Enum.PreferredInput.Gamepad
+		Hud:step(0)
+		local glyph = part("SwitchTeam"):FindFirstChild("Glyph") :: ImageLabel
+		expect(glyph.Image).toBe(keyImage(Enum.KeyCode.DPadUp))
+		-- On touch it is tapped (its Activated calls switchTeam; a test cannot fire it), with no key shown.
+		preferred = Enum.PreferredInput.Touch
+		held:Fire(false)
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect(part("SwitchTeam"):FindFirstChild("Key")).toBeNil()
+		Hud:switchTeam()
+		expect(switches).toBe(2)
+	end)
+
+	-- The owner (Q104, Q118): greyed while a switch can't happen, and then it asks nothing.
+	it("greys Switch team while the local player holds the ball or the other team is full", function()
+		local dim = config.UI.hud.dimTransparency
+		local function label(): TextLabel
+			return part("SwitchTeam"):FindFirstChild("Label") :: TextLabel
+		end
+		Fixtures.scriptedBinding(InputController.context, "ScoreTab"):Fire(true)
+		BallCarrier:set(LOCAL_ID)
+		Hud:step(0)
+		expect(label().TextTransparency).toBeCloseTo(dim, 5)
+		expect((part("SwitchTeam"):FindFirstChild("Key") :: TextLabel).TextTransparency).toBeCloseTo(dim, 5)
+		Hud:switchTeam()
+		expect(switches).toBe(0)
+		BallCarrier:set(nil)
+		Hud:step(0)
+		expect(label().TextTransparency).toBe(0)
+		Hud:switchTeam()
+		expect(switches).toBe(1)
+		local players = { Fixtures.playerStats("1", "Blue") }
+		for _, id in { "2", "3", "4" } do
+			table.insert(players, Fixtures.playerStats(id, "Orange"))
+		end
+		local orangeFull = { scores = { Blue = 0, Orange = 0 }, players = players }
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ stats = orangeFull }, 1))
+		Hud:step(0)
+		expect(label().TextTransparency).toBeCloseTo(dim, 5)
+		Hud:switchTeam()
+		expect(switches).toBe(1)
+	end)
+
+	it("offers no Switch team over the end screen, nor to a player the match doesn't list", function()
+		preferred = Enum.PreferredInput.Touch
+		endMatch()
+		Hud:step(0)
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect(part("ScoreTab") ~= nil).toBe(true)
+		expect(part("SwitchTeam")).toBeNil()
+		Hud:switchTeam()
+		expect(switches).toBe(0)
+		local others = { scores = { Blue = 0, Orange = 0 }, players = { Fixtures.playerStats("2", "Orange") } }
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", stats = others }, 2))
+		Hud:step(0)
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect(part("ScoreTab") ~= nil).toBe(true)
+		expect(part("SwitchTeam")).toBeNil()
+		Hud:switchTeam()
+		expect(switches).toBe(0)
 	end)
 
 	it("shows the end screen in place of the scoreboard once the match ends, until the next starts", function()

@@ -83,6 +83,8 @@ export type UIText = {
 	callPass: string,
 	-- The Get Up prompt's key on touch, where the stick has none.
 	touchMove: string,
+	-- The score tab's button that moves the player to the other team (#310).
+	switchTeam: string,
 }
 
 export type Place = { position: UDim2, size: UDim2 }
@@ -256,6 +258,7 @@ local defaults: UIConfig = {
 		-- A raised hand.
 		callPass = "\u{270B}",
 		touchMove = "Move",
+		switchTeam = "Switch team",
 	},
 	-- The HUD's graybox look; the art pass restyles it.
 	hud = {
@@ -474,6 +477,7 @@ local fields = Validate.record({
 		unknownPlayer = label,
 		callPass = label,
 		touchMove = label,
+		switchTeam = label,
 	}),
 	hud = Validate.record({
 		font = Validate.enumItem(Enum.Font),
