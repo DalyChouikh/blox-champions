@@ -605,6 +605,22 @@ describe("Config defaults", function()
 			panelSlideSeconds = 0.4,
 			beam = { width = 2, thickness = 0.5 },
 		})
+		-- The thrower's predicted arc and the ball's trail (#313).
+		expect(ui.trajectory).toEqual({
+			arc = {
+				spacing = 4,
+				maxDots = 40,
+				dotSize = 6,
+				color = Color3.new(1, 1, 1),
+				transparency = 0,
+				edgeColor = Color3.new(0, 0, 0),
+				edgeThickness = 1,
+				ringSize = 24,
+				ringThickness = 3,
+			},
+			-- Bolder after the screenshots (Q146).
+			trail = { lifetime = 0.4, width = 2, color = Color3.new(1, 1, 1), transparency = 0 },
+		})
 	end)
 
 	it("match the spec's arena layout", function()
@@ -1700,6 +1716,23 @@ describe("Config.forMode", function()
 		expect(top.UI.hud.layout.reticle.height).toBe(0.001)
 	end)
 
+	-- The thrower's arc and the ball's trail (#313).
+	it("accepts a throw's arc and a ball's trail just inside their limits", function()
+		local arc = {
+			spacing = 0.01,
+			maxDots = 1,
+			dotSize = 0.01,
+			transparency = 0.99,
+			edgeThickness = 0,
+			ringThickness = 0.01,
+		}
+		local trail = { lifetime = 0.01, width = 0.01, transparency = 0 }
+		local trajectory = Fixtures.config({ UI = { trajectory = { arc = arc, trail = trail } } }).UI.trajectory
+		expect(trajectory.arc.maxDots).toBe(1)
+		expect(trajectory.arc.edgeThickness).toBe(0)
+		expect(trajectory.trail.transparency).toBe(0)
+	end)
+
 	it("accepts a kickoff count whose digit just fits inside its ring", function()
 		-- 116 - 2 x 8 = 100: a 99 px digit fits.
 		local countdown =
@@ -1746,6 +1779,52 @@ describe("Config.forMode", function()
 			{
 				overrides = { UI = { arenaGlow = { beam = { thickness = 3000 } } } },
 				message = "UI.arenaGlow.beam.thickness: must be <= 2048 (got 3000)",
+			},
+			-- The thrower's arc (#313): dots some way apart, at least one, some pixels across, seen, any edge; a ring
+			-- some pixels across; the ball's trail: some time long, some width, seen.
+			{
+				overrides = { UI = { trajectory = { arc = { spacing = 0 } } } },
+				message = "UI.trajectory.arc.spacing: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { trajectory = { arc = { maxDots = 0 } } } },
+				message = "UI.trajectory.arc.maxDots: must be >= 1 (got 0)",
+			},
+			{
+				overrides = { UI = { trajectory = { arc = { maxDots = 2.5 } } } },
+				message = "UI.trajectory.arc.maxDots: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { trajectory = { arc = { dotSize = 0 } } } },
+				message = "UI.trajectory.arc.dotSize: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { trajectory = { arc = { transparency = 1 } } } },
+				message = "UI.trajectory.arc.transparency: must be < 1 (got 1)",
+			},
+			{
+				overrides = { UI = { trajectory = { arc = { edgeThickness = -1 } } } },
+				message = "UI.trajectory.arc.edgeThickness: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { trajectory = { arc = { ringSize = 0 } } } },
+				message = "UI.trajectory.arc.ringSize: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { trajectory = { arc = { ringThickness = 0 } } } },
+				message = "UI.trajectory.arc.ringThickness: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { trajectory = { trail = { lifetime = 0 } } } },
+				message = "UI.trajectory.trail.lifetime: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { trajectory = { trail = { width = 0 } } } },
+				message = "UI.trajectory.trail.width: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { trajectory = { trail = { transparency = 1 } } } },
+				message = "UI.trajectory.trail.transparency: must be < 1 (got 1)",
 			},
 			{ overrides = { UI = { hud = { screenMargin = -1 } } }, message = "UI.hud.screenMargin: must be >= 0" },
 			{ overrides = { UI = { keyNames = { Banana = "B" } } }, message = "UI.keyNames: Banana must name a key" },

@@ -1317,6 +1317,20 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   ring/scoreboard overlap now** as an M1 issue for the Presentation part (at 793 px tall the closed ring's top sits
   ~8 px under the scoreboard panel; under ~770 px tall and on phones the 130-px ring 31.5% down overlaps it). Not
   chosen: notes only.
+- **Q145 the arc's look** (session 57, #313, recommended). Measured in Play first (the arc built as small white
+  world dots): from our chase camera a throw flies almost straight away, so its whole predicted path (89 studs on a
+  full throw along the straight) shows as a thin vertical line from the ball up through the skater's head; the near
+  dots hide behind the body and the landing point sits right behind the head; the server's ball then followed the
+  drawn arc within 0.31 studs to its end (a bounce). The owner chose **dots drawn on top of everything** (the skater
+  too) at a fixed size on screen with a dark edge, **ending in a ring where the ball would first touch**. Not chosen:
+  a landing ring only; the world dots as built.
+- **Q146-Q147 #313's look, after screenshots** (session 57, both recommended). Built: the arc as Q145 (edged
+  white dots over everything, a landing ring), measured in Play: a full throw stayed within 1.5 studs of the drawn
+  arc over 97 studs and passed 0.8 studs from the ring; from the chase camera the far half and the ring gather at
+  the skater's head. The trail as first built (white, 1 stud wide, 0.3 s, 30% see-through) was faint on our light
+  floors from the side. **Q146**: **a bolder trail**: as wide as the ball (2 studs), solid at the ball fading out,
+  0.4 s long (64 studs behind a full throw). Not chosen: keep it; the team's colour later with #327. **Q147**:
+  **ship the arc as built** (judged again at the #317 playtest). Not chosen: the owner plays it first.
 
 ## Roller Champions
 

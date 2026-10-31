@@ -5,9 +5,9 @@
 -- from the server's state, a catch's pull into the hand), so everything after reads the spot drawn, then the camera,
 -- which shows the skater where physics left them, then the touch controls, which show what each button does now, then
 -- the HUD's state, whose clocks count on, then the HUD, which shows it, then the world's markers, the arena's glow and
--- the carrier's beam, which read that state too, then the name tags. Roblox gives RunService handlers no documented
--- order (they ran in reverse of their connection order when measured), so only this module connects them, one per
--- phase.
+-- the carrier's beam, which read that state too, then the thrower's arc, which aims through the camera's view, and the
+-- ball's trail, then the name tags. Roblox gives RunService handlers no documented order (they ran in reverse of their
+-- connection order when measured), so only this module connects them, one per phase.
 
 local RunService = game:GetService("RunService")
 
@@ -36,6 +36,8 @@ export type FrameController = {
 	_worldMarkers: Steppable,
 	_arenaGlow: Steppable,
 	_carrierBeam: Steppable,
+	_throwArc: Steppable,
+	_ballTrail: Steppable,
 	_nameTags: Steppable,
 }
 
@@ -54,6 +56,8 @@ local FrameController: FrameController = {
 		"WorldMarkers",
 		"ArenaGlow",
 		"CarrierBeam",
+		"ThrowArc",
+		"BallTrail",
 		"NameTags",
 	},
 	_input = nil :: any,
@@ -68,6 +72,8 @@ local FrameController: FrameController = {
 	_worldMarkers = nil :: any,
 	_arenaGlow = nil :: any,
 	_carrierBeam = nil :: any,
+	_throwArc = nil :: any,
+	_ballTrail = nil :: any,
 	_nameTags = nil :: any,
 
 	init = function(self: FrameController, deps: { [string]: any })
@@ -83,6 +89,8 @@ local FrameController: FrameController = {
 		self._worldMarkers = deps.WorldMarkers
 		self._arenaGlow = deps.ArenaGlow
 		self._carrierBeam = deps.CarrierBeam
+		self._throwArc = deps.ThrowArc
+		self._ballTrail = deps.BallTrail
 		self._nameTags = deps.NameTags
 	end,
 
@@ -111,6 +119,8 @@ local FrameController: FrameController = {
 		self._worldMarkers:step(dt)
 		self._arenaGlow:step(dt)
 		self._carrierBeam:step(dt)
+		self._throwArc:step(dt)
+		self._ballTrail:step(dt)
 		self._nameTags:step(dt)
 	end,
 }

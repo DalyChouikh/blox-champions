@@ -25,6 +25,7 @@ local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallCarrier = require(script.Parent.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
 local InputController = require(script.Parent.InputController)
+local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Reach = require(ReplicatedStorage.Shared.Actions.Reach)
@@ -59,6 +60,10 @@ export type ActionController = {
 	-- crosshair's ring shows (#312: it closes at a full charge, then blinks) and what tells a Dodge it cancels the
 	-- charge.
 	chargeSeconds: (self: ActionController) -> number?,
+	-- While a throw charges, the velocity the ball would leave the hand with if it were let go now, as the server will
+	-- make it (ActionService): through the crosshair at the charge so far, plus the carrier's share of their velocity
+	-- held to the movement guard's limit; nil otherwise. The thrower's predicted arc (#313).
+	throwVelocity: (self: ActionController) -> Vector3?,
 	step: (self: ActionController, dt: number) -> (),
 	-- What an ActionRejected message runs (tests call it directly).
 	rejected: (self: ActionController, payload: any) -> (),
@@ -67,6 +72,8 @@ export type ActionController = {
 	_carrier: BallCarrier.BallCarrier,
 	_skate: SkateController.SkateController,
 	_camera: AimCamera,
+	-- The fastest a skater may move (MovementCheck.speedLimit), which the server holds a thrower's velocity to.
+	_speedLimit: number,
 	_sendRequest: (payload: { [string]: any }) -> (),
 	_localId: PlayerId,
 	-- Records reused every step: the keys, an action's start, and which action a key names (never knocked down).
@@ -392,6 +399,7 @@ local ActionController: ActionController = {
 	_carrier = nil :: any,
 	_skate = nil :: any,
 	_camera = nil :: any,
+	_speedLimit = 0,
 	_sendRequest = function(_payload: { [string]: any }) end,
 	_localId = "",
 	_keys = nil :: any,
@@ -416,6 +424,7 @@ local ActionController: ActionController = {
 		self._carrier = deps.BallCarrier
 		self._skate = deps.SkateController
 		self._camera = deps.Camera or workspace.CurrentCamera
+		self._speedLimit = MovementCheck.speedLimit(config.Movement, config.Network)
 		self._sendRequest = deps.SendRequest
 			or function(payload: { [string]: any })
 				Remotes.get(ReplicatedStorage, Remotes.names.ActionRequest):FireServer(payload)
@@ -451,6 +460,16 @@ local ActionController: ActionController = {
 
 	chargeSeconds = function(self: ActionController): number?
 		return self._charge
+	end,
+
+	throwVelocity = function(self: ActionController): Vector3?
+		local held, skater = self._charge, self._skate.skater
+		if held == nil or skater == nil then
+			return nil
+		end
+		local throw = self._config.Actions.ChargeThrow.throw :: Config.ThrowSettings
+		local carrier = Vectors.clampMagnitude(skater.velocity, self._speedLimit)
+		return Throw.charged(throw, crosshairAim(self), Throw.share(throw, held), carrier)
 	end,
 
 	step = function(self: ActionController, dt: number)

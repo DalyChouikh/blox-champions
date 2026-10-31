@@ -20,6 +20,68 @@ describe("Trajectory.positionAt", function()
 	end)
 end)
 
+-- A floor at y 0 for Trajectory.path: where a chord from one point to the next first reaches it, else nil.
+local function floor(from: Vector3, to: Vector3): Vector3?
+	if to.Y >= 0 then
+		return nil
+	end
+	return from:Lerp(to, from.Y / (from.Y - to.Y))
+end
+
+local function clear(_from: Vector3, _to: Vector3): Vector3?
+	return nil
+end
+
+-- The thrower's predicted arc (#313). Worked example: from (0, 5, 0) at (40, 0, 0) under (0, -100, 0), a point every
+-- 4 studs of the launch speed is every 0.1 s: (4, 4.5, 0), (8, 3, 0), (12, 0.5, 0), then (16, -3, 0) lies under the
+-- floor, which the chord from (12, 0.5, 0) meets 0.5 / 3.5 of the way along: x = 12 + 4/7.
+describe("Trajectory.path", function()
+	local GRAVITY = Vector3.new(0, -100, 0)
+	local START, VELOCITY = Vector3.new(0, 5, 0), Vector3.new(40, 0, 0)
+
+	it("puts a point every spacing studs of the launch speed, ending where the ball first touches", function()
+		local points: { Vector3 } = {}
+		local count, touched = Trajectory.path(START, VELOCITY, GRAVITY, 4, 10, floor, points)
+		expect(count).toBe(5)
+		expect(touched).toBe(true)
+		Fixtures.expectNear(points[1], START)
+		Fixtures.expectNear(points[2], Vector3.new(4, 4.5, 0))
+		Fixtures.expectNear(points[3], Vector3.new(8, 3, 0))
+		Fixtures.expectNear(points[4], Vector3.new(12, 0.5, 0))
+		Fixtures.expectNear(points[5], Vector3.new(12 + 4 / 7, 0, 0))
+	end)
+
+	it("stops at maxCount points with nothing in the way, and fills the caller's list in place", function()
+		local points: { Vector3 } = { Vector3.one, Vector3.one, Vector3.one, Vector3.one }
+		local count, touched = Trajectory.path(START, VELOCITY, GRAVITY, 4, 3, clear, points)
+		expect(count).toBe(3)
+		expect(touched).toBe(false)
+		Fixtures.expectNear(points[3], Vector3.new(8, 3, 0))
+		-- Past the count, the list keeps what it held.
+		Fixtures.expectNear(points[4], Vector3.one)
+	end)
+
+	it("casts each chord from the point before it, in order", function()
+		local chords: { { Vector3 } } = {}
+		local function record(from: Vector3, to: Vector3): Vector3?
+			table.insert(chords, { from, to })
+			return nil
+		end
+		Trajectory.path(START, VELOCITY, GRAVITY, 4, 3, record, {})
+		expect(#chords).toBe(2)
+		Fixtures.expectNear(chords[1][1], START)
+		Fixtures.expectNear(chords[1][2], Vector3.new(4, 4.5, 0))
+		Fixtures.expectNear(chords[2][1], Vector3.new(4, 4.5, 0))
+		Fixtures.expectNear(chords[2][2], Vector3.new(8, 3, 0))
+	end)
+
+	it("draws no path for a ball that is not moving", function()
+		local count, touched = Trajectory.path(START, Vector3.zero, GRAVITY, 4, 10, floor, {})
+		expect(count).toBe(0)
+		expect(touched).toBe(false)
+	end)
+end)
+
 describe("Trajectory.crossingTimes", function()
 	it("solves a straight path when gravity runs along the plane, either way through it", function()
 		local first, second =

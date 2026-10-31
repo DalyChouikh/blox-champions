@@ -13,6 +13,7 @@ local BallCarrier = require(Client.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(Client.InputController)
+local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local RideSurfaces = require(Client.RideSurfaces)
 local SkateController = require(Client.SkateController)
 local SkaterBody = require(ServerScriptService.Server.SkaterBody)
@@ -515,6 +516,36 @@ describe("ActionController", function()
 		throw:Fire(false)
 		frame()
 		expect(ActionController:chargeSeconds()).toBeNil()
+	end)
+
+	-- The thrower's predicted arc (#313) starts with what the server will make of the release (ActionService): through
+	-- the crosshair at the charge so far, plus inheritCarrierVelocity of the carrier's velocity, held to the movement
+	-- guard's limit. Six steps of a 0.5 s charge: a fifth, 60 + 100 / 5 = 80 studs/s.
+	it("tells the velocity a throw let go now would leave with, and nothing while none charges", function()
+		setup()
+		expect(ActionController:throwVelocity()).toBeNil()
+		local throw = charging(6)
+		local speed = THROW.minSpeed + (THROW.maxSpeed - THROW.minSpeed) * 6 * DT / THROW.chargeMaxSeconds
+		skater().velocity = Vector3.new(20, 0, -30)
+		local share = THROW.inheritCarrierVelocity
+		Fixtures.expectNear(
+			ActionController:throwVelocity() :: Vector3,
+			AIM.Unit * speed + Vector3.new(20, 0, -30) * share,
+			1e-4
+		)
+		local asked = CAMERA.asked[#CAMERA.asked]
+		expect(asked.Y).toBeCloseTo(CROSSHAIR * CAMERA.ViewportSize.Y, 3)
+		-- Faster than the movement guard allows: held to its limit, as the server holds it.
+		local limit = MovementCheck.speedLimit(config.Movement, config.Network)
+		skater().velocity = Vector3.new(10 * limit, 0, 0)
+		Fixtures.expectNear(
+			ActionController:throwVelocity() :: Vector3,
+			AIM.Unit * speed + Vector3.new(limit, 0, 0) * share,
+			1e-4
+		)
+		throw:Fire(false)
+		frame()
+		expect(ActionController:throwVelocity()).toBeNil()
 	end)
 
 	it("keeps a throw charged and let go during a dodge for when the dodge ends", function()
