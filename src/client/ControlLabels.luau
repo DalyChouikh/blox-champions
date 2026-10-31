@@ -38,7 +38,7 @@ function ControlLabels.label(
 		return nil
 	end
 	local labels = config.UI.controlLabels
-	local charging = actions:chargeProgress() ~= nil
+	local charging = actions:chargeSeconds() ~= nil
 	if control == "jump" then
 		if skater.mode == "Grounded" then
 			return labels.Jump

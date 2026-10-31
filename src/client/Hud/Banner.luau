@@ -43,12 +43,12 @@ local function Banner(props: BannerProps): React.ReactElement
 		{
 			Fit = Style.fit(config, props.area, place.size),
 			-- The kickoff count's ring around its digit (the owner, Q108).
-			Ring = Style.ring(color, countdown.ringThickness, {
+			Ring = Style.ring({
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
 				Size = UDim2.fromOffset(countdown.ringSize, countdown.ringSize),
 				Visible = counting,
-			}),
+			}, { Color = color, Thickness = countdown.ringThickness }),
 		}
 	)
 end

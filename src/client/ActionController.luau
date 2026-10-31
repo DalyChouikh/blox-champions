@@ -31,6 +31,7 @@ local Reach = require(ReplicatedStorage.Shared.Actions.Reach)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local SkateController = require(script.Parent.SkateController)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
+local Throw = require(ReplicatedStorage.Shared.Actions.Throw)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
@@ -54,9 +55,10 @@ export type ActionController = {
 	-- The action `key` would start now (Config.Input.actions), or nil when none fits: what touch buttons and hints
 	-- show.
 	keyAction: (self: ActionController, key: Config.ActionKey) -> Config.ActionName?,
-	-- While a throw charges, its share of a full charge (0..1); nil otherwise: what the crosshair's ring shows (#312)
-	-- and what tells a Dodge it cancels the charge.
-	chargeProgress: (self: ActionController) -> number?,
+	-- While a throw charges, how long its key has been held (on past a full charge); nil otherwise: what the
+	-- crosshair's ring shows (#312: it closes at a full charge, then blinks) and what tells a Dodge it cancels the
+	-- charge.
+	chargeSeconds: (self: ActionController) -> number?,
 	step: (self: ActionController, dt: number) -> (),
 	-- What an ActionRejected message runs (tests call it directly).
 	rejected: (self: ActionController, payload: any) -> (),
@@ -309,12 +311,6 @@ local function settle(self: ActionController, skater: SkateMath.Skater)
 	end
 end
 
--- `held` seconds of the throw key as a share of a full charge. One charge, ChargeThrow's: Roll Ball spends it too.
-local function chargeShare(self: ActionController, held: number): number
-	local throw = self._config.Actions.ChargeThrow.throw :: Config.ThrowSettings
-	return math.clamp(held / throw.chargeMaxSeconds, 0, 1)
-end
-
 -- Through the crosshair (#312, the owner: Q123/Q127): the camera's ray through the screen's point centred across it
 -- and UI.hud.layout.reticle.height down it, where the HUD draws the reticle, above the skater as RC's sits.
 local function crosshairAim(self: ActionController): Vector3
@@ -336,7 +332,8 @@ local function request(
 		payload.aim = crosshairAim(self)
 	end
 	if Actions.spendsCharge(action.effect) then
-		payload.charge = chargeShare(self, held or 0)
+		-- One charge, ChargeThrow's: Roll Ball spends it too.
+		payload.charge = Throw.share(self._config.Actions.ChargeThrow.throw :: Config.ThrowSettings, held or 0)
 	end
 	return payload
 end
@@ -452,9 +449,8 @@ local ActionController: ActionController = {
 		return actionFor(self, key, holdsBall(self))
 	end,
 
-	chargeProgress = function(self: ActionController): number?
-		local held = self._charge
-		return if held ~= nil then chargeShare(self, held) else nil
+	chargeSeconds = function(self: ActionController): number?
+		return self._charge
 	end,
 
 	step = function(self: ActionController, dt: number)

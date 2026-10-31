@@ -103,8 +103,16 @@ export type HudLayout = {
 	speedometer: { position: UDim2, touchPosition: UDim2, size: UDim2 },
 	-- The crosshair (#312): its dot `size` pixels across, centred across the screen and `height` of the way down it
 	-- (throws and passes aim through it); while a throw charges, a ring ringSize pixels across with a ringThickness
-	-- stroke, its halves ringGap pixels apart at the top and the bottom.
-	reticle: { size: number, height: number, ringSize: number, ringThickness: number, ringGap: number },
+	-- stroke, its halves ringGap pixels apart at the top and the bottom, blinking once every blinkSeconds while a full
+	-- charge is held.
+	reticle: {
+		size: number,
+		height: number,
+		ringSize: number,
+		ringThickness: number,
+		ringGap: number,
+		blinkSeconds: number,
+	},
 	-- columnWidth: each number column; the name column takes the rest.
 	scoreTab: { position: UDim2, size: UDim2, rowHeight: number, columnWidth: number },
 	-- The touch button that opens the score tab.
@@ -307,7 +315,9 @@ local defaults: UIConfig = {
 			-- RC's crosshair (#312): above the skater, 31.5% down the screen (Video 32 at 2.0-4.4 s, Video 13 at 99.0
 			-- s; the owner kept it in trial #311, Q123/Q127); its ring, read at 1918 x 1078 (Video 32 at 3.2 s), 130 px
 			-- across with a ~4 px stroke, its halves ~29 px apart at the bottom; white, the HUD's text colour (Q141).
-			reticle = { size = 6, height = 0.315, ringSize = 130, ringThickness = 4, ringGap = 29 },
+			-- Closed and held, it blinks until the release (the owner, Q142): Video 32 at 30 fps lit at 3.67, 4.07 and
+			-- 4.47 s, nearly gone at 3.47, 3.87 and 4.27 s: once every 0.4 s.
+			reticle = { size = 6, height = 0.315, ringSize = 130, ringThickness = 4, ringGap = 29, blinkSeconds = 0.4 },
 			scoreTab = {
 				position = UDim2.fromScale(0.5, 0.5),
 				size = UDim2.fromOffset(640, 360),
@@ -525,6 +535,7 @@ local fields = Validate.record({
 				ringSize = positive,
 				ringThickness = positive,
 				ringGap = Validate.number({ min = 0 }),
+				blinkSeconds = positive,
 			}),
 			scoreTab = columns,
 			scoreButton = place,

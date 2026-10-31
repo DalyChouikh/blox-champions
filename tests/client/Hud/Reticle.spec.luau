@@ -5,6 +5,7 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 local afterEach = JestGlobals.afterEach
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local React = require(ReplicatedStorage.Packages.React)
 local Reticle = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.Hud.Reticle)
@@ -12,6 +13,8 @@ local Reticle = require(game:GetService("StarterPlayer").StarterPlayerScripts.Cl
 local config = Fixtures.config()
 local hud = config.UI.hud
 local layout = hud.layout.reticle
+-- A full charge's seconds: the binding carries how long the throw key has been held.
+local FULL = (config.Actions.ChargeThrow.throw :: Config.ThrowSettings).chargeMaxSeconds
 
 local folder: Folder?
 
@@ -42,9 +45,14 @@ local function mount(visible: boolean, charge: React.Binding<number>): (Frame, (
 	return mounted:FindFirstChild("Reticle") :: Frame, rerender
 end
 
+-- A ring half's outline.
+local function stroke(reticle: Frame, side: string): UIStroke
+	return (reticle :: any).Ring[side].Arc.Stroke
+end
+
 -- A ring half's gradient, which shows the half below its edge.
 local function sweep(reticle: Frame, side: string): UIGradient
-	return (reticle :: any).Ring[side].Arc.Stroke.Sweep
+	return (stroke(reticle, side) :: any).Sweep
 end
 
 describe("Reticle", function()
@@ -82,7 +90,7 @@ describe("Reticle", function()
 			{ charge = 1, offset = -0.5 },
 		}
 		for _, case in cases do
-			setCharge(case.charge)
+			setCharge(case.charge * FULL)
 			expect(ring.Visible).toBe(true)
 			for _, side in { "Left", "Right" } do
 				local gradient = sweep(reticle, side)
@@ -90,12 +98,40 @@ describe("Reticle", function()
 				expect(gradient.Offset.Y).toBeCloseTo(case.offset, 4)
 			end
 		end
+		-- Held past a full charge: still closed.
+		setCharge(3 * FULL)
+		expect(sweep(reticle, "Left").Offset.Y).toBeCloseTo(-0.5, 4)
 		setCharge(0)
 		expect(ring.Visible).toBe(false)
 	end)
 
+	-- RC's closed ring blinks until the release (Q142; Video 32 at 3.3-4.6 s, every 0.40 s): lit at a full charge,
+	-- fading to nothing half a blink on and back, 0.5 - 0.5 cos(2π t / blinkSeconds) see-through t seconds past it.
+	it("blinks the closed ring every blinkSeconds past a full charge, never the dot", function()
+		local charge, setCharge = React.createBinding(0)
+		local reticle = mount(true, charge)
+		local dot = reticle:FindFirstChild("Dot") :: Frame
+		local blink = layout.blinkSeconds
+		local cases = {
+			{ held = FULL / 2, transparency = 0 },
+			{ held = FULL, transparency = 0 },
+			{ held = FULL + blink / 4, transparency = 0.5 },
+			{ held = FULL + blink / 2, transparency = 1 },
+			{ held = FULL + 3 * blink / 4, transparency = 0.5 },
+			{ held = FULL + blink, transparency = 0 },
+			{ held = FULL + 2.5 * blink, transparency = 1 },
+		}
+		for _, case in cases do
+			setCharge(case.held)
+			for _, side in { "Left", "Right" } do
+				expect(stroke(reticle, side).Transparency).toBeCloseTo(case.transparency, 4)
+			end
+			expect(dot.BackgroundTransparency).toBe(0)
+		end
+	end)
+
 	it("hides each half above its gradient's edge, from the top down the ring", function()
-		local reticle = mount(true, (React.createBinding(1)))
+		local reticle = mount(true, (React.createBinding(FULL)))
 		for _, side in { "Left", "Right" } do
 			local gradient = sweep(reticle, side)
 			expect(gradient.Rotation).toBe(90)
@@ -112,7 +148,7 @@ describe("Reticle", function()
 	-- Each half is the whole ring, ringSize across with a ringThickness stroke, clipped to its side of a ringGap:
 	-- both rings start ringThickness in from the reticle's left edge, so they are one circle.
 	it("cuts one ring into two halves a gap apart, ringSize across, in the HUD's text colour", function()
-		local reticle = mount(true, (React.createBinding(1)))
+		local reticle = mount(true, (React.createBinding(FULL)))
 		local size, thickness, gap = layout.ringSize, layout.ringThickness, layout.ringGap
 		local ring = (reticle :: any).Ring :: Frame
 		expect(ring.Size == UDim2.fromScale(1, 1)).toBe(true)
@@ -127,9 +163,9 @@ describe("Reticle", function()
 			expect(left).toBeCloseTo(thickness, 6)
 			expect(arc.BackgroundTransparency).toBe(1)
 			expect((arc:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius == UDim.new(0.5, 0)).toBe(true)
-			local stroke = (arc :: any).Stroke :: UIStroke
-			expect(stroke.Thickness).toBe(thickness)
-			expect(stroke.Color == hud.textColor).toBe(true)
+			local outline = stroke(reticle, side)
+			expect(outline.Thickness).toBe(thickness)
+			expect(outline.Color == hud.textColor).toBe(true)
 		end
 		expect((ring :: any).Left.Position == UDim2.new()).toBe(true)
 		expect((ring :: any).Right.Position == UDim2.new(0.5, gap / 2, 0, 0)).toBe(true)

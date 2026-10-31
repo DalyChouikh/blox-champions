@@ -97,7 +97,7 @@ describe("ControlLabels", function()
 		ActionController:step(1 / 60) -- the throw key seen up while holding the ball
 		Fixtures.scriptedBinding(InputController.context, "Throw"):Fire(true)
 		ActionController:step(1 / 60)
-		expect(ActionController:chargeProgress() ~= nil).toBe(true)
+		expect(ActionController:chargeSeconds() ~= nil).toBe(true)
 		expect(now("throw")).toBe(labels.ChargeThrow)
 		expect(now("tackle")).toBe(labels.CancelDodge)
 		expect(now("uppercut")).toBe(labels.RollBall)

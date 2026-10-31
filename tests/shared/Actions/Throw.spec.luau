@@ -2,7 +2,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
-local describe, it = JestGlobals.describe, JestGlobals.it
+local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
@@ -13,6 +13,15 @@ local throw = actions.ChargeThrow.throw :: Config.ThrowSettings
 local pass = actions.Pass.pass :: Config.PassSettings
 
 describe("Throw", function()
+	-- One rule for the charge a held throw key gives (#312): the client's request, the server's cap, the crosshair.
+	it("charges a share of a full charge by how long the throw key is held, up to a full one", function()
+		local full = throw.chargeMaxSeconds
+		expect(Throw.share(throw, 0)).toBe(0)
+		expect(Throw.share(throw, full / 4)).toBeCloseTo(0.25, 6)
+		expect(Throw.share(throw, full)).toBe(1)
+		expect(Throw.share(throw, 6 * full)).toBe(1)
+	end)
+
 	it("throws faster the longer the charge, plus half the carrier's velocity", function()
 		local aim = Vector3.new(0, 0, -1)
 		local carrier = Vector3.new(10, 0, 0)

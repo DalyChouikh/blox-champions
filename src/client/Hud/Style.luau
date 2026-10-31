@@ -90,17 +90,12 @@ function Style.round(): React.ReactElement
 	return React.createElement("UICorner", { CornerRadius = UDim.new(0.5, 0) })
 end
 
--- A ring: a see-through disc frame (`props` place and size it) outlined `thickness` pixels wide in `color`. `stroke`
--- holds what acts on the outline itself (a gradient).
-function Style.ring(
-	color: Color3,
-	thickness: number,
-	props: Props,
-	stroke: { [string]: React.Node }?
-): React.ReactElement
+-- A ring: a see-through disc frame (`props` place and size it) with an outline, a UIStroke (`outline` sets its Color,
+-- Thickness and any other of its properties). `effects` holds what acts on the outline itself (a gradient).
+function Style.ring(props: Props, outline: Props, effects: { [string]: React.Node }?): React.ReactElement
 	return React.createElement("Frame", over({ BackgroundTransparency = 1 }, props), {
 		Corner = Style.round(),
-		Stroke = React.createElement("UIStroke", { Color = color, Thickness = thickness }, stroke),
+		Stroke = React.createElement("UIStroke", outline, effects),
 	})
 end
 

@@ -1,11 +1,18 @@
 --!strict
 -- The ball's velocity as it leaves a player's hands (spec §8.2): a charged throw along the aim, a charged roll along
--- the floor, or a pass at a fixed speed toward its target. Aims need not be unit.
+-- the floor, or a pass at a fixed speed toward its target; and the charge a held throw key gives. Aims need not be
+-- unit.
 
 local Actions = require(script.Parent.Parent.Config.Actions)
 local Vectors = require(script.Parent.Parent.Util.Vectors)
 
 local Throw = {}
+
+-- The charge of a throw key held `heldSeconds`: a share of a full one (0..1), full after chargeMaxSeconds. What a
+-- throw or a roll spends and the crosshair's ring shows (#312).
+function Throw.share(throw: Actions.ThrowSettings, heldSeconds: number): number
+	return math.clamp(heldSeconds / throw.chargeMaxSeconds, 0, 1)
+end
 
 -- From minSpeed at no charge to maxSpeed at a full one (`charge` is clamped to 0..1), plus the carrier's velocity
 -- scaled by inheritCarrierVelocity.

@@ -346,7 +346,7 @@ local function noEffect() end
 -- The charge the client claims, up to how long the thrower has held the ball: an honest client only charges once it
 -- learns it carries, so its hold is never longer than the server's.
 local function heldCharge(self: ActionService, payload: any, throw: Config.ThrowSettings): number
-	return math.min(payload.charge, self._ball.state.heldSeconds / throw.chargeMaxSeconds)
+	return math.min(payload.charge, Throw.share(throw, self._ball.state.heldSeconds))
 end
 
 -- The carrier's velocity as their client reports it, held to what the movement guard allows.

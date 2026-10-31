@@ -560,8 +560,16 @@ describe("Config defaults", function()
 					touchPosition = UDim2.fromOffset(16, 8),
 					size = UDim2.fromOffset(160, 40),
 				},
-				-- RC's crosshair (#312): 31.5% down (Q123/Q127), its ring 130 px across at 1918 x 1078 (Video 32).
-				reticle = { size = 6, height = 0.315, ringSize = 130, ringThickness = 4, ringGap = 29 },
+				-- RC's crosshair (#312): 31.5% down (Q123/Q127), its ring 130 px across at 1918 x 1078 (Video 32),
+				-- blinking every 0.4 s once closed (Q142).
+				reticle = {
+					size = 6,
+					height = 0.315,
+					ringSize = 130,
+					ringThickness = 4,
+					ringGap = 29,
+					blinkSeconds = 0.4,
+				},
 				scoreTab = {
 					position = UDim2.fromScale(0.5, 0.5),
 					size = UDim2.fromOffset(640, 360),
@@ -1678,10 +1686,16 @@ describe("Config.forMode", function()
 
 	-- RC's crosshair (#312): 130 - 2 x 4 leaves 122 px inside the ring.
 	it("accepts a crosshair just inside its limits", function()
-		local reticle = Fixtures.config({
-			UI = { hud = { layout = { reticle = { size = 121, height = 0.999, ringGap = 129 } } } },
-		}).UI.hud.layout.reticle
-		expect(reticle).toEqual({ size = 121, height = 0.999, ringSize = 130, ringThickness = 4, ringGap = 129 })
+		local inside = { size = 121, height = 0.999, ringGap = 129, blinkSeconds = 0.01 }
+		local reticle = Fixtures.config({ UI = { hud = { layout = { reticle = inside } } } }).UI.hud.layout.reticle
+		expect(reticle).toEqual({
+			size = 121,
+			height = 0.999,
+			ringSize = 130,
+			ringThickness = 4,
+			ringGap = 129,
+			blinkSeconds = 0.01,
+		})
 		local top = Fixtures.config({ UI = { hud = { layout = { reticle = { height = 0.001, ringGap = 0 } } } } })
 		expect(top.UI.hud.layout.reticle.height).toBe(0.001)
 	end)
@@ -1773,7 +1787,8 @@ describe("Config.forMode", function()
 				overrides = { UI = { hud = { layout = { scoreTab = { size = UDim2.fromOffset(0, 360) } } } } },
 				message = "UI.hud.layout.scoreTab.size: must be in pixels (scales 0, offsets > 0)",
 			},
-			-- RC's crosshair (#312): on the screen, a ring that holds its dot, halves that keep some arc.
+			-- RC's crosshair (#312): on the screen, a ring that holds its dot, halves that keep some arc, a blink that
+			-- takes some time.
 			{
 				overrides = { UI = { hud = { layout = { reticle = { height = 0 } } } } },
 				message = "UI.hud.layout.reticle.height: must be > 0 (got 0)",
@@ -1789,6 +1804,10 @@ describe("Config.forMode", function()
 			{
 				overrides = { UI = { hud = { layout = { reticle = { ringGap = -1 } } } } },
 				message = "UI.hud.layout.reticle.ringGap: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { reticle = { blinkSeconds = 0 } } } } },
+				message = "UI.hud.layout.reticle.blinkSeconds: must be > 0 (got 0)",
 			},
 			-- 130 - 2 x 4 leaves 122 px inside the ring: a 122 px dot would touch it.
 			{

@@ -416,7 +416,7 @@ local Hud: Hud = {
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
 			show(self._labels[control], ControlLabels.label(control, config, actions, skate) or "")
 		end
-		show(self._charge, actions:chargeProgress() or 0)
+		show(self._charge, actions:chargeSeconds() or 0)
 	end,
 }
 

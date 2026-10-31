@@ -495,24 +495,26 @@ describe("ActionController", function()
 		expect(request.charge).toBeCloseTo(half * DT / THROW.chargeMaxSeconds, 6)
 	end)
 
+	-- The key's time goes on past a full charge: the crosshair's closed ring blinks then (Q142).
 	it("charges no further than a full charge, however long the throw is held", function()
 		setup()
-		local throw = charging(math.round(2 * THROW.chargeMaxSeconds / DT))
-		expect(ActionController:chargeProgress()).toBe(1)
+		local steps = math.round(2 * THROW.chargeMaxSeconds / DT)
+		local throw = charging(steps)
+		expect(ActionController:chargeSeconds()).toBeCloseTo(steps * DT, 6)
 		throw:Fire(false)
 		frame()
 		expect(requests[1].charge).toBe(1)
 	end)
 
-	-- What the crosshair's ring shows (#312): the charge's share of a full one, from the press.
-	it("tells how far a throw has charged while it charges, and nothing otherwise", function()
+	-- What the crosshair's ring shows (#312): how long the throw key has been held, from the press.
+	it("tells how long a throw has charged while it charges, and nothing otherwise", function()
 		setup()
-		expect(ActionController:chargeProgress()).toBeNil()
+		expect(ActionController:chargeSeconds()).toBeNil()
 		local throw = charging(6)
-		expect(ActionController:chargeProgress()).toBeCloseTo(6 * DT / THROW.chargeMaxSeconds, 6)
+		expect(ActionController:chargeSeconds()).toBeCloseTo(6 * DT, 6)
 		throw:Fire(false)
 		frame()
-		expect(ActionController:chargeProgress()).toBeNil()
+		expect(ActionController:chargeSeconds()).toBeNil()
 	end)
 
 	it("keeps a throw charged and let go during a dodge for when the dodge ends", function()
@@ -548,12 +550,12 @@ describe("ActionController", function()
 		press("Tackle")
 		frame()
 		expect(requests).toEqual({ { action = "Dodge" } })
-		expect(ActionController:chargeProgress()).toBeNil()
+		expect(ActionController:chargeSeconds()).toBeNil()
 		-- Still held through the dodge, then let go after it: nothing.
 		for _ = 1, 40 do
 			frame()
 		end
-		expect(ActionController:chargeProgress()).toBeNil()
+		expect(ActionController:chargeSeconds()).toBeNil()
 		throw:Fire(false)
 		frame()
 		expect(requests).toEqual({ { action = "Dodge" } })
@@ -582,7 +584,7 @@ describe("ActionController", function()
 		-- The ball leaves at once, as a throw's does; no leap.
 		expect(BallCarrier.carrier).toBeNil()
 		expect(skater().mode).toBe("Grounded")
-		expect(ActionController:chargeProgress()).toBeNil()
+		expect(ActionController:chargeSeconds()).toBeNil()
 		-- Refused: the ball is back.
 		ActionController:rejected({ action = "RollBall" })
 		expect(BallCarrier.carrier).toBe(LOCAL_ID)
@@ -610,7 +612,7 @@ describe("ActionController", function()
 		frame()
 		expect(requests).toEqual({})
 		expect(BallCarrier.carrier).toBe(LOCAL_ID)
-		expect(ActionController:chargeProgress()).toBeCloseTo(6 * DT / THROW.chargeMaxSeconds, 6)
+		expect(ActionController:chargeSeconds()).toBeCloseTo(6 * DT, 6)
 	end)
 
 	-- RC greys Pump while a throw charges (Q106; Videos 13, 31, 32): the skating ignores the pump key meanwhile.
