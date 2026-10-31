@@ -17,6 +17,11 @@ local function keeper(overrides: { [string]: any }?): ScoreKeeper.ScoreKeeper
 	return scores
 end
 
+-- A player's line, as the keeper holds it.
+local function line(scores: ScoreKeeper.ScoreKeeper, player: string): Types.PlayerStats
+	return (scores:player(player) :: ScoreKeeper.Entry).stats
+end
+
 local function mvpAfter(events: { Types.Event }): string?
 	local scores = keeper()
 	for _, event in events do
@@ -30,15 +35,17 @@ describe("ScoreKeeper", function()
 		local scores = keeper()
 		expect(scores:teamScores()).toEqual({ Blue = 0, Orange = 0 })
 		expect(scores:player("O1")).toEqual({
-			player = "O1",
-			team = "Orange",
-			joinOrder = 3,
+			stats = {
+				player = "O1",
+				team = "Orange",
+				joinOrder = 3,
+				score = 0,
+				goals = 0,
+				assists = 0,
+				saves = 0,
+				steals = 0,
+			},
 			present = true,
-			score = 0,
-			goals = 0,
-			assists = 0,
-			saves = 0,
-			steals = 0,
 		})
 		expect(scores:player("Nobody")).toBeNil()
 	end)
@@ -49,13 +56,13 @@ describe("ScoreKeeper", function()
 		local scores = keeper()
 		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B1", assister = "B2", points = 3 })
 		expect(scores:teamScores()).toEqual({ Blue = 3, Orange = 0 })
-		expect(scores:player("B1")).toMatchObject({ score = 100, goals = 1 })
-		expect(scores:player("B2")).toMatchObject({ score = 0, assists = 0 })
+		expect(line(scores, "B1")).toMatchObject({ score = 100, goals = 1 })
+		expect(line(scores, "B2")).toMatchObject({ score = 0, assists = 0 })
 		scores:apply({ name = "AssistAwarded", player = "B2" })
-		expect(scores:player("B2")).toMatchObject({ score = 50, assists = 1 })
+		expect(line(scores, "B2")).toMatchObject({ score = 50, assists = 1 })
 		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B2", points = 5 })
 		expect(scores:teamScores()).toEqual({ Blue = 8, Orange = 0 })
-		expect(scores:player("B2")).toMatchObject({ score = 150, goals = 1 })
+		expect(line(scores, "B2")).toMatchObject({ score = 150, goals = 1 })
 	end)
 
 	it("scores saves, steals, laps and knockdowns", function()
@@ -64,8 +71,8 @@ describe("ScoreKeeper", function()
 		scores:apply({ name = "Steal", player = "O1", fromTeam = "Blue" })
 		scores:apply({ name = "TackleKnockdown", attacker = "O1", victim = "B1" })
 		scores:apply({ name = "LapCompleted", team = "Blue", streak = 1, holder = "B1" })
-		expect(scores:player("O1")).toMatchObject({ score = 80, saves = 1, steals = 1 })
-		expect(scores:player("B1")).toMatchObject({ score = 10 })
+		expect(line(scores, "O1")).toMatchObject({ score = 80, saves = 1, steals = 1 })
+		expect(line(scores, "B1")).toMatchObject({ score = 10 })
 		expect(scores:teamScores()).toEqual({ Blue = 0, Orange = 0 })
 	end)
 
@@ -73,7 +80,7 @@ describe("ScoreKeeper", function()
 		local scores = keeper({ Scoring = { points = { goal = 7 } } })
 		scores:apply({ name = "GoalScored", team = "Orange", scorer = "O1", points = 1 })
 		expect(scores:teamScores()).toEqual({ Blue = 0, Orange = 1 })
-		expect(scores:player("O1")).toMatchObject({ score = 7 })
+		expect(line(scores, "O1")).toMatchObject({ score = 7 })
 	end)
 
 	it("ignores events that carry no points", function()
@@ -87,9 +94,30 @@ describe("ScoreKeeper", function()
 		local scores = keeper()
 		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B1", points = 1 })
 		scores:removePlayer("B1")
-		expect(scores:player("B1")).toMatchObject({ present = false, score = 100 })
+		expect(scores:player("B1")).toMatchObject({ present = false, stats = { score = 100 } })
 		scores:addPlayer("B1", "Blue")
-		expect(scores:player("B1")).toMatchObject({ present = true, team = "Blue", score = 100, joinOrder = 1 })
+		expect(scores:player("B1")).toMatchObject({
+			present = true,
+			stats = { team = "Blue", score = 100, joinOrder = 1 },
+		})
+	end)
+
+	-- The owner (Q96, #309): a leaver's row goes at once and their team keeps their goals; back in the same match,
+	-- their row and numbers come back.
+	it("lists only the players still in the match, and a returning player with their numbers", function()
+		local scores = keeper()
+		scores:apply({ name = "GoalScored", team = "Blue", scorer = "B1", points = 3 })
+		scores:removePlayer("B1")
+		local listed: { string } = {}
+		for _, entry in scores:stats().players do
+			table.insert(listed, entry.player)
+		end
+		expect(listed).toEqual({ "B2", "O1" })
+		expect(scores:stats().scores).toEqual({ Blue = 3, Orange = 0 })
+		scores:addPlayer("B1", "Blue")
+		local back = scores:stats().players
+		expect(#back).toBe(3)
+		expect(back[1]).toMatchObject({ player = "B1", score = 100, goals = 1 })
 	end)
 
 	it("rejects duplicate and unknown players, unknown teams, and a returning player on another team", function()
@@ -123,7 +151,7 @@ describe("ScoreKeeper", function()
 		end
 		expect(order).toEqual({ "B2", "B1", "O1" })
 		stats.players[1].score = 999
-		expect(scores:player("B2")).toMatchObject({ score = 100 })
+		expect(line(scores, "B2")).toMatchObject({ score = 100 })
 	end)
 end)
 

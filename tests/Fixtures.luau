@@ -147,12 +147,11 @@ function Fixtures.config(overrides: { [string]: any }?): Config.GameConfig
 end
 
 -- A player's line in the score tab, with no points yet.
-function Fixtures.playerStats(id: Types.PlayerId, team: Team.Team, present: boolean): Types.PlayerStats
+function Fixtures.playerStats(id: Types.PlayerId, team: Team.Team): Types.PlayerStats
 	return {
 		player = id,
 		team = team,
 		joinOrder = tonumber(id) :: number,
-		present = present,
 		score = 0,
 		goals = 0,
 		assists = 0,
@@ -161,11 +160,11 @@ function Fixtures.playerStats(id: Types.PlayerId, team: Team.Team, present: bool
 	}
 end
 
--- `count` players with no points, ids "1" to `count`, alternately Blue and Orange, all still in the match.
+-- `count` players with no points, ids "1" to `count`, alternately Blue and Orange.
 function Fixtures.roster(count: number): { Types.PlayerStats }
 	local players: { Types.PlayerStats } = {}
 	for index = 1, count do
-		table.insert(players, Fixtures.playerStats(tostring(index), if index % 2 == 1 then "Blue" else "Orange", true))
+		table.insert(players, Fixtures.playerStats(tostring(index), if index % 2 == 1 then "Blue" else "Orange"))
 	end
 	return players
 end
@@ -186,7 +185,7 @@ function Fixtures.matchSnapshot(overrides: { [string]: any }?, frame: number?): 
 		nextGate = GOAL_GATE,
 		stats = {
 			scores = { Blue = 0, Orange = 0 },
-			players = { Fixtures.playerStats("1", "Blue", true), Fixtures.playerStats("2", "Orange", true) },
+			players = { Fixtures.playerStats("1", "Blue"), Fixtures.playerStats("2", "Orange") },
 		},
 	}
 	local changes: { [string]: any } = overrides or {}

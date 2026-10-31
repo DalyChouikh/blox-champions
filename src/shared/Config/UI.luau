@@ -106,9 +106,8 @@ export type HudLayout = {
 	getUp: Place,
 }
 
--- How the HUD looks and how long its messages last. dimTransparency fades an empty pip or a departed player's row;
--- glowThickness (pixels) outlines the lap bar while the goal is open, and the touch throw button while Ball Focus is
--- on.
+-- How the HUD looks and how long its messages last. dimTransparency fades an empty pip; glowThickness (pixels)
+-- outlines the lap bar while the goal is open, and the touch throw button while Ball Focus is on.
 export type HudSettings = {
 	font: Enum.Font,
 	textColor: Color3,
