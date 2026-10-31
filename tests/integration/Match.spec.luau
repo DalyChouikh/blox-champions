@@ -199,11 +199,18 @@ local function carry(rig: Model, from: number, to: number)
 	end
 end
 
+-- Puts the ball at `frame` as a jump the server made: a test's shortcut, never a flight, so it crosses no gate, no
+-- ring and no face of the arena (#311: a ball that goes through one is put back).
+local function jumpBall(frame: CFrame)
+	BallService.part.CFrame = frame
+	BallService:jumped()
+end
+
 -- The ball lands on the middle of the track where it is (#321: it drops in high beside a wall), and `rig` catches it
 -- there.
 local function catchWith(rig: Model)
 	local landing = Centerline.at(config.Arena, ballDistance(), MIDDLE, 3)
-	BallService.part.CFrame = landing
+	jumpBall(landing)
 	rig:PivotTo(landing)
 	MatchService:step(FRAME)
 end
@@ -227,9 +234,9 @@ local function openGoal(count: number?): (Model, { Model })
 	return rigs[1], rigs
 end
 
--- The ball is moved through the ring's disc front to back in two frames.
+-- The ball is put just in front of the ring, then moves through its disc front to back.
 local function throughRing(goal: CFrame)
-	BallService.part.CFrame = CFrame.new(goal.Position - goal.LookVector * 2)
+	jumpBall(CFrame.new(goal.Position - goal.LookVector * 2))
 	MatchService:step(FRAME)
 	BallService.part.CFrame = CFrame.new(goal.Position + goal.LookVector * 2)
 	MatchService:step(FRAME)
@@ -327,7 +334,7 @@ describe("A match on the generated arena", function()
 		local approach = goal.Position - goal.LookVector * 2
 		defender:PivotTo(CFrame.new(approach + goal.RightVector * 3))
 		BallService:throw("1", goal.LookVector * 60)
-		BallService.part.CFrame = CFrame.new(approach)
+		jumpBall(CFrame.new(approach))
 		frames(config.Scoring.saveLookaheadSeconds + 0.1)
 		expect(eventsNamed("SaveMade")).toEqual({ { name = "SaveMade", player = "2", kind = "Block" } })
 		-- The save came from the touch: a knocked-down defender never takes the ball (a catch would also block).
@@ -372,8 +379,12 @@ describe("A match on the generated arena", function()
 		local rigs = seat(2)
 		kickoff()
 		catchWith(rigs[1])
-		-- 8 studs behind the carrier: inside the tackle's reach (range plus lag tolerance), outside the pickup reach.
-		local frame = lineUp(rigs[2], rigs[1], 8)
+		-- Behind the carrier halfway between the pickup's reach (radius plus lag tolerance) and the tackle's (range
+		-- plus lag tolerance): it hits them but cannot catch.
+		local pickupReach = config.Ball.pickupRadius + config.Network.pickupLagToleranceStuds
+		local tackle = config.Actions.Tackle.hit :: Config.Hit
+		local tackleReach = tackle.range + config.Network.hitLagToleranceStuds
+		local frame = lineUp(rigs[2], rigs[1], (pickupReach + tackleReach) / 2)
 		local momentum = frame.LookVector * 30
 		Fixtures.root(rigs[1]).AssemblyLinearVelocity = momentum
 		ActionService:request("2", { action = "Tackle" })
@@ -384,11 +395,11 @@ describe("A match on the generated arena", function()
 		expect(BallService.state.status).toBe("Loose")
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, momentum)
 		-- Beside the knocked-down carrier, the ball stays loose.
-		BallService.part.CFrame = CFrame.new(Fixtures.root(rigs[1]).Position)
+		jumpBall(CFrame.new(Fixtures.root(rigs[1]).Position))
 		frames(FRAME)
 		expect(BallService.state.carrier).toBeNil()
 		-- Beside the tackler, it is theirs: a steal.
-		BallService.part.CFrame = CFrame.new(Fixtures.root(rigs[2]).Position)
+		jumpBall(CFrame.new(Fixtures.root(rigs[2]).Position))
 		frames(FRAME)
 		expect(BallService.state.carrier).toBe("2")
 		expect(#eventsNamed("Steal")).toBe(1)
@@ -413,11 +424,11 @@ describe("A match on the generated arena", function()
 		ActionService:request(passer, { action = "Pass", aim = frame.RightVector })
 		expect(BallService.state.status).toBe("Flying")
 		-- Beside the passer, inside rethrowPickupDelay: nobody takes it.
-		BallService.part.CFrame = CFrame.new(Fixtures.root(passerRig).Position)
+		jumpBall(CFrame.new(Fixtures.root(passerRig).Position))
 		frames(FRAME)
 		expect(BallService.state.carrier).toBeNil()
 		-- Beside the caller: theirs, and the team keeps possession, so no steal.
-		BallService.part.CFrame = CFrame.new(Fixtures.root(receiverRig).Position)
+		jumpBall(CFrame.new(Fixtures.root(receiverRig).Position))
 		frames(FRAME)
 		expect(BallService.state.carrier).toBe("3")
 		expect(#eventsNamed("PossessionChanged")).toBe(possessions)
@@ -719,10 +730,11 @@ describe("A match on the generated arena", function()
 		kickoff()
 		local from = ballDistance()
 		local total = 0
-		-- A free ball moving along the outside of the track (over the upper floor): the catch scan and the bounds check
-		-- every frame.
+		-- A free ball moving along the outside of the track, over the incline (8.5 to 11.5 high there): the catch scan,
+		-- the bounds check and the ball's rays (#311) every frame.
+		jumpBall(Centerline.at(config.Arena, from, MIDDLE + 18, 16))
 		for step = 1, 300 do
-			BallService.part.CFrame = Centerline.at(config.Arena, from + step, MIDDLE + 18, 8)
+			BallService.part.CFrame = Centerline.at(config.Arena, from + step, MIDDLE + 18, 16)
 			local started = os.clock()
 			MatchService:step(FRAME)
 			total += os.clock() - started

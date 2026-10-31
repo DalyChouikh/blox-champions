@@ -16,7 +16,8 @@ export type PoseConfig = {
 	brakeLeanDeg: number,
 	-- The legs tuck in the air by this much.
 	tuckDeg: number,
-	-- The arm that carries the ball rises by this much.
+	-- The arm that carries the ball rises sideways by this much; none hangs it at the side (Ball.carryOffset holds the
+	-- ball just below its hand).
 	carryArmDeg: number,
 	-- How far past hoverHeight a remote skater's ground ray reaches before the skater counts as airborne.
 	airborneProbe: number,
@@ -49,7 +50,8 @@ local defaults: PoseConfig = {
 	crouchDeg = 30,
 	brakeLeanDeg = 15,
 	tuckDeg = 60,
-	carryArmDeg = 75,
+	-- RC carries the ball low in the right hand, the arm down (Video 13 at 99.0 s; the owner's trial #311, Q130).
+	carryArmDeg = 0,
 	airborneProbe = 1.5,
 	lungeDeg = 35,
 	knockdownTiltDeg = 85,

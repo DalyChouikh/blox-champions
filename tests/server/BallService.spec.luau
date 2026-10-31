@@ -9,8 +9,10 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 local BallService = require(game:GetService("ServerScriptService").Server.BallService)
 local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
+local Config = require(ReplicatedStorage.Shared.Config)
 local DropIn = require(ReplicatedStorage.Shared.Ball.DropIn)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local SkaterBody = require(game:GetService("ServerScriptService").Server.SkaterBody)
 local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
@@ -23,14 +25,27 @@ local STRANDED = config.Ball.strandedSeconds
 -- The middle of the top straight at a standing root's height, well inside the arena: where tests catch the ball (a
 -- drop-in starts high beside a wall, #321) or rest it.
 local ON_TRACK = Vector3.new(0, 3, -60)
+-- How far from a skater's middle the server hands them a loose ball (#311): the magnet plus the lag tolerance.
+local REACH = config.Ball.pickupRadius + config.Network.pickupLagToleranceStuds
+-- The fastest a throw ever leaves the hand: a full charge plus its share of the carrier's speed, which the movement
+-- guard holds to its limit.
+local THROW = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
+local FASTEST_THROW = THROW.maxSpeed
+	+ THROW.inheritCarrierVelocity * MovementCheck.speedLimit(config.Movement, config.Network)
 
 local folder: Folder
+-- The arena's parts in a test: what a resting ball lies on (#308) and what no ball may pass through (#311). The rigs
+-- stand outside it, in `folder`, as characters stand outside the real arena.
+local arena: Folder
 beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "BallServiceTest"
 	folder.Parent = workspace
-	-- The test's folder is the arena a resting ball lies in (#308); the drops' spots repeat (#321).
-	BallService:init({ Config = config, ArenaService = { model = folder }, Random = Random.new(1) })
+	arena = Instance.new("Folder")
+	arena.Name = "Arena"
+	arena.Parent = folder
+	-- The drops' spots repeat (#321).
+	BallService:init({ Config = config, ArenaService = { model = arena }, Random = Random.new(1) })
 end)
 afterEach(function()
 	BallService:destroy()
@@ -76,11 +91,11 @@ end
 -- A slab of the arena just under a ball resting still at `position`: a ride surface (a part in a folder tagged
 -- RideSurface, as the floors are) or not (as the goal's rim is, #308).
 local function slabUnder(position: Vector3, rideSurface: boolean): Part
-	local parent: Instance = folder
+	local parent: Instance = arena
 	if rideSurface then
 		parent = Instance.new("Folder")
 		parent:AddTag(Tags.RideSurface)
-		parent.Parent = folder
+		parent.Parent = arena
 	end
 	local slab = Instance.new("Part")
 	slab.Anchored = true
@@ -122,7 +137,7 @@ describe("BallService", function()
 	it("makes a ball of the configured size, physics and skin, hidden until it spawns", function()
 		local ball = BallService.part
 		expect(ball.Shape).toBe(Enum.PartType.Ball)
-		expect(ball.Size).toEqual(Vector3.one * 3)
+		expect(ball.Size).toEqual(Vector3.one * (2 * config.Ball.radius))
 		local physics = ball.CustomPhysicalProperties :: PhysicalProperties
 		expect(physics.Density).toBeCloseTo(0.7, 4)
 		expect(physics.Friction).toBeCloseTo(0.3, 4)
@@ -200,7 +215,7 @@ describe("BallService", function()
 		BallService.part.AssemblyLinearVelocity = Vector3.new(20, 0, 0)
 		local closest = Fixtures.rig(folder, "Near", CFrame.new(at + Vector3.new(3, 0, 0)))
 		local farther = Fixtures.rig(folder, "Far", CFrame.new(at + Vector3.new(6, 0, 0)))
-		local outside = Fixtures.rig(folder, "Out", CFrame.new(at + Vector3.new(0, 0, 7.5)))
+		local outside = Fixtures.rig(folder, "Out", CFrame.new(at + Vector3.new(0, 0, REACH + 0.5)))
 		local frame =
 			BallService:step(1 / 60, { holder("Far", farther), holder("Near", closest), holder("Out", outside) })
 		expect(frame.picker).toBe("Near")
@@ -244,10 +259,11 @@ describe("BallService", function()
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
 	end)
 
-	it("carries the ball at the carrier's side, clear of the floor", function()
-		caughtBy("A")
+	it("carries the ball in the carrier's hand, clear of the floor they hover over", function()
+		local rig = caughtBy("A")
 		expect(BallService.state.carrier).toBe("A")
-		expect(BallService.part.Position.Y - config.Ball.radius >= 0).toBe(true)
+		local floor = Fixtures.root(rig).Position.Y - config.Movement.hoverHeight
+		expect(BallService.part.Position.Y - config.Ball.radius > floor).toBe(true)
 	end)
 
 	it("keeps the thrower from catching their own throw, and reports the throw once", function()
@@ -309,8 +325,13 @@ describe("BallService", function()
 	it("never respawns a ball rolling there, hanging still over it, or resting there in shorter spells", function()
 		spawnResting(false)
 		local ball = BallService.part
-		ball.AssemblyLinearVelocity = Vector3.new(config.Ball.restSpeed, 0, 0)
-		expect(respawnsWithin(2 * STRANDED)).toBe(false)
+		-- Kept rolling (as a slope keeps a ball rolling against the rolling slow-down, #311).
+		local respawned = false
+		for _ = 1, 2 * STRANDED do
+			ball.AssemblyLinearVelocity = Vector3.new(config.Ball.restSpeed, 0, 0)
+			respawned = BallService:step(1, {}).respawned or respawned
+		end
+		expect(respawned).toBe(false)
 		-- A ball's width over it, still (only for an instant at the top of a throw).
 		ball.AssemblyLinearVelocity = Vector3.zero
 		ball.CFrame = CFrame.new(ON_TRACK + Vector3.new(0, 2 * config.Ball.radius, 0))
@@ -601,5 +622,137 @@ describe("BallService", function()
 		BallService:kill()
 		expect(ballAt()).toBe("Workspace")
 		expect(BallService:step(1 / 60, { holder("A", rig) }).picker).toBeNil()
+	end)
+
+	-- The owner (Q91, #311): a loose ball within a body length of a skater's middle is theirs at once (the server
+	-- decides; each screen draws the pull into the hand, BallPull).
+	it(
+		"hands a loose ball to a skater within reach of their middle, on the floor and in the air, never beyond",
+		function()
+			-- On the floor the ball's centre is a radius up and the skater's middle hoverHeight up.
+			local rise = config.Movement.hoverHeight - config.Ball.radius
+			local across = math.sqrt(REACH * REACH - rise * rise)
+			local cases: { { offset: Vector3, caught: boolean } } = {
+				{ offset = Vector3.new(across - 0.01, -rise, 0), caught = true },
+				{ offset = Vector3.new(across + 0.01, -rise, 0), caught = false },
+				{ offset = Vector3.new(0, 0, REACH - 0.01), caught = true },
+				{ offset = Vector3.new(0, 0, REACH + 0.01), caught = false },
+				{ offset = Vector3.new(0, REACH - 0.01, 0), caught = true },
+				{ offset = Vector3.new(0, REACH + 0.01, 0), caught = false },
+			}
+			local rig = Fixtures.rig(folder, "A", CFrame.new(ON_TRACK))
+			for index, case in cases do
+				BallService:kill()
+				BallService:spawn()
+				BallService.part.CFrame = CFrame.new(ON_TRACK + case.offset)
+				BallService.part.AssemblyLinearVelocity = Vector3.zero
+				local picker = BallService:step(1 / 60, { holder("A", rig) }).picker
+				expect(`{index}: {picker ~= nil}`).toBe(`{index}: {case.caught}`)
+			end
+		end
+	)
+
+	it("welds a caught ball at the carry spot at once: each screen draws the pull from where it showed it", function()
+		local rig = caughtBy("A")
+		local weld = BallService.part:FindFirstChildOfClass("Weld") :: Weld
+		Fixtures.expectNear(weld.C0.Position, config.Ball.carryOffset)
+		Fixtures.expectNear(BallService.part.Position, Fixtures.root(rig).CFrame * config.Ball.carryOffset)
+	end)
+
+	-- The owner (Q124, Q128, #311): a loose ball slows like a coasting skater; Roblox gives a rolling ball none.
+	it(
+		"slows a loose ball along the surface under it by the skaters' rolling friction, its spin too, to rest",
+		function()
+			spawnResting(true)
+			local ball = BallService.part
+			local slowed = 20 - config.Movement.rollingFriction * 0.5
+			ball.AssemblyLinearVelocity = Vector3.new(20, -3, 0)
+			ball.AssemblyAngularVelocity = Vector3.new(0, 0, -20)
+			BallService:step(0.5, {})
+			-- Only along the floor: the push into it is physics' own.
+			Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(slowed, -3, 0))
+			Fixtures.expectNear(ball.AssemblyAngularVelocity, Vector3.new(0, 0, -20) * (slowed / 20))
+			ball.AssemblyLinearVelocity = Vector3.new(0, 0, config.Movement.rollingFriction / 2)
+			BallService:step(1, {})
+			Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.zero)
+		end
+	)
+
+	it("never slows a ball in the air, nor a pass or a drop-in while it flies flat", function()
+		spawnResting(true)
+		local ball = BallService.part
+		-- Two radii over the floor: nothing within its reach.
+		ball.CFrame = CFrame.new(ON_TRACK + Vector3.new(0, 2 * config.Ball.radius, 0))
+		ball.AssemblyLinearVelocity = Vector3.new(20, 0, 0)
+		BallService:step(0.5, {})
+		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(20, 0, 0))
+		-- A pass skimming the floor, its weight cancelled.
+		local rig = Fixtures.rig(folder, "A", CFrame.new(ON_TRACK))
+		BallService:step(1 / 60, { holder("A", rig) })
+		BallService:pass("A", Vector3.new(30, 0, 0), nil)
+		BallService:step(0.5, {})
+		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(30, 0, 0))
+	end)
+
+	-- Roblox's physics lets a fast small ball through a thin part (measured for #311: a 1-stud ball crossed the 1-stud
+	-- floor at 260 studs/s and the closed goal panel at 300).
+	it("puts a loose ball whose centre went through a solid face back where it was, bounced off that face", function()
+		BallService:spawn()
+		local ball = BallService.part
+		-- Clear of the floor's reach (which would slow it rolling).
+		local above = ON_TRACK + Vector3.new(0, 2 * config.Ball.radius, 0)
+		ball.CFrame = CFrame.new(above)
+		BallService:step(1 / 60, {})
+		slabUnder(ON_TRACK, true)
+		-- One frame of the fastest throw straight down carries its centre right through the 1-stud floor.
+		ball.CFrame = CFrame.new(above - Vector3.new(0, FASTEST_THROW / 60, 0))
+		ball.AssemblyLinearVelocity = Vector3.new(10, -FASTEST_THROW, 0)
+		local frame = BallService:step(1 / 60, {})
+		Fixtures.expectNear(ball.Position, above)
+		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(10, FASTEST_THROW * config.Ball.elasticity, 0))
+		-- Its movement ends where it was: nothing past the face counts (a gate, the ring).
+		expect(frame.moved).toBe(true)
+		Fixtures.expectNear(frame.from, above)
+		Fixtures.expectNear(frame.to, above)
+		-- It touched the face, though Roblox may never say so: the drop-in it was falling in is over.
+		expect(weightless()).toBe(false)
+		-- Already turned back by physics, it keeps its way.
+		ball.CFrame = CFrame.new(above - Vector3.new(0, FASTEST_THROW / 60, 0))
+		ball.AssemblyLinearVelocity = Vector3.new(0, 40, 0)
+		BallService:step(1 / 60, {})
+		Fixtures.expectNear(ball.Position, above)
+		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(0, 40, 0))
+		-- A throw through it lands there.
+		local rig = Fixtures.rig(folder, "A", CFrame.new(above))
+		BallService:step(1 / 60, { holder("A", rig) })
+		BallService:throw("A", Vector3.new(0, -FASTEST_THROW, 0))
+		BallService:step(1 / 60, {})
+		ball.CFrame = CFrame.new(ball.Position - Vector3.new(0, FASTEST_THROW / 60, 0))
+		BallService:step(1 / 60, {})
+		expect(BallService.state.status).toBe("Loose")
+	end)
+
+	it("lets a ball through what nothing hits (an open goal's panel), and a carrier anywhere", function()
+		BallService:spawn()
+		local ball = BallService.part
+		local above = ON_TRACK + Vector3.new(0, 2 * config.Ball.radius, 0)
+		ball.CFrame = CFrame.new(above)
+		BallService:step(1 / 60, {})
+		local panel = slabUnder(ON_TRACK, false)
+		panel.CanCollide = false
+		panel.CanQuery = false
+		local below = above - Vector3.new(0, FASTEST_THROW / 60, 0)
+		ball.CFrame = CFrame.new(below)
+		BallService:step(1 / 60, {})
+		Fixtures.expectNear(ball.Position, below)
+		-- A carrier's ball goes where they go.
+		panel.CanCollide = true
+		panel.CanQuery = true
+		local rig = caughtBy("A")
+		BallService:step(1 / 60, {})
+		rig:PivotTo(CFrame.new(ON_TRACK - Vector3.new(0, 4, 0)))
+		BallService:step(1 / 60, {})
+		Fixtures.expectNear(Fixtures.root(rig).Position, ON_TRACK - Vector3.new(0, 4, 0))
+		Fixtures.expectNear(ball.Position, Fixtures.root(rig).CFrame * config.Ball.carryOffset)
 	end)
 end)
