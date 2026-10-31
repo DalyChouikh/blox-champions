@@ -5,11 +5,14 @@
 -- its top included: Bounds.inArena) drops in again whatever its state, a loose one resting a while on something
 -- nobody skates (the goal's rim, #308) too, and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt.
 -- Each frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose body it
--- touched. Jumps the server makes (a drop-in's start, the snap to a catcher's side, a carrier it moves, a drop it
--- places) are never reported as movement, so they can never cross a gate or the ring. A pass flies flat, its weight
--- cancelled, and homes on its target, until it touches anything or anyone or the target can no longer catch; a drop-in
--- falls steadily the lap's way, its weight cancelled too, until it touches anything or anyone; then either falls like
--- any ball. A ball passes through the player who let go of it until it is clear of them.
+-- touched. Jumps the server makes (a drop-in's start, the snap into a catcher's hand, a carrier it moves, a drop it
+-- places) are never reported as movement, so they can never cross a gate or the ring; each screen draws the catch's
+-- flight into the hand itself (Client/BallPull). A pass flies flat, its weight cancelled, and homes on its target,
+-- until it touches anything or anyone or the target can no longer catch; a drop-in falls steadily the lap's way, its
+-- weight cancelled too, until it touches anything or anyone; then either falls like any ball. A ball passes through
+-- the player who let go of it until it is clear of them. A loose ball slows rolling as a coasting skater does (#311,
+-- Q124), and never passes through the arena: Roblox lets a fast small ball through a thin part, so a loose ball whose
+-- centre crossed a solid face since the last frame goes back there, bounced off that face (#311).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -70,7 +73,8 @@ export type BallService = {
 	drop: (self: BallService, velocity: Vector3?) -> (),
 	-- Lets go of a carried ball, still, at `position`: where its carrier was last in the arena (MovementGuard).
 	dropAt: (self: BallService, position: Vector3) -> (),
-	-- The server moved the carrier, and the ball welded to them: the next step reports no movement.
+	-- The server moved the ball, with the carrier it is welded to or alone: the next step reports no movement, so the
+	-- jump crosses no gate, no ring and no face of the arena.
 	jumped: (self: BallService) -> (),
 	onTouched: (self: BallService, hit: BasePart) -> (),
 	step: (self: BallService, dt: number, holders: { Holder }) -> BallFrame,
@@ -102,9 +106,11 @@ export type BallService = {
 	-- flies flat and a drop-in falls at its steady speed.
 	_lift: VectorForce,
 	_touched: RBXScriptConnection?,
-	-- What a resting ball lies on: a ray into the arena only, from its center to a radius past its bottom (#308).
-	_restParams: RaycastParams,
-	_restReach: Vector3,
+	-- Rays into the arena only: every part of it that takes no part in collisions (a ghost, an open goal's panel) takes
+	-- none in rays either, so they meet only what the ball can touch.
+	_arenaParams: RaycastParams,
+	-- What a loose ball lies or rolls on: a ray from its center to a radius past its bottom (#308, #311).
+	_groundReach: Vector3,
 	-- How long the loose ball has rested on something nobody skates.
 	_strandedSeconds: number,
 	_canPickUp: (PlayerId) -> boolean,
@@ -191,7 +197,7 @@ end
 
 -- Lets go of the ball if someone carries it: a free physics part again, simulated by the server. The weld goes
 -- first: network ownership is set for a whole assembly, and while welded the ball is part of its carrier's. The ball
--- leaves from the carrier's side, within touch of their collider, so it passes through them until it is clear of
+-- leaves from the carrier's hand, within touch of their collider, so it passes through them until it is clear of
 -- them: a throw across their body would otherwise bounce off it. It keeps the carrier's velocity, read while still
 -- welded into their assembly, up to the speed limit.
 local function release(self: BallService)
@@ -222,8 +228,9 @@ local function release(self: BallService)
 	end
 end
 
--- Welds the ball at the carrier's side (Ball.carryOffset in their root's frame). A Weld with an explicit offset puts
--- it in the same place on every machine; while carried it is weightless and touches nothing.
+-- Welds the ball in the carrier's hand at once (Ball.carryOffset in their root's frame): the server decides the catch
+-- then, so nobody steals it mid-pull, and each screen draws its flight into the hand (Client/BallPull). A Weld with an
+-- explicit offset puts it in the same place on every machine; while carried it is weightless and touches nothing.
 local function attach(self: BallService, holder: Holder)
 	endGuidance(self)
 	local part = self.part
@@ -339,18 +346,64 @@ local function holdDropIn(self: BallService, position: Vector3)
 end
 
 -- Whether the loose ball has rested Ball.strandedSeconds on something nobody skates (#308, Q93): slower than
--- Ball.restSpeed on any part of the arena but a ride surface (the goal's rim). Any other frame, a carried ball's
--- included, starts the count over: a ball resting on a floor, a bank, a wall or the glass stays where it is.
-local function stranded(self: BallService, position: Vector3, dt: number): boolean
+-- Ball.restSpeed on `ground`, any part of the arena but a ride surface (the goal's rim). Any other frame, a carried
+-- ball's included (it has no ground), starts the count over: a ball resting on a floor, a bank, a wall or the glass
+-- stays where it is.
+local function stranded(self: BallService, ground: RaycastResult?, dt: number): boolean
 	local ball = self._config.Ball
-	local resting = self.state.status ~= "Carried" and self.part.AssemblyLinearVelocity.Magnitude < ball.restSpeed
-	local under = if resting then workspace:Raycast(position, self._restReach, self._restParams) else nil
-	if under == nil or TaggedLayout.isRideSurface(under.Instance) then
+	if
+		ground == nil
+		or TaggedLayout.isRideSurface(ground.Instance)
+		or self.part.AssemblyLinearVelocity.Magnitude >= ball.restSpeed
+	then
 		self._strandedSeconds = 0
 		return false
 	end
 	self._strandedSeconds += dt
 	return self._strandedSeconds >= ball.strandedSeconds
+end
+
+-- A loose ball on `ground` loses Movement.rollingFriction studs/s each second along it, as a coasting skater does
+-- (the owner, Q124, Q128, #311: Roblox gives a rolling ball no resistance, so it rolled on for good), and its spin with
+-- it, so the floor's grip never spins it back up. Its weight cancelled, a pass or a drop-in flies on unslowed.
+local function slowRolling(self: BallService, ground: RaycastResult?, dt: number)
+	if ground == nil or self._lift.Enabled then
+		return
+	end
+	local part = self.part
+	local velocity = part.AssemblyLinearVelocity
+	local along = Vectors.alongSurface(velocity, ground.Normal)
+	local speed = along.Magnitude
+	if speed == 0 then
+		return
+	end
+	local kept = math.max(0, speed - self._config.Movement.rollingFriction * dt) / speed
+	part.AssemblyLinearVelocity = velocity - along * (1 - kept)
+	part.AssemblyAngularVelocity *= kept
+end
+
+-- Where a loose ball that moved from `from` to `to` this frame is: Roblox's physics lets a fast small ball through a
+-- thin part (measured for #311: a 1-stud ball crossed the 1-stud floor at 260 studs/s and the closed goal panel at
+-- 300), and a centre that crossed a solid face of the arena can only have gone through it, so it goes back where it
+-- was, bounced off that face by the ball's elasticity unless physics already turned it back. Not to the face itself:
+-- placed exactly touching a thin panel, Roblox's solver dragged it on through (measured). The frame's movement ends
+-- there, so nothing past the face counts. It touched the face, though Roblox may never say so: a thrown ball lands, a
+-- pass or a drop-in ends (onTouched), so a pass into glass bounces off loose (Q105).
+local function stopTunnel(self: BallService, from: Vector3, to: Vector3): Vector3
+	local hit = workspace:Raycast(from, to - from, self._arenaParams)
+	if hit == nil then
+		return to
+	end
+	local part = self.part
+	local velocity = part.AssemblyLinearVelocity
+	local normal = hit.Normal
+	local into = velocity:Dot(normal)
+	if into < 0 then
+		part.AssemblyLinearVelocity = velocity - normal * ((1 + self._config.Ball.elasticity) * into)
+	end
+	part.Position = from
+	self:onTouched(hit.Instance)
+	return from
 end
 
 local BallService: BallService = {
@@ -375,8 +428,8 @@ local BallService: BallService = {
 	_lift = nil :: any,
 	_candidates = {},
 	_catchers = {},
-	_restParams = nil :: any,
-	_restReach = Vector3.zero,
+	_arenaParams = nil :: any,
+	_groundReach = Vector3.zero,
 	_strandedSeconds = 0,
 	_canPickUp = function(_player: PlayerId): boolean
 		return false
@@ -400,11 +453,11 @@ local BallService: BallService = {
 		self._droppingIn = false
 		self._gravity = Config.gravity(config)
 		self.state = BallState.new(config.Ball.rethrowPickupDelay)
-		local restParams = RaycastParams.new()
-		restParams.FilterType = Enum.RaycastFilterType.Include
-		restParams.FilterDescendantsInstances = { deps.ArenaService.model }
-		self._restParams = restParams
-		self._restReach = Vector3.new(0, -2 * config.Ball.radius, 0)
+		local arenaParams = RaycastParams.new()
+		arenaParams.FilterType = Enum.RaycastFilterType.Include
+		arenaParams.FilterDescendantsInstances = { deps.ArenaService.model }
+		self._arenaParams = arenaParams
+		self._groundReach = Vector3.new(0, -2 * config.Ball.radius, 0)
 		self._strandedSeconds = 0
 		self._canPickUp = function(player: PlayerId): boolean
 			return self._catchers[player] == true and self.state:canPickUp(player)
@@ -523,15 +576,20 @@ local BallService: BallService = {
 		end
 
 		local position = self.part.Position
-		clearOfReleaser(self, position)
+		local carried = state.status == "Carried"
 		if self._teleported then
 			self._teleported = false
 		else
+			-- A carried ball goes wherever its carrier skates.
+			if not carried then
+				position = stopTunnel(self, self._last, position)
+			end
 			frame.moved = true
 			frame.from = self._last
 			frame.to = position
 		end
 		self._last = position
+		clearOfReleaser(self, position)
 
 		state:tick(dt)
 		frame.thrower = self._pendingThrower
@@ -546,11 +604,13 @@ local BallService: BallService = {
 			end
 			return frame
 		end
-		if out or stranded(self, position, dt) then
+		-- What a loose ball in the arena lies or rolls on, if anything.
+		local ground = if out or carried then nil else workspace:Raycast(position, self._groundReach, self._arenaParams)
+		if out or stranded(self, ground, dt) then
 			respawn(self, frame)
 			return frame
 		end
-		if state.status == "Carried" then
+		if carried then
 			return frame
 		end
 
@@ -573,6 +633,7 @@ local BallService: BallService = {
 		end
 		home(self, holders, position, dt)
 		holdDropIn(self, position)
+		slowRolling(self, ground, dt)
 		return frame
 	end,
 

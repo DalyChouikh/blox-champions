@@ -26,6 +26,9 @@ export type BallConfig = {
 	elasticity: number,
 	-- A player whose root is this close to the ball's center catches it (plus Network.pickupLagToleranceStuds).
 	pickupRadius: number,
+	-- How long a caught ball takes to fly into the hand on every screen (Client/BallPull); the server hands it over
+	-- at once. None is a snap.
+	pickupPullSeconds: number,
 	-- How long a thrower must wait before catching their own throw.
 	rethrowPickupDelay: number,
 	-- A loose ball resting this long on something nobody skates (any part of the arena but a ride surface: the goal's
@@ -37,17 +40,22 @@ export type BallConfig = {
 	-- How far past either glass, below the floor or over the top (Bounds.inArena) the ball's center may go before it is
 	-- out.
 	outOfBoundsMargin: number,
-	-- Where a carried ball sits in its carrier's root frame: at their right side, clear of the floor and the legs.
+	-- Where a carried ball sits in its carrier's root frame: in the right hand at the hip, clear of the floor.
 	carryOffset: Vector3,
 }
 
 local defaults: BallConfig = {
-	radius = 1.5,
+	-- The owner's trial #311 (Q90, Q121, Q126, Q130): 2 studs across, a third of a skater; RC's is about a sixth
+	-- (Video 13 at 99.0 s), but 1 stud was hard to see from far and 1.5 was tried.
+	radius = 1,
 	-- Roblox's Plastic density.
 	density = 0.7,
 	friction = 0.3,
 	elasticity = 0.5,
-	pickupRadius = 5,
+	-- The owner (Q91, #311): a loose ball within a body length of a skater's middle is theirs at once.
+	pickupRadius = 6,
+	-- The owner (Q129, Q132, #311): RC pulls a ball into the hand in ~0.2 s (Video 13 at 1:36.8); 0.3 felt right.
+	pickupPullSeconds = 0.3,
 	rethrowPickupDelay = 0.4,
 	-- The owner (Q93, #308): no idle respawn; only a ball resting 5 s on something nobody skates respawns.
 	strandedSeconds = 5,
@@ -58,7 +66,9 @@ local defaults: BallConfig = {
 	-- it appears (RC's took ~2.5 s).
 	dropIn = { outerIn = 8, innerIn = 6, speed = 20, descent = 40 },
 	outOfBoundsMargin = 2,
-	carryOffset = Vector3.new(2.5, 0, -0.5),
+	-- RC carries the ball low in the right hand at the hip, the arm down (Video 13 at 99.0 s; the owner's trial #311,
+	-- Q130): just below the hand of an arm hanging at the side (measured in Play at (1.46, 0.36, 0) from the root).
+	carryOffset = Vector3.new(1.7, -0.8, -0.3),
 }
 
 local nonNegative = Validate.number({ min = 0 })
@@ -72,6 +82,7 @@ local schema = Validate.checkAll(
 		friction = Validate.number({ min = 0, max = 2 }),
 		elasticity = Validate.number({ min = 0, max = 1 }),
 		pickupRadius = positive,
+		pickupPullSeconds = nonNegative,
 		rethrowPickupDelay = nonNegative,
 		strandedSeconds = positive,
 		restSpeed = positive,

@@ -9,6 +9,9 @@ local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Pose = require(ReplicatedStorage.Shared.Skate.Pose)
 
 local pose = Config.defaults().Pose
+-- A carry that raises the ball's arm out to the side: the default hangs it down (RC's carry, #311).
+local raisedCarry = table.clone(pose)
+raisedCarry.carryArmDeg = 75
 
 -- A pose with nothing happening: standing, upright, carrying nothing.
 local function still(): Pose.PoseInput
@@ -88,22 +91,36 @@ describe("Pose", function()
 		expect(anglesOf(out, "leftHip")[1]).toBeCloseTo(0, 4)
 		expect(anglesOf(out, "rightKnee")[1]).toBeCloseTo(0, 4)
 		expect(anglesOf(out, "rightShoulder")[1]).toBeCloseTo(150, 4)
-		-- A carrier keeps the ball's arm up.
+		-- A carrier keeps the ball's arm where the carry holds it: it does not reach ahead.
 		input.carrying = true
 		Pose.compute(pose, input, out)
-		expect(math.abs(anglesOf(out, "rightShoulder")[3])).toBeCloseTo(75, 4)
+		expect(anglesOf(out, "rightShoulder")[1]).toBeCloseTo(0, 4)
+		expect(math.abs(anglesOf(out, "rightShoulder")[3])).toBeCloseTo(pose.carryArmDeg, 4)
 		-- A lunge in the air (a dive) tips the body as a lunge does.
 		input.lunging = true
 		Pose.compute(pose, input, out)
 		expect(out.root.LookVector.Y).toBeCloseTo(-math.sin(math.rad(pose.lungeDeg)), 6)
 	end)
 
-	it("raises the right arm while carrying", function()
+	-- Roller Champions carries the ball low in the right hand at the hip, the arm down (Video 13 at 99.0 s; the
+	-- owner's trial #311, Q130).
+	it("carries the ball with the right arm down", function()
 		local out = {} :: Pose.Frame
 		local input = still()
 		input.carrying = true
 		Pose.compute(pose, input, out)
-		expect(math.abs(anglesOf(out, "rightShoulder")[3])).toBeCloseTo(75, 4)
+		local angles = anglesOf(out, "rightShoulder")
+		expect(angles[1]).toBeCloseTo(0, 4)
+		expect(angles[2]).toBeCloseTo(0, 4)
+		expect(angles[3]).toBeCloseTo(0, 4)
+	end)
+
+	it("raises the ball's arm by carryArmDeg when one is set", function()
+		local out = {} :: Pose.Frame
+		local input = still()
+		input.carrying = true
+		Pose.compute(raisedCarry, input, out)
+		expect(math.abs(anglesOf(out, "rightShoulder")[3])).toBeCloseTo(raisedCarry.carryArmDeg, 4)
 	end)
 
 	-- In body axes (x right, y up, -z forward), which an R15 avatar's joint frames match: a turn writes where a part
@@ -138,9 +155,9 @@ describe("Pose", function()
 		local turningRight = still()
 		turningRight.lean = 10
 		turningRight.carrying = true
-		Pose.compute(pose, turningRight, out)
+		Pose.compute(raisedCarry, turningRight, out)
 		expect(points(out.root, Vector3.yAxis).X).toBeGreaterThan(0) -- into a right turn
-		expect(points(out.rightShoulder, DOWN).X).toBeGreaterThan(0) -- the right arm rises out to the side
+		expect(points(out.rightShoulder, DOWN).X).toBeGreaterThan(0) -- the carry raises the right arm out to the side
 	end)
 
 	it("tips a lunging root forward and a knocked-down root back, knocked down first", function()
