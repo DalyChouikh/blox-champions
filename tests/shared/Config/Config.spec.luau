@@ -38,18 +38,21 @@ describe("Config defaults", function()
 
 	it("match the spec's ball and network values", function()
 		local d = Config.defaults()
+		-- The owner's trial #311 (Q121-Q133): a 2-stud ball carried low in the right hand, the magnet at 6 studs with
+		-- a 0.3 s pull into the hand.
 		expect(d.Ball).toEqual({
-			radius = 1.5,
+			radius = 1,
 			density = 0.7,
 			friction = 0.3,
 			elasticity = 0.5,
-			pickupRadius = 5,
+			pickupRadius = 6,
+			pickupPullSeconds = 0.3,
 			rethrowPickupDelay = 0.4,
 			strandedSeconds = 5,
 			restSpeed = 1,
 			dropIn = { outerIn = 8, innerIn = 6, speed = 20, descent = 40 },
 			outOfBoundsMargin = 2,
-			carryOffset = Vector3.new(2.5, 0, -0.5),
+			carryOffset = Vector3.new(1.7, -0.8, -0.3),
 		})
 		expect(d.Network).toEqual({
 			pickupLagToleranceStuds = 2,
@@ -279,7 +282,8 @@ describe("Config defaults", function()
 			crouchDeg = 30,
 			brakeLeanDeg = 15,
 			tuckDeg = 60,
-			carryArmDeg = 75,
+			-- RC carries the ball low in the right hand, the arm down (Video 13 at 99.0 s; trial #311, Q130).
+			carryArmDeg = 0,
 			airborneProbe = 1.5,
 			lungeDeg = 35,
 			knockdownTiltDeg = 85,
@@ -982,6 +986,14 @@ describe("Config.forMode", function()
 		expect(ball.restSpeed).toBe(0.01)
 	end)
 
+	-- The owner (Q91, Q132, #311): a caught ball flies into the hand over 0.3 s on every screen.
+	it("rejects a pull into the hand that takes negative time, and accepts none (a snap)", function()
+		expect(function()
+			Fixtures.config({ Ball = { pickupPullSeconds = -0.1 } })
+		end).toThrow("Ball.pickupPullSeconds: must be >= 0 (got -0.1)")
+		expect(Fixtures.config({ Ball = { pickupPullSeconds = 0 } }).Ball.pickupPullSeconds).toBe(0)
+	end)
+
 	it("rejects the old idle respawn as unknown", function()
 		expect(function()
 			Fixtures.config({ Ball = { ballIdleResetSeconds = 15 } })
@@ -993,9 +1005,11 @@ describe("Config.forMode", function()
 		local clear = "Ball: the drop-in must start clear of the glass (dropIn.innerIn and dropIn.outerIn >= radius)"
 		local apart = "Ball: the drop-in's two lines must lie apart across the track "
 			.. "(dropIn.innerIn + dropIn.outerIn < Arena.trackWidth)"
+		-- Each line half the ball's radius from its face: the ball would start inside the glass.
+		local inside = Config.defaults().Ball.radius / 2
 		local cases: { { dropIn: { [string]: number }, message: string } } = {
-			{ dropIn = { innerIn = 1 }, message = clear },
-			{ dropIn = { outerIn = 1 }, message = clear },
+			{ dropIn = { innerIn = inside }, message = clear },
+			{ dropIn = { outerIn = inside }, message = clear },
 			{ dropIn = { innerIn = 40, outerIn = 40 }, message = apart },
 			{ dropIn = { descent = 0 }, message = "Ball.dropIn.descent: must be > 0 (got 0)" },
 			{ dropIn = { speed = -1 }, message = "Ball.dropIn.speed: must be >= 0 (got -1)" },

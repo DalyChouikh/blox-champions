@@ -12,8 +12,8 @@ local config = Fixtures.config()
 local arena = config.Arena
 local ball = config.Ball
 local dropIn = ball.dropIn
--- The glass's top (120) less its lip (12) and the ball's width (3).
-local HEIGHT = 105
+-- The glass's top (120) less its lip (12) and the ball's width (2 since #311).
+local HEIGHT = arena.glass.top - arena.glass.lipRadius - 2 * ball.radius
 -- Halfway along the top straight (heading -X at z -60) and round the left curved end (centred on x -100, heading
 -- +Z at its apex).
 local MID_STRAIGHT = 100
