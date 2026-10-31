@@ -574,6 +574,9 @@ describe("MatchEngine players", function()
 			function()
 				engine:removePlayer("Ghost")
 			end,
+			function()
+				engine:switchTeam("Ghost", "Blue")
+			end,
 		}
 		for _, input in inputs do
 			expect(input).toThrow('MatchEngine: unknown player "Ghost"')
@@ -589,6 +592,38 @@ describe("MatchEngine players", function()
 		expect(function()
 			engine:thrown("B2")
 		end).toThrow('MatchEngine: player "B2" threw the ball without holding it')
+	end)
+
+	-- The owner (Q104, #310): a switcher plays for their new team at once.
+	it("counts a switching player for their new team at once", function()
+		local engine = liveEngine()
+		engine:pickedUp("O1", ZERO, ZERO)
+		engine:drainEvents()
+		engine:switchTeam("B1", "Orange")
+		-- Their pickup is no steal now, and Orange's own O2 cannot knock them down.
+		engine:pickedUp("B1", ZERO, ZERO)
+		engine:knockedDown("O2", "B1")
+		expectEvents(engine, {})
+		expect(engine:snapshot().possessingTeam).toBe("Orange")
+		for _, entry in engine:stats().players do
+			if entry.player == "B1" then
+				expect(entry.team).toBe("Orange")
+			end
+		end
+	end)
+
+	-- The owner (Q119, #310): a ball the switcher threw still counts for the team they left, and the goal is theirs.
+	it("scores a goal thrown before a switch for the team the thrower left, crediting the thrower", function()
+		local engine = liveEngine()
+		engine:pickedUp("B1", ZERO, ZERO)
+		lap(engine)
+		engine:thrown("B1")
+		engine:switchTeam("B1", "Orange")
+		engine:drainEvents()
+		engine:ballMoved(Fixtures.throughRing())
+		local scored = engine:drainEvents()[1]
+		expect(scored).toMatchObject({ name = "GoalScored", team = "Blue", scorer = "B1", points = 1 })
+		expect(engine:snapshot().scores).toEqual({ Blue = 1, Orange = 0 })
 	end)
 
 	it("ignores departed players, keeping their stats", function()

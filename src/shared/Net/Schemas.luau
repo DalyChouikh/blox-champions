@@ -46,4 +46,6 @@ return table.freeze({
 	ActionRequest = actionRequest(),
 	-- The knocked-down sender moved: nothing else, as the server judges when they are up.
 	GetUp = Validate.record({}),
+	-- The sender asks to switch team: nothing else, as the server judges whether they may (#310).
+	SwitchTeam = Validate.record({}),
 })

@@ -83,6 +83,8 @@ export type ActionService = {
 	step: (self: ActionService, dt: number) -> { Knockdown },
 	-- The kickoff: no action, knockdown or call left, on the server or on any character.
 	reset: (self: ActionService) -> (),
+	-- A switch of team (#310): no action, knockdown or call left for that player.
+	resetPlayer: (self: ActionService, player: PlayerId) -> (),
 	forget: (self: ActionService, player: PlayerId) -> (),
 	-- In a dodge's active phase: no strike reaches them.
 	isImmune: (self: ActionService, player: PlayerId) -> boolean,
@@ -128,12 +130,33 @@ local function refreshHolders(self: ActionService)
 	self._holderList = list
 end
 
-local function setAttribute(self: ActionService, player: PlayerId, name: string, value: any)
+local function characterOf(self: ActionService, player: PlayerId): Instance?
 	local holder = self._holderOf[player]
-	local character = if holder ~= nil then holder.root.Parent else nil
+	return if holder ~= nil then holder.root.Parent else nil
+end
+
+local function setAttribute(self: ActionService, player: PlayerId, name: string, value: any)
+	local character = characterOf(self, player)
 	if character ~= nil then
 		character:SetAttribute(name, value)
 	end
+end
+
+-- Ends a record's action and knockdown on the server.
+local function restart(record: Record)
+	record.runner:reset()
+	record.struck = false
+	record.hit = nil
+	record.knockdownLeft = 0
+	record.landing = nil
+	record.shown = nil
+end
+
+-- Clears what every client reads of a character's action, knockdown and call.
+local function clearShown(character: Instance)
+	character:SetAttribute(Attributes.Action, nil)
+	character:SetAttribute(Attributes.KnockedDown, nil)
+	character:SetAttribute(Attributes.CallingPass, nil)
 end
 
 local function recordOf(self: ActionService, player: PlayerId): Record
@@ -507,23 +530,28 @@ local ActionService: ActionService = {
 	reset = function(self: ActionService)
 		refreshHolders(self)
 		for _, player in self._order do
-			local record = self._records[player]
-			record.runner:reset()
-			record.struck = false
-			record.hit = nil
-			record.knockdownLeft = 0
-			record.landing = nil
-			record.shown = nil
+			restart(self._records[player])
 		end
 		for _, holder in self._holderList do
 			local character = holder.root.Parent
 			if character ~= nil then
-				character:SetAttribute(Attributes.Action, nil)
-				character:SetAttribute(Attributes.KnockedDown, nil)
-				character:SetAttribute(Attributes.CallingPass, nil)
+				clearShown(character)
 			end
 		end
 		table.clear(self._calls)
+	end,
+
+	resetPlayer = function(self: ActionService, player: PlayerId)
+		refreshHolders(self)
+		local record = self._records[player]
+		if record ~= nil then
+			restart(record)
+		end
+		local character = characterOf(self, player)
+		if character ~= nil then
+			clearShown(character)
+		end
+		self._calls[player] = nil
 	end,
 
 	forget = function(self: ActionService, player: PlayerId)

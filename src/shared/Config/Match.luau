@@ -20,6 +20,8 @@ export type MatchConfig = {
 	postMatchSeconds: number,
 	-- How long a character that died waits before it is loaded again on its team spawn.
 	respawnSeconds: number,
+	-- Whether a player may switch to the other team's free seat from the score tab (spec §10.1, Rules/TeamSwitch).
+	teamSwitching: boolean,
 	-- Whether a trailing team holding the ball at 0:00 plays its one last attack, at any deficit (spec §5.3).
 	lastChance: { enabled: boolean },
 }
@@ -42,6 +44,9 @@ local defaults: MatchConfig = {
 	postMatchSeconds = 15,
 	respawnSeconds = 3,
 	lastChance = { enabled = true },
+	-- The owner (Q97, Q104, #310): switching by choice in normal games, into any free seat; ranked (M7) never offers
+	-- it.
+	teamSwitching = true,
 }
 
 local positiveInteger = Validate.number({ min = 1, integer = true })
@@ -80,6 +85,7 @@ local fields = Validate.record({
 	postMatchSeconds = nonNegativeSeconds,
 	respawnSeconds = nonNegativeSeconds,
 	lastChance = Validate.record({ enabled = Validate.boolean() }),
+	teamSwitching = Validate.boolean(),
 })
 
 local schema = Validate.check(fields, function(match: MatchConfig): boolean
