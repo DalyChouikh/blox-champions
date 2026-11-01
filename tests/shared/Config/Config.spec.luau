@@ -265,11 +265,12 @@ describe("Config defaults", function()
 			hoverHeight = 2.5,
 			hoverSpring = 15,
 			groundProbeLength = 6,
-			strideAccel = 30,
+			-- Grown with the stride's top, so the top still comes in ~1.8 s (#328, Q161).
+			strideAccel = 33,
 			rollingFriction = 4,
 			airDrag = 0.02,
-			-- Roller Champions' stride on the flat: 55 km/h (#265).
-			cruiseSpeed = 46,
+			-- A tenth over #265's 46: 8.7 body lengths a second (#328, Q161-Q163).
+			cruiseSpeed = 51,
 			softCap = 90,
 			hardCap = 121,
 			overSpeedBleed = 5,
@@ -1181,7 +1182,7 @@ describe("Config.forMode", function()
 				message = "Movement.climbAccel: must be > 0 (got 0)",
 			},
 			{
-				overrides = { Movement = { climbSpeed = 46 } },
+				overrides = { Movement = { climbSpeed = 51 } },
 				message = "Movement: climbSpeed must stay below cruiseSpeed",
 			},
 			{
@@ -1306,8 +1307,8 @@ describe("Config.forMode", function()
 	end)
 
 	it("accepts a climb just inside its limits", function()
-		local movement = Fixtures.config({ Movement = { climbSpeed = 45.9, climbAccel = 0.01 } }).Movement
-		expect(movement.climbSpeed).toBe(45.9)
+		local movement = Fixtures.config({ Movement = { climbSpeed = 50.9, climbAccel = 0.01 } }).Movement
+		expect(movement.climbSpeed).toBe(50.9)
 		expect(movement.climbAccel).toBe(0.01)
 	end)
 

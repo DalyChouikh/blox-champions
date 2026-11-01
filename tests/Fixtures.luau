@@ -41,6 +41,10 @@ export type Camera = {
 -- default 196.2, pointing down. The game itself pulls with the config's World.gravity (#279).
 Fixtures.GRAVITY = Vector3.new(0, -196.2, 0)
 
+-- A skater's speed after 0.1 s of the stride from rest on flat ground, with the default config: strideAccel 33
+-- × 0.1 = 3.3, then 3.3 − (rollingFriction 4 + airDrag 0.02 × 3.3) × 0.1 (#328).
+Fixtures.FIRST_STRIDE = 2.8934
+
 -- The gates in a lap, one at each corner of the arena (spec §4.2): every fixture's gates and markers.
 Fixtures.GATE_COUNT = 4
 

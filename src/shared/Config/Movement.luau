@@ -2,8 +2,8 @@
 -- Skating (spec §7.2): the skater's body, momentum, steering, wall riding, pump, brake, jump, draft and attach, the
 -- slide of a knocked-down skater, a hard landing and a belly landing, and the speedometer's scale.
 -- Speeds are in studs/s, accelerations in studs/s², turn rates in rad/s, angles in degrees. The values the spec
--- doesn't give (hoverSpring, strideAccel, airTurnRate, airUprightRate, pumpFlatSlopeDeg, bodyUpSmoothing, attachSpring)
--- are starting points for tuning, like the spec's own.
+-- doesn't give (hoverSpring, airTurnRate, airUprightRate, pumpFlatSlopeDeg, bodyUpSmoothing, attachSpring) are starting
+-- points for tuning, like the spec's own.
 
 local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
@@ -16,12 +16,15 @@ export type MovementConfig = {
 	-- How hard the hover pulls back to hoverHeight: normal speed per stud of error.
 	hoverSpring: number,
 	groundProbeLength: number,
-	-- The push of holding the stick, up to cruiseSpeed.
+	-- The push of holding the stick, up to cruiseSpeed: from a stop it reaches the top in ~1.8 s, grown with the top
+	-- so that time stays (the owner, #328, Q161).
 	strideAccel: number,
 	rollingFriction: number,
 	-- Speed lost per second per stud/s of speed.
 	airDrag: number,
-	-- The stride's top speed on flat ground: 46 reads 55 km/h, like Roller Champions' 45-58 (the owner, #265).
+	-- The stride's top speed on flat ground: 8.7 body lengths a second, a tenth over #265's 7.9 (the owner, #328: Q124
+	-- "a little faster"; trial 328 kept, Q161-Q163). Roller Champions' flat speed could not be timed by frames in the
+	-- clips at hand, so it was decided by playing.
 	cruiseSpeed: number,
 	-- Speeding up fades from softCap to nothing at hardCap; hardCap is never exceeded, on the ground or in the air
 	-- (Roller Champions' readout never passed 145 km/h, #214).
@@ -136,10 +139,10 @@ local defaults: MovementConfig = {
 	hoverHeight = 2.5,
 	hoverSpring = 15,
 	groundProbeLength = 6,
-	strideAccel = 30,
+	strideAccel = 33,
 	rollingFriction = 4,
 	airDrag = 0.02,
-	cruiseSpeed = 46,
+	cruiseSpeed = 51,
 	softCap = 90,
 	hardCap = 121,
 	overSpeedBleed = 5,
