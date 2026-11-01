@@ -1,5 +1,10 @@
 --!strict
--- The ball's and the next gate's markers (spec §9.4, §11.1), stepped before each frame is drawn (FrameController):
+-- The ball's team colour, and the ball's and the next gate's markers (spec §9.4, §11.1), stepped before each frame is
+-- drawn (FrameController):
+-- - the ball itself in the colour of the team that last held it, carried, flying or loose, and in its skin's own colour
+--   until a team has since the kickoff (the owner, #327, Q158, Q159: Roller Champions', Video 31). A client's write
+--   stays on its client and the server never writes the colour again, so it is written when the ball or the colour
+--   changes (a respawn's new ball arrives in its skin's);
 -- - a ring around the ball, seen through walls (a BillboardGui, AlwaysOnTop), as wide as the ball plus ringSize pixels;
 -- - a line from the ball down to a disc on the ground below it (one ray through the ride surfaces), both hidden when
 --   nothing lies within groundProbe studs;
@@ -7,9 +12,10 @@
 -- - for the local player while they carry the ball, an arrow to their team's next gate: over its corner marker's pivot
 --   (its glass wall's middle), or pinned to the screen's edge. Every streak starts at the goal's gate (spec §4.2), so
 --   it shows from the pickup.
--- All of them take the colour of the team with the ball, or the HUD's text colour while it is loose, and hide while
--- there is no ball. The arrows sit in a ScreenGui without insets, so their pixels are the camera's. A property is
--- written only when it changes; a step allocates only the disc's frame, the ray's result and a shown arrow's place.
+-- The markers take the colour of the team that last held the ball, or the HUD's text colour until a team has (the match
+-- keeps its possessing team through throws, passes, drops and respawns until a kickoff), and hide while there is no
+-- ball. The arrows sit in a ScreenGui without insets, so their pixels are the camera's. A property is written only
+-- when it changes; a step allocates only the disc's frame, the ray's result and a shown arrow's place.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,15 +23,18 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ArenaParts = require(script.Parent.ArenaParts)
 local BallCarrier = require(script.Parent.BallCarrier)
 local BallPart = require(script.Parent.BallPart)
+local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local Config = require(ReplicatedStorage.Shared.Config)
 local HudStore = require(script.Parent.HudStore)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local RideSurfaces = require(script.Parent.RideSurfaces)
 local ScreenMarker = require(ReplicatedStorage.Shared.Hud.ScreenMarker)
 local Style = require(script.Parent.Hud.Style)
+local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
+type Team = Team.Team
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its members.
 export type WorldMarkers = {
@@ -57,8 +66,12 @@ export type WorldMarkers = {
 	_top: Attachment,
 	_strokes: { UIStroke },
 	_images: { ImageLabel },
-	-- What was last written.
+	-- The ball's colour until a team holds it: its skin's.
+	_neutral: Color3,
+	-- What was last written: the markers' colour, and the ball given a colour and that colour.
 	_color: Color3?,
+	_worn: BasePart?,
+	_wornColor: Color3?,
 	_hasBall: boolean,
 	_grounded: boolean,
 	_ballPlacement: ScreenMarker.Placement,
@@ -115,6 +128,16 @@ local function paint(self: WorldMarkers, color: Color3)
 	end
 	self.ground.Color = color
 	self.line.Color = ColorSequence.new(color)
+end
+
+-- The ball in `team`'s colour, or its skin's with no team, written when the ball or the colour changes.
+local function wear(self: WorldMarkers, ball: BasePart?, team: Team?)
+	local color = if team ~= nil then Style.teamColor(self._config, team) else self._neutral
+	if ball ~= nil and (ball ~= self._worn or color ~= self._wornColor) then
+		ball.Color = color
+		self._worn = ball
+		self._wornColor = color
+	end
 end
 
 -- The disc and the line, shown while the ray below the ball hits a ride surface.
@@ -210,7 +233,10 @@ local WorldMarkers: WorldMarkers = {
 	_top = nil :: any,
 	_strokes = {},
 	_images = {},
+	_neutral = Color3.new(),
 	_color = nil,
+	_worn = nil,
+	_wornColor = nil,
 	_hasBall = false,
 	_grounded = false,
 	_ballPlacement = ScreenMarker.newPlacement(),
@@ -240,7 +266,10 @@ local WorldMarkers: WorldMarkers = {
 			or function(origin: Vector3, direction: Vector3, params: RaycastParams): RaycastResult?
 				return workspace:Raycast(origin, direction, params)
 			end
+		self._neutral = BallSkins.get(BallSkins.DEFAULT).color
 		self._color = nil
+		self._worn = nil
+		self._wornColor = nil
 		self._hasBall = false
 		self._grounded = false
 		self._ballPlacement = ScreenMarker.newPlacement()
@@ -327,8 +356,11 @@ local WorldMarkers: WorldMarkers = {
 
 	step = function(self: WorldMarkers, _dt: number)
 		local match = self._store.state.match
-		paint(self, Style.teamColor(self._config, if match ~= nil then match.possessingTeam else nil))
-		placeBall(self, self._ballPart:get())
+		local team: Team? = if match ~= nil then match.possessingTeam else nil
+		local ball = self._ballPart:get()
+		paint(self, Style.teamColor(self._config, team))
+		wear(self, ball, team)
+		placeBall(self, ball)
 		placeGate(self, if match ~= nil then match.nextGate else nil)
 	end,
 }

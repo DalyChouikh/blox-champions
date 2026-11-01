@@ -14,6 +14,11 @@ describe("BallSkins", function()
 		expect(table.isfrozen(skin)).toBe(true)
 	end)
 
+	it("makes the Default ball white, Roller Champions' neutral ball", function()
+		-- The owner (#327, Q159): the ball's colour from a kickoff until a team first holds it (Video 31 at 27.2 s).
+		expect(BallSkins.get(BallSkins.DEFAULT).color:ToHex()).toBe("ffffff")
+	end)
+
 	it("rejects an unknown skin", function()
 		expect(function()
 			BallSkins.get("Ghost")
