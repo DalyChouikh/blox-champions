@@ -908,7 +908,7 @@ describe("BallService: the loose ball's state for every screen", function()
 	local FRAME = 1 / 60
 	local REST = config.Network.ballStream.restSeconds
 
-	it("gives the loose ball's state each frame it moves: where, how fast, weightless or not, and when", function()
+	it("gives the loose ball's state each frame it moves: where, how fast, whether borne, and when", function()
 		-- Parked until it spawns: nothing to draw.
 		expect(BallService:streamState(FRAME)).toBeNil()
 		BallService:spawn()
@@ -917,8 +917,8 @@ describe("BallService: the loose ball's state for every screen", function()
 		local state = BallService:streamState(FRAME) :: BallService.BallStream
 		Fixtures.expectNear(state.position, BallService.part.Position)
 		Fixtures.expectNear(state.velocity, BallService.part.AssemblyLinearVelocity)
-		-- A drop-in falls with its weight cancelled (#321).
-		expect(state.lifted).toBe(true)
+		-- A drop-in falls with its weight cancelled by its lift (#321).
+		expect(state.supported).toBe(true)
 		expect(state.time).toBe(42.5)
 		expect(BallService:streamState(FRAME)).never.toBeNil()
 		BallService:hide()
@@ -929,7 +929,8 @@ describe("BallService: the loose ball's state for every screen", function()
 		spawnResting(true)
 		BallService:step(FRAME, {})
 		local state = BallService:streamState(FRAME) :: BallService.BallStream
-		expect(state.lifted).toBe(false)
+		-- The floor bears it (#337).
+		expect(state.supported).toBe(true)
 		expect(BallService:streamState(REST / 2)).toBeNil()
 		expect(BallService:streamState(REST / 2)).never.toBeNil()
 		-- Rolling a little slower than Ball.restSpeed is resting; at it, moving.
@@ -937,6 +938,27 @@ describe("BallService: the loose ball's state for every screen", function()
 		expect(BallService:streamState(FRAME)).toBeNil()
 		BallService.part.AssemblyLinearVelocity = Vector3.new(config.Ball.restSpeed, 0, 0)
 		expect(BallService:streamState(FRAME)).never.toBeNil()
+	end)
+
+	-- #337 (the owner's video, 2026-11-01): every screen carried a resting ball's state on falling, and drew it sinking
+	-- into the floor and popping back up. The ground it lies or rolls on bears its weight, as a lift does; a screen
+	-- carries a borne ball on without gravity.
+	it("says the ground bears a ball lying or rolling on it, after a point too, and nothing in the air", function()
+		spawnResting(true)
+		BallService:step(FRAME, {})
+		expect((BallService:streamState(FRAME) :: BallService.BallStream).supported).toBe(true)
+		-- Moved 30 studs over the floor, rolling: nothing bears it.
+		BallService.part.CFrame = CFrame.new(ON_TRACK + Vector3.new(0, 30, 0))
+		BallService.part.AssemblyLinearVelocity = Vector3.new(10, 0, 0)
+		BallService:jumped()
+		BallService:step(FRAME, {})
+		expect((BallService:streamState(FRAME) :: BallService.BallStream).supported).toBe(false)
+		-- Out of play after a point, back on the floor: it still shows until the kickoff, borne by the floor.
+		BallService:kill()
+		BallService.part.CFrame = CFrame.new(ON_TRACK)
+		BallService:jumped()
+		BallService:step(FRAME, {})
+		expect((BallService:streamState(FRAME) :: BallService.BallStream).supported).toBe(true)
 	end)
 
 	it("gives nothing while the ball is carried, and its state at once when it is let go, even still", function()

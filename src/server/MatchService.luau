@@ -310,7 +310,13 @@ local MatchService: MatchService = {
 		-- The loose ball for every screen to draw (#316), as this frame left it.
 		local stream = self._ball:streamState(dt)
 		if stream ~= nil then
-			self._net:streamAll(Remotes.streams.BallState, stream.position, stream.velocity, stream.lifted, stream.time)
+			self._net:streamAll(
+				Remotes.streams.BallState,
+				stream.position,
+				stream.velocity,
+				stream.supported,
+				stream.time
+			)
 		end
 
 		local postMatchLeft = self._postMatchLeft

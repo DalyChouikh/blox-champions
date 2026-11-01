@@ -62,10 +62,17 @@ local fakeNet = {
 		table.insert(fired, { name = name, payload = payload, to = to })
 	end,
 	-- The ball's state (#316) goes out as plain values; kept as one record here.
-	streamAll = function(_self: any, name: string, position: Vector3, velocity: Vector3, lifted: boolean, time: number)
+	streamAll = function(
+		_self: any,
+		name: string,
+		position: Vector3,
+		velocity: Vector3,
+		supported: boolean,
+		time: number
+	)
 		table.insert(
 			fired,
-			{ name = name, payload = { position = position, velocity = velocity, lifted = lifted, time = time } }
+			{ name = name, payload = { position = position, velocity = velocity, supported = supported, time = time } }
 		)
 	end,
 }
@@ -739,8 +746,8 @@ describe("A match on the generated arena", function()
 		frames(FRAME)
 		local state = lastFired(Remotes.streams.BallState).payload
 		Fixtures.expectNear(state.position, BallService.part.Position)
-		-- It drops in with its weight cancelled (#321).
-		expect(state.lifted).toBe(true)
+		-- It drops in with its weight cancelled by its lift (#321).
+		expect(state.supported).toBe(true)
 		local sent = #firedNamed(Remotes.streams.BallState)
 		frames(FRAME)
 		expect(#firedNamed(Remotes.streams.BallState)).toBe(sent + 1)

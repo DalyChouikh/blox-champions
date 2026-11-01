@@ -57,10 +57,10 @@ export type BallFrame = {
 	respawned: boolean,
 }
 
--- The loose ball as every screen needs it (#316): where it is and how fast, whether its weight is cancelled (a pass
--- or a drop-in flying flat), and the server's time then (workspace:GetServerTimeNow), so each screen carries it on to
--- its own now.
-export type BallStream = { position: Vector3, velocity: Vector3, lifted: boolean, time: number }
+-- The loose ball as every screen needs it (#316): where it is and how fast, whether something bears its weight (a
+-- lift: a pass or a drop-in flying flat; or the ground it lies or rolls on, #337), and the server's time then
+-- (workspace:GetServerTimeNow), so each screen carries it on to its own now, falling only while nothing bears it.
+export type BallStream = { position: Vector3, velocity: Vector3, supported: boolean, time: number }
 
 -- Spelled out so the module is a Loader.LoadableModule (whose start is optional) and callers see its methods.
 export type BallService = {
@@ -128,6 +128,8 @@ export type BallService = {
 	_arenaParams: RaycastParams,
 	-- What a loose ball lies or rolls on: a ray from its center to a radius past its bottom (#308, #311).
 	_groundReach: Vector3,
+	-- Whether that ray found ground under the loose ball at the last step that looked: the ground bears its weight.
+	_grounded: boolean,
 	-- How long the loose ball has rested on something nobody skates.
 	_strandedSeconds: number,
 	_canPickUp: (PlayerId) -> boolean,
@@ -464,6 +466,7 @@ local BallService: BallService = {
 	_catchers = {},
 	_arenaParams = nil :: any,
 	_groundReach = Vector3.zero,
+	_grounded = false,
 	_strandedSeconds = 0,
 	_canPickUp = function(_player: PlayerId): boolean
 		return false
@@ -497,8 +500,9 @@ local BallService: BallService = {
 		arenaParams.FilterDescendantsInstances = { deps.ArenaService.model }
 		self._arenaParams = arenaParams
 		self._groundReach = Vector3.new(0, -2 * config.Ball.radius, 0)
+		self._grounded = false
 		self._strandedSeconds = 0
-		self._stream = { position = Vector3.zero, velocity = Vector3.zero, lifted = false, time = 0 }
+		self._stream = { position = Vector3.zero, velocity = Vector3.zero, supported = false, time = 0 }
 		self._sinceStreamed = math.huge
 		self._serverTime = deps.ServerClock or function(): number
 			return workspace:GetServerTimeNow()
@@ -656,6 +660,10 @@ local BallService: BallService = {
 
 		local ball = self._config.Ball
 		local out = not Bounds.inArena(self._config.Arena, position, ball.outOfBoundsMargin)
+		-- What a loose ball in the arena lies or rolls on, if anything: what bears its weight on every screen
+		-- (streamState), out of play after a point too.
+		local ground = if out or carried then nil else workspace:Raycast(position, self._groundReach, self._arenaParams)
+		self._grounded = ground ~= nil
 		if state.status == "Dead" then
 			-- Out of play anyway: parked until the next kickoff, before it can fall out of the world.
 			if out then
@@ -663,8 +671,6 @@ local BallService: BallService = {
 			end
 			return frame
 		end
-		-- What a loose ball in the arena lies or rolls on, if anything.
-		local ground = if out or carried then nil else workspace:Raycast(position, self._groundReach, self._arenaParams)
 		if out or stranded(self, ground, dt) then
 			respawn(self, frame)
 			return frame
@@ -713,7 +719,7 @@ local BallService: BallService = {
 		local stream = self._stream
 		stream.position = part.Position
 		stream.velocity = velocity
-		stream.lifted = self._lift.Enabled
+		stream.supported = self._lift.Enabled or self._grounded
 		stream.time = self._serverTime()
 		return stream
 	end,
