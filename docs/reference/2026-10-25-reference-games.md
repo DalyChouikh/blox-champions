@@ -1393,6 +1393,20 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   skaters is clear of the arena (its floors, banks, walls and glass, the middle glass above all): otherwise no pass
   key's letter over them, the hint greyed, the key does nothing, and the server refuses such a pass too. Read as a
   ruling (not asked): players are no obstacle, so opponents can still step into a pass on its way (Q129).
+- **Q156 diagonal climbs hold their line** (session 61, #326, recommended). RC (Video 4 at 343.4-344.9 s, 10 frames
+  a second): a skater rides diagonally up from the track and along Pixel City's outer wall (its solid barrier only
+  about a body height, the ride along the glass above it) for ~1.5 s, then back down. Ours (worked from SkateMath's
+  wall case, s61 climb326.py): holding the stick diagonally up the upright grey wall (40 studs, 6.8 body heights) at
+  cruise, a ride 30/45/60 deg up peaks 0.4/1.0/2.2 body heights up and arcs back; only rides steeper than ~72 deg reach
+  the glass's foot (the stick turns at most 1 rad/s on walls, gravity bends a 40-studs/s ride up to 3.3 rad/s).
+  **Q156**: **hold the line**: while the stick pushes up a grey (solid) surface, a diagonal ride keeps its angle at
+  the climb speed instead of bending down, so 30-60 deg rides reach the glass's foot in 1.2-2.0 s; on the glass, real
+  physics again (it arcs back down). W straight at the glass still stops there; the glass gets no climb. Not chosen:
+  the stick steering uphill 3.5x faster on grey walls (a path curling up). Next: a playable Studio trial.
+- **Q157 trial 326 kept** (session 61): the owner played trial 326 (Studio copy of SkateMath: while the stick
+  pushes up a solid surface, gravity's part across the heading is dropped; its part along the heading still slows
+  the climber, topped up by the climb as before; the glass unchanged) on the outer wall, the middle wall's bank and
+  the bump, and W straight at the glass: **"Keep it, build it"** (test-first, as trialled).
 
 ## Roller Champions
 

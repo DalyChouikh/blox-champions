@@ -250,7 +250,8 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	local speed = velocity.Magnitude
 	local heading = if speed > EPSILON then velocity / speed else facingOn(self, normal)
 	-- On a wall the stick steers at most wallTurnRate and never strides, and the brake does nothing (#239); up a
-	-- solid wall it only climbs (below). Gravity pulls along every surface at full strength (#256).
+	-- solid wall it only climbs (below). Gravity pulls along every surface at full strength (#256), save the part
+	-- across a climber's heading (below).
 	local wall = isWall(self, normal)
 	local brake = input.brake and not wall
 
@@ -278,6 +279,17 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	end
 
 	local gravityAlong = alongSurface(self._gravity, normal)
+	-- Climbing: holding the stick up any solid ride surface steeper than flat, however steep (the owner, #299, Q85:
+	-- "climb all walls, just till they reach the glass then they start dropping"). Never on the glass, where the
+	-- skates only roll (#239), nor with the stick pushing back against the motion. Flat means under pumpFlatSlopeDeg,
+	-- so float noise on a level floor never jump-starts a skater.
+	local climbing = stick > 0 and against == 0 and not ground.glass and gravityAlong:Dot(heading) < -self._flatPull
+	if climbing then
+		-- A climb holds its line (the owner, #326, Q156-Q157: trial 326 kept): gravity's part across the heading is
+		-- dropped, so a diagonal ride up a grey wall or the bump keeps its angle to the glass's foot instead of
+		-- bending back down. Its part along the heading still slows the climber, and the climb below makes that up.
+		gravityAlong = heading * gravityAlong:Dot(heading)
+	end
 	local acceleration = gravityAlong + heading * input.draftAccel
 	if input.pump and not brake then
 		acceleration += heading * pumpPush(self, gravityAlong:Dot(heading))
@@ -307,13 +319,9 @@ local function stepGrounded(self: Skater, input: Types.SkateInput, ground: Types
 	else
 		speed = math.max(0, speed - (movement.rollingFriction + movement.airDrag * speed) * dt)
 	end
-	-- Holding the stick up any solid ride surface steeper than flat, however steep, a skater gains speed along their
-	-- heading at climbAccel whatever the slope, up to climbSpeed, as far as the stick points along it (the owner,
-	-- #299, Q85: "climb all walls, just till they reach the glass then they start dropping"); faster, gravity slows
-	-- them as anywhere. Never on the glass, where the skates only roll (#239), nor with the stick pushing back
-	-- against the motion. Flat means under pumpFlatSlopeDeg, so float noise on a level floor never jump-starts a
-	-- skater.
-	if stick > 0 and against == 0 and not ground.glass and gravityAlong:Dot(heading) < -self._flatPull then
+	-- A climber gains speed along their heading at climbAccel whatever the slope, up to climbSpeed, as far as the
+	-- stick points along it (#299); faster, gravity slows them as anywhere.
+	if climbing then
 		local moving = direction * speed
 		local reach =
 			math.min(movement.climbSpeed * wishDirection:Dot(heading), startSpeed + movement.climbAccel * stick * dt)

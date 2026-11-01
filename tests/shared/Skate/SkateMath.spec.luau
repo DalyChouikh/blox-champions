@@ -278,11 +278,42 @@ describe("SkateMath climbing", function()
 		half:step(input({ move = uphill * 0.5 }), ground(normal), 0.1)
 		Fixtures.expectNear(half.velocity, uphill * 2.25) -- 45 x 0.5 x 0.1
 		-- Up a 39 deg wall at 30 with the stick 52.15 deg off the way up: the heading turns 0.1 rad toward it
-		-- (wallTurnRate), and the climb holds 40 x cos 46.42 deg = 27.58 along it.
+		-- (wallTurnRate), and the climb holds 40 x cos 46.42 deg = 27.58 along it; gravity's part across the heading
+		-- bends nothing while climbing (Q156).
 		local wallNormal, upWall = slope(39)
 		local s = skater(upWall * 30)
 		s:step(input({ move = Vector3.new(1, 0, 1).Unit }), ground(wallNormal), 0.1)
-		Fixtures.expectNear(s.velocity, Vector3.new(3.9494, 17.1917, 21.23))
+		Fixtures.expectNear(s.velocity, Vector3.new(2.753, 17.2672, 21.3233))
+	end)
+
+	-- The owner (#326, Q125): a skater riding diagonally up the grey walls and the bump must reach the glass's foot;
+	-- trial 326 kept (Q156-Q157): while climbing, a diagonal ride holds its line.
+	it("holds a diagonal climb's line up a solid wall instead of bending it down", function()
+		local upright = slope(90)
+		local diagonal = Vector3.new(1, 1, 0).Unit
+		local s = skater(diagonal * 40)
+		for _ = 1, 60 do
+			s:step(input({ move = diagonal }), ground(upright), 1 / 60)
+		end
+		-- A second on, still 45 deg up at 40: gravity's part along the ride slows it and the climb tops it back up.
+		Fixtures.expectNear(s.velocity, Vector3.new(28.2843, 28.2843, 0))
+	end)
+
+	it("bends a diagonal ride down on the glass, with no stick, or with the stick against the motion", function()
+		local upright = slope(90)
+		local diagonal = Vector3.new(1, 1, 0).Unit
+		-- 45 deg up the upright wall at 40 for 0.25 s, where nothing climbs: gravity's part across turns the ride down.
+		local function ride(move: Vector3, glass: boolean?): Vector3
+			local s = skater(diagonal * 40)
+			for _ = 1, 15 do
+				s:step(input({ move = move }), ground(upright, nil, nil, glass), 1 / 60)
+			end
+			return s.velocity
+		end
+		Fixtures.expectNear(ride(diagonal, true), Vector3.new(25.6927, -14.8102, 0))
+		Fixtures.expectNear(ride(Vector3.zero), Vector3.new(27.2443, -20.8244, 0))
+		-- The stick back across the ride (-X): part of it points against the motion.
+		Fixtures.expectNear(ride(-Vector3.xAxis), Vector3.new(25.5596, -19.6249, 0))
 	end)
 
 	it("never climbs the glass, where the skates only roll", function()
@@ -468,8 +499,9 @@ describe("SkateMath off the ground and on walls", function()
 	it("steers on a wall no faster than wallTurnRate", function()
 		local s = skater(Vector3.new(0, 0, -30))
 		s:step(input({ move = Vector3.yAxis }), ground(Vector3.xAxis), 0.1)
-		-- Turned 1 × 0.1 rad up (the floor's rate at 30 is 3.38), plus (0, −19.62, 0), then friction and drag
-		Fixtures.expectNear(s.velocity, Vector3.new(0, -16.3971, -29.441))
+		-- Turned 1 × 0.1 rad up (the floor's rate at 30 is 3.38), so climbing: gravity slows it along that heading only
+		-- (Q156), 30 − 196.2 × sin 0.1 × 0.1, then friction and drag: 27.5852 at 0.1 rad up.
+		Fixtures.expectNear(s.velocity, Vector3.new(0, 2.7539, -27.4474))
 	end)
 
 	it("neither brakes nor turns on a wall with the stick held back: the skates only roll", function()
