@@ -13,7 +13,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 
 local config = Config.defaults()
-local settings = config.UI.trajectory.trail
+local settings = config.UI.ballTrail
 local DT = 1 / 60
 
 local folder: Folder

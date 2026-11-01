@@ -184,26 +184,9 @@ export type ArenaGlowSettings = {
 	beam: { width: number, thickness: number },
 }
 
--- Where a throw goes (§9.4, #313). The thrower's predicted arc while a throw charges, drawn over everything: a dot
--- every `spacing` studs of the throw's launch speed, at most maxDots of them, each `dotSize` pixels across in `color`,
--- `transparency` see-through, inside an edgeThickness-pixel edge in `edgeColor`; where the ball would first touch, a
--- ring ringSize pixels across, ringThickness wide in `color`, with that edge on both sides. The trail behind a thrown,
--- passed or rolled ball on every screen: `lifetime` seconds long and `width` studs wide in `color`, `transparency`
--- see-through behind the ball, fading to nothing at its end.
-export type TrajectorySettings = {
-	arc: {
-		spacing: number,
-		maxDots: number,
-		dotSize: number,
-		color: Color3,
-		transparency: number,
-		edgeColor: Color3,
-		edgeThickness: number,
-		ringSize: number,
-		ringThickness: number,
-	},
-	trail: { lifetime: number, width: number, color: Color3, transparency: number },
-}
+-- The trail behind a thrown, passed or rolled ball on every screen (§9.4, #313): `lifetime` seconds long and `width`
+-- studs wide in `color`, `transparency` see-through behind the ball, fading to nothing at its end.
+export type BallTrailSettings = { lifetime: number, width: number, color: Color3, transparency: number }
 
 export type UIConfig = {
 	clockWarnings: { number },
@@ -218,7 +201,7 @@ export type UIConfig = {
 	markers: MarkerSettings,
 	nameTag: NameTagSettings,
 	arenaGlow: ArenaGlowSettings,
-	trajectory: TrajectorySettings,
+	ballTrail: BallTrailSettings,
 }
 
 local defaults: UIConfig = {
@@ -376,28 +359,11 @@ local defaults: UIConfig = {
 		panelSlideSeconds = 0.4,
 		beam = { width = 2, thickness = 0.5 },
 	},
-	-- The owner asked for both (Q98): an arc while charging (neither RC nor Illegal Soccer has one) and a trail behind
-	-- the ball (RC's thrown ball leaves a white streak, Video 4 at 366.8-367.0 s; Illegal Soccer's a white dashed one).
-	-- White as the crosshair is (Q141). The arc: a dot every 4 studs (two-thirds of a body length) up to 160 studs,
-	-- about a full throw's reach before it comes down. From the chase camera a throw flies almost straight away, so its
-	-- path shows as a thin line up through the thrower's skater (measured), hence the owner's look (Q145): drawn over
-	-- everything at a fixed size on screen, 6 px as the crosshair's dot, with a 1 px dark edge that reads on the light
-	-- floors, and a 24 px ring where it lands. The trail, bolder once a thin faint one was seen from the side (Q146):
-	-- as wide as the ball, solid at it, 0.4 s long: 64 studs behind a full throw (11 body lengths), 40 behind a pass.
-	trajectory = {
-		arc = {
-			spacing = 4,
-			maxDots = 40,
-			dotSize = 6,
-			color = Color3.new(1, 1, 1),
-			transparency = 0,
-			edgeColor = Color3.new(0, 0, 0),
-			edgeThickness = 1,
-			ringSize = 24,
-			ringThickness = 3,
-		},
-		trail = { lifetime = 0.4, width = 2, color = Color3.new(1, 1, 1), transparency = 0 },
-	},
+	-- The owner asked for a trail behind the ball (Q98; RC's thrown ball leaves a white streak, Video 4 at
+	-- 366.8-367.0 s and Video 31 at 39.1 s; Illegal Soccer's a white dashed one), white as the crosshair is (Q141),
+	-- and bolder once a thin faint one was seen from the side (Q146): as wide as the ball, solid at it, 0.4 s long: 96
+	-- studs behind a full throw (16 body lengths).
+	ballTrail = { lifetime = 0.4, width = 2, color = Color3.new(1, 1, 1), transparency = 0 },
 }
 
 local function noDuplicates(values: { number }): boolean
@@ -615,24 +581,11 @@ local fields = Validate.record({
 		-- The beam is one part: Roblox would silently clamp a size outside its part limits.
 		beam = Validate.record({ width = partSize, thickness = partSize }),
 	}),
-	trajectory = Validate.record({
-		arc = Validate.record({
-			spacing = positive,
-			maxDots = Validate.number({ min = 1, integer = true }),
-			dotSize = positive,
-			color = Validate.datatype("Color3"),
-			transparency = seen,
-			edgeColor = Validate.datatype("Color3"),
-			edgeThickness = Validate.number({ min = 0 }),
-			ringSize = positive,
-			ringThickness = positive,
-		}),
-		trail = Validate.record({
-			lifetime = positive,
-			width = positive,
-			color = Validate.datatype("Color3"),
-			transparency = seen,
-		}),
+	ballTrail = Validate.record({
+		lifetime = positive,
+		width = positive,
+		color = Validate.datatype("Color3"),
+		transparency = seen,
 	}),
 })
 

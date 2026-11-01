@@ -38,7 +38,6 @@ beforeEach(function()
 		WorldMarkers = recorder("worldMarkers"),
 		ArenaGlow = recorder("arenaGlow"),
 		CarrierBeam = recorder("carrierBeam"),
-		ThrowArc = recorder("throwArc"),
 		BallTrail = recorder("ballTrail"),
 		NameTags = recorder("nameTags"),
 	})
@@ -52,7 +51,7 @@ describe("FrameController", function()
 
 	it(
 		"checks Roblox's overlays, then draws the ball, then renders the camera, touch controls, HUD state, HUD, "
-			.. "world markers, arena glow, carrier's beam, throw's arc, ball's trail and name tags before each frame",
+			.. "world markers, arena glow, carrier's beam, ball's trail and name tags before each frame",
 		function()
 			FrameController:render(0.25)
 			expect(order).toEqual({
@@ -65,7 +64,6 @@ describe("FrameController", function()
 				"worldMarkers 0.25",
 				"arenaGlow 0.25",
 				"carrierBeam 0.25",
-				"throwArc 0.25",
 				"ballTrail 0.25",
 				"nameTags 0.25",
 			})

@@ -1,13 +1,16 @@
 --!strict
 -- The arena's parts the HUD points at and lights (spec §9.1): the corner markers (the gates' glass panels) by gate
--- index, the goal hoop's parts and its up (its pivot's), and the goal panel, found by their tags (Arena/Tags). The
--- arena model is Persistent, so it reaches every client whole, soon after the player joins, and stays; until it has,
--- `parts` is nil. One cache every client module reads, refreshed by the tags' signals from start on. Each refresh makes
--- a new record, so a reader sees that it changed.
+-- index, the goal hoop's parts, its up (its pivot's) and its opening, and the goal panel, found by their tags
+-- (Arena/Tags); a throw aims at the opening's centre through it (#313). The arena model is Persistent, so it reaches
+-- every client whole, soon after the player joins, and stays; until it has, `parts` is nil. One cache every client
+-- module reads, refreshed by the tags' signals from start on. Each refresh makes a new record, so a reader sees that it
+-- changed.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
+local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
 -- A corner marker: every part of it (a model's parts, or the marker itself when it is a part), and its pivot's
@@ -20,6 +23,8 @@ export type Parts = {
 	hoop: { BasePart },
 	-- Up in the ring's own plane: the panel slides along it, out of the ring.
 	hoopUp: Vector3,
+	-- The scoring disc (TaggedLayout.goalDisc).
+	goal: Crossing.Disc,
 	panel: BasePart,
 }
 
@@ -94,13 +99,19 @@ local ArenaParts: ArenaParts = {
 			end
 		end
 		local hoopModel = CollectionService:GetTagged(Tags.GoalHoop)[1]
+		local goal = if hoopModel ~= nil then TaggedLayout.goalDisc(hoopModel) else nil
 		local panel = firstPart(Tags.GoalPanel)
-		if count == 0 or hoopModel == nil or not hoopModel:IsA("PVInstance") or panel == nil then
+		if count == 0 or hoopModel == nil or goal == nil or panel == nil then
 			self.parts = nil
 			return
 		end
-		local hoop = partsOf(hoopModel)
-		self.parts = { markers = markers, hoop = hoop, hoopUp = hoopModel:GetPivot().UpVector, panel = panel }
+		self.parts = {
+			markers = markers,
+			hoop = partsOf(hoopModel),
+			hoopUp = goal.frame.UpVector,
+			goal = goal,
+			panel = panel,
+		}
 	end,
 
 	destroy = function(self: ArenaParts)

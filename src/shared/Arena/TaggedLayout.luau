@@ -138,13 +138,19 @@ local function readGates(root: Instance): { Crossing.Rectangle }
 	return gates
 end
 
-local function readGoal(root: Instance): Crossing.Disc
-	local hoop = single(root, Tags.GoalHoop)
+-- The goal hoop's opening, the scoring disc: the hoop's pivot and its positive OpeningRadius; nil for an instance that
+-- is not one. What the layout reads and the client's arena parts hold (a throw through it aims at its centre, #313).
+function TaggedLayout.goalDisc(hoop: Instance): Crossing.Disc?
 	local radius = hoop:GetAttribute(Tags.Attribute.OpeningRadius)
 	if hoop:IsA("PVInstance") and type(radius) == "number" and radius > 0 then
 		return { frame = hoop:GetPivot(), radius = radius }
 	end
-	return fail(`{Tags.GoalHoop} needs a positive {Tags.Attribute.OpeningRadius} attribute`)
+	return nil
+end
+
+local function readGoal(root: Instance): Crossing.Disc
+	return TaggedLayout.goalDisc(single(root, Tags.GoalHoop))
+		or fail(`{Tags.GoalHoop} needs a positive {Tags.Attribute.OpeningRadius} attribute`)
 end
 
 local function readMarkers(root: Instance, gateCount: number): { PVInstance }

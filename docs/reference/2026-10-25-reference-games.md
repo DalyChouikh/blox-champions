@@ -1331,6 +1331,47 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   floors from the side. **Q146**: **a bolder trail**: as wide as the ball (2 studs), solid at the ball fading out,
   0.4 s long (64 studs behind a full throw). Not chosen: keep it; the team's colour later with #327. **Q147**:
   **ship the arc as built** (judged again at the #317 playtest). Not chosen: the owner plays it first.
+- **Q148 the throw lands on the crosshair** (session 58, recommended), the owner's words first: "the throw trail
+  is coming from the ball, and not the crosshair dot, it is not making sense, the crosshair hae no use then ... even
+  the ball isn't coming from the crosshair, it should be from there so the crosshair makes sense, like RC ... in a
+  realistic way of course" (Video 31). RC, at 10 frames a second: Video 31 at 38.5-39.5 s (standing, the charge ring
+  on the far end of the straight ~32% down): released at ~39.0, the ball leaves the HAND, rises into the crosshair by
+  ~39.3 (0.3 s), sits on it (a hair above at 39.4) as it flies down the straight, and its marker stays at the far end
+  where the ring was (39.5-44.5); a white trail from the hand to the ball. Video 4 at 365.8 s: the charge ring on the
+  goal ring, the ball flies into it (GOAL 367.6). Ours: the ball leaves the hand PARALLEL to the crosshair's line,
+  ~1 body height under it, so on screen it tops out at the head and never reaches the dot. **Q148**: **the ball lands
+  on the crosshair's spot with real gravity**: it leaves the hand on the arc that comes down where the crosshair's
+  line meets the arena (or through the goal ring's centre); a full charge flies flat (a floor spot 100 studs out:
+  0.64 s, ~1 body height up), a weak one lobs; a spot too far for the charge -> the farthest point of the line it
+  reaches, then it falls; the arc dots run into the dot, the landing ring on it. Coupling said: looking level, the
+  dot's line climbs 15 deg, so a flat throw needs a slightly lowered look (as RC's player's). Trial first. Not
+  chosen: a straight line with no drop until a touch (RC's flat look); aimed at it with gravity after (~28 studs).
+- **Trial 148, Q149** (session 58). Trial 148 (Studio copies): Q148 as chosen; in Play a full throw with the view
+  15 deg down (the crosshair's line level, meeting the curved end's floor 177 studs out) flew a 36 deg lob 6.5 body
+  heights high and came down 1.7 studs from the spot after 1.3 s; the arc's dots ran from the hand into the dot,
+  its ring on it (the dot cap raised 40 -> 100 for long lobs). The owner played it: "just remove the arc trail
+  entirely, and make the throw not in a arc, but more flatter and direct, the arc trail is confusing and not in RC
+  anyways". So: **the predicted arc goes** (Q98's arc part reversed: neither RC nor Illegal Soccer has one); **a
+  throw flies flat and direct at the crosshair's spot**. Read: the trail BEHIND a thrown ball stays (RC draws one:
+  Video 4 at 366.6-367.8, Video 31 at 39.1). Trial 149 (Studio copies): the ball flies STRAIGHT from the hand at the
+  spot, its weight cancelled by the pass's lift until it first touches anything (then real physics), the carrier's
+  share kept on that line; measured in Play: a full throw (168 studs/s) stayed on the line (0.00 studs off) and
+  reached the spot 33 studs out in 0.20 s, a tap (72) in 0.47 s.
+- **Trial 149, Q150** (session 58). The owner played trial 149 (dead straight, no drop until a touch): "add drop,
+  not like that in direction direction, remember we want real physics, gravity, etc..., like RC". So: **real
+  gravity, a visible drop**, yet flatter and more direct than trial 148's lob (Q149). With real gravity a flatter
+  flight means a faster throw (RC's ball reaches the far end of Video 31's straight in ~1 s); RC's own ball gravity
+  is not measurable in the clips at hand (Video 3's replays: short throws, cuts, maybe slowed). Trial 150 (Studio
+  copies): trial 148's throw landing on the crosshair's spot under real gravity, the predicted arc removed, the
+  ChargeThrow speeds 60-160 -> **90-240 studs/s** (Roll Ball shares them). On paper at 240: a spot 100 studs out =
+  6 deg, 0.4 body heights up, 0.42 s; 177 out = 14.8 deg, 2.4 body heights, 0.76 s. Measured in Play: a full throw
+  down the straight at 13 deg rose 12 studs (2 body heights) and came down 2.4 studs from the spot 174 studs out
+  after 0.73 s.
+- **Q151 trial 150 kept** (session 58, recommended): **"Keep it, build it"**: a charged throw leaves the hand on
+  the real-gravity arc that comes down on the crosshair's spot (where its line first meets the arena, or the goal
+  ring's centre when it passes the opening; out of the charge's reach, the farthest point of that line it reaches),
+  at 90 studs/s for a tap to 240 for a full charge (Roll Ball the same); no predicted arc; the trail behind a thrown
+  ball stays. Built on #313's PR #334 as a second commit. Not chosen: faster (~300); slower (~200).
 
 ## Roller Champions
 

@@ -1,7 +1,7 @@
 --!strict
 -- The ball's trail (spec §9.4, #313; the owner, Q98): on every screen, a fading streak behind the ball while it flies
 -- loose from a throw, a pass or a roll, from the server's mark (Attributes.Thrown) until the next catch. Roblox draws
--- it, a Trail between two attachments UI.trajectory.trail.width apart and facing the camera, on a part of its own
+-- it, a Trail between two attachments UI.ballTrail.width apart and facing the camera, on a part of its own
 -- that keeps to where this screen draws the ball (BallView), without the ball's spin, which would twist it. The part
 -- keeps to the ball while no trail shows too, so each trail starts at the ball, never with a streak from where the
 -- last one ended. It stays on this client; nothing hits, sees or touches it. Stepped before each frame is drawn
@@ -61,7 +61,7 @@ local BallTrail: BallTrail = {
 	end,
 
 	start = function(self: BallTrail)
-		local settings = self._config.UI.trajectory.trail
+		local settings = self._config.UI.ballTrail
 		local holder = Instance.new("Part")
 		holder.Name = "BallTrail"
 		holder.Anchored = true

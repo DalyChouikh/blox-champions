@@ -27,7 +27,9 @@ describe("Schemas", function()
 			{ action = "Tackle" },
 			{ action = "CallPass" },
 			{ action = "Pass", aim = Vector3.new(0, 0, -1) },
-			{ action = "ChargeThrow", aim = Vector3.new(1, 0, 0), charge = 0.5 },
+			-- A throw also carries the crosshair's spot it comes down on (#313): any point, the world's origin too.
+			{ action = "ChargeThrow", aim = Vector3.new(1, 0, 0), spot = Vector3.new(40, 2, -7), charge = 0.5 },
+			{ action = "ChargeThrow", aim = Vector3.new(1, 0, 0), spot = Vector3.zero, charge = 0.5 },
 			-- Roll Ball spends the charge like a throw (#312).
 			{ action = "RollBall", aim = Vector3.new(0, 0.3, -1), charge = 1 },
 		}
@@ -38,8 +40,13 @@ describe("Schemas", function()
 			{ action = "Tackle", aim = Vector3.zero },
 			{ action = "Pass" },
 			{ action = "Pass", aim = Vector3.zero },
-			{ action = "ChargeThrow", aim = Vector3.new(0 / 0, 0, 0), charge = 0.5 },
-			{ action = "ChargeThrow", aim = Vector3.xAxis, charge = 5 },
+			{ action = "Pass", aim = Vector3.xAxis, spot = Vector3.zero },
+			{ action = "ChargeThrow", aim = Vector3.new(0 / 0, 0, 0), spot = Vector3.zero, charge = 0.5 },
+			{ action = "ChargeThrow", aim = Vector3.xAxis, spot = Vector3.zero, charge = 5 },
+			{ action = "ChargeThrow", aim = Vector3.xAxis, charge = 0.5 },
+			{ action = "ChargeThrow", aim = Vector3.xAxis, spot = Vector3.new(math.huge, 0, 0), charge = 0.5 },
+			{ action = "ChargeThrow", aim = Vector3.xAxis, spot = "here", charge = 0.5 },
+			{ action = "RollBall", aim = Vector3.xAxis, spot = Vector3.zero, charge = 1 },
 			{ action = "RollBall", aim = Vector3.xAxis },
 			{ action = "RollBall", aim = Vector3.zero, charge = 0.5 },
 			{ action = "RollBall", aim = Vector3.xAxis, charge = -0.1 },

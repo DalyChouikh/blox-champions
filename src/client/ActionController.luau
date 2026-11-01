@@ -2,7 +2,8 @@
 -- The local player's actions (spec §3.3, §8.1–8.3). Each physics step, after the skating (FrameController), it reads
 -- the action keys and starts at most one action at once in its own ActionRunner: it pushes the skater, then asks the
 -- server, which checks the action again. A throw, roll or pass predicts the ball leaving, aimed through the crosshair
--- (the camera's ray through its point on the screen, #312). A refusal (ActionRejected) stops the action, refunds its
+-- (the camera's ray through its point on the screen, #312); a throw is told where it comes down, the spot where that
+-- ray first meets the arena or the goal ring's centre (#313). A refusal (ActionRejected) stops the action, refunds its
 -- cooldown and gives a refused throw's ball back; a push already given stays (the movement guard tolerates it), but a
 -- lunge eases back to the speed before over its recovery, and drops to it at once when its action stops early (#241).
 -- A throw charges while its key is held with the ball (RC's crosshair shows how far, #312), and starting any action
@@ -24,8 +25,8 @@ local Actions = require(ReplicatedStorage.Shared.Config.Actions)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallCarrier = require(script.Parent.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local InputController = require(script.Parent.InputController)
-local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Reach = require(ReplicatedStorage.Shared.Actions.Reach)
@@ -43,6 +44,10 @@ type AimCamera = {
 	ViewportSize: Vector2,
 	ViewportPointToRay: (self: AimCamera, x: number, y: number, depth: number?) -> Ray,
 }
+-- What a throw's spot is found against (fakes in tests): the arena's solid surfaces (RideSurfaces.solid) and the goal
+-- ring's opening (ArenaParts), none until the arena is here.
+type Surfaces = { solid: RaycastParams }
+type Goal = { parts: { goal: Crossing.Disc }? }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
 export type ActionController = {
@@ -60,10 +65,6 @@ export type ActionController = {
 	-- crosshair's ring shows (#312: it closes at a full charge, then blinks) and what tells a Dodge it cancels the
 	-- charge.
 	chargeSeconds: (self: ActionController) -> number?,
-	-- While a throw charges, the velocity the ball would leave the hand with if it were let go now, as the server will
-	-- make it (ActionService): through the crosshair at the charge so far, plus the carrier's share of their velocity
-	-- held to the movement guard's limit; nil otherwise. The thrower's predicted arc (#313).
-	throwVelocity: (self: ActionController) -> Vector3?,
 	step: (self: ActionController, dt: number) -> (),
 	-- What an ActionRejected message runs (tests call it directly).
 	rejected: (self: ActionController, payload: any) -> (),
@@ -72,8 +73,8 @@ export type ActionController = {
 	_carrier: BallCarrier.BallCarrier,
 	_skate: SkateController.SkateController,
 	_camera: AimCamera,
-	-- The fastest a skater may move (MovementCheck.speedLimit), which the server holds a thrower's velocity to.
-	_speedLimit: number,
+	_surfaces: Surfaces,
+	_goal: Goal,
 	_sendRequest: (payload: { [string]: any }) -> (),
 	_localId: PlayerId,
 	-- Records reused every step: the keys, an action's start, and which action a key names (never knocked down).
@@ -320,14 +321,27 @@ end
 
 -- Through the crosshair (#312, the owner: Q123/Q127): the camera's ray through the screen's point centred across it
 -- and UI.hud.layout.reticle.height down it, where the HUD draws the reticle, above the skater as RC's sits.
-local function crosshairAim(self: ActionController): Vector3
+local function crosshair(self: ActionController): Ray
 	local camera = self._camera
 	local size = camera.ViewportSize
-	return camera:ViewportPointToRay(size.X / 2, size.Y * self._config.UI.hud.layout.reticle.height).Direction
+	return camera:ViewportPointToRay(size.X / 2, size.Y * self._config.UI.hud.layout.reticle.height)
 end
 
--- What the server is told: the action, with the aim when it lets go of the ball and the charge when it spends it. The
--- shape follows the action's effect, as Net/Schemas checks it.
+-- Where a throw along the crosshair's `ray` comes down (#313, the owner: Q148): where the ray first meets the arena's
+-- solid surfaces within the throw's aimReach, or where it ends there, unless it passes through the goal ring's
+-- opening on the way (Throw.spot). On a surface the ball's centre aims a radius off it along its normal, so the ball
+-- itself touches the spot: aimed with its centre on the floor, a full throw at a spot 67 studs out first touched the
+-- floor 19 studs short of it (measured in Play).
+local function spotAlong(self: ActionController, ray: Ray, throw: Config.ThrowSettings): Vector3
+	local line = ray.Direction.Unit * throw.aimReach
+	local hit = workspace:Raycast(ray.Origin, line, self._surfaces.solid)
+	local finish = if hit ~= nil then hit.Position + hit.Normal * self._config.Ball.radius else ray.Origin + line
+	local parts = self._goal.parts
+	return Throw.spot(ray.Origin, finish, if parts ~= nil then parts.goal else nil)
+end
+
+-- What the server is told: the action, with the aim when it lets go of the ball, the crosshair's spot when it comes
+-- down there and the charge when it spends it. The shape follows the action's effect, as Net/Schemas checks it.
 local function request(
 	self: ActionController,
 	name: Config.ActionName,
@@ -336,7 +350,11 @@ local function request(
 ): { [string]: any }
 	local payload: { [string]: any } = { action = name }
 	if Actions.releasesBall(action.effect) then
-		payload.aim = crosshairAim(self)
+		local ray = crosshair(self)
+		payload.aim = ray.Direction
+		if Actions.aimsAtSpot(action.effect) then
+			payload.spot = spotAlong(self, ray, action.throw :: Config.ThrowSettings)
+		end
 	end
 	if Actions.spendsCharge(action.effect) then
 		-- One charge, ChargeThrow's: Roll Ball spends it too.
@@ -392,14 +410,15 @@ end
 
 local ActionController: ActionController = {
 	name = "ActionController",
-	dependencies = { "Config", "InputController", "BallCarrier", "SkateController" },
+	dependencies = { "Config", "InputController", "BallCarrier", "SkateController", "RideSurfaces", "ArenaParts" },
 	runner = nil :: any,
 	_config = nil :: any,
 	_input = nil :: any,
 	_carrier = nil :: any,
 	_skate = nil :: any,
 	_camera = nil :: any,
-	_speedLimit = 0,
+	_surfaces = nil :: any,
+	_goal = nil :: any,
 	_sendRequest = function(_payload: { [string]: any }) end,
 	_localId = "",
 	_keys = nil :: any,
@@ -424,7 +443,8 @@ local ActionController: ActionController = {
 		self._carrier = deps.BallCarrier
 		self._skate = deps.SkateController
 		self._camera = deps.Camera or workspace.CurrentCamera
-		self._speedLimit = MovementCheck.speedLimit(config.Movement, config.Network)
+		self._surfaces = deps.RideSurfaces
+		self._goal = deps.ArenaParts
 		self._sendRequest = deps.SendRequest
 			or function(payload: { [string]: any })
 				Remotes.get(ReplicatedStorage, Remotes.names.ActionRequest):FireServer(payload)
@@ -460,16 +480,6 @@ local ActionController: ActionController = {
 
 	chargeSeconds = function(self: ActionController): number?
 		return self._charge
-	end,
-
-	throwVelocity = function(self: ActionController): Vector3?
-		local held, skater = self._charge, self._skate.skater
-		if held == nil or skater == nil then
-			return nil
-		end
-		local throw = self._config.Actions.ChargeThrow.throw :: Config.ThrowSettings
-		local carrier = Vectors.clampMagnitude(skater.velocity, self._speedLimit)
-		return Throw.charged(throw, crosshairAim(self), Throw.share(throw, held), carrier)
 	end,
 
 	step = function(self: ActionController, dt: number)
