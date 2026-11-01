@@ -188,8 +188,9 @@ describe("BallService", function()
 		local dropIn = config.Ball.dropIn
 		Fixtures.expectNear(ball.AssemblyLinearVelocity, DropIn.velocity(config.Arena, config.Ball, ball.Position))
 		expect(weightless()).toBe(true)
-		-- Wherever it has fallen to, it holds the drop's way there: past the left curved end's apex, +Z.
-		ball.CFrame = CFrame.new(-126, 60, 0)
+		-- Wherever it has fallen to, it holds the drop's way there: at the left curved end's apex, by the middle glass
+		-- (26 out from the end's axis at x -straightLength / 2), +Z.
+		ball.CFrame = CFrame.new(-config.Arena.straightLength / 2 - 26, 60, 0)
 		BallService:step(1 / 60, {})
 		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(0, -dropIn.descent, dropIn.speed))
 		local floor = Instance.new("Part")

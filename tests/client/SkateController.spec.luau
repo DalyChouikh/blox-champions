@@ -793,16 +793,17 @@ describe("SkateController", function()
 		glassFolder:Destroy()
 	end)
 
-	-- By default the normal is the arena's own (SmoothNormals): a wall caught on the middle glass's round end at
-	-- (120, 40, 0), 20 from the +X end's axis, is the cylinder there, whatever strip the ray met.
+	-- By default the normal is the arena's own (SmoothNormals): a wall caught on the middle glass's round end, 40 up
+	-- and 20 out from the +X end's axis (x straightLength / 2), is the cylinder there, whatever strip the ray met.
 	it("reads the arena's own smooth shape by default", function()
 		local facet = Vector3.new(math.cos(math.rad(1.875)), 0, math.sin(math.rad(1.875)))
+		local onRoundEnd = Vector3.new(config.Arena.straightLength / 2 + 20, 40, 0)
 		setup({
 			Raycast = function(_origin: Vector3, _direction: Vector3): any
 				return {
 					Normal = facet,
 					Distance = movement.hoverHeight,
-					Position = Vector3.new(120, 40, 0),
+					Position = onRoundEnd,
 					Instance = SOLID,
 				}
 			end,

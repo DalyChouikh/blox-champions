@@ -41,21 +41,22 @@ describe("The generated arena", function()
 	end)
 
 	-- The heights below are worked out independently of the code: on the top straight u = -z - 20; around the left
-	-- curved end u is the distance from (-100, 0) less 20, and between two stations the built surface is the plane
-	-- through the two strips' chords.
+	-- curved end u is the distance from its axis (-straightLength / 2, 0) less 20, and between two stations the built
+	-- surface is the plane through the two strips' chords.
 	it("puts the riding surface where the profile says, including the blend at a corner", function()
+		local half = config.Arena.straightLength / 2
 		local floors: { { any } } = {
 			{ Vector3.new(30, 60, -47), 0 }, -- top straight, the spawn room (u 27)
 			{ Vector3.new(30, 60, -74), 10.493 }, -- top straight, the incline (u 54): 8 + 10 tan 14°
 			-- Top straight, the rise's third strip (u 35.6 to 38.4, 2.481 to 4.681 high), halfway across.
 			{ Vector3.new(30, 60, -57), 3.581 },
 			-- Gate 2, halfway between the two sections: u 45 on the chord from (43.798, 5.811) to (55.293, 9.187).
-			{ Vector3.new(-100, 60, -65), 6.164 },
+			{ Vector3.new(-half, 60, -65), 6.164 },
 			-- Left curved end, the bowl: a stud past the apex, whose station is a seam a ray exactly on misses.
-			{ Vector3.new(-160, 60, 1), 2.752 },
+			{ Vector3.new(-half - 60, 60, 1), 2.752 },
 			{ Vector3.new(0, 60, 0), 0 }, -- the infield, at the lowest floor's height
 			-- The infield under the left curved end, a stud off the station line at 135° (another seam).
-			{ Vector3.new(-110, 60, 11), 0 },
+			{ Vector3.new(-half - 10, 60, 11), 0 },
 		}
 		for _, case in floors do
 			local hit = cast(case[1], Vector3.new(0, -100, 0))
@@ -73,17 +74,19 @@ describe("The generated arena", function()
 				cast(Centerline.at(config.Arena, distance, lateral, 60).Position, Vector3.new(0, -100, 0))
 			return if hit then hit.Position.Y else nil
 		end
-		-- The left curved end's bowl, mid-way between two stations (48 of them, 3.927 studs apart, from 200), across
-		-- its strips: each on the plane through its two chords.
+		-- Distances from Gate 2, where the left curved end starts (stations every 4 studs on a straight).
+		local gate2 = Centerline.gateDistance(config.Arena, 2)
+		-- The left curved end's bowl, mid-way between two stations (48 of them, 3.927 studs apart, from Gate 2),
+		-- across its strips: each on the plane through its two chords.
 		local bowl = { { 20, 0.158 }, { 28, 0.69 }, { 36, 1.911 }, { 44, 3.765 }, { 52, 6.373 }, { 60, 9.377 } }
 		for _, case in bowl do
-			expect(floorAt(241.2, case[1])).toBeCloseTo(case[2], 2)
+			expect(floorAt(gate2 + 41.2, case[1])).toBeCloseTo(case[2], 2)
 		end
-		-- u 45 just before and just after Gate 2 (distance 200), where the section is blending: on the triangles
-		-- between the neighboring stations' strips (the incline's first, from 44 to 53.7 on a straight and 43.6 to 56.9
-		-- at a curved end, blended 0.794, 0.5 and 0.211 at 196, 200 and 203.9).
-		expect(floorAt(198, 45)).toBeCloseTo(6.79, 2)
-		expect(floorAt(202, 45)).toBeCloseTo(5.584, 2)
+		-- u 45 just before and just after Gate 2, where the section is blending: on the triangles between the
+		-- neighboring stations' strips (the incline's first, from 44 to 53.7 on a straight and 43.6 to 56.9 at a curved
+		-- end, blended 0.794, 0.5 and 0.211 at 4 before, at, and 3.927 past Gate 2).
+		expect(floorAt(gate2 - 2, 45)).toBeCloseTo(6.79, 2)
+		expect(floorAt(gate2 + 2, 45)).toBeCloseTo(5.584, 2)
 	end)
 
 	it("stands the walls, the glass and the roof where the profile says", function()

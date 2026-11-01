@@ -74,10 +74,11 @@ describe("Surface.build", function()
 				wedges += 1
 			end
 		end
-		-- 196 station steps (50 along each straight, 48 around each end) by 20 strips. No strip but the wall's is a
+		-- 226 station steps (65 along each straight, 48 around each end) by 20 strips. No strip but the wall's is a
 		-- rectangle around an end, and none is in the 20-stud blends (3 steps either side of each corner), so: each
-		-- straight's 44 steps between the blends make one block per strip (40), each end's 42 steps past the blends one
-		-- block for the wall (84), and the other quads four wedges each: (2 · 42 · 19 + 24 · 20) · 4 = 8304.
+		-- straight's 59 steps between the blends make one block per strip (40, however long the straights), each end's
+		-- 42 steps past the blends one block for the wall (84), and the other quads four wedges each:
+		-- (2 · 42 · 19 + 24 · 20) · 4 = 8304.
 		expect(blocks).toBe(124)
 		expect(wedges).toBe(8304)
 	end)
@@ -85,13 +86,18 @@ describe("Surface.build", function()
 	-- Fewer parts, and no seams across a straight for a rolling ball to bump on.
 	it("spans each straight with one block per strip wherever the cross-section does not change", function()
 		local arena = Config.defaults().Arena
+		-- A straight's section and a curved end's share only the bank's top and the wall's top, so every strip changes
+		-- in the 20-stud blend at each corner and runs between the first and last stations past the blends: 12 from
+		-- each end (three 4-stud station steps past the blend's 10). The spawn room runs from the bank's foot (24) to
+		-- 30: 6 wide, its middle 20 + 27 = 47 from the long axis.
+		local run = arena.straightLength - 2 * 12
 		local whole, between = 0, 0
 		local room: Types.Piece? = nil
 		for _, piece in Surface.build(arena) do
 			if piece.shape == "Block" then
-				if math.abs(piece.size.Z - 200) < 1e-3 then
+				if math.abs(piece.size.Z - arena.straightLength) < 1e-3 then
 					whole += 1
-				elseif math.abs(piece.size.Z - 176) < 1e-3 then
+				elseif math.abs(piece.size.Z - run) < 1e-3 then
 					between += 1
 					if (piece.cframe.Position - Vector3.new(0, -0.5, -47)).Magnitude < 1e-3 then
 						room = piece
@@ -99,13 +105,9 @@ describe("Surface.build", function()
 				end
 			end
 		end
-		-- A straight's section and a curved end's share only the bank's top and the wall's top, so every strip changes
-		-- in the 20-stud blend at each corner and runs 176 studs, between the first and last stations past the blends
-		-- (12 and 188). The spawn room runs from the bank's foot (24) to 30: 6 wide, its middle 20 + 27 = 47 from the
-		-- long axis.
 		expect(whole).toBe(0)
 		expect(between).toBe(2 * 20)
 		expect(room).never.toBeNil()
-		expect(((room :: Types.Piece).size - Vector3.new(6, 1, 176)).Magnitude).toBeLessThan(1e-3)
+		expect(((room :: Types.Piece).size - Vector3.new(6, 1, run)).Magnitude).toBeLessThan(1e-3)
 	end)
 end)
