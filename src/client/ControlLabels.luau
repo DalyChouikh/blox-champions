@@ -4,8 +4,10 @@
 -- that work it. Nothing works without a skater. Jump jumps on the ground and strikes the Air Pose in the air, once
 -- until landing (SkateMath), Attach needs a teammate right ahead (SkateController.attachable), and an action key the
 -- action it would start now (ActionController:keyAction). While a throw charges (#312) the pump does nothing, and the
--- Dodge reads Cancel & Dodge, as RC's hints read then (Video 32 at 3.2 s). The throw's control works Ball Focus while
--- it would start no throw: without the ball.
+-- Dodge reads Cancel & Dodge, as RC's hints read then (Video 32 at 3.2 s). While knocked down or diving
+-- (SkateController:controlsLocked) the skating's controls do nothing and the action keys start nothing but a carrier's
+-- throw, as RC's hints read through a carrier's dive and slide (#314, Video 33 at 17.6-19.0 s). The throw's control
+-- works Ball Focus while it would start no throw: without the ball.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -27,6 +29,10 @@ ControlLabels.CONTROLS = table.freeze({
 	"throw",
 } :: { Config.TouchControl })
 
+-- The controls the skating takes, which do nothing while it is locked (Attach too, but a locked skater is never
+-- SkateController.attachable).
+local SKATING: { [string]: boolean } = table.freeze({ jump = true, pump = true, brake = true })
+
 function ControlLabels.label(
 	control: Config.TouchControl,
 	config: Config.GameConfig,
@@ -39,7 +45,9 @@ function ControlLabels.label(
 	end
 	local labels = config.UI.controlLabels
 	local charging = actions:chargeSeconds() ~= nil
-	if control == "jump" then
+	if SKATING[control] and skate:controlsLocked() then
+		return nil
+	elseif control == "jump" then
 		if skater.mode == "Grounded" then
 			return labels.Jump
 		end

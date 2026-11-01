@@ -169,12 +169,12 @@ describe("Config defaults", function()
 				airMultiplier = 0.4,
 				followUp = { action = "Dive", from = 0.1, to = 1 },
 			},
-			-- Only as the Tackle's follow-up, a 0.3 s flight (#277, Q66), then on the belly at the first touch of the
-			-- ground until the slide stops (#221, #240, #242).
+			-- Only as a follow-up, a 0.3 s flight (#277, Q66), then on the belly at the first touch of the ground until
+			-- the slide stops (#221, #240, #242): the Tackle's with empty hands, the Dodge's with the ball (#314).
 			Dive = {
 				phases = { windup = 0, active = 0.3, recovery = 0.9 },
 				cooldown = 0.8,
-				requires = requires("without"),
+				requires = requires("any"),
 				effect = "Knockdown",
 				pose = "Lunge",
 				hit = { range = 11, coneDeg = 90, aimUpDeg = 0, knockdownSeconds = 1.5 },
@@ -195,6 +195,8 @@ describe("Config defaults", function()
 				effect = "Dodge",
 				pose = "None",
 				motion = { sideSpeed = 45 },
+				-- Its key dives with the ball from 0.1 to 1.0 s after it (#314, Q102: RC's "Dive" row, Video 32).
+				followUp = { action = "Dive", from = 0.1, to = 1 },
 			},
 			Uppercut = {
 				phases = { windup = 0.05, active = 0.2, recovery = 0 },
@@ -212,10 +214,11 @@ describe("Config defaults", function()
 				-- √(2/3) of 110: as high at two thirds of the gravity (#279).
 				motion = { leapImpulse = 89.81 },
 			},
+			-- Down too: through the carrier's own dive and slide, the one knockdown that keeps the ball (#314, Q154).
 			ChargeThrow = {
 				phases = { windup = 0, active = 0, recovery = 0 },
 				cooldown = 0,
-				requires = requires("with"),
+				requires = { ball = "with", grounded = "any", charge = "any", notKnockedDown = false },
 				effect = "Throw",
 				pose = "None",
 				-- A full charge in 0.5 s (Q99, Q133), as RC's crosshair closes; faster after trial 150 (Q151), so a
@@ -1330,9 +1333,14 @@ describe("Config.forMode", function()
 				overrides = { Tackle = { followUp = { from = -0.1 } } },
 				message = "Actions.Tackle.followUp.from: must be >= 0 (got -0.1)",
 			},
+			-- The Dodge's (#314), by the same rules.
 			{
-				overrides = { Dodge = { followUp = { action = "Dive", from = 0, to = 1 } } },
-				message = "Actions.Dodge.followUp: unknown key",
+				overrides = { Dodge = { followUp = { action = "Dodge" } } },
+				message = "Actions.Dodge.followUp.action: must name another action",
+			},
+			{
+				overrides = { Uppercut = { followUp = { action = "Dive", from = 0, to = 1 } } },
+				message = "Actions.Uppercut.followUp: unknown key",
 			},
 			{
 				overrides = { Dive = { landing = { knockdownSeconds = 0 } } },
@@ -1529,6 +1537,7 @@ describe("Config.forMode", function()
 				Actions = {
 					getUpAfter = 0.01,
 					Tackle = { followUp = { from = 0, to = 0.01 } },
+					Dodge = { followUp = { from = 0, to = 0.01 } },
 					Dive = { landing = { knockdownSeconds = 0.01, stopSpeed = 0.01 } },
 				},
 				Network = { maxGetUpsPerSecond = 0.01, posedLandingTolerance = 0 },
@@ -1545,6 +1554,7 @@ describe("Config.forMode", function()
 			end
 			expect(config.Actions.getUpAfter).toBe(0.01)
 			expect(config.Actions.Tackle.followUp).toEqual({ action = "Dive", from = 0, to = 0.01 })
+			expect(config.Actions.Dodge.followUp).toEqual({ action = "Dive", from = 0, to = 0.01 })
 			expect(config.Actions.Dive.landing).toEqual({ knockdownSeconds = 0.01, stopSpeed = 0.01 })
 			expect(config.Network.maxGetUpsPerSecond).toBe(0.01)
 			expect(config.Network.posedLandingTolerance).toBe(0)

@@ -31,8 +31,9 @@ type Fields = {
 	-- refused or the runner reset.
 	_lastStarted: Actions.ActionName?,
 	_sinceStart: number,
-	-- Each action named as another's follow-up (the Dive), by the action it follows (the Tackle).
-	_followUpOf: { [string]: Actions.ActionName },
+	-- The actions another names as its follow-up (the Dive, the Tackle's and the Dodge's): each starts only in the
+	-- window of the action started last, if that one names it.
+	_followUps: { [string]: boolean },
 }
 
 export type Runner = typeof(setmetatable({} :: Fields, ActionRunner))
@@ -62,6 +63,12 @@ end
 local function elapsed(self: Runner, phases: Actions.Phases): number
 	local index = self._phaseIndex
 	return phaseStart(phases, index) + phaseLength(phases, index) - self._phaseLeft
+end
+
+-- `source`'s follow-up window when it names `name` (the Dive after a Tackle or a Dodge); nil otherwise.
+local function windowFor(self: Runner, source: Actions.ActionName?, name: Actions.ActionName): Actions.FollowUp?
+	local followUp = if source ~= nil then self._actions[source].followUp else nil
+	return if followUp ~= nil and followUp.action == name then followUp else nil
 end
 
 -- Whether an action's ball requirement lets a player who holds the ball (or doesn't) start it.
@@ -111,12 +118,12 @@ end
 
 function ActionRunner.new(actions: Actions.ActionsConfig): Runner
 	local cooldowns: { [string]: number } = {}
-	local followUpOf: { [string]: Actions.ActionName } = {}
+	local followUps: { [string]: boolean } = {}
 	for _, name: Actions.ActionName in Actions.names do
 		cooldowns[name] = 0
 		local followUp = actions[name].followUp
 		if followUp ~= nil then
-			followUpOf[followUp.action] = name
+			followUps[followUp.action] = true
 		end
 	end
 	local self: Fields = {
@@ -129,25 +136,24 @@ function ActionRunner.new(actions: Actions.ActionsConfig): Runner
 		_cooldowns = cooldowns,
 		_lastStarted = nil,
 		_sinceStart = 0,
-		_followUpOf = followUpOf,
+		_followUps = followUps,
 	}
 	return setmetatable(self, ActionRunner)
 end
 
 -- Whether `name` may start as far as the context and, for a follow-up, its window go (not its cooldown, nor what
--- runs): the action it follows started last, between its window's `from` and `to` seconds ago, each edge moved by
--- `tolerance`. What an action key would start now (ActionController).
+-- runs): the action started last names it, and started between its window's `from` and `to` seconds ago, each edge
+-- moved by `tolerance`. What an action key would start now (ActionController).
 function ActionRunner.available(self: Runner, name: Actions.ActionName, context: Context, tolerance: number?): boolean
 	if not allows(self._actions[name].requires, context) then
 		return false
 	end
-	local source: Actions.ActionName? = self._followUpOf[name]
-	if source == nil then
+	if not self._followUps[name] then
 		return true
 	end
-	local window = self._actions[source].followUp :: Actions.FollowUp
+	local window = windowFor(self, self._lastStarted, name)
 	local slack, since = tolerance or 0, self._sinceStart
-	return self._lastStarted == source and since >= window.from - slack and since <= window.to + slack
+	return window ~= nil and since >= window.from - slack and since <= window.to + slack
 end
 
 -- Starts `name` when it is available, nothing else runs (a follow-up replaces the action it follows) and its cooldown
@@ -161,7 +167,7 @@ function ActionRunner.start(self: Runner, name: Actions.ActionName, context: Con
 	end
 	local slack = tolerance or 0
 	local running: Actions.ActionName? = self.action
-	if running ~= nil and self._followUpOf[name] ~= running then
+	if running ~= nil and windowFor(self, running, name) == nil then
 		local phases = self._actions[running].phases
 		if elapsed(self, phases) < phaseStart(phases, #PHASES + 1) - slack then
 			return "Busy"

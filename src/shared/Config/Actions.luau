@@ -25,6 +25,7 @@ export type Requires = {
 	ball: BallRequirement,
 	grounded: Grounded,
 	charge: ChargeRequirement,
+	-- Only on their feet, out of any dive (every action but the throw, which a carrier's own dive allows: #314).
 	notKnockedDown: boolean,
 }
 -- Who a strike reaches: within range, and within coneDeg of the facing pitched up by aimUpDeg.
@@ -55,7 +56,7 @@ export type Motion = {
 -- along the ground, or for knockdownSeconds at most; moving does not get them up sooner (#242).
 export type Landing = { knockdownSeconds: number, stopSpeed: number }
 -- Another action this one's key starts instead from `from` to `to` seconds after this one started (the Tackle's Dive,
--- #240), replacing it if it still runs. An action named as a follow-up starts only that way.
+-- #240, and the Dodge's, #314), replacing it if it still runs. An action named as a follow-up starts only that way.
 export type FollowUp = { action: ActionName, from: number, to: number }
 export type ThrowSettings = {
 	-- Holding this long charges the throw fully.
@@ -184,16 +185,17 @@ local defaults: ActionsConfig = {
 		airMultiplier = 0.4,
 		followUp = { action = "Dive", from = 0.1, to = 1 },
 	},
-	-- Roller Champions' dive (the owner's Videos 5 and 6), only as the Tackle's follow-up: 72 km/h along the way, or a
-	-- faster skater's own speed, and in the air down the fall line, speeding up (RC: 19 -> 65 km/h at the press, 133
-	-- at the touchdown 1.1 s later). Its strike is a 0.3 s flight (the owner, #277 Q66: shorter, as RC's ~0.3 s), then
-	-- on the belly until the slide is under 2 studs/s (2.4 km/h), 1.5 s at most (the owner, #242: RC's slid to 0-3 km/h
-	-- in 0.7-0.8 s, and every action came back at the stop). It snaps to an opponent beside the diver, even a little
-	-- behind (Q64: the owner's dives missed opponents 10-19 studs away, 62-96 deg off the facing).
+	-- Roller Champions' dive (the owner's Videos 5 and 6), only as a follow-up: the Tackle's with empty hands, or the
+	-- Dodge's with the ball (#314), which the carrier keeps (Q102) and dives with as hard (Q152). 72 km/h along the
+	-- way, or a faster skater's own speed, and in the air down the fall line, speeding up (RC: 19 -> 65 km/h at the
+	-- press, 133 at the touchdown 1.1 s later). Its strike is a 0.3 s flight (the owner, #277 Q66: shorter, as RC's
+	-- ~0.3 s), then on the belly until the slide is under 2 studs/s (2.4 km/h), 1.5 s at most (the owner, #242: RC's
+	-- slid to 0-3 km/h in 0.7-0.8 s, and every action came back at the stop). It snaps to an opponent beside the diver,
+	-- even a little behind (Q64: the owner's dives missed opponents 10-19 studs away, 62-96 deg off the facing).
 	Dive = {
 		phases = { windup = 0, active = 0.3, recovery = 0.9 },
 		cooldown = 0.8,
-		requires = requires("without"),
+		requires = requires("any"),
 		effect = "Knockdown",
 		pose = "Lunge",
 		hit = { range = 11, coneDeg = 90, aimUpDeg = 0, knockdownSeconds = 1.5 },
@@ -205,7 +207,9 @@ local defaults: ActionsConfig = {
 		motion = { diveSpeed = 60 },
 		landing = { knockdownSeconds = 1.5, stopSpeed = 2 },
 	},
-	-- Tackle-immune exactly while active.
+	-- Tackle-immune exactly while active. Its key then dives with the ball from 0.1 to 1.0 s after it, as the Tackle's
+	-- does (#314, Q102): RC's Dodge row reads "Dive" for ~1 s after a dodge with the ball (Video 32 at 4.6-5.6 s; Video
+	-- 33: the dodge at ~17.0 s, "Dive" from 17.2, pressed at 17.4).
 	Dodge = {
 		phases = { windup = 0, active = 0.3, recovery = 0.2 },
 		cooldown = 1.5,
@@ -213,6 +217,7 @@ local defaults: ActionsConfig = {
 		effect = "Dodge",
 		pose = "None",
 		motion = { sideSpeed = 45 },
+		followUp = { action = "Dive", from = 0.1, to = 1 },
 	},
 	-- Aimed up, so its cone covers "in front and above"; it leaps the skater up from any ground, 89.81² / (2 × 130.8) =
 	-- 31 studs, 1.37 s in the air (the owner, #219: RC's uppercut launches on open floor; #279: √(2/3) of 110 at two
@@ -243,11 +248,12 @@ local defaults: ActionsConfig = {
 	-- (trial 150 kept, Q151; was 60-160): 90 studs/s at a tap to 240 at a full charge (15-41 body lengths a second). A
 	-- spot 100 studs out then takes a 6 deg throw; a straight's far end, 177 out, a 15 deg one rising 2.4 body heights
 	-- in 0.76 s (RC's ball reaches the far end in about 1 s). The crosshair's line looks 1000 studs for the spot, past
-	-- any arena's far side.
+	-- any arena's far side. Down too: through the carrier's own dive and belly slide (#314, Q154: RC's hints keep
+	-- Charge Throw lit there, Video 33 at 17.6-19.0 s), the one knockdown that keeps the ball.
 	ChargeThrow = {
 		phases = INSTANT,
 		cooldown = 0,
-		requires = requires("with"),
+		requires = { ball = "with", grounded = "any", charge = "any", notKnockedDown = false },
 		effect = "Throw",
 		pose = "None",
 		throw = {
@@ -392,7 +398,10 @@ local schema = Validate.record({
 		motion = Validate.record({ diveSpeed = positive }),
 		landing = Validate.record({ knockdownSeconds = positive, stopSpeed = positive }),
 	}),
-	Dodge = action(defaults.Dodge, { motion = Validate.record({ sideSpeed = positive }) }),
+	Dodge = action(defaults.Dodge, {
+		motion = Validate.record({ sideSpeed = positive }),
+		followUp = followUp("Dodge"),
+	}),
 	Uppercut = action(defaults.Uppercut, {
 		hit = hit,
 		seek = seek,

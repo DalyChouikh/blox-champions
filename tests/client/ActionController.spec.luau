@@ -175,18 +175,20 @@ local function actionsOnly()
 	ActionController:step(DT)
 end
 
--- Steps `step` past the Tackle's follow-up window's start, two frames in.
-local function intoWindow(step: () -> ())
-	for _ = 1, math.floor(FOLLOW_UP.from / DT) + 2 do
+-- Steps `step` past the start of `window` (the Tackle's follow-up window by default), two frames in.
+local function intoWindow(step: () -> (), window: Config.FollowUp?)
+	for _ = 1, math.floor((window or FOLLOW_UP).from / DT) + 2 do
 		step()
 	end
 end
 
--- Roller Champions' tackle key (#240): a press tackles, a second one in the tackle's follow-up window dives.
+-- Roller Champions' tackle key (#240): a press tackles, or with the ball dodges (#314), and a second one in that
+-- action's follow-up window dives.
 local function dive(step: () -> ())
+	local source: Config.ActionName = if BallCarrier.carrier == LOCAL_ID then "Dodge" else "Tackle"
 	press("Tackle")
 	step()
-	intoWindow(step)
+	intoWindow(step, config.Actions[source].followUp :: Config.FollowUp)
 	press("Tackle")
 	step()
 end
@@ -493,6 +495,32 @@ describe("ActionController", function()
 		expect(SkateController.diving).toBe(true)
 		ActionController:rejected({ action = "Dive" })
 		expect(SkateController.diving).toBe(false)
+	end)
+
+	-- RC (#314, Q102; Video 33 at 17.0-19.2 s): with the ball the tackle key dodges, and the same key in the dodge's
+	-- window dives, the ball kept.
+	it("dodges with the ball, then dives with it from the same key in the dodge's window", function()
+		setup()
+		BallCarrier:set(LOCAL_ID)
+		skater().velocity = Vector3.new(0, 0, -30)
+		dive(frame)
+		expect(requests).toEqual({ { action = "Dodge" }, { action = "Dive" } })
+		expect(SkateController.diving).toBe(true)
+		expect(BallCarrier.carrier).toBe(LOCAL_ID)
+	end)
+
+	-- The owner (#314, Q154): RC keeps Charge Throw lit through the carrier's dive and slide (Video 33 at 17.6-19.0 s).
+	it("throws from the belly after the carrier's own dive, and starts nothing else there", function()
+		setup()
+		local throw = charging(6)
+		rig:SetAttribute(Attributes.KnockedDown, "Dive")
+		frame()
+		expect(names()).toEqual({ tackle = "none", uppercut = "none", pass = "none", throw = "ChargeThrow" })
+		throw:Fire(false)
+		frame()
+		expect(#requests).toBe(1)
+		expect(requests[1].action).toBe("ChargeThrow")
+		rig:SetAttribute(Attributes.KnockedDown, nil)
 	end)
 
 	-- Through the crosshair above the skater (#312, Q123/Q127), so aiming forward or up never drops the camera to the
@@ -980,10 +1008,24 @@ describe("ActionController's magnetic strikes (#277)", function()
 		standing("Mate", Vector3.new(8, HOVER, -0.5), "Blue")
 		standing("Down", Vector3.new(6, HOVER, -0.5)):SetAttribute(Attributes.KnockedDown, "Hit")
 		standing("Dodging", Vector3.new(7, HOVER, -0.5)):SetAttribute(Attributes.Action, "Dodge")
+		-- On the belly after a dive without the ball (#314: only a carrier's own dive leaves them in reach).
+		standing("Diver", Vector3.new(7.5, HOVER, -0.5)):SetAttribute(Attributes.KnockedDown, "Dive")
 		skater().velocity = Vector3.new(0, 0, -30)
 		press("Tackle")
 		actionsOnly()
 		expect(across(skater().forward):Dot(-Vector3.zAxis)).toBeGreaterThan(0.999)
+	end)
+
+	-- The owner (#314, Q153): a carrier sliding after their own dive can be struck, so a strike homes onto them.
+	it("homes onto an opponent carrier sliding on the belly after their own dive", function()
+		setup()
+		frame()
+		standing("Carrier", Vector3.new(8, HOVER, -0.5)):SetAttribute(Attributes.KnockedDown, "Dive")
+		BallCarrier:set("Carrier")
+		skater().velocity = Vector3.new(0, 0, -30)
+		press("Tackle")
+		actionsOnly()
+		expect(across(skater().forward):Dot(across(Vector3.new(8, 0, -0.5)))).toBeGreaterThan(0.999)
 	end)
 
 	it("never homes onto an opponent knocked down since the last strike", function()
@@ -1010,6 +1052,16 @@ describe("ActionController's magnetic strikes (#277)", function()
 		aside(target, before, 20)
 		actionsOnly()
 		expect(turnedFrom(before)).toBeLessThan(1e-3)
+	end)
+
+	-- Q153 (#314): a carrier on the belly after their own dive stays in reach, so the strike keeps after them.
+	it("keeps bending toward a target who carries the ball and lies down after their own dive", function()
+		local target, before = tackleAhead()
+		BallCarrier:set(target.Name)
+		target:SetAttribute(Attributes.KnockedDown, "Dive")
+		aside(target, before, 20)
+		actionsOnly()
+		expect(turnedFrom(before)).toBeCloseTo(TACKLE_STEP, 1)
 	end)
 
 	it("stops bending once its target's character is gone", function()

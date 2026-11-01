@@ -111,4 +111,31 @@ describe("ControlLabels", function()
 		expect(now("uppercut")).toBeNil()
 		expect(now("tackle")).toBe(labels.CancelDodge)
 	end)
+
+	-- RC's Dodge row reads "Dive" for ~1 s after a dodge with the ball (#314, Video 32 at 4.6-5.6 s).
+	it("names the Dive on the tackle button in a dodge's follow-up window, with the ball", function()
+		BallCarrier:set(LOCAL_ID)
+		expect(now("tackle")).toBe(labels.Dodge)
+		Fixtures.intoDiveWindow(config, "Dodge")
+		expect(now("tackle")).toBe(labels.Dive)
+	end)
+
+	-- RC's hints through a carrier's dive and belly slide (#314, Q154, Video 33 at 17.6-19.0 s): only Charge Throw
+	-- lit. Nothing else works there: the skating takes no input (SkateMath) and no other action starts.
+	it("names only the carrier's throw while diving or down, and Ball Focus without the ball", function()
+		BallCarrier:set(LOCAL_ID)
+		local skate: any = SkateController
+		for _, field in { "diving", "knockedDown" } do
+			skate[field] = true
+			for _, control: Config.TouchControl in ControlLabels.CONTROLS do
+				expect(now(control)).toBe(if control == "throw" then labels.ChargeThrow else nil)
+			end
+			skate[field] = false
+		end
+		BallCarrier:set(nil)
+		skate.knockedDown = true
+		expect(now("throw")).toBe(labels.BallFocus)
+		expect(now("tackle")).toBeNil()
+		skate.knockedDown = false
+	end)
 end)

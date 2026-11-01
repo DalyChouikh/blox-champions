@@ -73,11 +73,23 @@ end)
 
 describe("Reach.strikable", function()
 	it("lets a strike reach only an opponent on their feet who is not dodging", function()
-		expect(Reach.strikable("Blue", "Orange", false, false)).toBe(true)
+		expect(Reach.strikable("Blue", "Orange", nil, false, false)).toBe(true)
+		expect(Reach.strikable("Blue", "Orange", nil, true, false)).toBe(true)
 		-- A teammate, a player without a seat, a knocked-down opponent and a dodging one.
-		expect(Reach.strikable("Blue", "Blue", false, false)).toBe(false)
-		expect(Reach.strikable("Blue", nil, false, false)).toBe(false)
-		expect(Reach.strikable("Blue", "Orange", true, false)).toBe(false)
-		expect(Reach.strikable("Blue", "Orange", false, true)).toBe(false)
+		expect(Reach.strikable("Blue", "Blue", nil, false, false)).toBe(false)
+		expect(Reach.strikable("Blue", nil, nil, false, false)).toBe(false)
+		expect(Reach.strikable("Blue", "Orange", "Hit", false, false)).toBe(false)
+		expect(Reach.strikable("Blue", "Orange", nil, false, true)).toBe(false)
+	end)
+
+	-- The owner (#314, Q153): a carrier on the belly after their own dive can still be struck, so the ball stays
+	-- stealable; a diver without the ball, or anyone down otherwise, cannot.
+	it("also reaches a carrier sliding after their own dive, and nobody else who is down", function()
+		expect(Reach.strikable("Blue", "Orange", "Dive", true, false)).toBe(true)
+		expect(Reach.strikable("Blue", "Orange", "Dive", false, false)).toBe(false)
+		expect(Reach.strikable("Blue", "Orange", "Fall", true, false)).toBe(false)
+		expect(Reach.strikable("Blue", "Orange", "Hit", true, false)).toBe(false)
+		expect(Reach.strikable("Blue", "Blue", "Dive", true, false)).toBe(false)
+		expect(Reach.strikable("Blue", "Orange", "Dive", true, true)).toBe(false)
 	end)
 end)

@@ -79,6 +79,9 @@ export type SkateController = {
 	-- the server's rule for that knockdown's end holds (#286). Meanwhile they glide, slowed by friction and drag only
 	-- (#242), and in the air fly down the fall line (SkateMath, #241).
 	diving: boolean,
+	-- Knocked down or diving: the skating takes none of the player's input, and no action starts but a carrier's throw
+	-- (#314, the owner: Q154; RC greys every other hint then).
+	controlsLocked: (self: SkateController) -> boolean,
 	-- Set by ActionController each step while a throw charges (#312): the pump key does nothing then and is not
 	-- reported as pumping (the owner, Q106: RC greys Pump while charging). A new character starts without it.
 	charging: boolean,
@@ -261,7 +264,7 @@ local function moveSkater(self: SkateController, root: BasePart, skater: SkateMa
 	local movement = self._config.Movement
 	local keys = self._keys
 	local attach = self._attach
-	if self.knockedDown or self.diving or self._inputController.paused then
+	if self:controlsLocked() or self._inputController.paused then
 		if attach.leader ~= nil then
 			attach:reset()
 			skater:release(Vector3.zero)
@@ -596,6 +599,10 @@ local SkateController: SkateController = {
 	hasSkater = function(self: SkateController): boolean
 		local root = self.root
 		return self.skater ~= nil and root ~= nil and root.Parent ~= nil
+	end,
+
+	controlsLocked = function(self: SkateController): boolean
+		return self.knockedDown or self.diving
 	end,
 
 	step = function(self: SkateController, dt: number)
