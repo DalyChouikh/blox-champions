@@ -13,10 +13,11 @@ local modules: { Loader.LoadableModule } = {
 	require(script.Parent.BallPart),
 	require(script.Parent.ArenaParts),
 	require(script.Parent.SkateController),
+	-- Before the actions: throws and passes aim along its crosshair's line.
+	require(script.Parent.CameraController),
 	require(script.Parent.ActionController),
 	require(script.Parent.PoseController),
 	require(script.Parent.BallView),
-	require(script.Parent.CameraController),
 	require(script.Parent.TouchControls),
 	require(script.Parent.HudStore),
 	require(script.Parent.Hud),

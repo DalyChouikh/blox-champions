@@ -5,9 +5,10 @@
 -- corner (Config.Input.touch), each working its control through InputController as its keys do; the throw button also
 -- works Ball Focus. On a big screen the stick and the buttons grow, as Roblox's own do (TouchArea), and they follow the
 -- screen's size. Before each frame is drawn (FrameController), every button reads what its control does now
--- (ControlLabels), hiding while it would do nothing, and the throw button rings while Ball Focus is on
--- (CameraController.focusing). A property is written only when it changes. Hiding the controls under a thumb ends that
--- touch.
+-- (ControlLabels), hiding while it would do nothing and greyed (its text faded by UI.hud.dimTransparency) while it
+-- shows but does not work (Magnetic Pass with nobody to pass to, #315), and the throw button rings while Ball Focus is
+-- on (CameraController.focusing). A property is written only when it changes. Hiding the controls under a thumb ends
+-- that touch.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -55,6 +56,7 @@ export type TouchControls = {
 	_enabled: boolean,
 	_texts: { [string]: string },
 	_shown: { [string]: boolean },
+	_fades: { [string]: number },
 	_focusShown: boolean,
 	-- The touch on the pad: where it began, nil while none lasts.
 	_origin: Vector2?,
@@ -95,17 +97,25 @@ local function newButton(control: Config.TouchControl, config: Config.GameConfig
 	return button
 end
 
--- Shows `control`'s button reading `label`, or hides it when there is none.
-local function show(self: TouchControls, control: Config.TouchControl, label: string?)
+-- Shows `control`'s button reading `label`, `greyed` or not, or hides it when there is none.
+local function show(self: TouchControls, control: Config.TouchControl, label: string?, greyed: boolean)
 	local visible = label ~= nil
 	local button = self.buttons[control]
 	if self._shown[control] ~= visible then
 		self._shown[control] = visible
 		button.Visible = visible
 	end
-	if label ~= nil and self._texts[control] ~= label then
+	if label == nil then
+		return
+	end
+	if self._texts[control] ~= label then
 		self._texts[control] = label
 		button.Text = label
+	end
+	local fade = if greyed then self._config.UI.hud.dimTransparency else 0
+	if self._fades[control] ~= fade then
+		self._fades[control] = fade
+		button.TextTransparency = fade
 	end
 end
 
@@ -172,6 +182,7 @@ local TouchControls: TouchControls = {
 	_enabled = false,
 	_texts = {},
 	_shown = {},
+	_fades = {},
 	_focusShown = false,
 	_origin = nil,
 	_stickScale = 1,
@@ -197,6 +208,7 @@ local TouchControls: TouchControls = {
 		self._enabled = false
 		self._texts = {}
 		self._shown = {}
+		self._fades = {}
 		self._focusShown = false
 		self._origin = nil
 		self._stickScale = 1
@@ -299,7 +311,8 @@ local TouchControls: TouchControls = {
 		end
 		local config, actions, skate = self._config, self._actions, self._skate
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
-			show(self, control, ControlLabels.label(control, config, actions, skate))
+			local label, greyed = ControlLabels.label(control, config, actions, skate)
+			show(self, control, label, greyed)
 		end
 		local focusing = self._camera.focusing
 		if focusing ~= self._focusShown then

@@ -1386,6 +1386,13 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   throw from the belly is shown, so that it works there is not proven). Ours: no action until the skater is up.
   **Q154**: **yes, like RC's lit hint**: during their own dive and belly slide the carrier's throw key charges and
   throws as usual; Roll Ball, Pump and Jump stay off (RC greys them). Not chosen: throw once up.
+- **Q155 no Magnetic Pass through an obstacle** (session 61, #315, the owner's words during #315's 2-player Play
+  check, where a pass at a teammate on the other straight met the passer's own inner bank 7 studs out and rolled back
+  loose): "passing through the middle glass shouldn't be possible, so don't show the R icon above players when there
+  is an obstacle between them". So a teammate is a Magnetic Pass's target only while the line between the two
+  skaters is clear of the arena (its floors, banks, walls and glass, the middle glass above all): otherwise no pass
+  key's letter over them, the hint greyed, the key does nothing, and the server refuses such a pass too. Read as a
+  ruling (not asked): players are no obstacle, so opponents can still step into a pass on its way (Q129).
 
 ## Roller Champions
 

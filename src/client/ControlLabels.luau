@@ -1,13 +1,14 @@
 --!strict
 -- What each control does now (spec §11.1), named once for the touch buttons and the HUD's hints: the controls in the
--- order both show them, each one's label from Config.UI.controlLabels (nil while it would do nothing), and the keys
--- that work it. Nothing works without a skater. Jump jumps on the ground and strikes the Air Pose in the air, once
--- until landing (SkateMath), Attach needs a teammate right ahead (SkateController.attachable), and an action key the
--- action it would start now (ActionController:keyAction). While a throw charges (#312) the pump does nothing, and the
--- Dodge reads Cancel & Dodge, as RC's hints read then (Video 32 at 3.2 s). While knocked down or diving
--- (SkateController:controlsLocked) the skating's controls do nothing and the action keys start nothing but a carrier's
--- throw, as RC's hints read through a carrier's dive and slide (#314, Video 33 at 17.6-19.0 s). The throw's control
--- works Ball Focus while it would start no throw: without the ball.
+-- order both show them, each one's label from Config.UI.controlLabels (nil while it would do nothing) and whether it is
+-- greyed, and the keys that work it. Nothing works without a skater. Jump jumps on the ground and strikes the Air Pose
+-- in the air, once until landing (SkateMath), Attach needs a teammate right ahead (SkateController.attachable), and an
+-- action key names the action it would start now (ActionController:keyAction). While a throw charges (#312) the pump
+-- does nothing, and the Dodge reads Cancel & Dodge, as RC's hints read then (Video 32 at 3.2 s). While knocked down or
+-- diving (SkateController:controlsLocked) the skating's controls do nothing and the action keys start nothing but a
+-- carrier's throw, as RC's hints read through a carrier's dive and slide (#314, Video 33 at 17.6-19.0 s). The throw's
+-- control works Ball Focus while it would start no throw: without the ball. With the ball the pass's control reads
+-- Magnetic Pass; with nobody to pass to it shows greyed and does not work, as RC's does (#315, Video 34 at 43.0 s).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -33,39 +34,46 @@ ControlLabels.CONTROLS = table.freeze({
 -- SkateController.attachable).
 local SKATING: { [string]: boolean } = table.freeze({ jump = true, pump = true, brake = true })
 
+-- A control never greyed: lit whenever it shows.
+local function lit(label: string?): (string?, boolean)
+	return label, false
+end
+
+-- What `control` does now: its label (nil while it does nothing, and its button and hint hide), and whether it is
+-- greyed: shown, but doing nothing now (Magnetic Pass with nobody to pass to, #315).
 function ControlLabels.label(
 	control: Config.TouchControl,
 	config: Config.GameConfig,
 	actions: ActionController.ActionController,
 	skate: SkateController.SkateController
-): string?
+): (string?, boolean)
 	local skater = skate.skater
 	if skater == nil or not skate:hasSkater() then
-		return nil
+		return lit(nil)
 	end
 	local labels = config.UI.controlLabels
 	local charging = actions:chargeSeconds() ~= nil
 	if SKATING[control] and skate:controlsLocked() then
-		return nil
+		return lit(nil)
 	elseif control == "jump" then
 		if skater.mode == "Grounded" then
-			return labels.Jump
+			return lit(labels.Jump)
 		end
-		return if skater.mode == "Airborne" and skater.airPoseReady then labels.AirPose else nil
+		return lit(if skater.mode == "Airborne" and skater.airPoseReady then labels.AirPose else nil)
 	elseif control == "pump" then
-		return if charging then nil else labels.Pump
+		return lit(if charging then nil else labels.Pump)
 	elseif control == "brake" then
-		return labels.Brake
+		return lit(labels.Brake)
 	elseif control == "attach" then
-		return if skate.attachable then labels.Attach else nil
+		return lit(if skate.attachable then labels.Attach else nil)
 	end
-	local action = actions:keyAction(control :: Config.ActionKey)
+	local action, ready = actions:keyAction(control :: Config.ActionKey)
 	if action == nil then
-		return if control == "throw" then labels.BallFocus else nil
+		return lit(if control == "throw" then labels.BallFocus else nil)
 	elseif charging and config.Actions[action].effect == "Dodge" then
-		return labels.CancelDodge
+		return lit(labels.CancelDodge)
 	end
-	return labels[action]
+	return labels[action], not ready
 end
 
 -- The keys that work `control` now (Config.Input): Ball Focus's for the throw's control while it would start no throw.

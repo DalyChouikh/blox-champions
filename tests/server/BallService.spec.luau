@@ -13,6 +13,7 @@ local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
 local DropIn = require(ReplicatedStorage.Shared.Ball.DropIn)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Homing = require(ReplicatedStorage.Shared.Ball.Homing)
 local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local SkaterBody = require(game:GetService("ServerScriptService").Server.SkaterBody)
@@ -28,6 +29,8 @@ local STRANDED = config.Ball.strandedSeconds
 local ON_TRACK = Vector3.new(0, 3, -60)
 -- How far from a skater's middle the server hands them a loose ball (#311): the magnet plus the lag tolerance.
 local REACH = config.Ball.pickupRadius + config.Network.pickupLagToleranceStuds
+-- How hard a pass homes (#315, the owner's trial: Q139).
+local HOMING = (config.Actions.Pass.pass :: Config.PassSettings).homingAccel
 -- The fastest a throw ever leaves the hand: a full charge plus its share of the carrier's speed, which the movement
 -- guard holds to its limit.
 local THROW = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
@@ -317,7 +320,7 @@ describe("BallService", function()
 		expect(thrown()).toBe(true)
 		catch()
 		expect(thrown()).toBeNil()
-		BallService:pass("A", Vector3.new(0, 0, 30), nil)
+		BallService:pass("A", Vector3.new(0, 0, 30), "B")
 		expect(thrown()).toBe(true)
 		BallService:spawn()
 		expect(thrown()).toBeNil()
@@ -557,15 +560,30 @@ describe("BallService", function()
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -limit))
 	end)
 
-	it("homes a pass on its target", function()
+	-- A pass leads its receiver (#315): it homes on where they will be when it gets there (Homing.lead), from their
+	-- velocity as their client reports it, held to what the movement guard allows.
+	it("homes a pass on where its target will be when it gets there", function()
 		local a = caughtBy("A")
 		local b = Fixtures.rig(folder, "B", CFrame.new(BallService.part.Position + Vector3.new(20, 0, -30)))
-		BallService:pass("A", Vector3.new(0, 0, -90), "B")
+		BallService:pass("A", Vector3.new(0, 0, -100), "B")
 		expect(BallService.state.status).toBe("Flying")
 		local root = Fixtures.root(b)
-		local turn = (root.Position - BallService.part.Position).Unit * 60 * 0.1
+		local turn = (root.Position - BallService.part.Position).Unit * HOMING * 0.1
 		BallService:step(0.1, { holder("A", a), holder("B", b) })
-		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -90) + turn)
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -100) + turn)
+		local limit = MovementCheck.speedLimit(config.Movement, config.Network)
+		for _, run in { Vector3.new(30, 0, 0), Vector3.new(10000, 0, 0) } do
+			local position = BallService.part.Position
+			local velocity = BallService.part.AssemblyLinearVelocity
+			root.AssemblyLinearVelocity = run
+			local seen = run.Unit * math.min(run.Magnitude, limit)
+			local meet = Homing.lead(position, velocity.Magnitude, HOMING, root.Position, seen)
+			BallService:step(0.1, { holder("A", a), holder("B", b) })
+			Fixtures.expectNear(
+				BallService.part.AssemblyLinearVelocity,
+				velocity + (meet - position).Unit * HOMING * 0.1
+			)
+		end
 	end)
 
 	it("stops homing when the target can no longer catch", function()
@@ -592,8 +610,9 @@ describe("BallService", function()
 
 	it("flies a pass flat against gravity until it lands, and a plain throw falls", function()
 		local a = caughtBy("A")
+		local b = Fixtures.rig(folder, "B", CFrame.new(Fixtures.root(a).Position + Vector3.new(0, 0, -100)))
 		expect(weightless()).toBe(false)
-		BallService:pass("A", Vector3.new(0, 0, -90), nil)
+		BallService:pass("A", Vector3.new(0, 0, -90), "B")
 		expect(weightless()).toBe(true)
 		-- As strong as the free ball's weight in the world's gravity (#279), upward, at its center (a welded massless
 		-- part weighs 0 by GetMass).
@@ -601,7 +620,7 @@ describe("BallService", function()
 		Fixtures.expectNear(lift.Force, Vector3.new(0, BallService.part:GetMass() * config.World.gravity, 0))
 		expect(lift.RelativeTo).toBe(Enum.ActuatorRelativeTo.World)
 		expect(lift.ApplyAtCenterOfMass).toBe(true)
-		BallService:step(1 / 60, { holder("A", a) })
+		BallService:step(1 / 60, { holder("A", a), holder("B", b) })
 		expect(weightless()).toBe(true)
 		local wall = Instance.new("Part")
 		wall.Parent = folder
@@ -622,41 +641,41 @@ describe("BallService", function()
 		local bRoot = Fixtures.root(b)
 		local c = Fixtures.rig(folder, "C", CFrame.new(aRoot.Position + Vector3.new(0, 0, 30)))
 		local cRoot = Fixtures.root(c)
-		local function passFromA(target: string?)
+		local function passFromA()
 			BallService.part.CFrame = CFrame.new(aRoot.Position)
 			BallService:step(config.Ball.rethrowPickupDelay, { holder("A", a) })
 			assert(BallService.state.carrier == "A", "A should carry the ball")
-			BallService:pass("A", Vector3.new(0, 0, -90), target)
+			BallService:pass("A", Vector3.new(0, 0, -90), "B")
 			assert(weightless(), "a pass should fly flat")
 		end
 		-- Caught by its receiver.
-		passFromA("B")
+		passFromA()
 		BallService.part.CFrame = CFrame.new(bRoot.Position)
 		BallService:step(1 / 60, { holder("A", a), holder("B", b) })
 		expect(BallService.state.carrier).toBe("B")
 		expect(weightless()).toBe(false)
-		-- Touching a knocked-down body.
-		BallService:pass("B", Vector3.new(0, 0, 90), nil)
+		-- Touching a knocked-down body on its way to A.
+		BallService:pass("B", Vector3.new(0, 0, 90), "A")
 		BallService.part.CFrame = CFrame.new(cRoot.Position + Vector3.new(3, 0, 0))
-		BallService:step(1 / 60, { holder("B", b), holder("C", c, false) })
+		BallService:step(1 / 60, { holder("A", a), holder("B", b), holder("C", c, false) })
 		expect(weightless()).toBe(false)
 		-- Its receiver knocked down.
-		passFromA("B")
+		passFromA()
 		BallService:step(1 / 60, { holder("A", a), holder("B", b, false) })
 		expect(weightless()).toBe(false)
 		-- Back in play from a spawn: a drop, homing on no one (#321).
-		passFromA("B")
+		passFromA()
 		BallService:spawn()
 		BallService:step(0.1, { holder("A", a), holder("B", b) })
 		local dropping = BallService.part
 		local dropVelocity = DropIn.velocity(config.Arena, config.Ball, dropping.Position)
 		Fixtures.expectNear(dropping.AssemblyLinearVelocity, dropVelocity)
 		-- Dead after a point, or hidden for a kickoff.
-		passFromA(nil)
+		passFromA()
 		BallService:kill()
 		expect(weightless()).toBe(false)
 		BallService:spawn()
-		passFromA(nil)
+		passFromA()
 		BallService:hide()
 		expect(weightless()).toBe(false)
 	end)
@@ -783,12 +802,41 @@ describe("BallService", function()
 		ball.AssemblyLinearVelocity = Vector3.new(20, 0, 0)
 		BallService:step(0.5, {})
 		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(20, 0, 0))
-		-- A pass skimming the floor, its weight cancelled.
+		-- A pass skimming the floor, its weight cancelled, homing straight on toward a receiver far along its way.
 		local rig = Fixtures.rig(folder, "A", CFrame.new(ON_TRACK))
 		BallService:step(1 / 60, { holder("A", rig) })
-		BallService:pass("A", Vector3.new(30, 0, 0), nil)
-		BallService:step(0.5, {})
-		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(30, 0, 0))
+		BallService:pass("A", Vector3.new(30, 0, 0), "B")
+		local receiver = Fixtures.rig(folder, "B", CFrame.new(ball.Position + Vector3.new(300, 0, 0)))
+		BallService:step(0.5, { holder("B", receiver) })
+		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(30 + HOMING * 0.5, 0, 0))
+	end)
+
+	-- RC (Q105): a pass into glass bounces off and is loose. Its centre crossing the pane in one frame, the ball goes
+	-- back where it was, bounced off it, and the pass's lift and homing end (the anti-tunnel guard of #311).
+	it("ends a pass that meets glass on its way: bounced off it, loose, homing on no one", function()
+		local a = caughtBy("A")
+		local ball = BallService.part
+		local b = Fixtures.rig(folder, "B", CFrame.new(Fixtures.root(a).Position + Vector3.new(0, 0, -40)))
+		local glass = Instance.new("Part")
+		glass.Name = "Glass"
+		glass.Anchored = true
+		glass.Size = Vector3.new(40, 40, 0.5)
+		glass.CFrame = CFrame.new(Fixtures.root(a).Position + Vector3.new(0, 0, -20))
+		glass.Parent = arena
+		BallService:pass("A", Vector3.new(0, 0, -100), "B")
+		local holders = { holder("A", a), holder("B", b) }
+		BallService:step(1 / 60, holders)
+		local before = ball.Position
+		-- One frame carries its centre through the pane.
+		ball.CFrame = CFrame.new(before + Vector3.new(0, 0, -25))
+		BallService:step(1 / 60, holders)
+		Fixtures.expectNear(ball.Position, before)
+		expect(ball.AssemblyLinearVelocity.Z).toBeGreaterThan(0)
+		expect(weightless()).toBe(false)
+		expect(BallService.state.status).toBe("Loose")
+		local bounced = ball.AssemblyLinearVelocity
+		BallService:step(0.1, holders)
+		Fixtures.expectNear(ball.AssemblyLinearVelocity, bounced)
 	end)
 
 	-- Roblox's physics lets a fast small ball through a thin part (measured for #311: a 1-stud ball crossed the 1-stud

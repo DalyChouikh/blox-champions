@@ -23,6 +23,8 @@ local DT = 1 / 60
 local PHONE, BIG = Fixtures.PHONE, Fixtures.BIG_SCREEN
 
 local folder: Folder
+-- The other skaters the skating sees, reset before each test.
+local skaters: { any }
 local preferred: Enum.PreferredInput
 local screen: Fixtures.Screen
 -- The Switch team requests the Hud sent.
@@ -78,7 +80,8 @@ beforeEach(function()
 	preferred = Enum.PreferredInput.KeyboardAndMouse
 	screen = PHONE
 	switches = 0
-	Fixtures.startSkating(folder, config, LOCAL_ID)
+	skaters = {}
+	Fixtures.startSkating(folder, config, LOCAL_ID, skaters)
 	HudStore:init({ Config = config, LocalId = LOCAL_ID })
 	HudStore:onSnapshot(Fixtures.matchSnapshot())
 	Hud:init({
@@ -203,6 +206,57 @@ describe("Hud", function()
 		rig:Destroy()
 		Hud:step(0)
 		expect(part("ControlHints")).toBeNil()
+	end)
+
+	-- Magnetic Pass (#315, the owner: Q103): RC fades the whole row with nobody in the aim (Video 34 at 43.0 s); ours
+	-- by the HUD's dim, as the score tab's greyed Switch team (Q118).
+	it("greys the Magnetic Pass hint with nobody in the aim, and lights it with a teammate there", function()
+		local dim = config.UI.hud.dimTransparency
+		Fixtures.spawnSkater(folder, config)
+		BallCarrier:set(LOCAL_ID)
+		ActionController:step(DT)
+		Hud:step(0)
+		local hints = part("ControlHints")
+		expect(hints.pass.Visible).toBe(true)
+		expect(hints.pass.Label.Text).toBe(config.UI.controlLabels.Pass)
+		expect(hints.pass.Label.TextTransparency).toBeCloseTo(dim, 4)
+		expect(hints.pass.Key.TextTransparency).toBeCloseTo(dim, 4)
+		expect(hints.throw.Label.TextTransparency).toBe(0)
+		expect(hints.throw.Key.TextTransparency).toBe(0)
+		table.insert(
+			skaters,
+			(Fixtures.otherSkater(folder, "2", Vector3.new(0, config.Movement.hoverHeight, -40), "Blue"))
+		)
+		ActionController:step(DT)
+		Hud:step(0)
+		expect(hints.pass.Label.TextTransparency).toBe(0)
+		expect(hints.pass.Key.TextTransparency).toBe(0)
+		-- A gamepad's glyph fades the same way.
+		table.clear(skaters)
+		ActionController:step(DT)
+		preferred = Enum.PreferredInput.Gamepad
+		Hud:step(0)
+		expect(part("ControlHints").pass.Glyph.ImageTransparency).toBeCloseTo(dim, 4)
+	end)
+
+	-- The letter NameTags shows over a pass's target (#315; RC Video 34 at 41.6 s): the pass hint's own key, or on
+	-- touch, where no key shows, the touch mark.
+	it("names the pass key as the hints show it, for the mark over a pass's target", function()
+		Hud:step(0)
+		expect(Hud.passKey).toBeNil()
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		expect(Hud.passKey).toBeNil()
+		preferred = Enum.PreferredInput.KeyboardAndMouse
+		Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		expect(Hud.passKey).toEqual({ text = "R" })
+		preferred = Enum.PreferredInput.Gamepad
+		Hud:step(0)
+		expect(Hud.passKey).toEqual({ image = keyImage(Enum.KeyCode.ButtonY) })
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		expect(Hud.passKey).toEqual({ text = config.UI.text.touchPassTarget })
 	end)
 
 	-- Roller Champions' Get Up (#220): moving gets a knocked-down skater up sooner.

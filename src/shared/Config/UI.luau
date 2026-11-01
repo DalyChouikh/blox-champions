@@ -84,6 +84,8 @@ export type UIText = {
 	unknownPlayer: string,
 	-- Over a teammate calling for the ball.
 	callPass: string,
+	-- Over the teammate a pass would go to, on touch, where no key letter shows (#315).
+	touchPassTarget: string,
 	-- The Get Up prompt's key on touch, where the stick has none.
 	touchMove: string,
 	-- The score tab's button that moves the player to the other team (#310).
@@ -222,7 +224,8 @@ local defaults: UIConfig = {
 		-- RC's hints while a throw charges (#312; Video 32 at 3.2 s).
 		RollBall = "Roll Ball",
 		CancelDodge = "Cancel & Dodge",
-		Pass = "Pass",
+		-- RC's name for it (#315, the owner: Q103; Video 34 at 41.6 s).
+		Pass = "Magnetic Pass",
 		CallPass = "Call",
 		BallFocus = "Focus",
 		GetUp = "Get Up",
@@ -279,6 +282,9 @@ local defaults: UIConfig = {
 		unknownPlayer = "Player",
 		-- A raised hand.
 		callPass = "\u{270B}",
+		-- A down-pointing triangle: RC floats the pass key's letter there (Video 34 at 41.6 s); a touch screen has
+		-- none.
+		touchPassTarget = "\u{25BC}",
 		touchMove = "Move",
 		switchTeam = "Switch team",
 	},
@@ -513,6 +519,7 @@ local fields = Validate.record({
 		}),
 		unknownPlayer = label,
 		callPass = label,
+		touchPassTarget = label,
 		touchMove = label,
 		switchTeam = label,
 	}),

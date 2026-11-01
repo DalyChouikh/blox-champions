@@ -22,6 +22,8 @@ local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
 local config = Config.defaults()
 local movement = config.Movement
+-- A root standing on the floor.
+local HOVER = movement.hoverHeight
 -- The Tackle's Dive (#240).
 local FOLLOW_UP = config.Actions.Tackle.followUp :: Config.FollowUp
 -- The line a diver facing -Z flies along (#241): fallLineDeg below the facing.
@@ -29,10 +31,10 @@ local FALL_LINE = Vector3.new(0, -math.sin(math.rad(movement.fallLineDeg)), -mat
 local DT = 1 / 60
 -- One charge, ChargeThrow's: a roll spends it too (#312).
 local THROW = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
--- The crosshair's height on the screen, as a share of it from the top (#312).
-local CROSSHAIR = config.UI.hud.layout.reticle.height
+-- Magnetic Pass (#315): its cone and range.
+local PASS = config.Actions.Pass.pass :: Config.PassSettings
 -- Where the camera's ray through the crosshair goes: above its look, unlike any of its own axes.
-local AIM = Vector3.new(0, 0.26, -0.97)
+local AIM = Vector3.new(0, 0.26, -0.97).Unit
 -- Looking toward -Z from behind the skater, so the skater's right is the camera's right, +X.
 local CAMERA = Fixtures.camera(CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(0, 5, 0)), AIM)
 local LOCAL_ID = "1"
@@ -87,6 +89,16 @@ local function wallAhead(): BasePart
 	return wall
 end
 
+-- A pane standing on the floor 20 studs ahead along -Z, 4 studs wide and taller than any skater (#315 Q155: what hides
+-- a teammate from a pass, as the middle glass does).
+local function paneAhead(): BasePart
+	local pane = Instance.new("Part")
+	pane.Anchored = true
+	pane.Size = Vector3.new(4, 20, 0.5)
+	pane.CFrame = CFrame.new(0, 10, -20)
+	return pane
+end
+
 -- The controllers over a floor, on a skater facing -Z. `surfaces` become ride surfaces too, before the rays read them.
 local function setup(surfaces: { BasePart }?)
 	local floor = Instance.new("Part")
@@ -139,17 +151,8 @@ end
 -- Another skater standing at `position` (an Orange opponent unless `team` says otherwise): a character with a
 -- root, as the skating's views show the other players.
 local function standing(name: string, position: Vector3, team: string?): Model
-	local character = Instance.new("Model")
-	character.Name = name
-	local root = Instance.new("Part")
-	root.Name = "HumanoidRootPart"
-	root.Anchored = true
-	root.CanCollide = false
-	root.Size = Vector3.new(2, 2, 1)
-	root.Position = position
-	root.Parent = character
-	character.Parent = folder
-	table.insert(others, { player = name, team = team or "Orange", root = root })
+	local view, character = Fixtures.otherSkater(folder, name, position, team or "Orange")
+	table.insert(others, view)
 	return character
 end
 
@@ -214,12 +217,10 @@ local function names(): { [string]: string }
 	return found
 end
 
--- A request's aim went through the crosshair (#312, Q123/Q127): the camera's ray through the screen's point
--- centred across it and the crosshair's height down it.
+-- A request's aim went along the crosshair's line (#312, Q123/Q127), as the camera gives it (CameraController:
+-- crosshair, #315).
 local function expectAimedThroughCrosshair(request: { [string]: any })
-	local asked = CAMERA.asked[#CAMERA.asked]
-	expect(asked.X).toBeCloseTo(0.5 * CAMERA.ViewportSize.X, 3)
-	expect(asked.Y).toBeCloseTo(CROSSHAIR * CAMERA.ViewportSize.Y, 3)
+	expect(CAMERA.crosshairs).toBeGreaterThan(0)
 	Fixtures.expectNear(request.aim, AIM, 1e-6)
 end
 
@@ -231,7 +232,7 @@ beforeEach(function()
 	bindings = {}
 	others = {}
 	arenaParts.parts = nil
-	table.clear(CAMERA.asked)
+	CAMERA.crosshairs = 0
 end)
 afterEach(function()
 	InputController:destroy()
@@ -679,6 +680,7 @@ describe("ActionController", function()
 	-- RC greys Magnetic Pass while a throw charges (Q140, Video 32 at 2.6-3.2 s): the pass key does nothing.
 	it("never passes while a throw charges, and the charge goes on", function()
 		setup()
+		standing("Mate", Vector3.new(0, HOVER, -40), "Blue")
 		charging(5)
 		press("Pass")
 		frame()
@@ -761,6 +763,7 @@ describe("ActionController", function()
 
 	it("predicts the ball leaving with a pass, and takes it back if the pass is refused", function()
 		setup()
+		standing("Mate", Vector3.new(0, HOVER, -40), "Blue")
 		BallCarrier:set(LOCAL_ID)
 		press("Pass")
 		frame()
@@ -781,6 +784,7 @@ describe("ActionController", function()
 
 	it("passes with the ball and calls for one without", function()
 		setup()
+		standing("Mate", Vector3.new(0, HOVER, -40), "Blue")
 		BallCarrier:set(LOCAL_ID)
 		press("Pass")
 		frame()
@@ -791,6 +795,114 @@ describe("ActionController", function()
 		expect(requests[1].action).toBe("Pass")
 		expectAimedThroughCrosshair(requests[1])
 		expect(requests[2]).toEqual({ action = "CallPass" })
+	end)
+
+	-- Magnetic Pass, RC's way (#315, the owner: Q103, Q105; Video 34 at 41.6-43.2 s): with the ball the pass key names
+	-- the teammate nearest the crosshair's line within the cone and the range; with nobody there it is greyed and does
+	-- nothing.
+	it("passes only to a teammate in the crosshair's cone and range, and names them while carrying", function()
+		setup()
+		BallCarrier:set(LOCAL_ID)
+		frame()
+		local action, ready = ActionController:keyAction("pass")
+		expect(action).toBe("Pass")
+		expect(ready).toBe(false)
+		expect(ActionController:passTarget()).toBeNil()
+		press("Pass")
+		frame()
+		expect(requests).toEqual({})
+		expect(BallCarrier.carrier).toBe(LOCAL_ID)
+		-- An opponent in the aim, a teammate behind, a teammate past the range: still nobody.
+		standing("Opponent", Vector3.new(0, HOVER, -20))
+		standing("Behind", Vector3.new(0, HOVER, 20), "Blue")
+		standing("Far", Vector3.new(0, HOVER, -(PASS.maxRange + 5)), "Blue")
+		frame()
+		expect(ActionController:passTarget()).toBeNil()
+		-- A teammate 20 deg off the crosshair's line.
+		standing("Mate", Vector3.new(10, HOVER, -40), "Blue")
+		frame()
+		action, ready = ActionController:keyAction("pass")
+		expect(action).toBe("Pass")
+		expect(ready).toBe(true)
+		expect(ActionController:passTarget()).toBe("Mate")
+		press("Pass")
+		frame()
+		expect(requests[1].action).toBe("Pass")
+		expectAimedThroughCrosshair(requests[1])
+		expect(BallCarrier.carrier).toBeNil()
+		-- Without the ball the key calls for it, and names no target.
+		frame()
+		expect(ActionController:passTarget()).toBeNil()
+		expect((ActionController:keyAction("pass"))).toBe("CallPass")
+	end)
+
+	-- The server's own rule (PassTarget.choose): a caller in the cone first, the latest of two by the call's time that
+	-- their CallingPass holds; nobody knocked down catches.
+	it("names a teammate calling in the cone first, the latest caller of two, and nobody who is down", function()
+		setup()
+		BallCarrier:set(LOCAL_ID)
+		local onLine = standing("OnLine", Vector3.new(0, HOVER, -40), "Blue")
+		local right = standing("Right", Vector3.new(30, HOVER, -40), "Blue")
+		frame()
+		expect(ActionController:passTarget()).toBe("OnLine")
+		right:SetAttribute(Attributes.CallingPass, 12.5)
+		frame()
+		expect(ActionController:passTarget()).toBe("Right")
+		onLine:SetAttribute(Attributes.CallingPass, 13)
+		frame()
+		expect(ActionController:passTarget()).toBe("OnLine")
+		right:SetAttribute(Attributes.CallingPass, 14)
+		frame()
+		expect(ActionController:passTarget()).toBe("Right")
+		right:SetAttribute(Attributes.KnockedDown, "Hit")
+		frame()
+		expect(ActionController:passTarget()).toBe("OnLine")
+		onLine:SetAttribute(Attributes.KnockedDown, "Hit")
+		frame()
+		expect(ActionController:passTarget()).toBeNil()
+	end)
+
+	-- The owner (Q155): no pass through the middle glass, nor anything else of the arena between the two skaters: no
+	-- letter over a teammate the ride surfaces hide, the key greyed and doing nothing.
+	it("names no teammate the arena hides from the skater, a caller neither", function()
+		setup({ paneAhead() })
+		BallCarrier:set(LOCAL_ID)
+		local hidden = standing("Hidden", Vector3.new(0, HOVER, -40), "Blue")
+		hidden:SetAttribute(Attributes.CallingPass, 12.5)
+		frame()
+		expect(ActionController:passTarget()).toBeNil()
+		local _, ready = ActionController:keyAction("pass")
+		expect(ready).toBe(false)
+		press("Pass")
+		frame()
+		expect(requests).toEqual({})
+		-- One in the open beside them: the line to them crosses the pane's plane 7.5 studs aside.
+		standing("Open", Vector3.new(15, HOVER, -40), "Blue")
+		frame()
+		expect(ActionController:passTarget()).toBe("Open")
+	end)
+
+	-- RC greys Magnetic Pass while a throw charges (Q140) and through a carrier's dive (Q154): no target is named then.
+	it("names no pass target while a throw charges or the controls are locked", function()
+		setup()
+		standing("Mate", Vector3.new(0, HOVER, -40), "Blue")
+		BallCarrier:set(LOCAL_ID)
+		frame()
+		expect(ActionController:passTarget()).toBe("Mate")
+		local skate: any = SkateController
+		for _, field in { "diving", "knockedDown" } do
+			skate[field] = true
+			expect(ActionController:passTarget()).toBeNil()
+			skate[field] = false
+		end
+		-- Held still (a kickoff's hold): the actions' step names nobody.
+		skate.frozen = true
+		actionsOnly()
+		expect(ActionController:passTarget()).toBeNil()
+		skate.frozen = false
+		charging(2)
+		expect(ActionController:passTarget()).toBeNil()
+		expect((ActionController:keyAction("pass"))).toBeNil()
 	end)
 
 	-- Roller Champions' uppercut launches on flat floor, away from any wall (#219): 89.81 studs/s up, about 31 studs at
@@ -899,14 +1011,14 @@ describe("ActionController", function()
 		setup()
 		press("Tackle")
 		actionsOnly()
-		expect(ActionController:keyAction("tackle")).toBe("Tackle")
+		expect((ActionController:keyAction("tackle"))).toBe("Tackle")
 		intoWindow(actionsOnly)
-		expect(ActionController:keyAction("tackle")).toBe("Dive")
+		expect((ActionController:keyAction("tackle"))).toBe("Dive")
 		-- Past the window, which closes as the tackle's cooldown ends (both at 1 s).
 		for _ = 1, math.ceil((FOLLOW_UP.to - FOLLOW_UP.from) / DT) do
 			actionsOnly()
 		end
-		expect(ActionController:keyAction("tackle")).toBe("Tackle")
+		expect((ActionController:keyAction("tackle"))).toBe("Tackle")
 		press("Tackle")
 		actionsOnly()
 		expect(requests).toEqual({ { action = "Tackle" }, { action = "Tackle" } })
@@ -934,7 +1046,6 @@ describe("ActionController", function()
 end)
 
 describe("ActionController's magnetic strikes (#277)", function()
-	local HOVER = movement.hoverHeight
 	-- One step's turn at the Tackle's turn rate, in degrees: 300 deg/s over 1/60 s.
 	local TACKLE_STEP = (config.Actions.Tackle.seek :: Config.Seek).turnDegPerSecond * DT
 

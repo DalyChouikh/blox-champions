@@ -35,6 +35,7 @@ export type HudBindings = {
 	clock: React.Binding<string>,
 	speed: React.Binding<string>,
 	labels: ControlHints.HintLabels,
+	fades: ControlHints.HintFades,
 	-- The HUD's stage in pixels, where the banner, the feed, the score tab and the end screen centre and fit; zero
 	-- until it is known.
 	stage: React.Binding<Vector2>,
@@ -96,7 +97,12 @@ local function App(props: AppProps): React.ReactElement
 				})
 				else nil,
 			ControlHints = if keys ~= nil
-				then React.createElement(ControlHints, { config = config, keys = keys, labels = bindings.labels })
+				then React.createElement(ControlHints, {
+					config = config,
+					keys = keys,
+					labels = bindings.labels,
+					fades = bindings.fades,
+				})
 				else nil,
 			Speedometer = React.createElement(Speedometer, {
 				config = config,

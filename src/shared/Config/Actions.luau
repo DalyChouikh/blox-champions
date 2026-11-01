@@ -71,12 +71,9 @@ export type ThrowSettings = {
 export type PassSettings = {
 	speed: number,
 	homingAccel: number,
-	-- Without a caller, a pass goes to the best teammate within coneDeg of the aim and maxRange, scored by
-	-- angleWeight × (1 − angle / coneDeg) + distanceWeight × (1 − distance / maxRange).
+	-- A pass goes only to a teammate within coneDeg of the aim and maxRange (PassTarget, #315).
 	coneDeg: number,
 	maxRange: number,
-	angleWeight: number,
-	distanceWeight: number,
 }
 export type ActionConfig = {
 	phases: Phases,
@@ -284,7 +281,16 @@ local defaults: ActionsConfig = {
 		requires = requires("with", nil, "notCharging"),
 		effect = "Pass",
 		pose = "None",
-		pass = { speed = 90, homingAccel = 60, coneDeg = 70, maxRange = 120, angleWeight = 0.6, distanceWeight = 0.4 },
+		pass = {
+			-- The owner's trial on the smooth ball (Q139: #316's 2-player test, my bot passing to them 8 times) kept
+			-- 100 (was 90); 150 felt instant and nobody could step into it (Q129), 90 with homing 150 too slow (Q131).
+			speed = 100,
+			-- The same trial: homing 150 (was 60), so a pass 40 studs out reaches a still teammate in 0.28 s at ~142.
+			homingAccel = 150,
+			-- Magnetic Pass (#315, Q105): a teammate within 70 deg of the aim and 120 studs (20 body lengths).
+			coneDeg = 70,
+			maxRange = 120,
+		},
 	},
 	CallPass = {
 		phases = INSTANT,
@@ -324,20 +330,12 @@ local throw = Validate.check(
 	end,
 	"maxSpeed must be at least minSpeed"
 )
-local pass = Validate.check(
-	Validate.record({
-		speed = positive,
-		homingAccel = nonNegative,
-		coneDeg = cone,
-		maxRange = positive,
-		angleWeight = nonNegative,
-		distanceWeight = nonNegative,
-	}),
-	function(settings: PassSettings): boolean
-		return settings.angleWeight + settings.distanceWeight > 0
-	end,
-	"angleWeight + distanceWeight must be above 0"
-)
+local pass = Validate.record({
+	speed = positive,
+	homingAccel = nonNegative,
+	coneDeg = cone,
+	maxRange = positive,
+})
 
 -- Every action's name as a plain string: Luau tables are invariant, so { ActionName } is not the { string } that
 -- oneOf takes.

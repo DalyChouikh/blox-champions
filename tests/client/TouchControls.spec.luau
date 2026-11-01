@@ -33,6 +33,8 @@ local ACTIONS: { { control: Config.TouchControl, action: string } } = {
 }
 
 local folder: Folder
+-- The other skaters the skating sees, reset before each test.
+local others: { any }
 local preferred: Enum.PreferredInput
 local screen: Vector2
 -- The camera as TouchControls reads it: whether Ball Focus is on.
@@ -72,7 +74,8 @@ beforeEach(function()
 	preferred = Enum.PreferredInput.Touch
 	screen = Vector2.new(800, 400)
 	camera = { focusing = false }
-	Fixtures.startSkating(folder, config, LOCAL_ID)
+	others = {}
+	Fixtures.startSkating(folder, config, LOCAL_ID, others)
 	Fixtures.spawnSkater(folder, config)
 	TouchControls:init({
 		Config = config,
@@ -210,6 +213,25 @@ describe("TouchControls", function()
 		SkateController.attachable = true
 		TouchControls:step(DT)
 		expect(button("attach").Visible).toBe(true)
+	end)
+
+	-- Magnetic Pass (#315, the owner: Q103): the button stays with nobody in the aim, greyed (its text faded by the
+	-- HUD's dim, as the hint's), and does nothing; lit with a teammate there.
+	it("greys the pass button with nobody to pass to", function()
+		BallCarrier:set(LOCAL_ID)
+		ActionController:step(DT)
+		TouchControls:step(DT)
+		expect(button("pass").Visible).toBe(true)
+		expect(button("pass").Text).toBe(labels.Pass)
+		expect(button("pass").TextTransparency).toBeCloseTo(config.UI.hud.dimTransparency, 4)
+		expect(button("throw").TextTransparency).toBe(0)
+		table.insert(
+			others,
+			(Fixtures.otherSkater(folder, "2", Vector3.new(0, config.Movement.hoverHeight, -40), "Blue"))
+		)
+		ActionController:step(DT)
+		TouchControls:step(DT)
+		expect(button("pass").TextTransparency).toBe(0)
 	end)
 
 	it("rings the throw button while Ball Focus is on", function()

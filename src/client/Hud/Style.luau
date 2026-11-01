@@ -12,6 +12,8 @@ local Team = require(ReplicatedStorage.Shared.Rules.Team)
 export type Props = { [any]: any }
 -- One key as the HUD shows it: the name the player's own keyboard gives it, or Roblox's glyph on a gamepad.
 export type KeyView = { text: string?, image: string? }
+-- How see-through a greyed part's text or glyph is: a number, or a binding that follows the play.
+export type Fade = number | React.Binding<number>
 
 local Style = {}
 
@@ -128,7 +130,7 @@ function Style.key(
 	view: KeyView,
 	height: number,
 	order: number,
-	fade: number?
+	fade: Fade?
 ): (string, React.ReactElement)
 	local size = UDim2.fromOffset(height, height)
 	if view.image ~= nil then
@@ -165,7 +167,7 @@ function Style.label(
 	config: Config.GameConfig,
 	text: string | React.Binding<string>,
 	order: number,
-	fade: number?
+	fade: Fade?
 ): React.ReactElement
 	return React.createElement(
 		"TextLabel",

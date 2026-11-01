@@ -14,6 +14,7 @@ local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local CharacterService = require(ServerScriptService.Server.CharacterService)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Homing = require(ReplicatedStorage.Shared.Ball.Homing)
 local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Schemas = require(ReplicatedStorage.Shared.Net.Schemas)
@@ -23,6 +24,8 @@ local TeamService = require(ServerScriptService.Server.TeamService)
 local defaults = Fixtures.config()
 -- Get Up's own tests ask for it sooner than the whole slide (#287), so its rules still show.
 local earlyGetUp = Fixtures.config({ Actions = { getUpAfter = 0.5 } })
+-- A mode whose pass has a cooldown: a refused pass must give it back (#315).
+local passCooldown = Fixtures.config({ Actions = { Pass = { cooldown = 1 } } })
 -- The config every service starts with (beforeEach).
 local config = defaults
 local throwSettings = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
@@ -138,6 +141,16 @@ end)
 local function stand(id: string, offset: Vector3)
 	rigs[id]:PivotTo(CFrame.new(ON_TRACK + offset))
 	CharacterService.placed:Fire(id)
+end
+
+-- A pane of the arena (one of its ride surfaces, as the middle glass is) standing on the floor `offset` from the track
+-- spot, 4 studs wide across Z and taller than any skater.
+local function pane(offset: Vector3)
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.Size = Vector3.new(4, 20, 0.5)
+	part.CFrame = CFrame.new(ON_TRACK.X + offset.X, 10, ON_TRACK.Z + offset.Z)
+	part.Parent = folder:FindFirstChild("Floor")
 end
 
 -- `id`'s root moving at `speed` along -Z, as their client's physics reports it: a diver's slide (#242).
@@ -381,20 +394,99 @@ describe("ActionService", function()
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, limit))
 	end)
 
-	it("passes to the teammate who called", function()
-		local a, b = blue[1], blue[2]
+	-- Magnetic Pass (#315, the owner: Q103, Q105): a teammate in the aim's direction, a caller there first.
+	it("passes to a teammate who called in the aim's cone first, else the one nearest the aim's line", function()
+		local a, b, c = blue[1], blue[2], blue[3]
+		local aim = Vector3.new(0, 0, -1)
 		stand(a, Vector3.zero)
-		stand(b, Vector3.new(0, 0, -40))
+		-- 26.6 deg off the aim, and on its line.
+		stand(b, Vector3.new(20, 0, -40))
+		stand(c, Vector3.new(0, 0, -50))
 		giveBall(a)
+		advance(0.5)
 		ActionService:request(b, { action = "CallPass" })
-		expect(attribute(b, Attributes.CallingPass)).toBe(true)
-		ActionService:request(a, { action = "Pass", aim = Vector3.xAxis })
+		-- The call's time on the service's clock, so every client ranks two callers as the server does.
+		expect(attribute(b, Attributes.CallingPass)).toBeCloseTo(0.5, 6)
+		ActionService:request(a, { action = "Pass", aim = aim })
 		local velocity = BallService.part.AssemblyLinearVelocity
-		expect(velocity.Magnitude).toBeCloseTo(90, 3)
+		expect(velocity.Magnitude).toBeCloseTo(100, 3)
 		Fixtures.expectNear(velocity.Unit, (Fixtures.root(rigs[b]).Position - BallService.part.Position).Unit)
 		-- The call ends after its window.
 		advance(config.Actions.callPassWindow + 0.1)
 		expect(attribute(b, Attributes.CallingPass)).toBeNil()
+		-- With no caller, the teammate nearest the aim's line.
+		giveBall(a)
+		ActionService:request(a, { action = "Pass", aim = aim })
+		local toC = (Fixtures.root(rigs[c]).Position - BallService.part.Position).Unit
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, toC)
+		expect(rejected(a)).toEqual({})
+	end)
+
+	-- RC greys Magnetic Pass with nobody in the aim (Q103), so the client sends none; a pass the server's own look
+	-- finds nobody for (lag at the cone's edge) is refused, and the ball stays.
+	it("refuses a pass with no teammate who can catch in the aim's cone and range", function()
+		local a, b, c = blue[1], blue[2], blue[3]
+		local d = orange[1]
+		stand(a, Vector3.zero)
+		-- A caller behind, a teammate knocked down ahead, an opponent ahead, a teammate past the range.
+		stand(b, Vector3.new(0, 0, 40))
+		stand(c, Vector3.new(0, 0, -30))
+		stand(d, Vector3.new(0, 0, -20))
+		giveBall(a)
+		ActionService:request(b, { action = "CallPass" })
+		rigs[c]:SetAttribute(Attributes.KnockedDown, "Hit")
+		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, -1) })
+		expect(rejected(a)).toEqual({ "Pass" })
+		expect(BallService.state.carrier).toBe(a)
+		rigs[c]:SetAttribute(Attributes.KnockedDown, nil)
+		stand(c, Vector3.new(0, 0, -(config.Actions.Pass.pass :: Config.PassSettings).maxRange - 5))
+		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, -1) })
+		expect(rejected(a)).toEqual({ "Pass", "Pass" })
+		expect(BallService.state.carrier).toBe(a)
+		-- Aimed at the caller behind: theirs.
+		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, 1) })
+		expect(rejected(a)).toEqual({ "Pass", "Pass" })
+		expect(BallService.state.status).toBe("Flying")
+	end)
+
+	-- The owner (Q155): no pass through the middle glass, nor anything else of the arena between the two skaters.
+	it("passes over a teammate the arena hides, a caller too, and refuses a pass with nobody else", function()
+		local a, b, c = blue[1], blue[2], blue[3]
+		local aim = Vector3.new(0, 0, -1)
+		stand(a, Vector3.zero)
+		-- On the aim's line behind a pane 20 studs out, and 26.6 deg off it in the open.
+		stand(b, Vector3.new(0, 0, -50))
+		stand(c, Vector3.new(20, 0, -40))
+		pane(Vector3.new(0, 0, -20))
+		giveBall(a)
+		ActionService:request(b, { action = "CallPass" })
+		ActionService:request(a, { action = "Pass", aim = aim })
+		local toC = (Fixtures.root(rigs[c]).Position - BallService.part.Position).Unit
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, toC)
+		expect(rejected(a)).toEqual({})
+		-- The open teammate gone behind: only the hidden caller is left in the aim.
+		stand(c, Vector3.new(0, 0, 40))
+		giveBall(a)
+		ActionService:request(a, { action = "Pass", aim = aim })
+		expect(rejected(a)).toEqual({ "Pass" })
+		expect(BallService.state.carrier).toBe(a)
+	end)
+
+	-- The pass leads its receiver (#315): straight to where they will be when it gets there.
+	it("passes to where a teammate skating across will be when it gets there", function()
+		local a, b = blue[1], blue[2]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(0, 0, -40))
+		Fixtures.root(rigs[b]).AssemblyLinearVelocity = Vector3.new(30, 0, 0)
+		giveBall(a)
+		local hand = BallService.part.Position
+		local receiver = Fixtures.root(rigs[b]).Position
+		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, -1) })
+		local pass = config.Actions.Pass.pass :: Config.PassSettings
+		local meet = Homing.lead(hand, pass.speed, pass.homingAccel, receiver, Vector3.new(30, 0, 0))
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, (meet - hand).Unit * pass.speed, 1e-3)
+		-- Ahead of where they stand now.
+		expect((meet - receiver).X).toBeGreaterThan(5)
 	end)
 
 	it("knocks down the nearest opponent a tackle reaches, once", function()
@@ -819,7 +911,8 @@ describe("ActionService", function()
 		stand(a, Vector3.zero)
 		ActionService:request(a, { action = "CallPass" })
 		advance(0.1)
-		expect(attribute(a, Attributes.CallingPass)).toBe(true)
+		-- Called at the service's clock's start.
+		expect(attribute(a, Attributes.CallingPass)).toBe(0)
 		giveBall(a)
 		advance(DT)
 		expect(attribute(a, Attributes.CallingPass)).toBeNil()
@@ -883,15 +976,17 @@ describe("ActionService", function()
 	end)
 
 	it("forgets the call of a player it clears, so it steers no pass", function()
-		local a, b = blue[1], blue[2]
+		local a, b, c = blue[1], blue[2], blue[3]
 		stand(a, Vector3.zero)
-		stand(b, Vector3.new(0, 0, -40))
+		-- In the aim's cone, but further off its line than c: only a call would make it theirs.
+		stand(b, Vector3.new(30, 0, -40))
+		stand(c, Vector3.new(0, 0, -50))
 		giveBall(a)
 		ActionService:request(b, { action = "CallPass" })
 		ActionService:resetPlayer(b)
-		ActionService:request(a, { action = "Pass", aim = Vector3.xAxis })
-		local toCaller = (Fixtures.root(rigs[b]).Position - BallService.part.Position).Unit
-		expect(BallService.part.AssemblyLinearVelocity.Unit:Dot(toCaller)).toBeLessThan(0.5)
+		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, -1) })
+		local toC = (Fixtures.root(rigs[c]).Position - BallService.part.Position).Unit
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, toC)
 	end)
 
 	it("forgets a player who leaves, and starts a respawned character clean", function()
@@ -963,6 +1058,28 @@ describe("ActionService's front-half hits (#277)", function()
 		ActionService:request(a, { action = "Uppercut" })
 		expect(rejected(a)).toEqual({})
 		expect(advance(0.3)).toEqual({ `{a}>{b}` })
+	end)
+end)
+
+describe("ActionService's refused pass", function()
+	beforeAll(function()
+		config = passCooldown
+	end)
+	afterAll(function()
+		config = defaults
+	end)
+
+	-- Nothing of a pass the server refuses stays (#315): with a cooldown in the mode, the next pass still goes at once.
+	it("gives a refused pass's cooldown back", function()
+		local a, b = blue[1], blue[2]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(0, 0, -40))
+		giveBall(a)
+		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, 1) })
+		expect(rejected(a)).toEqual({ "Pass" })
+		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, -1) })
+		expect(rejected(a)).toEqual({ "Pass" })
+		expect(BallService.state.status).toBe("Flying")
 	end)
 end)
 

@@ -1,23 +1,24 @@
 --!strict
 -- The HUD on screen (spec §11.1), drawn with React Luau through a legacy root, which renders at once. Its panels sit in
 -- the ScreenGui "Hud", below Roblox's own top bar; the reticle sits in "HudCentre", which spans the whole screen, so
--- its place there is the screen point throws and passes aim through (App draws it there through a portal, #312).
--- Before each frame is drawn (FrameController), after HudStore has counted the clocks, the Hud renders App again only
--- when something App shows has changed: the HUD state's version, the device, the carrier, whether the local player has
--- a skater, whether it shows the Get Up prompt, or whether the score tab is open. What changes every frame (the clock,
--- the speed, what each control does now, how far a throw has charged) goes through bindings instead, each set only when
--- it changes; the texts come from caches and the config, so a quiet frame allocates nothing. Hints name each key as the
--- device shows it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout gives it, else
--- Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the labels. The Get Up
--- prompt (a skater knocked down by a strike or a fall: SkateController.promptsGetUp, #242) names the movement keys the
--- same way: the first composite's four keys, the gamepad's stick, or on touch Config.UI.text's name for the stick.
--- The score tab shows while its key is held; on touch a button toggles it, and the toggle clears once the device is
--- not touch and whenever the end screen appears or goes, so the tab never pops open unasked. While the tab shows its
--- Switch team button (HudState.switchOffer, #310), the button's key, or a tap on touch, asks the server for a switch
--- when one works. The banner, the feed, the score tab and the end screen centre and fit in the HUD's stage, a
--- binding: on touch the part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that
--- GuiService gives), elsewhere the whole of it. It is measured again when the screen's size changes (from start on)
--- and when the device does.
+-- its place there is the screen point throws and passes aim through (App draws it there through a portal, #312). Before
+-- each frame is drawn (FrameController), after HudStore has counted the clocks, the Hud renders App again only when
+-- something App shows has changed: the HUD state's version, the device, the carrier, whether the local player has a
+-- skater, whether it shows the Get Up prompt, or whether the score tab is open. What changes every frame (the clock,
+-- the speed, what each control does now and whether it works, how far a throw has charged) goes through bindings
+-- instead, each set only when it changes; the texts come from caches and the config, so a quiet frame allocates
+-- nothing. Hints name each key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the player's own
+-- keyboard layout gives it, else Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the
+-- buttons carry the labels; each render names the pass key for the mark over a pass's target (passKey, #315). The Get
+-- Up prompt (a skater knocked down by a strike or a fall: SkateController.promptsGetUp, #242) names the movement keys
+-- the same way: the first composite's four keys, the gamepad's stick, or on touch Config.UI.text's name for the stick.
+-- The score tab shows while its key is held; on touch a button toggles it, and the toggle clears once the device is not
+-- touch and whenever the end screen appears or goes, so the tab never pops open unasked. While the tab shows its Switch
+-- team button (HudState.switchOffer, #310), the button's key, or a tap on touch, asks the server for a switch when one
+-- works. The banner, the feed, the score tab and the end screen centre and fit in the HUD's stage, a binding: on touch
+-- the part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that GuiService gives),
+-- elsewhere the whole of it. It is measured again when the screen's size changes (from start on) and when the device
+-- does.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -45,6 +46,9 @@ local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 type PlayerId = Types.PlayerId
 
+-- The pass's control, whose key marks a pass's target (#315).
+local PASS: Config.TouchControl = "pass"
+
 -- A value shown through a binding: its setter, and the value last set.
 type Shown<T> = { binding: React.Binding<T>, set: (value: T) -> (), value: T }
 
@@ -68,6 +72,9 @@ export type Hud = {
 	centre: ScreenGui,
 	-- How many times App has rendered.
 	renders: number,
+	-- The pass key as the hints show it on this device, or on touch, where no key shows, UI.text.touchPassTarget: what
+	-- NameTags floats over the teammate a pass would go to (#315; RC Video 34 at 41.6 s). Nil without a skater.
+	passKey: Style.KeyView?,
 	_config: Config.GameConfig,
 	_text: HudText.HudText,
 	_store: HudStore.HudStore,
@@ -87,6 +94,7 @@ export type Hud = {
 	_clock: Shown<string>,
 	_speed: Shown<string>,
 	_labels: { [string]: Shown<string> },
+	_fades: { [string]: Shown<number> },
 	_charge: Shown<number>,
 	-- The stage last set on its binding, and the setter.
 	_stage: Vector2,
@@ -180,6 +188,22 @@ local function hintKeys(self: Hud, device: Enum.PreferredInput, hasSkater: boole
 	return keys
 end
 
+-- The pass key on `device` for the mark over a pass's target (#315): the pass hint's own key (`keys`), or on touch,
+-- where no hints show, the touch mark; nil without a skater.
+local function passKeyView(
+	self: Hud,
+	device: Enum.PreferredInput,
+	hasSkater: boolean,
+	keys: ControlHints.HintKeys?
+): Style.KeyView?
+	if not hasSkater then
+		return nil
+	elseif device == Enum.PreferredInput.Touch then
+		return { text = self._config.UI.text.touchPassTarget }
+	end
+	return if keys ~= nil then keys[PASS] else nil
+end
+
 -- The score tab's Switch team button on `device`: nil while it has none, else whether it works now (`carrier` holding
 -- the ball), its key (none on touch, where it is tapped) and what a tap does.
 local function switchTeamView(self: Hud, device: Enum.PreferredInput, carrier: PlayerId?): ScoreTab.SwitchTeam?
@@ -199,6 +223,7 @@ local Hud: Hud = {
 	gui = nil :: any,
 	centre = nil :: any,
 	renders = 0,
+	passKey = nil,
 	_config = nil :: any,
 	_text = nil :: any,
 	_store = nil :: any,
@@ -224,6 +249,7 @@ local Hud: Hud = {
 	_clock = nil :: any,
 	_speed = nil :: any,
 	_labels = {},
+	_fades = {},
 	_charge = nil :: any,
 	_stage = Vector2.zero,
 	_setStage = function(_stage: Vector2) end,
@@ -268,6 +294,7 @@ local Hud: Hud = {
 				return GuiService:GetInsetArea(insets)
 			end
 		self.renders = 0
+		self.passKey = nil
 		self._version = nil
 		self._device = nil
 		self._shownCarrier = nil
@@ -291,12 +318,15 @@ local Hud: Hud = {
 		self._speed = newShown("")
 		local labels: { [string]: Shown<string> } = {}
 		local labelBindings: ControlHints.HintLabels = {}
+		local fades: { [string]: Shown<number> } = {}
+		local fadeBindings: ControlHints.HintFades = {}
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
-			local shown = newShown("")
-			labels[control] = shown
-			labelBindings[control] = shown.binding
+			local label, fade = newShown(""), newShown(0)
+			labels[control], fades[control] = label, fade
+			labelBindings[control], fadeBindings[control] = label.binding, fade.binding
 		end
 		self._labels = labels
+		self._fades = fades
 		self._charge = newShown(0)
 		local stage, setStage = React.createBinding(Vector2.zero)
 		self._stage = Vector2.zero
@@ -305,6 +335,7 @@ local Hud: Hud = {
 			clock = self._clock.binding,
 			speed = self._speed.binding,
 			labels = labelBindings,
+			fades = fadeBindings,
 			stage = stage,
 			charge = self._charge.binding,
 		}
@@ -389,6 +420,8 @@ local Hud: Hud = {
 			self._promptsGetUp = promptsGetUp
 			self._scoreTabOpen = scoreTabOpen
 			self.renders += 1
+			local keys = hintKeys(self, device, hasSkater)
+			self.passKey = passKeyView(self, device, hasSkater, keys)
 			self._root:render(React.createElement(App, {
 				config = self._config,
 				text = self._text,
@@ -397,7 +430,7 @@ local Hud: Hud = {
 				localId = self._localId,
 				carrier = carrier,
 				hasSkater = hasSkater,
-				keys = hintKeys(self, device, hasSkater),
+				keys = keys,
 				getUpKeys = if promptsGetUp then moveKeys(self, device) else nil,
 				scoreTabOpen = scoreTabOpen,
 				onScoreButton = self._onScoreButton,
@@ -413,8 +446,11 @@ local Hud: Hud = {
 			show(self._speed, self._text:speed(skater:shownSpeed()))
 		end
 		local config, actions = self._config, self._actions
+		local dim = config.UI.hud.dimTransparency
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
-			show(self._labels[control], ControlLabels.label(control, config, actions, skate) or "")
+			local label, greyed = ControlLabels.label(control, config, actions, skate)
+			show(self._labels[control], label or "")
+			show(self._fades[control], if greyed then dim else 0)
 		end
 		show(self._charge, actions:chargeSeconds() or 0)
 	end,

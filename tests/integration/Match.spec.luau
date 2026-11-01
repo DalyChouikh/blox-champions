@@ -427,8 +427,8 @@ describe("A match on the generated arena", function()
 		rigs[if passerIndex == 1 then 2 else 1]:PivotTo(CFrame.new(0, 200, 0))
 		local possessions = #eventsNamed("PossessionChanged")
 		ActionService:request("3", { action = "CallPass" })
-		-- Aimed away from the caller: the call decides.
-		ActionService:request(passer, { action = "Pass", aim = frame.RightVector })
+		-- Aimed at the caller, as a pass must be (#315).
+		ActionService:request(passer, { action = "Pass", aim = frame.LookVector })
 		expect(BallService.state.status).toBe("Flying")
 		-- Beside the passer, inside rethrowPickupDelay: nobody takes it.
 		jumpBall(CFrame.new(Fixtures.root(passerRig).Position))
