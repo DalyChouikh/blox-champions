@@ -63,8 +63,9 @@ local fakeNet = {
 -- (#294).
 local smoothNormal: (Vector3, Vector3) -> Vector3 = Fixtures.faceNormal
 
--- Its model (the test's folder) and its ride surfaces (a floor under the track spot, tagged as the arena's are), set
--- for each test.
+-- Its model and its ride surfaces: a floor under the track spot, tagged as the arena's are, set for each test. The
+-- rigs stand outside the model, as characters stand outside the arena: a ball let go clears the arena, not its own
+-- carrier's body (#345).
 local fakeArena = {
 	model = nil :: Instance?,
 	arena = { teamSpawns = { Blue = {}, Orange = {} }, rideSurfaces = {} :: { Instance } },
@@ -99,7 +100,7 @@ beforeEach(function()
 	slab.CFrame = CFrame.new(ON_TRACK.X, -0.5, ON_TRACK.Z)
 	slab.Parent = floor
 	floor.Parent = folder
-	fakeArena.model = folder
+	fakeArena.model = floor
 	fakeArena.arena.rideSurfaces = { floor }
 	BallService:init({ Config = config, ArenaService = fakeArena })
 	TeamService:init({ Config = config })
@@ -269,6 +270,20 @@ local function throwAt(id: string, spot: Vector3, charge: number)
 	ActionService:request(id, { action = "ChargeThrow", aim = Vector3.new(0, -0.05, -1), spot = spot, charge = charge })
 end
 
+-- The playtest's finding (#345, Q172): a carrier just landed on a slope leans less than it, so the hand on its uphill
+-- side dips into the floor. Puts a slope rising 38 deg to `id`'s right (the rise's steepest) through the floor under
+-- their upright root, into the hand they carry the ball in; returns where the ball leaves from: where it would first
+-- touch the slope on the way from the root to the hand, Ball.releaseClearance off it.
+local function leanIntoSlope(id: string): Vector3
+	local root = Fixtures.root(rigs[id]).CFrame
+	local under = Vector3.new(root.X, 0, root.Z)
+	local _, normal = Fixtures.slopeBeside(folder:FindFirstChild("Floor") :: Instance, root, under, 38)
+	local hand = root * config.Ball.carryOffset
+	local meets = Fixtures.sphereMeetsPlane(root.Position, hand, config.Ball.radius, under, normal)
+	assert(meets ~= nil, "the hand should be in the slope")
+	return meets + normal * config.Ball.releaseClearance
+end
+
 describe("ActionService", function()
 	-- A throw comes down on the crosshair's spot (#313, the owner: Q148, Q151), from the hand at the charged speed.
 	it("throws the carrier's ball from the hand at the charged speed, down onto the crosshair's spot", function()
@@ -302,6 +317,31 @@ describe("ActionService", function()
 		ActionService:request(a, { action = "ChargeThrow", aim = -Vector3.xAxis, spot = spot, charge = 1 })
 		expect(rejected(a)).toEqual({})
 		expectLandsOn(hand, spot)
+	end)
+
+	-- #345: thrown from where the ball really leaves, a throw from a hand in a slope still comes down on the spot.
+	it("aims a throw from where the ball leaves a hand in a slope, down onto the crosshair's spot", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
+		local from = leanIntoSlope(a)
+		throwAt(a, SPOT, 1)
+		expect(rejected(a)).toEqual({})
+		Fixtures.expectNear(BallService.part.Position, from)
+		expectLandsOn(from, SPOT)
+	end)
+
+	it("aims a pass from where the ball leaves a hand in a slope, straight at its receiver", function()
+		local a, b = blue[1], blue[2]
+		stand(a, Vector3.zero)
+		stand(b, Vector3.new(0, 0, -40))
+		giveBall(a)
+		local from = leanIntoSlope(a)
+		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, -1) })
+		expect(rejected(a)).toEqual({})
+		Fixtures.expectNear(BallService.part.Position, from)
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, (Fixtures.root(rigs[b]).Position - from).Unit)
 	end)
 
 	-- RC's Roll Ball (#312, Q100; Video 31 at 1:19.4): the charge spent along the floor. Aimed (3, 4, -4) from a

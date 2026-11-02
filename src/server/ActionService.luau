@@ -14,13 +14,13 @@
 -- they move) is up once Actions.getUpAfter has passed since the knockdown, never sooner; a diver is up once their root
 -- slides slower than the landing's stopSpeed along the ground, whatever they ask (#242); anyone, at the latest after
 -- the knockdown's seconds.
--- A throw comes down on the spot its client's crosshair points at, from the ball's own spot in the hand (#313). A throw
--- or a roll keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held for. A
--- Magnetic Pass goes to the teammate PassTarget names along its aim, led to where they will be, or is refused (#315).
--- The server never sees the throw key: an action that needs a charge under way (Roll Ball) or none (a pass, #312)
--- starts either way here.
--- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
--- sum of the frames it is stepped, so a request between frames counts as the last frame's.
+-- A throw comes down on the spot its client's crosshair points at, from where the ball leaves the hand (#313; clear of
+-- the arena, BallService.releasePoint, #345). A throw or a roll keeps no more of the carrier's speed than skating
+-- allows, and no more charge than the ball was held for. A Magnetic Pass goes to the teammate PassTarget names along
+-- its aim, led to where they will be, or is refused (#315). The server never sees the throw key: an action that needs a
+-- charge under way (Roll Ball) or none (a pass, #312) starts either way here. MatchService steps it first in each frame
+-- and reports its knockdowns to the rules; a kickoff resets it. Time is the sum of the frames it is stepped, so a
+-- request between frames counts as the last frame's.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -384,7 +384,7 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Roll: Effect, 
 	Throw = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
 		local throw = action.throw :: Config.ThrowSettings
 		local charge = heldCharge(self, payload, throw)
-		local from = self._ball.part.Position
+		local from = self._ball:releasePoint()
 		local velocity =
 			Throw.aimed(throw, charge, from, payload.aim, payload.spot, reportedVelocity(self, holder), self._gravity)
 		self._ball:throw(player, velocity)
@@ -417,7 +417,7 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Roll: Effect, 
 			refuse(self, player, payload.action)
 			return
 		end
-		local from, at = self._ball.part.Position, receiver.root.Position
+		local from, at = self._ball:releasePoint(), receiver.root.Position
 		self._ball:pass(
 			player,
 			Throw.pass(pass, from, payload.aim, at, reportedVelocity(self, receiver)),

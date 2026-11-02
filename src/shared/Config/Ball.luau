@@ -40,8 +40,12 @@ export type BallConfig = {
 	-- How far past either glass, below the floor or over the top (Bounds.inArena) the ball's center may go before it is
 	-- out.
 	outOfBoundsMargin: number,
-	-- Where a carried ball sits in its carrier's root frame: in the right hand at the hip, clear of the floor.
+	-- Where a carried ball sits in its carrier's root frame: in the right hand at the hip, clear of a floor the root
+	-- leans with (a slope it leans less than can reach the hand: releaseClearance).
 	carryOffset: Vector3,
+	-- How far off the arena a ball let go starts when the hand is in it (#345): on the way out from the carrier's root,
+	-- this far off what it would first touch (BallService.releasePoint).
+	releaseClearance: number,
 }
 
 local defaults: BallConfig = {
@@ -70,6 +74,11 @@ local defaults: BallConfig = {
 	-- RC carries the ball low in the right hand at the hip, the arm down (Video 13 at 99.0 s; the owner's trial #311,
 	-- Q130): just below the hand of an arm hanging at the side (measured in Play at (1.46, 0.36, 0) from the root).
 	carryOffset = Vector3.new(1.7, -0.8, -0.3),
+	-- A ruling (#345, the playtest's finding, Q172): a hair, so a ball let go from a hand in the floor (a carrier just
+	-- landed on a slope leans less than it) starts off it, not touching it, which would end a pass's flight at once.
+	-- A ball placed exactly touching a thin part was dragged through it by Roblox's solver; 0.05 off it bounced cleanly
+	-- (measured for #311).
+	releaseClearance = 0.05,
 }
 
 local nonNegative = Validate.number({ min = 0 })
@@ -90,6 +99,7 @@ local schema = Validate.checkAll(
 		dropIn = Validate.record({ outerIn = positive, innerIn = positive, speed = nonNegative, descent = positive }),
 		outOfBoundsMargin = nonNegative,
 		carryOffset = Validate.check(Validate.datatype("Vector3"), Finite.vector, "must be finite"),
+		releaseClearance = positive,
 	}),
 	{
 		{
