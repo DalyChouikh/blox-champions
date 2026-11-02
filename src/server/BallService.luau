@@ -2,20 +2,20 @@
 -- The ball in the arena (spec §9.3): one server-owned physics part, in its own model that streams to every client, that
 -- BallState says what to do with. It is hidden (in ServerStorage, so its next spawn is never replicated early) until a
 -- kickoff ends, then drops in from above (Ball/DropIn, #321). A ball that leaves the arena (the box inside the glass,
--- its top included: Bounds.inArena) drops in again whatever its state, a loose one resting a while on something
--- nobody skates (the goal's rim, #308) too, and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt.
--- Each frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose body it
--- touched. Jumps the server makes (a drop-in's start, the snap into a catcher's hand, a carrier it moves, a drop it
--- places, a roll it puts on the floor) are never reported as movement, so they can never cross a gate or the ring; each
--- screen draws the catch's flight into the hand itself (Client/BallView). A pass flies flat, its weight cancelled, and
--- homes on its target, until it touches anything or anyone or the target can no longer catch; a drop-in falls steadily
--- the lap's way, its weight cancelled too, until it touches anything or anyone; then either falls like any ball. A
--- roll (Roll Ball, #312) leaves from the floor under the hand, already rolling. A ball passes through the player who
--- let go of it until it is clear of them. A loose ball slows rolling as a coasting skater does (#311, Q124), and never
--- passes through the arena: Roblox lets a fast small ball through a thin part, so a loose ball whose centre crossed a
--- solid face since the last frame goes back there, bounced off that face (#311). From a throw, a pass or a roll until
--- the next catch, drop-in or kickoff the ball's part says it was thrown (Attributes.Thrown), and every screen trails it
--- (Client/BallTrail, #313).
+-- its top included: Bounds.inArena) drops in again whatever its state, a loose one resting a while on something nobody
+-- skates (the goal's rim, #308) too, and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each
+-- frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose body it touched.
+-- Jumps the server makes (a drop-in's start, the snap into a catcher's hand, a carrier it moves, a drop it places, a
+-- roll it puts on the floor) are never reported as movement, so they can never cross a gate or the ring; each screen
+-- draws the catch's flight into the hand itself (Client/BallView). A pass flies flat, its weight cancelled, and homes
+-- on where its receiver will be (Homing.lead, #315), until it touches anything or anyone (glass between them bounces it
+-- off, loose) or the receiver can no longer catch; a drop-in falls steadily the lap's way, its weight cancelled too,
+-- until it touches anything or anyone; then either falls like any ball. A roll (Roll Ball, #312) leaves from the floor
+-- under the hand, already rolling. A ball passes through the player who let go of it until it is clear of them. A loose
+-- ball slows rolling as a coasting skater does (#311, Q124), and never passes through the arena: Roblox lets a fast
+-- small ball through a thin part, so a loose ball whose centre crossed a solid face since the last frame goes back
+-- there, bounced off that face (#311). From a throw, a pass or a roll until the next catch, drop-in or kickoff the
+-- ball's part says it was thrown (Attributes.Thrown), and every screen trails it (Client/BallTrail, #313).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -76,8 +76,8 @@ export type BallService = {
 	spawn: (self: BallService) -> (),
 	kill: (self: BallService) -> (),
 	throw: (self: BallService, player: PlayerId, velocity: Vector3) -> (),
-	-- A throw that flies flat and homes on `target`, or flies flat along `velocity` with none.
-	pass: (self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId?) -> (),
+	-- A throw that flies flat and homes on its receiver, `target` (#315: every pass has one).
+	pass: (self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId) -> (),
 	-- A throw along the floor (Roll Ball, #312): it leaves from the floor under the hand (Ball.carryOffset across the
 	-- carrier's root, a radius above the floor the root hovers Movement.hoverHeight over), rolling at `velocity`, which
 	-- runs along that floor.
@@ -351,7 +351,9 @@ local function clearOfReleaser(self: BallService, position: Vector3)
 	end
 end
 
--- Steers a pass toward its target while it flies and the target can catch. Once either stops, the pass is over.
+-- Steers a pass toward where its target will be when it gets there (Homing.lead, #315), from their velocity as their
+-- client reports it, held to the speed limit, while the pass flies and the target can catch. Once either stops, the
+-- pass is over.
 local function home(self: BallService, holders: { Holder }, position: Vector3, dt: number)
 	local target = self._passTarget
 	if target == nil then
@@ -362,9 +364,11 @@ local function home(self: BallService, holders: { Holder }, position: Vector3, d
 		endGuidance(self)
 		return
 	end
-	local part = self.part
-	part.AssemblyLinearVelocity =
-		Homing.step(position, part.AssemblyLinearVelocity, holder.root.Position, self._homingAccel, dt)
+	local part, root, accel = self.part, holder.root, self._homingAccel
+	local velocity = part.AssemblyLinearVelocity
+	local running = Vectors.clampMagnitude(root.AssemblyLinearVelocity, self._speedLimit)
+	local meet = Homing.lead(position, velocity.Magnitude, accel, root.Position, running)
+	part.AssemblyLinearVelocity = Homing.step(position, velocity, meet, accel, dt)
 end
 
 -- Holds a drop-in's velocity where the ball now is (Q116): the lap's way round a curved end too.
@@ -561,7 +565,7 @@ local BallService: BallService = {
 		self._pendingThrower = player
 	end,
 
-	pass = function(self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId?)
+	pass = function(self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId)
 		self:throw(player, velocity)
 		self._passTarget = target
 		self._lift.Enabled = true

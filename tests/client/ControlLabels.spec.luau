@@ -20,10 +20,18 @@ local LOCAL_ID = "1"
 
 local folder: Folder
 local rig: Model
+-- The other skaters the skating sees, reset before each test.
+local others: { any }
 
 -- What each control's button or hint reads now, nil for one that does nothing.
 local function now(control: Config.TouchControl): string?
-	return ControlLabels.label(control, config, ActionController, SkateController)
+	return (ControlLabels.label(control, config, ActionController, SkateController))
+end
+
+-- Whether a control is greyed: shown, but doing nothing now (#315).
+local function greyed(control: Config.TouchControl): boolean
+	local _, shownGreyed = ControlLabels.label(control, config, ActionController, SkateController)
+	return shownGreyed
 end
 
 beforeEach(function()
@@ -31,7 +39,8 @@ beforeEach(function()
 	folder.Name = "ControlLabelsTest"
 	folder.Parent = workspace
 	Fixtures.floor(folder)
-	Fixtures.startSkating(folder, config, LOCAL_ID)
+	others = {}
+	Fixtures.startSkating(folder, config, LOCAL_ID, others)
 	rig = Fixtures.spawnSkater(folder, config)
 end)
 
@@ -110,6 +119,33 @@ describe("ControlLabels", function()
 		skater.mode = "Airborne"
 		expect(now("uppercut")).toBeNil()
 		expect(now("tackle")).toBe(labels.CancelDodge)
+	end)
+
+	-- Magnetic Pass (#315, the owner: Q103): with the ball the pass's control reads RC's "Magnetic Pass", lit while a
+	-- teammate is in the crosshair's cone and range, greyed with nobody there (shown, but doing nothing: RC fades the
+	-- row, Video 34 at 43.0 s). Every other control shown works.
+	it("greys Magnetic Pass with nobody in the aim, and lights it with a teammate there", function()
+		BallCarrier:set(LOCAL_ID)
+		ActionController:step(1 / 60)
+		expect(labels.Pass).toBe("Magnetic Pass")
+		expect(now("pass")).toBe(labels.Pass)
+		expect(greyed("pass")).toBe(true)
+		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
+			if control ~= "pass" then
+				expect(greyed(control)).toBe(false)
+			end
+		end
+		table.insert(
+			others,
+			(Fixtures.otherSkater(folder, "2", Vector3.new(0, config.Movement.hoverHeight, -40), "Blue"))
+		)
+		ActionController:step(1 / 60)
+		expect(now("pass")).toBe(labels.Pass)
+		expect(greyed("pass")).toBe(false)
+		-- Without the ball the key calls for it.
+		BallCarrier:set(nil)
+		expect(now("pass")).toBe(labels.CallPass)
+		expect(greyed("pass")).toBe(false)
 	end)
 
 	-- RC's Dodge row reads "Dive" for ~1 s after a dodge with the ball (#314, Video 32 at 4.6-5.6 s).

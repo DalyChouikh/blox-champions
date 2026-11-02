@@ -2,20 +2,21 @@
 -- The server's side of actions (spec §3.3, §8.1, §13). Every request a client sends is checked again in that player's
 -- own ActionRunner and applied here, or refused with ActionRejected: a follow-up (the Dive) only inside its window
 -- after a Tackle or a Dodge the server itself started. Throws, rolls and passes go through BallService. Strikes are
--- judged each frame against the server's positions and knock down the nearest opponent they reach; every strike
--- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns (each with
--- its kind, Attributes.Knockdown), the running action (until its recovery) and calls for a pass show as character
--- attributes every client reads. Each frame the server casts its own ray along each skater's down: a hard landing
--- (Skate/Fall), or any landing while their client reports the Air Pose (touching down posed, #245), knocks them down as
--- a fall, and a diver's first touch of the ground past the dive's active phase as a dive (an action with a landing
--- ends on the belly; nothing but a carrier's throw starts meanwhile). A carrier keeps the ball through their own dive
--- and can still be struck on the belly (#314); every other knockdown drops it. No one scores the knockdowns a player
--- deals themselves. A player knocked down by a strike or a
--- fall whose client asks to get up (GetUp, sent when they move) is up once Actions.getUpAfter has passed since the
--- knockdown, never sooner; a diver is up once their root slides slower than the landing's stopSpeed along the ground,
--- whatever they ask (#242); anyone, at the latest after the knockdown's seconds.
+-- judged each frame against the server's positions and knock down the nearest opponent they reach; every strike of a
+-- frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns (each with its
+-- kind, Attributes.Knockdown), the running action (until its recovery) and calls for a pass (each with its time) show
+-- as character attributes every client reads. Each frame the server casts its own ray along each skater's down: a hard
+-- landing (Skate/Fall), or any landing while their client reports the Air Pose (touching down posed, #245), knocks them
+-- down as a fall, and a diver's first touch of the ground past the dive's active phase as a dive (an action with a
+-- landing ends on the belly; nothing but a carrier's throw starts meanwhile). A carrier keeps the ball through their
+-- own dive and can still be struck on the belly (#314); every other knockdown drops it. No one scores the knockdowns a
+-- player deals themselves. A player knocked down by a strike or a fall whose client asks to get up (GetUp, sent when
+-- they move) is up once Actions.getUpAfter has passed since the knockdown, never sooner; a diver is up once their root
+-- slides slower than the landing's stopSpeed along the ground, whatever they ask (#242); anyone, at the latest after
+-- the knockdown's seconds.
 -- A throw comes down on the spot its client's crosshair points at, from the ball's own spot in the hand (#313). A throw
--- or a roll keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held for.
+-- or a roll keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held for. A
+-- Magnetic Pass goes to the teammate PassTarget names along its aim, led to where they will be, or is refused (#315).
 -- The server never sees the throw key: an action that needs a charge under way (Roll Ball) or none (a pass, #312)
 -- starts either way here.
 -- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
@@ -115,8 +116,9 @@ export type ActionService = {
 	_calls: { [PlayerId]: number },
 	_candidates: { Reach.Candidate },
 	_context: ActionRunner.Context,
-	-- The arena's ride surfaces, the only things the server's ground rays hit, their direction where a ray finds them
-	-- (SmoothNormals.reader, as the skating reads it: #294; a fake in tests), and what the last ray found.
+	-- The arena's ride surfaces, the only things the server's ground rays hit and what hides a pass's receiver (Q155),
+	-- their direction where a ray finds them (SmoothNormals.reader, as the skating reads it: #294; a fake in tests),
+	-- and what the last ray found.
 	_rideParams: RaycastParams,
 	_smoothNormal: SmoothNormals.Reader,
 	_ground: SkateTypes.Ground,
@@ -203,6 +205,13 @@ end
 
 local function reject(self: ActionService, player: PlayerId, action: Config.ActionName)
 	self._net:fireTo(player, Remotes.names.ActionRejected, { action = action })
+end
+
+-- An action the runner started that cannot take effect (a pass with nobody to go to): stopped with its cooldown and
+-- any follow-up window it opened given back, and refused as `reject` does.
+local function refuse(self: ActionService, player: PlayerId, action: Config.ActionName)
+	recordOf(self, player).runner:cancel(action, true)
+	reject(self, player, action)
 end
 
 -- The kind of knockdown the player is down by; nil on their feet.
@@ -361,8 +370,9 @@ local function heldCharge(self: ActionService, payload: any, throw: Config.Throw
 	return math.min(payload.charge, Throw.share(throw, self._ball.state.heldSeconds))
 end
 
--- The carrier's velocity as their client reports it, held to what the movement guard allows.
-local function carrierVelocity(self: ActionService, holder: Holder): Vector3
+-- A player's velocity as their client reports it, held to what the movement guard allows: a thrower's, or a pass's
+-- receiver's.
+local function reportedVelocity(self: ActionService, holder: Holder): Vector3
 	return Vectors.clampMagnitude(holder.root.AssemblyLinearVelocity, self._speedLimit)
 end
 
@@ -376,7 +386,7 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Roll: Effect, 
 		local charge = heldCharge(self, payload, throw)
 		local from = self._ball.part.Position
 		local velocity =
-			Throw.aimed(throw, charge, from, payload.aim, payload.spot, carrierVelocity(self, holder), self._gravity)
+			Throw.aimed(throw, charge, from, payload.aim, payload.spot, reportedVelocity(self, holder), self._gravity)
 		self._ball:throw(player, velocity)
 	end,
 	-- Roll Ball (#312): ChargeThrow's charge at ChargeThrow's speeds (one charge, one speed range), along the floor
@@ -388,25 +398,36 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Roll: Effect, 
 			throw,
 			payload.aim,
 			heldCharge(self, payload, throw),
-			carrierVelocity(self, holder),
+			reportedVelocity(self, holder),
 			frame.UpVector,
 			frame.LookVector
 		)
 		self._ball:roll(player, velocity)
 	end,
+	-- Magnetic Pass (#315): to the teammate PassTarget names along the aim in the open (nothing of the arena between
+	-- them, Q155), straight to where they will be when it gets there. With nobody there the client greys the key and
+	-- sends none, so only lag at the cone's edge or a line's gets here.
 	Pass = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
 		local pass = action.pass :: Config.PassSettings
-		local window = self._config.Actions.callPassWindow
 		local teammates = candidates(self, player, true)
 		local target =
-			PassTarget.choose(pass, window, holder.root.Position, payload.aim, teammates, self._calls, self._now)
-		local targetHolder = if target ~= nil then self._holderOf[target] else nil
-		local targetAt = if targetHolder ~= nil then targetHolder.root.Position else nil
-		self._ball:pass(player, Throw.pass(pass, self._ball.part.Position, payload.aim, targetAt), target)
+			PassTarget.choose(pass, holder.root.Position, payload.aim, teammates, self._calls, self._rideParams)
+		local receiver = if target ~= nil then self._holderOf[target] else nil
+		if receiver == nil then
+			refuse(self, player, payload.action)
+			return
+		end
+		local from, at = self._ball.part.Position, receiver.root.Position
+		self._ball:pass(
+			player,
+			Throw.pass(pass, from, payload.aim, at, reportedVelocity(self, receiver)),
+			receiver.player
+		)
 	end,
+	-- A call's time goes on the caller's character too, so every client ranks callers as the server does.
 	CallPass = function(self: ActionService, player: PlayerId)
 		self._calls[player] = self._now
-		setAttribute(self, player, Attributes.CallingPass, true)
+		setAttribute(self, player, Attributes.CallingPass, self._now)
 	end,
 }
 

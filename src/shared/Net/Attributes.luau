@@ -19,7 +19,8 @@ return table.freeze({
 	KnockedDown = "KnockedDown",
 	-- On a character: the action it is running (a Config.Actions name) until that action's recovery; absent otherwise.
 	Action = "Action",
-	-- On a character: calling for a pass, for Actions.callPassWindow or until they get the ball.
+	-- On a character: calling for a pass, for Actions.callPassWindow or until they get the ball. It holds the call's
+	-- time on the server's clock, so every client ranks two callers as the server does (PassTarget, #315).
 	CallingPass = "CallingPass",
 	-- On a character: how many times the server has placed it (on its spawn at each kickoff, or back inside the
 	-- arena); each new count tells its client to start the skater over from rest there.

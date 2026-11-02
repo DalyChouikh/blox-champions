@@ -1,11 +1,14 @@
 --!strict
 -- The local player's actions (spec §3.3, §8.1–8.3). Each physics step, after the skating (FrameController), it reads
 -- the action keys and starts at most one action at once in its own ActionRunner: it pushes the skater, then asks the
--- server, which checks the action again. A throw, roll or pass predicts the ball leaving, aimed through the crosshair
--- (the camera's ray through its point on the screen, #312); a throw is told where it comes down, the spot where that
--- ray first meets the arena or the goal ring's centre (#313). A refusal (ActionRejected) stops the action, refunds its
--- cooldown and gives a refused throw's ball back; a push already given stays (the movement guard tolerates it), but a
--- lunge eases back to the speed before over its recovery, and drops to it at once when its action stops early (#241).
+-- server, which checks the action again. A throw, roll or pass predicts the ball leaving, aimed along the crosshair's
+-- line (the camera's line through its point on the screen, CameraController:crosshair, #312); a throw is told where it
+-- comes down, the spot where that line first meets the arena or the goal ring's centre (#313). With the ball, each step
+-- names the teammate a Magnetic Pass would go to, by the server's own rule (PassTarget, #315): the pass key passes only
+-- to them, and with nobody there it is greyed (keyAction) and does nothing. A refusal (ActionRejected) stops the
+-- action, refunds its cooldown and gives a refused throw's or pass's ball back; a push already given stays (the
+-- movement guard tolerates it), but a lunge eases back to the speed before over its recovery, and drops to it at once
+-- when its action stops early (#241).
 -- A throw charges while its key is held with the ball (RC's crosshair shows how far, #312), and starting any action
 -- ends the charge: a throw, or Roll Ball on the uppercut key, spends it; a Dodge drops it (Cancel & Dodge); no pass
 -- starts meanwhile, and the skating pumps nothing (SkateController.charging). A throw let go while another action
@@ -28,6 +31,7 @@ local BallCarrier = require(script.Parent.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local InputController = require(script.Parent.InputController)
+local PassTarget = require(ReplicatedStorage.Shared.Actions.PassTarget)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local Reach = require(ReplicatedStorage.Shared.Actions.Reach)
@@ -40,14 +44,13 @@ local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
 type PlayerId = Types.PlayerId
 
--- What the actions read of the camera (a fake in tests): throws, rolls and passes aim through a point of its viewport.
-type AimCamera = {
-	ViewportSize: Vector2,
-	ViewportPointToRay: (self: AimCamera, x: number, y: number, depth: number?) -> Ray,
-}
--- What a throw's spot is found against (fakes in tests): the arena's solid surfaces (RideSurfaces.solid) and the goal
--- ring's opening (ArenaParts), none until the arena is here.
-type Surfaces = { solid: RaycastParams }
+-- What the actions read of the camera (CameraController; a fake in tests): throws, rolls and passes aim along the
+-- crosshair's line, its origin and unit direction.
+type AimCamera = { crosshair: (self: AimCamera) -> (Vector3, Vector3) }
+-- What a throw's spot is found against: the arena's solid surfaces (RideSurfaces.solid) and the goal ring's opening
+-- (ArenaParts), none until the arena is here; and what hides a pass's receiver, the arena's ride surfaces as the server
+-- casts against them (RideSurfaces.params, #315 Q155).
+type Surfaces = { solid: RaycastParams, params: RaycastParams }
 type Goal = { parts: { goal: Crossing.Disc }? }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
@@ -59,9 +62,12 @@ export type ActionController = {
 	runner: ActionRunner.Runner,
 	-- The running action's pose in its windup or active phase, else "None": how PoseController poses the local skater.
 	pose: (self: ActionController) -> Config.PoseName,
-	-- The action `key` would start now (Config.Input.actions), or nil when none fits: what touch buttons and hints
+	-- The action `key` names now (Config.Input.actions), or nil when none fits, and whether it would start: a pass
+	-- names Magnetic Pass with the ball, greyed while nobody is there to take it (#315). What touch buttons and hints
 	-- show.
-	keyAction: (self: ActionController, key: Config.ActionKey) -> Config.ActionName?,
+	keyAction: (self: ActionController, key: Config.ActionKey) -> (Config.ActionName?, boolean),
+	-- The teammate the pass key would pass to now (#315); nil while it would not pass: what the name tags mark.
+	passTarget: (self: ActionController) -> PlayerId?,
 	-- While a throw charges, how long its key has been held (on past a full charge); nil otherwise: what the
 	-- crosshair's ring shows (#312: it closes at a full charge, then blinks) and what tells a Dodge it cancels the
 	-- charge.
@@ -100,6 +106,11 @@ export type ActionController = {
 	_targetPlayer: PlayerId,
 	-- The opponents a strike may reach, refilled at each press.
 	_candidates: { Reach.Candidate },
+	-- With the ball, refilled each step (#315): the teammates who can catch, their calls' times, and the one a pass
+	-- would go to.
+	_teammates: { Reach.Candidate },
+	_calls: { [PlayerId]: number },
+	_passTarget: PlayerId?,
 }
 
 -- What the player is doing now, in the reused context record: the ball, the air, whether the controls are locked
@@ -115,18 +126,25 @@ local function contextNow(self: ActionController, hasBall: boolean): ActionRunne
 	return context
 end
 
--- The action `key` starts: the first of Config.Input.actions[key] that may start now (ActionRunner.available: its
+-- The action `key` names: the first of Config.Input.actions[key] that may start now (ActionRunner.available: its
 -- requirements fit the ball, the air, the knockdown and the charge, and a follow-up's window is open: the tackle key
 -- dives just after a tackle, or a dodge with the ball); nil when none fits (an uppercut with the ball and no charge, a
--- throw without the ball, anything but a carrier's throw while down).
-local function actionFor(self: ActionController, key: Config.ActionKey, hasBall: boolean): Config.ActionName?
+-- throw without the ball, anything but a carrier's throw while down). Then whether it would start: a pass only with a
+-- teammate to go to (#315).
+local function actionFor(self: ActionController, key: Config.ActionKey, hasBall: boolean): (Config.ActionName?, boolean)
 	local context = contextNow(self, hasBall)
 	for _, name in self._config.Input.actions[key] do
 		if self.runner:available(name, context) then
-			return name
+			return name, self._config.Actions[name].effect ~= "Pass" or self._passTarget ~= nil
 		end
 	end
-	return nil
+	return nil, false
+end
+
+-- The action `key` would start now, or nil.
+local function startable(self: ActionController, key: Config.ActionKey, hasBall: boolean): Config.ActionName?
+	local name: Config.ActionName?, ready = actionFor(self, key, hasBall)
+	return if ready then name else nil
 end
 
 local function holdsBall(self: ActionController): boolean
@@ -157,13 +175,13 @@ local function chosen(
 		self._throwReady = true
 	end
 	if keys.tackle then
-		return actionFor(self, "tackle", hasBall)
+		return startable(self, "tackle", hasBall)
 	elseif keys.uppercut then
-		return actionFor(self, "uppercut", hasBall)
+		return startable(self, "uppercut", hasBall)
 	elseif keys.pass then
-		return actionFor(self, "pass", hasBall)
+		return startable(self, "pass", hasBall)
 	elseif throwReleased then
-		return actionFor(self, "throw", hasBall)
+		return startable(self, "throw", hasBall)
 	end
 	return nil
 end
@@ -333,25 +351,52 @@ local function settle(self: ActionController, skater: SkateMath.Skater)
 	end
 end
 
--- Through the crosshair (#312, the owner: Q123/Q127): the camera's ray through the screen's point centred across it
--- and UI.hud.layout.reticle.height down it, where the HUD draws the reticle, above the skater as RC's sits.
-local function crosshair(self: ActionController): Ray
-	local camera = self._camera
-	local size = camera.ViewportSize
-	return camera:ViewportPointToRay(size.X / 2, size.Y * self._config.UI.hud.layout.reticle.height)
+-- Where a throw along the crosshair's line from `origin` along `direction` (unit) comes down (#313, the owner: Q148):
+-- where the line first meets the arena's solid surfaces within the throw's aimReach, or where it ends there, unless it
+-- passes through the goal ring's opening on the way (Throw.spot). On a surface the ball's centre aims a radius off it
+-- along its normal, so the ball itself touches the spot: aimed with its centre on the floor, a full throw at a spot 67
+-- studs out first touched the floor 19 studs short of it (measured in Play).
+local function spotAlong(
+	self: ActionController,
+	origin: Vector3,
+	direction: Vector3,
+	throw: Config.ThrowSettings
+): Vector3
+	local line = direction * throw.aimReach
+	local hit = workspace:Raycast(origin, line, self._surfaces.solid)
+	local finish = if hit ~= nil then hit.Position + hit.Normal * self._config.Ball.radius else origin + line
+	local parts = self._goal.parts
+	return Throw.spot(origin, finish, if parts ~= nil then parts.goal else nil)
 end
 
--- Where a throw along the crosshair's `ray` comes down (#313, the owner: Q148): where the ray first meets the arena's
--- solid surfaces within the throw's aimReach, or where it ends there, unless it passes through the goal ring's
--- opening on the way (Throw.spot). On a surface the ball's centre aims a radius off it along its normal, so the ball
--- itself touches the spot: aimed with its centre on the floor, a full throw at a spot 67 studs out first touched the
--- floor 19 studs short of it (measured in Play).
-local function spotAlong(self: ActionController, ray: Ray, throw: Config.ThrowSettings): Vector3
-	local line = ray.Direction.Unit * throw.aimReach
-	local hit = workspace:Raycast(ray.Origin, line, self._surfaces.solid)
-	local finish = if hit ~= nil then hit.Position + hit.Normal * self._config.Ball.radius else ray.Origin + line
-	local parts = self._goal.parts
-	return Throw.spot(ray.Origin, finish, if parts ~= nil then parts.goal else nil)
+-- The teammate a Magnetic Pass would go to now (#315), by the server's own rule (PassTarget.choose): of the others on
+-- the local player's team who can catch (no KnockedDown, as the server's CharacterService marks them), the one it
+-- names from the skater along the crosshair's line, callers ranked by the call's time their CallingPass holds, none the
+-- arena's ride surfaces hide (Q155).
+local function aimPass(self: ActionController, root: BasePart): PlayerId?
+	local skate = self._skate
+	local team = skate:team()
+	if team == nil then
+		return nil
+	end
+	local list, calls = self._teammates, self._calls
+	table.clear(calls)
+	local count = 0
+	for _, view in skate:others() do
+		local character = view.root.Parent
+		if view.team == team and character ~= nil and character:GetAttribute(Attributes.KnockedDown) == nil then
+			count += 1
+			Pickup.setCandidate(list, count, view.player, view.root.Position)
+			local at = character:GetAttribute(Attributes.CallingPass)
+			if type(at) == "number" then
+				calls[view.player] = at
+			end
+		end
+	end
+	Pickup.trimCandidates(list, count)
+	local _, aim = self._camera:crosshair()
+	local pass = self._config.Actions.Pass.pass :: Config.PassSettings
+	return PassTarget.choose(pass, root.Position, aim, list, calls, self._surfaces.params)
 end
 
 -- What the server is told: the action, with the aim when it lets go of the ball, the crosshair's spot when it comes
@@ -364,10 +409,10 @@ local function request(
 ): { [string]: any }
 	local payload: { [string]: any } = { action = name }
 	if Actions.releasesBall(action.effect) then
-		local ray = crosshair(self)
-		payload.aim = ray.Direction
+		local origin, direction = self._camera:crosshair()
+		payload.aim = direction
 		if Actions.aimsAtSpot(action.effect) then
-			payload.spot = spotAlong(self, ray, action.throw :: Config.ThrowSettings)
+			payload.spot = spotAlong(self, origin, direction, action.throw :: Config.ThrowSettings)
 		end
 	end
 	if Actions.spendsCharge(action.effect) then
@@ -419,7 +464,15 @@ end
 
 local ActionController: ActionController = {
 	name = "ActionController",
-	dependencies = { "Config", "InputController", "BallCarrier", "SkateController", "RideSurfaces", "ArenaParts" },
+	dependencies = {
+		"Config",
+		"InputController",
+		"BallCarrier",
+		"SkateController",
+		"CameraController",
+		"RideSurfaces",
+		"ArenaParts",
+	},
 	runner = nil :: any,
 	_config = nil :: any,
 	_input = nil :: any,
@@ -443,6 +496,9 @@ local ActionController: ActionController = {
 	_targetTeam = nil,
 	_targetPlayer = "",
 	_candidates = nil :: any,
+	_teammates = nil :: any,
+	_calls = nil :: any,
+	_passTarget = nil,
 
 	-- deps.Camera, deps.SendRequest and deps.LocalId replace the live game in tests.
 	init = function(self: ActionController, deps: { [string]: any })
@@ -451,7 +507,7 @@ local ActionController: ActionController = {
 		self._input = deps.InputController
 		self._carrier = deps.BallCarrier
 		self._skate = deps.SkateController
-		self._camera = deps.Camera or workspace.CurrentCamera
+		self._camera = deps.Camera or deps.CameraController
 		self._surfaces = deps.RideSurfaces
 		self._goal = deps.ArenaParts
 		self._sendRequest = deps.SendRequest
@@ -466,6 +522,9 @@ local ActionController: ActionController = {
 		self._throwReady = false
 		self._lunge = nil
 		self._candidates = {}
+		self._teammates = {}
+		self._calls = {}
+		self._passTarget = nil
 	end,
 
 	start = function(self: ActionController)
@@ -482,8 +541,13 @@ local ActionController: ActionController = {
 		return self._config.Actions[striking].pose
 	end,
 
-	keyAction = function(self: ActionController, key: Config.ActionKey): Config.ActionName?
+	keyAction = function(self: ActionController, key: Config.ActionKey): (Config.ActionName?, boolean)
 		return actionFor(self, key, holdsBall(self))
+	end,
+
+	passTarget = function(self: ActionController): PlayerId?
+		local name: Config.ActionName? = actionFor(self, "pass", holdsBall(self))
+		return if name ~= nil and self._config.Actions[name].effect == "Pass" then self._passTarget else nil
 	end,
 
 	chargeSeconds = function(self: ActionController): number?
@@ -501,6 +565,7 @@ local ActionController: ActionController = {
 			self._charge = nil
 			self._throwReady = false
 			self._lunge = nil
+			self._passTarget = nil
 			skate.charging = false
 			return
 		end
@@ -516,6 +581,7 @@ local ActionController: ActionController = {
 		easeLunge(self, skater, dt)
 		self._input:readActions(keys)
 		local hasBall = holdsBall(self)
+		self._passTarget = if hasBall then aimPass(self, root) else nil
 		local name: Config.ActionName? = chosen(self, keys, hasBall, dt)
 		if name ~= nil then
 			begin(self, skater, root, name, hasBall)

@@ -239,21 +239,15 @@ describe("Config defaults", function()
 				effect = "Roll",
 				pose = "None",
 			},
-			-- Never while a throw charges (Q140).
+			-- Never while a throw charges (Q140). Magnetic Pass (#315): a teammate within 70 deg of the aim and 120
+			-- studs (Q105), at 100 studs/s with homing 150 (the owner's trial, Q139).
 			Pass = {
 				phases = { windup = 0, active = 0, recovery = 0 },
 				cooldown = 0,
 				requires = requires("with", nil, "notCharging"),
 				effect = "Pass",
 				pose = "None",
-				pass = {
-					speed = 90,
-					homingAccel = 60,
-					coneDeg = 70,
-					maxRange = 120,
-					angleWeight = 0.6,
-					distanceWeight = 0.4,
-				},
+				pass = { speed = 100, homingAccel = 150, coneDeg = 70, maxRange = 120 },
 			},
 			CallPass = {
 				phases = { windup = 0, active = 0, recovery = 0 },
@@ -490,7 +484,8 @@ describe("Config defaults", function()
 			-- RC's hints while a throw charges (#312; Video 32 at 3.2 s).
 			RollBall = "Roll Ball",
 			CancelDodge = "Cancel & Dodge",
-			Pass = "Pass",
+			-- RC's name for it (#315, Q103; Video 34 at 41.6 s).
+			Pass = "Magnetic Pass",
 			CallPass = "Call",
 			BallFocus = "Focus",
 			GetUp = "Get Up",
@@ -548,6 +543,8 @@ describe("Config defaults", function()
 			unknownPlayer = "Player",
 			-- A raised hand.
 			callPass = "\u{270B}",
+			-- A down-pointing triangle: over a pass's target on touch, where no key letter fits (#315).
+			touchPassTarget = "\u{25BC}",
 			touchMove = "Move",
 			switchTeam = "Switch team",
 		})
@@ -1109,6 +1106,16 @@ describe("Config.forMode", function()
 			maxAgeSeconds = 0.001,
 			restSeconds = 0.001,
 		})
+	end)
+
+	-- Magnetic Pass (#315, Q105): a caller in the cone first, else the teammate nearest the aim's line, so the old
+	-- score's weights are gone.
+	it("rejects the old pass score's weights as unknown", function()
+		for _, key in { "angleWeight", "distanceWeight" } do
+			expect(function()
+				Fixtures.config({ Actions = { Pass = { pass = { [key] = 0.5 } } } })
+			end).toThrow(`Actions.Pass.pass.{key}: unknown key`)
+		end
 	end)
 
 	it("rejects the old idle respawn as unknown", function()
@@ -1756,6 +1763,11 @@ describe("Config.forMode", function()
 		})
 	end)
 
+	-- Magnetic Pass (#315): any single character marks a pass's target on touch.
+	it("accepts a one-character mark over a pass's target on touch", function()
+		expect(Fixtures.config({ UI = { text = { touchPassTarget = "v" } } }).UI.text.touchPassTarget).toBe("v")
+	end)
+
 	it("accepts a kickoff count whose digit just fits inside its ring", function()
 		-- 116 - 2 x 8 = 100: a 99 px digit fits.
 		local countdown =
@@ -1827,6 +1839,10 @@ describe("Config.forMode", function()
 				message = "UI.controlLabels.AirPose: must not be empty",
 			},
 			{ overrides = { UI = { text = { touchMove = "" } } }, message = "UI.text.touchMove: must not be empty" },
+			{
+				overrides = { UI = { text = { touchPassTarget = "" } } },
+				message = "UI.text.touchPassTarget: must not be empty",
+			},
 			{ overrides = { UI = { text = { draw = "" } } }, message = "UI.text.draw: must not be empty" },
 			{ overrides = { UI = { text = { go = "GO!" } } }, message = "UI.text.go: placeholder count must be 1" },
 			{

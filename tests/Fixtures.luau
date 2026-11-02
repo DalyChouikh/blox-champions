@@ -27,15 +27,14 @@ export type Menu = { MenuOpened: Signal.Signal<>, MenuClosed: Signal.Signal<>, M
 -- Roblox's 58 px top bar.
 export type Screen = { hud: Rect, controls: Rect }
 
--- A stand-in for the camera the controllers read: the skating steers by its CFrame, and throws and passes aim through
--- a point of its viewport (#312). Every ViewportPointToRay call is recorded in `asked` and answered with a ray along
--- `aim`.
+-- A stand-in for the camera the controllers read: the skating steers by its CFrame, and throws and passes aim along
+-- the crosshair's line (CameraController:crosshair, #312, #315), which runs from the camera along `aim` (unit);
+-- `crosshairs` counts the calls.
 export type Camera = {
 	CFrame: CFrame,
-	ViewportSize: Vector2,
 	aim: Vector3,
-	asked: { Vector2 },
-	ViewportPointToRay: (self: Camera, x: number, y: number, depth: number?) -> Ray,
+	crosshairs: number,
+	crosshair: (self: Camera) -> (Vector3, Vector3),
 }
 
 -- A round gravity for the pure math that takes gravity as an argument (skating, the ball's path, saves): Roblox's
@@ -45,17 +44,15 @@ Fixtures.GRAVITY = Vector3.new(0, -196.2, 0)
 -- The gates in a lap, one at each corner of the arena (spec §4.2): every fixture's gates and markers.
 Fixtures.GATE_COUNT = 4
 
--- A camera at `cframe` with a 1000 x 600 px viewport, whose rays through any point go along `aim` (its look without
--- one): a test reads what was asked from `asked`.
+-- A camera at `cframe` whose crosshair's line goes along `aim` (its look without one), made unit as the camera's is.
 function Fixtures.camera(cframe: CFrame, aim: Vector3?): Camera
 	return {
 		CFrame = cframe,
-		ViewportSize = Vector2.new(1000, 600),
-		aim = aim or cframe.LookVector,
-		asked = {},
-		ViewportPointToRay = function(self: Camera, x: number, y: number): Ray
-			table.insert(self.asked, Vector2.new(x, y))
-			return Ray.new(self.CFrame.Position, self.aim)
+		aim = (aim or cframe.LookVector).Unit,
+		crosshairs = 0,
+		crosshair = function(self: Camera): (Vector3, Vector3)
+			self.crosshairs += 1
+			return self.CFrame.Position, self.aim
 		end,
 	}
 end
@@ -389,11 +386,28 @@ function Fixtures.faceNormal(_position: Vector3, face: Vector3): Vector3
 	return face
 end
 
+-- Another player's skater as the skating sees it (SkateController's views): a character in `folder` named `player`
+-- with an anchored root at `position`, on `team`. Returns the view and the character.
+function Fixtures.otherSkater(folder: Instance, player: Types.PlayerId, position: Vector3, team: string): (any, Model)
+	local character = Instance.new("Model")
+	character.Name = player
+	local root = Instance.new("Part")
+	root.Name = SkaterRig.root
+	root.Anchored = true
+	root.CanCollide = false
+	root.Size = Vector3.new(2, 2, 1)
+	root.Position = position
+	root.Parent = character
+	character.Parent = folder
+	return { player = player, team = team, root = root }, character
+end
+
 -- Starts the local player's skating and actions as the client does, with fakes for the live game (a camera looking
 -- along -Z, nothing sent): InputController (its context in `folder`), BallCarrier, RideSurfaces, SkateController and
--- ActionController, for the local player `localId`. Ride surfaces must be in place first, as RideSurfaces reads them
--- here. The client's modules are required here, so specs that never skate never load them.
-function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, localId: Types.PlayerId)
+-- ActionController, for the local player `localId` on Blue. The skating sees the other players in `others` (none
+-- without it; a spec may fill the list later). Ride surfaces must be in place first, as RideSurfaces reads them here.
+-- The client's modules are required here, so specs that never skate never load them.
+function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, localId: Types.PlayerId, others: { any }?)
 	local Client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 	local InputController = require(Client.InputController) :: any
 	local BallCarrier = require(Client.BallCarrier) :: any
@@ -401,6 +415,7 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 	local SkateController = require(Client.SkateController) :: any
 	local ActionController = require(Client.ActionController) :: any
 	local camera = Fixtures.camera(CFrame.new())
+	local views = others or {}
 	InputController:init({ Config = config, Parent = folder })
 	BallCarrier:init({})
 	RideSurfaces:init({})
@@ -411,7 +426,7 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 		SmoothNormal = Fixtures.faceNormal,
 		Camera = camera,
 		Skaters = function(): { any }
-			return {}
+			return views
 		end,
 		SendSkateState = function() end,
 		SendGetUp = function() end,
@@ -424,6 +439,8 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 		InputController = InputController,
 		BallCarrier = BallCarrier,
 		SkateController = SkateController,
+		-- What hides a pass's receiver (#315 Q155).
+		RideSurfaces = RideSurfaces,
 		Camera = camera,
 		SendRequest = function() end,
 		LocalId = localId,

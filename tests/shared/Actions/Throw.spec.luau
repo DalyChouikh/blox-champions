@@ -39,12 +39,21 @@ describe("Throw", function()
 		expect(Throw.speed(throw, -1)).toBe(MIN)
 	end)
 
-	it("passes at passSpeed toward the target, or along the aim without one", function()
+	-- A Magnetic Pass flies straight at 100 studs/s (#315, the owner's trial: Q139) where its receiver will be when it
+	-- gets there (Homing.lead; worked by brute force in s60\worked315b.py).
+	it("passes straight at the pass's speed to where the receiver will be", function()
 		local aim = Vector3.new(2, 0, 0)
-		Fixtures.expectNear(Throw.pass(pass, Vector3.zero, aim, Vector3.new(0, 0, -30)), Vector3.new(0, 0, -90))
-		Fixtures.expectNear(Throw.pass(pass, Vector3.zero, aim, nil), Vector3.new(90, 0, 0))
-		-- A target exactly at the passer gives no direction: along the aim.
-		Fixtures.expectNear(Throw.pass(pass, Vector3.zero, aim, Vector3.zero), Vector3.new(90, 0, 0))
+		local from = Vector3.new(5, 3, 5)
+		local still = Vector3.zero
+		Fixtures.expectNear(Throw.pass(pass, from, aim, from + Vector3.new(0, 0, -30), still), Vector3.new(0, 0, -100))
+		Fixtures.expectNear(Throw.pass(pass, from, aim, from + Vector3.new(30, 0, 40), still), Vector3.new(60, 0, 80))
+		Fixtures.expectNear(
+			Throw.pass(pass, from, aim, from + Vector3.new(0, 0, -40), Vector3.new(30, 0, 0)),
+			Vector3.new(24.044092, 0, -97.066377),
+			1e-3
+		)
+		-- A receiver exactly at the hand gives no direction: along the aim.
+		Fixtures.expectNear(Throw.pass(pass, from, aim, from, still), Vector3.new(100, 0, 0))
 	end)
 
 	-- Roll Ball (#312): the aim's way across the ground at the charge's speed, plus the carrier's share of their

@@ -12,7 +12,8 @@
 -- for a new character, it starts behind the skater's facing, at its resting view. Ball Focus (§8.2) turns it toward the
 -- ball while the player doesn't carry it: held on PC and gamepad, toggled by a tap on touch (Config.Input). A player
 -- with no character (or whose character is gone before the next is bound) watches the ball, from the spectator's
--- distance and height above it; with no ball either, the camera holds still.
+-- distance and height above it; with no ball either, the camera holds still. Throws and passes aim along the
+-- crosshair's line through the view it last drew (`crosshair`).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -44,6 +45,10 @@ export type CameraController = {
 	init: (self: CameraController, deps: { [string]: any }) -> (),
 	start: ((self: CameraController) -> ())?,
 	step: (self: CameraController, dt: number) -> (),
+	-- The crosshair's line (#312, #315): from the camera through the screen's point centred across it and
+	-- UI.hud.layout.reticle.height down it, where the HUD draws the reticle, in the view last drawn: its origin and
+	-- unit direction.
+	crosshair: (self: CameraController) -> (Vector3, Vector3),
 	chase: ChaseCamera.ChaseCamera,
 	-- Whether Ball Focus is on, as the last step applied it (the touch throw button rings while it is).
 	focusing: boolean,
@@ -53,6 +58,9 @@ export type CameraController = {
 	_skate: SkateController.SkateController,
 	_carrier: BallCarrier.BallCarrier,
 	_camera: CameraLike,
+	-- The view last drawn: its frame and vertical field of view (degrees).
+	_frame: CFrame,
+	_fov: number,
 	_mouse: MouseLike,
 	_preferredInput: () -> Enum.PreferredInput,
 	_raycast: (origin: Vector3, direction: Vector3, params: RaycastParams) -> RaycastResult?,
@@ -147,8 +155,11 @@ local function place(self: CameraController, anchor: Vector3, height: number, di
 	local look = chase:lookVector()
 	local behind = reach(self, focus, -look, distance)
 	local camera = self._camera
-	camera.CFrame = CFrame.lookAlong(focus - look * behind, look, up)
+	local frame = CFrame.lookAlong(focus - look * behind, look, up)
+	camera.CFrame = frame
 	camera.FieldOfView = chase.fov
+	self._frame = frame
+	self._fov = chase.fov
 	return behind
 end
 
@@ -225,6 +236,8 @@ local CameraController: CameraController = {
 	_skate = nil :: any,
 	_carrier = nil :: any,
 	_camera = nil :: any,
+	_frame = CFrame.identity,
+	_fov = 0,
 	_mouse = nil :: any,
 	_preferredInput = function(): Enum.PreferredInput
 		return Enum.PreferredInput.KeyboardAndMouse
@@ -264,6 +277,8 @@ local CameraController: CameraController = {
 		self._ballPart = deps.BallPart
 		self._localId = deps.LocalId or PlayerIds.of(Players.LocalPlayer :: Player)
 		self.chase = ChaseCamera.new(config.Camera, config.Movement.hardCap, Vector3.yAxis, -Vector3.zAxis)
+		self._frame = CFrame.identity
+		self._fov = self.chase.fov
 		self._keys = InputController.newCameraKeys()
 		self._target = {
 			up = Vector3.yAxis,
@@ -280,6 +295,16 @@ local CameraController: CameraController = {
 		self._fadeItems = {}
 		self._fade = 0
 		self._fadeSignals = {}
+	end,
+
+	-- Worked from the view's own frame and vertical field of view, spanning the whole screen as
+	-- Camera:ViewportPointToRay takes it (they agreed to 1.8e-6 deg, measured), without the Ray and the ViewportSize
+	-- that call allocates (72 B a call, measured), so the pass's target can follow it every frame (#315).
+	crosshair = function(self: CameraController): (Vector3, Vector3)
+		local frame = self._frame
+		local height = self._config.UI.hud.layout.reticle.height
+		local slope = math.tan(math.rad(self._fov) / 2) * (1 - 2 * height)
+		return frame.Position, (frame.LookVector + frame.UpVector * slope).Unit
 	end,
 
 	step = function(self: CameraController, dt: number)

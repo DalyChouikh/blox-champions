@@ -170,6 +170,31 @@ describe("CameraController", function()
 		expect(camera.FieldOfView).toBeCloseTo(70, 3)
 	end)
 
+	-- Throws and passes aim along the crosshair's line (#312, #315): from the camera through the reticle's point on the
+	-- screen, centred across it and UI.hud.layout.reticle.height (0.315) down it. At a 70 deg view that is
+	-- atan(tan 35 deg x (1 - 2 x 0.315)) = 14.5247 deg above the look, about the camera's right.
+	it("gives the crosshair's line: from the camera through the reticle's point, as it last drew the view", function()
+		CameraController:step(DT)
+		local origin, direction = CameraController:crosshair()
+		Fixtures.expectNear(origin, camera.CFrame.Position)
+		Fixtures.expectNear(direction, Vector3.new(0, 0.250797, -0.968040), 1e-5)
+		-- Turned and tipped down: the same 14.5247 deg above the camera's own look, about its own right.
+		local look = Fixtures.scriptedBinding(InputController.context, "Look")
+		look:Fire(Vector2.new(1 / DT, 0))
+		CameraController:step(DT)
+		look:Fire(Vector2.zero)
+		tipUp(look, -20)
+		origin, direction = CameraController:crosshair()
+		Fixtures.expectNear(origin, camera.CFrame.Position)
+		Fixtures.expectNear(direction, (camera.CFrame * CFrame.Angles(math.rad(14.524658), 0, 0)).LookVector, 1e-5)
+		-- A fast skater's wider view, 80 deg: 17.2478 deg above.
+		CameraController.chase.fov = 80
+		CameraController:step(0)
+		expect(camera.FieldOfView).toBe(80)
+		local _, wide = CameraController:crosshair()
+		Fixtures.expectNear(wide, (camera.CFrame * CFrame.Angles(math.rad(17.247837), 0, 0)).LookVector, 1e-5)
+	end)
+
 	it("turns with the look input", function()
 		local look = Fixtures.scriptedBinding(InputController.context, "Look")
 		look:Fire(Vector2.new((math.pi / 2) / DT, 0))
