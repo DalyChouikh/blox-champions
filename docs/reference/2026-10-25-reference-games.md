@@ -1546,6 +1546,20 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   (the same server recorder): 72 released passes in 169 s, **70 caught clean (97%)**, 1 after touching the arena, 1
   missed; 2 first touches on a floor (both within 0.15 s of the release), none on the glass; clean catches in 0.24 /
   0.56 / 0.75 s within 10, at 10-15 and 15-20 body lengths. Built as PR #348 and published (65adf98, 17:50:59Z).
+- **The Ball & rules part's end-of-part review; Q178-Q180** (session 66, AskUserQuestion, plain words, all
+  recommended). The review (Standards + Spec, main bfc0e1d -> 76ea830) found a Dive with the ball no answer allowed and
+  two points no answer settled. **Q178**: **a Dive keeps to the move it follows**: after a Tackle only with empty
+  hands, after a Dodge only while holding the ball (#314 said "no Dive with the ball without a Dodge first", yet a
+  Tackle, a magnet catch and the key within 1 s dived holding it); so a Dodge then a throw gives no Dive (the key
+  tackles). RC's clips show neither case. Not chosen: block only the ball case. **Q179**: **the kickoff count stays at
+  the banner's place** (its centre 200 px from the top, about a fifth down at 1080 px; RC's a third down, Video 31,
+  where our always-shown crosshair dot sits) until the Presentation part's HUD redesign places it with the dot (Q55)
+  and the ring/scoreboard overlap (#333). Not chosen: RC's third now. **Q180**: **no live play of 65adf98 needed**
+  before the review's fixes and the merges (the built #345/#346 were played in Studio, Q177). Not chosen: play it now.
+- **Correction to Q116** (session 66, from the ledger's trial log): trial 2 as run started 105 studs up (lateral 72
+  outer / 6 inner) and fell a steady 40 studs/s (not ~102 and 42), first touch 2.0 s (outer foot) / 2.3 s (inner bank);
+  the build matches it (#321's Play check: 2.13 / 2.45 s); since #311's 2-stud ball it starts at 106 (the lip less the
+  ball's width).
 
 ## Roller Champions
 

@@ -69,7 +69,7 @@ Every PR's CI ran green with 0 annotations on every job; the stack head's suite 
 - RC's flat skating speed (Q161: the camera moves with the skater), RC's ball gravity (Q150), the drop-in's height and fall speed in RC (Q111: no side view), RC's straight-to-end proportion (Q164: only an oblique flyover), whether an opponent can cut in during RC's magnet pull (Q91): the owner judged these by playing.
 - A pass let go by a passer skating along the glass can touch it at the release: 2 of 42 in trial 346b, none of 72 in the built code's check.
 - The published 65adf98 was played as built code in Studio's two-player test (Q177), not yet in the Roblox Player.
-- The Presentation part: the crosshair with and without the ball and RC's small carrying ring (Q55, Q143); the ring overlapping the scoreboard on short screens and phones (#333, Q144); the goal's current worth on its housing ("+1", "+3"), a "Lap n Completed" caption and a fiery streak on each lap (Video 35); the HUD's declutter and phone buttons; the goal replay and celebration; the intro and kickoff cutscenes; the drop-in's look.
+- The Presentation part: the crosshair with and without the ball and RC's small carrying ring (Q55, Q143); the ring overlapping the scoreboard on short screens and phones (#333, Q144); the goal's current worth on its housing ("+1", "+3"), a "Lap n Completed" caption and a fiery streak on each lap (Video 35); the HUD's declutter and phone buttons; the goal replay and celebration; the intro and kickoff cutscenes; the drop-in's look; the kickoff count's place (it sits at the banner's, above RC's third of the way down, Q179).
 - A leaver replaced by a bot in every mode (Q97): M2. No team switching in ranked games (Q97): M7.
 
 ## Publishing notes

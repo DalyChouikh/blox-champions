@@ -41,7 +41,7 @@ local function marks(config: Config.GameConfig, count: number, full: number, col
 			LayoutOrder = index,
 			Size = size,
 			BackgroundColor3 = color,
-			BackgroundTransparency = if index <= full then 0 else config.UI.hud.dimTransparency,
+			BackgroundTransparency = Style.dim(config, index > full),
 			BorderSizePixel = 0,
 		})
 	end

@@ -3,9 +3,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
-local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
+local beforeEach = JestGlobals.beforeEach
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local PassTarget = require(ReplicatedStorage.Shared.Actions.PassTarget)
 local Reach = require(ReplicatedStorage.Shared.Actions.Reach)
 
@@ -14,30 +15,26 @@ local pass = Config.defaults().Actions.Pass.pass :: Config.PassSettings
 local PASSER = Vector3.new(10, 3, 10)
 local AIM = Vector3.new(0, 0, -5)
 
--- The surfaces that block a pass (the arena's, #315 Q155): the test folder's parts, none until a test adds some.
-local folder: Folder
-local blocking: RaycastParams
+-- The arena (#315 Q155) as these tests stand it in: it hides every teammate standing at a spot in `hidden`, and
+-- `asked` keeps the end of every line `choose` asked about. The server and the client cast along their ride surfaces.
+local hidden: { Vector3 } = {}
+local asked: { Vector3 } = {}
 
 beforeEach(function()
-	folder = Instance.new("Folder")
-	folder.Name = "PassTargetTest"
-	folder.Parent = workspace
-	blocking = RaycastParams.new()
-	blocking.FilterType = Enum.RaycastFilterType.Include
-	blocking.FilterDescendantsInstances = { folder }
+	table.clear(hidden)
+	table.clear(asked)
 end)
 
-afterEach(function()
-	folder:Destroy()
-end)
-
--- An anchored block of `size` centred `offset` from the passer, among the blocking surfaces.
-local function block(offset: Vector3, size: Vector3)
-	local part = Instance.new("Part")
-	part.Anchored = true
-	part.Size = size
-	part.CFrame = CFrame.new(PASSER + offset)
-	part.Parent = folder
+local function inTheOpen(from: Vector3, offset: Vector3): boolean
+	assert(from == PASSER, "a line starts at the passer")
+	local to = from + offset
+	table.insert(asked, to)
+	for _, spot in hidden do
+		if (to - spot).Magnitude < 1e-3 then
+			return false
+		end
+	end
+	return true
 end
 
 -- A teammate `offset` from the passer.
@@ -51,7 +48,7 @@ local function off(degrees: number, distance: number): Vector3
 end
 
 local function choose(teammates: { Reach.Candidate }, calls: { [string]: number }?): string?
-	return PassTarget.choose(pass, PASSER, AIM, teammates, calls or {}, blocking)
+	return PassTarget.choose(pass, PASSER, AIM, teammates, calls or {}, inTheOpen)
 end
 
 -- Magnetic Pass, RC's way (#315, the owner: Q103, Q105): a teammate in the aim's direction, a caller first.
@@ -99,17 +96,22 @@ describe("PassTarget.choose", function()
 	end)
 
 	-- The owner (Q155): no pass through the middle glass, nor anything else of the arena between the two skaters.
-	it("passes over a teammate the blocking surfaces hide from the passer, a caller too", function()
-		local hidden = mate("Hidden", off(0, 50))
+	it("passes over a teammate the arena hides from the passer, a caller too", function()
+		local behindGlass = mate("Hidden", off(0, 50))
 		local open = mate("Open", off(30, 40))
-		-- The floor under them both (their roots stand above it) blocks nobody.
-		block(Vector3.new(0, -3.5, -20), Vector3.new(200, 1, 200))
-		expect(choose({ hidden, open })).toBe("Hidden")
-		-- A pane across the aim 45 studs out, just short of Hidden (the whole line is looked along), 4 wide: Open, 34.6
-		-- studs out along the aim, is short of its plane.
-		block(off(0, 45), Vector3.new(4, 20, 0.5))
-		expect(choose({ hidden, open })).toBe("Open")
-		expect(choose({ hidden, open }, { Hidden = 2 })).toBe("Open")
-		expect(choose({ hidden }, { Hidden = 2 })).toBeNil()
+		expect(choose({ behindGlass, open })).toBe("Hidden")
+		table.insert(hidden, behindGlass.position)
+		expect(choose({ behindGlass, open })).toBe("Open")
+		expect(choose({ behindGlass, open }, { Hidden = 2 })).toBe("Open")
+		expect(choose({ behindGlass }, { Hidden = 2 })).toBeNil()
+	end)
+
+	-- A cast that hits allocates its result (~80 B, #315): the arena is asked about a teammate only once they are in
+	-- the cone and the range, along the whole line from the passer to them.
+	it("asks the arena only about teammates in the cone and the range, along the line to each", function()
+		local inCone = mate("In", off(10, 40))
+		choose({ mate("Wide", off(pass.coneDeg + 1, 40)), mate("Far", off(0, pass.maxRange + 1)), inCone })
+		expect(#asked).toBe(1)
+		Fixtures.expectNear(asked[1], inCone.position, 1e-4)
 	end)
 end)

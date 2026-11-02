@@ -713,7 +713,7 @@ describe("ActionController", function()
 		throw:Fire(false)
 		-- Held still (a kickoff's placement).
 		charging(1)
-		Fixtures.root(rig).Anchored = true
+		Fixtures.placed(rig)
 		frame()
 		expect(SkateController.charging).toBe(false)
 	end)
@@ -952,16 +952,15 @@ describe("ActionController", function()
 		expect(requests).toEqual({})
 	end)
 
-	it("spends the keys and resets the runner while frozen", function()
+	it("spends the keys and resets the runner while a placement holds the skater still", function()
 		setup()
 		press("Tackle")
 		frame()
 		expect(ActionController.runner.action).toBe("Tackle")
-		Fixtures.root(rig).Anchored = true
+		Fixtures.placed(rig)
 		press("Tackle")
 		frame()
 		expect(ActionController.runner.action).toBeNil()
-		Fixtures.root(rig).Anchored = false
 		frame()
 		expect(#requests).toBe(1)
 		-- The tackle's cooldown went with the reset.
@@ -1022,6 +1021,27 @@ describe("ActionController", function()
 		press("Tackle")
 		actionsOnly()
 		expect(requests).toEqual({ { action = "Tackle" }, { action = "Tackle" } })
+	end)
+
+	-- The owner (Q178): a Dive keeps to the move it follows, so the key names it after a tackle only with empty hands
+	-- and after a dodge only while the ball is still held; else the key's own action for the hands it has.
+	it("names no dive for a tackler the ball reached in the tackle's window: the key dodges", function()
+		setup()
+		press("Tackle")
+		actionsOnly()
+		BallCarrier:set(LOCAL_ID)
+		intoWindow(actionsOnly)
+		expect((ActionController:keyAction("tackle"))).toBe("Dodge")
+	end)
+
+	it("names no dive for a carrier whose ball went in the dodge's window: the key tackles", function()
+		setup()
+		BallCarrier:set(LOCAL_ID)
+		press("Tackle")
+		actionsOnly()
+		BallCarrier:set(nil)
+		intoWindow(actionsOnly, config.Actions.Dodge.followUp :: Config.FollowUp)
+		expect((ActionController:keyAction("tackle"))).toBe("Tackle")
 	end)
 
 	it("steps in under 0.1 ms", function()

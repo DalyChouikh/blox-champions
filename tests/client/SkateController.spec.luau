@@ -183,19 +183,6 @@ describe("SkateController", function()
 		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -Fixtures.FIRST_STRIDE))
 	end)
 
-	it("holds still while the root is anchored, then starts from rest", function()
-		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(0, 1))
-		for _ = 1, 10 do
-			SkateController:step(0.1)
-		end
-		Fixtures.root(rig).Anchored = true
-		SkateController:step(0.1)
-		Fixtures.expectNear((SkateController.skater :: any).velocity, Vector3.zero)
-		Fixtures.root(rig).Anchored = false
-		SkateController:step(0.1)
-		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -Fixtures.FIRST_STRIDE))
-	end)
-
 	-- Each kickoff stands everyone on their spawn, free to skate through its count (the owner, Q92): the server counts
 	-- the placement on the character (Attributes.Placed), and nothing going or pressed before it carries into the
 	-- kickoff.
@@ -339,13 +326,13 @@ describe("SkateController", function()
 		Fixtures.scriptedBinding(InputController.context, "Attach"):Fire(true)
 		SkateController:step(1 / 60)
 		expect(skater.mode).never.toBe("Attached")
-		-- The server's knockdown takes over; a kickoff freeze or a new character ends a dive too.
+		-- The server's knockdown takes over; a kickoff's placement or a new character ends a dive too.
 		rig:SetAttribute(Attributes.KnockedDown, "Hit")
 		SkateController:step(1 / 60)
 		expect(SkateController.diving).toBe(false)
 		rig:SetAttribute(Attributes.KnockedDown, nil)
 		SkateController.diving = true
-		Fixtures.root(rig).Anchored = true
+		Fixtures.placed(rig)
 		SkateController:step(1 / 60)
 		expect(SkateController.diving).toBe(false)
 		SkateController.diving = true
@@ -421,8 +408,8 @@ describe("SkateController", function()
 		expect(velocityOf(rig).Magnitude).toBeLessThan(movement.attachBoostSpeed)
 	end)
 
-	it("keeps telling the server about pump and brake during the freeze", function()
-		Fixtures.root(rig).Anchored = true
+	it("keeps telling the server about pump and brake while a placement holds it still", function()
+		Fixtures.placed(rig)
 		Fixtures.scriptedBinding(InputController.context, "Pump"):Fire(true)
 		SkateController:step(1 / 60)
 		expect(sent).toEqual({ { true, false, false } })
@@ -486,13 +473,12 @@ describe("SkateController", function()
 			rig:SetAttribute(Attributes.KnockedDown, "Fall")
 			SkateController:step(1 / 60)
 			expect(sent).toEqual({ POSED, STANDING, POSED, STANDING })
-			-- So do a kickoff freeze and a new character.
+			-- So do a kickoff's placement and a new character.
 			rig:SetAttribute(Attributes.KnockedDown, nil)
 			landPosed()
-			Fixtures.root(rig).Anchored = true
+			Fixtures.placed(rig)
 			SkateController:step(1 / 60)
 			expect(sent).toEqual({ POSED, STANDING, POSED, STANDING, POSED, STANDING })
-			Fixtures.root(rig).Anchored = false
 			landPosed()
 			SkateController:bind(skaterAt("Respawned", Vector3.new(50, 0, 0)))
 			SkateController:step(1 / 60)
@@ -939,7 +925,7 @@ describe("SkateController", function()
 			expect(math.deg(Vectors.angleBetween(shown, Vector3.yAxis))).toBeCloseTo(5.902, 2)
 			expect(math.deg(Vectors.angleBetween(shown, tilted))).toBeCloseTo(9.098, 2)
 		end
-		Fixtures.root(respawned).Anchored = true
+		Fixtures.placed(respawned)
 		SkateController:step(1 / 60)
 		Fixtures.expectNear(alignOf(respawned).SecondaryAxis, Vector3.yAxis)
 	end)

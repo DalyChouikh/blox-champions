@@ -17,6 +17,8 @@ export type DropInSettings = {
 	speed: number,
 	-- Straight down while it falls (studs/s).
 	descent: number,
+	-- The share of drops on the outer wall's line; the rest by the middle glass.
+	outerShare: number,
 }
 
 export type BallConfig = {
@@ -67,9 +69,9 @@ local defaults: BallConfig = {
 	-- A ruling (#308): a sixth of a body length a second; a ball rolling or rocking faster is not at rest.
 	restSpeed = 1,
 	-- The owner (Q111-Q116, #321): Roller Champions' drop from above at a random spot by either wall; trial 2 kept:
-	-- onto the outer wall's foot or the inner bank, 3.4 body lengths a second the lap's way, landing 2.0-2.3 s after
-	-- it appears (RC's took ~2.5 s).
-	dropIn = { outerIn = 8, innerIn = 6, speed = 20, descent = 40 },
+	-- onto the outer wall's foot or the inner bank, half the drops on each line (Q112), 3.4 body lengths a second the
+	-- lap's way, landing 2.1-2.5 s after it appears (measured in Play; RC's took ~2.5 s).
+	dropIn = { outerIn = 8, innerIn = 6, speed = 20, descent = 40, outerShare = 0.5 },
 	outOfBoundsMargin = 2,
 	-- RC carries the ball low in the right hand at the hip, the arm down (Video 13 at 99.0 s; the owner's trial #311,
 	-- Q130): just below the hand of an arm hanging at the side (measured in Play at (1.46, 0.36, 0) from the root).
@@ -96,7 +98,13 @@ local schema = Validate.checkAll(
 		rethrowPickupDelay = nonNegative,
 		strandedSeconds = positive,
 		restSpeed = positive,
-		dropIn = Validate.record({ outerIn = positive, innerIn = positive, speed = nonNegative, descent = positive }),
+		dropIn = Validate.record({
+			outerIn = positive,
+			innerIn = positive,
+			speed = nonNegative,
+			descent = positive,
+			outerShare = Validate.number({ min = 0, max = 1 }),
+		}),
 		outOfBoundsMargin = nonNegative,
 		carryOffset = Validate.check(Validate.datatype("Vector3"), Finite.vector, "must be finite"),
 		releaseClearance = positive,

@@ -39,7 +39,7 @@ export type ScoreTabProps = {
 local function switchTeamButton(config: Config.GameConfig, switchTeam: SwitchTeam, order: number): React.ReactElement
 	local hud = config.UI.hud
 	local height = hud.layout.scoreTab.rowHeight
-	local fade = if switchTeam.open then 0 else hud.dimTransparency
+	local fade = Style.dim(config, not switchTeam.open)
 	local children: { [string]: React.Node } = {
 		Layout = Style.list(config, Enum.FillDirection.Horizontal),
 		Label = Style.label(config, config.UI.text.switchTeam, 2, fade),

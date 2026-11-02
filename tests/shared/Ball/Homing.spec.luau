@@ -30,7 +30,7 @@ describe("Homing.aimOn", function()
 end)
 
 -- A pass leads its receiver (#315) at its steady speed (#346): it flies where they will be when it gets there. Worked
--- by bisection in s65\worked346.py, independently of the closed form.
+-- by bisection apart from the code, independently of the closed form.
 describe("Homing.lead", function()
 	it("meets a receiver skating across where they will be", function()
 		local run = Vector3.new(30, 0, 0)
@@ -61,7 +61,7 @@ describe("Homing.lead", function()
 end)
 
 -- A pass turns toward where its receiver will be without speeding up (#346, Q175): at most turnAccel sideways, so
--- turnAccel / speed x dt radians a step, always at its speed (worked in s65\worked346.py).
+-- turnAccel / speed x dt radians a step, always at its speed (worked apart from the code).
 describe("Homing.turn", function()
 	it("turns a pass at most turnAccel sideways, at its steady speed", function()
 		local heading = Vector3.new(0, 0, -150)
@@ -95,7 +95,7 @@ describe("Homing.turn", function()
 	end)
 
 	-- The owner's pick (Q175, Q176): a steady 150 studs/s turning at 300, aimed at the chest, caught 90% of passes over
-	-- real receivers' paths. The first frame within the catch reach, from s65\worked346.py's flights.
+	-- real receivers' paths. The first frame within the catch reach, from flights stepped apart from the code.
 	it("brings a pass to a teammate skating across, away, toward or cutting, and not to one turning back", function()
 		local cases: { { start: Vector3, run: (number) -> Vector3, frames: number? } } = {
 			{ start = Vector3.new(0, 0, -80), run = skating(Vector3.new(55, 0, 0)), frames = 32 },

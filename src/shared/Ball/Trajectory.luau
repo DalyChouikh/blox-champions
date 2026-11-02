@@ -10,8 +10,10 @@ local Trajectory = {}
 local FLAT_EPSILON = 1e-9
 
 -- How many rounds Trajectory.toward takes to settle a launch whose aim and flight time depend on each other. Each
--- round shrinks the miss by about the carry's share of the throw across it: 12 hold a tap at 90 studs/s thrown
--- sideways off a skater at the speed limit (a carry of 50) to 0.004 studs; a throw along its carry settles sooner.
+-- round shrinks the miss by about the carry's share of the throw across it. Worked apart from the code: 12 hold a
+-- tap at 90 studs/s thrown sideways at a spot 20 studs out to 0.001 studs off a skater at hardCap (121, a carry of
+-- 60.5) and to 0.2 off one at the server's speed limit (145.2, a carry of 72.6); a throw along its carry settles
+-- sooner.
 local CARRY_ROUNDS = 12
 
 function Trajectory.positionAt(position: Vector3, velocity: Vector3, gravity: Vector3, t: number): Vector3

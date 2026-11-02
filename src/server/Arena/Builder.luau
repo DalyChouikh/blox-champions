@@ -16,7 +16,7 @@ local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 type ArenaConfig = Config.ArenaConfig
 type Piece = Types.Piece
 
--- Invisible parts: the tag-only gates and ball spawns, and an open map's ceiling.
+-- Invisible parts: the tag-only gates and an open map's ceiling.
 local HIDDEN = 1
 
 local Builder = {}

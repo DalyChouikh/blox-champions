@@ -97,7 +97,7 @@ describe("Config defaults", function()
 			rethrowPickupDelay = 0.4,
 			strandedSeconds = 5,
 			restSpeed = 1,
-			dropIn = { outerIn = 8, innerIn = 6, speed = 20, descent = 40 },
+			dropIn = { outerIn = 8, innerIn = 6, speed = 20, descent = 40, outerShare = 0.5 },
 			outOfBoundsMargin = 2,
 			carryOffset = Vector3.new(1.7, -0.8, -0.3),
 			releaseClearance = 0.05,
@@ -1210,6 +1210,8 @@ describe("Config.forMode", function()
 			{ dropIn = { innerIn = 40, outerIn = 40 }, message = apart },
 			{ dropIn = { descent = 0 }, message = "Ball.dropIn.descent: must be > 0 (got 0)" },
 			{ dropIn = { speed = -1 }, message = "Ball.dropIn.speed: must be >= 0 (got -1)" },
+			{ dropIn = { outerShare = -0.1 }, message = "Ball.dropIn.outerShare: must be >= 0 (got -0.1)" },
+			{ dropIn = { outerShare = 1.1 }, message = "Ball.dropIn.outerShare: must be <= 1 (got 1.1)" },
 		}
 		for _, case in cases do
 			expect(function()
@@ -1219,8 +1221,9 @@ describe("Config.forMode", function()
 	end)
 
 	it("accepts a drop just inside its limits", function()
-		local inside = { innerIn = 1.5, outerIn = 78.4, speed = 0, descent = 0.01 }
+		local inside = { innerIn = 1.5, outerIn = 78.4, speed = 0, descent = 0.01, outerShare = 1 }
 		expect(Fixtures.config({ Ball = { dropIn = inside } }).Ball.dropIn).toEqual(inside)
+		expect(Fixtures.config({ Ball = { dropIn = { outerShare = 0 } } }).Ball.dropIn.outerShare).toBe(0)
 	end)
 
 	it("rejects the old ball spawn settings as unknown", function()

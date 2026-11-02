@@ -2,9 +2,9 @@
 -- A Magnetic Pass steering toward its receiver (spec §8.2): it flies at a steady speed, leaving for and each step
 -- turning toward where the receiver's chest will be when it gets there (#315, #346), so it flies straight into the
 -- hands of a teammate skating across and bends after one who cuts. Steered at the receiver's spot alone, a pass to a
--- teammate 80 studs out skating across at 55 studs/s passed 25.6 studs from them (#315; s60\lead315.py). Speeding up
--- toward them instead (#315's homing), a pass turned slower the faster it got, and missed receivers who turned late
--- (the owner's trial, Q174; replayed over real receivers' paths: 64% caught, 90% at a steady speed, Q175).
+-- teammate 80 studs out skating across at 55 studs/s passed 25.6 studs from them (#315, simulated apart from the code).
+-- Speeding up toward them instead (#315's homing), a pass turned slower the faster it got, and missed receivers who
+-- turned late (the owner's trial, Q174; replayed over real receivers' paths: 64% caught, 90% at a steady speed, Q175).
 -- Allocates nothing.
 
 local Vectors = require(script.Parent.Parent.Util.Vectors)

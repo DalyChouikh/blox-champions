@@ -6,10 +6,10 @@
 -- - steps SkateMath, slides the skater along any ride surface in its way, and writes the result into the skater body
 --   the server built, whose up eases toward the skating's (#255).
 -- Whenever the server places the character (each kickoff: everyone back on their spawn, free to skate through the
--- count), it starts the skater over from rest there; it holds the skater still while its root is anchored and until
--- the arena has reached this client. A knocked-down skater (the server's KnockedDown attribute) lets go of any attach
--- and only slides; knocked down by a strike or a fall, they ask the server to get up (GetUp) once per knockdown, as
--- soon as the stick moves: the server decides when.
+-- count), it starts the skater over from rest there; it holds the skater still until the arena has reached this client.
+-- A knocked-down skater (the server's KnockedDown attribute) lets go of any attach and only slides; knocked down by a
+-- strike or a fall, they ask the server to get up (GetUp) once per knockdown, as soon as the stick moves: the server
+-- decides when.
 -- A diver's own knockdown ends when the slide stops (the server sees it, #242). A diver (`diving`) lets go of any
 -- attach too and glides until that knockdown. While Roblox's menu holds the keys the skater lets go of any attach too,
 -- with no release boost. Actions push the skater through `push`; the pump does nothing while a throw charges
@@ -624,7 +624,7 @@ local SkateController: SkateController = {
 		local placed: number? = character:GetAttribute(Attributes.Placed) :: number?
 		local wasPlaced = placed ~= self._placed
 		self._placed = placed
-		self.frozen = root.Anchored or not self._surfaces.ready or wasPlaced
+		self.frozen = not self._surfaces.ready or wasPlaced
 		if self.frozen then
 			startOver(self, root, skater)
 			return

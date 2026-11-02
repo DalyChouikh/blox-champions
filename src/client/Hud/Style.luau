@@ -43,6 +43,12 @@ function Style.teamColor(config: Config.GameConfig, team: Team.Team?): Color3
 	return if team ~= nil then config.UI.teamColors[team] else config.UI.hud.textColor
 end
 
+-- How see-through something greyed is (a control, a hint or a button that would do nothing, an empty pip):
+-- UI.hud.dimTransparency; else solid.
+function Style.dim(config: Config.GameConfig, greyed: boolean): number
+	return if greyed then config.UI.hud.dimTransparency else 0
+end
+
 -- A panel: the HUD's panel colour, see-through by panelTransparency.
 function Style.panel(config: Config.GameConfig, props: Props?): Props
 	local hud = config.UI.hud

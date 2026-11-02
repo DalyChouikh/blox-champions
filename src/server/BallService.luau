@@ -250,32 +250,35 @@ local function clearToward(self: BallService, from: Vector3, spot: Vector3): Vec
 	return from + way.Unit * hit.Distance + hit.Normal * self._config.Ball.releaseClearance
 end
 
+-- The root the carried ball is welded to; nil while nobody carries it.
+local function carrierRoot(self: BallService): BasePart?
+	local weld = self._weld
+	return if weld ~= nil then weld.Part0 else nil
+end
+
 -- Where the carried ball leaves if let go now, `rise` straight above the hand: there, or the nearest point toward it
 -- from the carrier's root that is clear of the arena (#345). A ball nobody carries leaves from where it is.
 local function leavingFrom(self: BallService, rise: number): Vector3
 	local part = self.part
-	local weld = self._weld
-	local root = if weld ~= nil then weld.Part0 else nil
+	local root = carrierRoot(self)
 	if root == nil then
 		return part.Position
 	end
 	return clearToward(self, root.Position, part.Position + Vector3.yAxis * rise)
 end
 
--- Lets go of the ball if someone carries it: a free physics part again, simulated by the server. The weld goes
--- first: network ownership is set for a whole assembly, and while welded the ball is part of its carrier's. The ball
--- leaves `rise` above the carrier's hand, or clear of the arena near there (leavingFrom, #345), within touch of
--- their collider, so it passes through them until it is clear of them: a throw across their body would otherwise
--- bounce off it. It keeps the carrier's velocity, read while still welded into their assembly, up to the speed
--- limit.
-local function release(self: BallService, rise: number)
+-- Lets go of the ball if someone carries it: a free physics part again, simulated by the server. The weld goes first:
+-- network ownership is set for a whole assembly, and while welded the ball is part of its carrier's. The ball leaves
+-- from `from` (a point clear of the arena: leavingFrom, #345), within touch of their collider, so it passes through
+-- them until it is clear of them: a throw across their body would otherwise bounce off it. It keeps the carrier's
+-- velocity, read while still welded into their assembly, up to the speed limit.
+local function release(self: BallService, from: Vector3)
 	local weld = self._weld
 	if weld == nil then
 		return
 	end
 	local part = self.part
 	local carried = part.AssemblyLinearVelocity
-	local from = leavingFrom(self, rise)
 	local root = weld.Part0
 	local character = if root then root.Parent else nil
 	local collider = if character then character:FindFirstChild(SkaterRig.collider) :: BasePart? else nil
@@ -298,13 +301,18 @@ local function release(self: BallService, rise: number)
 	end
 end
 
--- Lets the carrier's ball go at `velocity`, `rise` above the hand (release), flying loose from their throw.
-local function letGo(self: BallService, player: PlayerId, velocity: Vector3, rise: number)
+-- Refuses a throw from anyone but the carrier.
+local function mustCarry(self: BallService, player: PlayerId)
 	local carrier = self.state.carrier
 	if carrier ~= player then
 		error(`BallService: only the carrier can throw (carrier: {carrier or "none"}, thrower: {player})`, 0)
 	end
-	release(self, rise)
+end
+
+-- Lets the carrier's ball go at `velocity` from `from` (release), flying loose from their throw.
+local function letGo(self: BallService, player: PlayerId, velocity: Vector3, from: Vector3)
+	mustCarry(self, player)
+	release(self, from)
 	self.part.AssemblyLinearVelocity = velocity
 	markThrown(self, true)
 	self.state:throw()
@@ -335,7 +343,7 @@ end
 -- Into play from above at a random start (Ball/DropIn), holding the drop-in's velocity there, its weight cancelled.
 local function dropIn(self: BallService)
 	rebuiltIfDestroyed(self)
-	release(self, 0)
+	release(self, leavingFrom(self, 0))
 	endGuidance(self)
 	markThrown(self, false)
 	local config = self._config
@@ -355,7 +363,7 @@ end
 -- Back into play by a drop-in from wherever it was, a carried ball taken from its carrier first.
 local function respawn(self: BallService, frame: BallFrame)
 	if self.state.status == "Carried" then
-		release(self, 0)
+		release(self, leavingFrom(self, 0))
 		self.state:drop()
 	end
 	dropIn(self)
@@ -604,7 +612,7 @@ local BallService: BallService = {
 	end,
 
 	kill = function(self: BallService)
-		release(self, 0)
+		release(self, leavingFrom(self, 0))
 		endGuidance(self)
 		markThrown(self, false)
 		self.state:kill()
@@ -619,25 +627,24 @@ local BallService: BallService = {
 	end,
 
 	throw = function(self: BallService, player: PlayerId, velocity: Vector3)
-		letGo(self, player, velocity, 0)
+		letGo(self, player, velocity, leavingFrom(self, 0))
 	end,
 
 	pass = function(self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId)
-		letGo(self, player, velocity, self._pass.releaseHeight)
+		letGo(self, player, velocity, leavingFrom(self, self._pass.releaseHeight))
 		self._passTarget = target
 		self._lift.Enabled = true
 	end,
 
 	roll = function(self: BallService, player: PlayerId, velocity: Vector3)
-		local weld = self._weld
-		local root = if weld ~= nil then weld.Part0 else nil
-		self:throw(player, velocity)
-		-- A carried ball is welded to its carrier's root: `throw` refused anyone else.
-		local frame = (root :: BasePart).CFrame
+		mustCarry(self, player)
+		-- A carried ball is welded to its carrier's root. It leaves on the floor under the hand, or clear of the
+		-- arena on the way there (#345): one cast.
+		local frame = (carrierRoot(self) :: BasePart).CFrame
 		local ball, offset = self._config.Ball, self._config.Ball.carryOffset
-		local part = self.part
 		local under = frame * Vector3.new(offset.X, ball.radius - self._config.Movement.hoverHeight, offset.Z)
-		part.Position = clearToward(self, frame.Position, under)
+		letGo(self, player, velocity, clearToward(self, frame.Position, under))
+		local part = self.part
 		-- Already rolling, its bottom still on the floor: Roblox's friction turns a sliding ball's slide into a roll at
 		-- 5/7 of its speed (measured for #311), so this keeps the charge's whole speed.
 		part.AssemblyAngularVelocity = frame.UpVector:Cross(velocity) / ball.radius
@@ -645,7 +652,7 @@ local BallService: BallService = {
 	end,
 
 	drop = function(self: BallService, velocity: Vector3?)
-		release(self, 0)
+		release(self, leavingFrom(self, 0))
 		if velocity ~= nil then
 			self.part.AssemblyLinearVelocity = Vectors.clampMagnitude(velocity, self._speedLimit)
 		end

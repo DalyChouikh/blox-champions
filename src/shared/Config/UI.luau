@@ -124,8 +124,9 @@ export type HudLayout = {
 	getUp: Place,
 }
 
--- How the HUD looks and how long its messages last. dimTransparency fades an empty pip; glowThickness (pixels)
--- outlines the lap bar while the goal is open, and the touch throw button while Ball Focus is on.
+-- How the HUD looks and how long its messages last. dimTransparency greys what would do nothing (a control, a hint,
+-- the Switch team button) and fades an empty pip (Style.dim); glowThickness (pixels) outlines the lap bar while the
+-- goal is open, and the touch throw button while Ball Focus is on.
 export type HudSettings = {
 	font: Enum.Font,
 	textColor: Color3,

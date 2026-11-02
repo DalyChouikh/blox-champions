@@ -120,6 +120,7 @@ export type ActionService = {
 	-- their direction where a ray finds them (SmoothNormals.reader, as the skating reads it: #294; a fake in tests),
 	-- and what the last ray found.
 	_rideParams: RaycastParams,
+	_inTheOpen: PassTarget.InTheOpen,
 	_smoothNormal: SmoothNormals.Reader,
 	_ground: SkateTypes.Ground,
 	_knockdowns: { Knockdown },
@@ -209,7 +210,7 @@ end
 
 -- An action the runner started that cannot take effect (a pass with nobody to go to): stopped with its cooldown and
 -- any follow-up window it opened given back, and refused as `reject` does.
-local function refuse(self: ActionService, player: PlayerId, action: Config.ActionName)
+local function takeBack(self: ActionService, player: PlayerId, action: Config.ActionName)
 	recordOf(self, player).runner:cancel(action, true)
 	reject(self, player, action)
 end
@@ -411,10 +412,10 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Roll: Effect, 
 		local pass = action.pass :: Config.PassSettings
 		local teammates = candidates(self, player, true)
 		local target =
-			PassTarget.choose(pass, holder.root.Position, payload.aim, teammates, self._calls, self._rideParams)
+			PassTarget.choose(pass, holder.root.Position, payload.aim, teammates, self._calls, self._inTheOpen)
 		local receiver = if target ~= nil then self._holderOf[target] else nil
 		if receiver == nil then
-			refuse(self, player, payload.action)
+			takeBack(self, player, payload.action)
 			return
 		end
 		local from = self._ball:passPoint()
@@ -447,6 +448,7 @@ local ActionService: ActionService = {
 	_candidates = {},
 	_context = { hasBall = false, knockedDown = false },
 	_rideParams = nil :: any,
+	_inTheOpen = nil :: any,
 	_smoothNormal = nil :: any,
 	_ground = nil :: any,
 	_knockdowns = {},
@@ -475,6 +477,9 @@ local ActionService: ActionService = {
 		rideParams.FilterType = Enum.RaycastFilterType.Include
 		rideParams.FilterDescendantsInstances = deps.ArenaService.arena.rideSurfaces
 		self._rideParams = rideParams
+		self._inTheOpen = function(from: Vector3, offset: Vector3): boolean
+			return workspace:Raycast(from, offset, rideParams) == nil
+		end
 		self._smoothNormal = deps.SmoothNormal or SmoothNormals.reader(config.Arena, config.Movement.cornerDeg)
 		self._ground = { hit = false, normal = Vector3.yAxis, distance = 0 }
 		self._knockdowns = {}

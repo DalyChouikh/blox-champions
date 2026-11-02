@@ -114,7 +114,7 @@ The M1 spec's §9.1 (layout, dimensions, markers, goal placement), §9.2 (folder
 10. **The gate wall follows the cross-section as built** (amended 2026-10-27). It runs from the solid section at the gate (a straight's and a curved end's blended halfway there) up to the walls' top outline (the lips' chords and 120). Its slices break at every point of either outline, so its edges lie on the surface's and the lips' own chords; equal slices would cut across the rise and the foot curves. Breaks closer than Roblox's smallest part (0.001) merge into one. It is `gatePanel.depth` (0.2) thick, behind the gate's plane, and keeps the name "gate panel" in code. The goal hangs in gate 2's plane, centred on it, so the wall must be thinner than half the goal's thinnest part (§3.3, rule 8): at 0.5 the wall's back face lay in the rim's face plane and the rim flickered (seen 2026-10-27; clean at 0.2). Cost if wrong: none. *(2026-10-26: an opening of half an ellipse, `gatePanel.openingHeight` 60, in `gatePanel.segments` 16 slices, 2 deep.)*
 11. **The goal's arm comes from the outer glass.** A post rises from the rim's top up to `goal.arm.height` (51 since #268, was 40), then a beam runs out to the outer glass's face. That works on both kinds of top. Cost if wrong: none.
 12. **The beam covers the vertical outer glass**, from the solid wall's top (40 since #268, was 28) up to where the lip starts (108). Cost if wrong: none.
-13. **A lap at cruise speed takes about 13 s** (777 studs at 60), past the M1 spec's 10–12 s target. The Feel part tunes speeds. (The Feel part's #265 lowered cruise to 46 studs/s, 55 km/h: 16.9 s, computed. On #268's map a skater holding the stick along the spawn lane, u 27, 695 studs round, laps in 15.0 s, measured in Play.) Cost if wrong: longer laps until then.
+13. **A lap at cruise speed takes about 13 s** (777 studs at 60), past the M1 spec's 10–12 s target. The Feel part tunes speeds. (The Feel part's #265 lowered cruise to 46 studs/s, 55 km/h: 16.9 s, computed. On #268's map a skater holding the stick along the spawn lane, u 27, 695 studs round, laps in 15.0 s, measured in Play; #328's stride of 51: 13.48 s; #329's straights of 260: 15.82 s.) Cost if wrong: longer laps until then.
 14. **The middle** keeps a floor slab (untagged, not rideable) at the lowest floor's height, 38 wide between the inner glass slabs. Cost if wrong: one number.
 
 ---
@@ -162,7 +162,7 @@ Both sections have the same six solid pieces: a curved end's bowl splits where a
 
 | Key | Task 1 | New |
 |---|---|---|
-| `straightLength` | 200 | 200 |
+| `straightLength` | 200 | 200 (260 since #329) |
 | `endRadius` | 70 | 60 |
 | `trackWidth` | 60 | 80 |
 | `outerWallHeight` / `innerBankHeight` | 28 / 8 | 40 (28 until #268) / 8 (16 since #217) |

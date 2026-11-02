@@ -4,14 +4,15 @@
 --   MatchSnapshot  server → clients  { frame, match, names }: after each batch, on each seat change, and to a joiner
 --   BallCarrier    server → clients  { carrier = PlayerId? } whenever the ball changes hands
 --   SkateState     client → server   { pump, brake, airPose } whenever one changes (Net/Schemas checks it)
---   ActionRequest  client → server   { action, aim?, charge? } when a player starts an action (Net/Schemas)
+--   ActionRequest  client → server   { action, aim?, spot?, charge? } when a player starts an action (Net/Schemas)
 --   ActionRejected server → client   { action } when the server refuses it, so the client cancels it
 --   GetUp          client → server   {} once per knockdown, when the knocked-down player moves (Net/Schemas)
 --   SwitchTeam     client → server   {} when a player asks to switch to the other team (#310; Net/Schemas)
 -- Streams are UnreliableRemoteEvents: each message soon makes the last one stale, so a lost one is not resent.
 --   BallState      server → clients  position, velocity, supported, serverTime: the loose ball each frame it moves
 --                                    and every Network.ballStream.restSeconds at rest, and whether a lift or the
---                                    ground bears its weight (#316, #337; Client/BallView draws it)
+--                                    ground bears its weight (#316, #337; Client/BallView draws it); four values,
+--                                    not a record, which every client would receive as a new table each message
 
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 

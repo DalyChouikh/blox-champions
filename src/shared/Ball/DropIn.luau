@@ -19,13 +19,18 @@ local DropIn = {}
 function DropIn.start(arena: ArenaConfig, ball: BallConfig, distance: number, outer: boolean): Vector3
 	local dropIn = ball.dropIn
 	local lateral = if outer then arena.trackWidth - dropIn.outerIn else dropIn.innerIn
-	local position = Centerline.pose(arena, distance, lateral, Profile.lipStart(arena) - 2 * ball.radius)
-	return position
+	return (Centerline.pose(arena, distance, lateral, Profile.lipStart(arena) - 2 * ball.radius))
 end
 
--- A new drop's start: anywhere round the loop, on either line alike (Q112).
+-- A new drop's start: anywhere round the loop, on the outer wall's line for dropIn.outerShare of them, else the
+-- middle glass's (Q112: half each).
 function DropIn.pick(arena: ArenaConfig, ball: BallConfig, random: Random): Vector3
-	return DropIn.start(arena, ball, random:NextNumber(0, Centerline.length(arena)), random:NextNumber() < 0.5)
+	return DropIn.start(
+		arena,
+		ball,
+		random:NextNumber(0, Centerline.length(arena)),
+		random:NextNumber() < ball.dropIn.outerShare
+	)
 end
 
 -- The velocity a drop holds at `position`: the lap's way along the track there at dropIn.speed, and straight down

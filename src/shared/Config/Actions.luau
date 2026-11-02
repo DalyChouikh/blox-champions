@@ -191,13 +191,14 @@ local defaults: ActionsConfig = {
 		airMultiplier = 0.4,
 		followUp = { action = "Dive", from = 0.1, to = 1 },
 	},
-	-- Roller Champions' dive (the owner's Videos 5 and 6), only as a follow-up: the Tackle's with empty hands, or the
-	-- Dodge's with the ball (#314), which the carrier keeps (Q102) and dives with as hard (Q152). 72 km/h along the
-	-- way, or a faster skater's own speed, and in the air down the fall line, speeding up (RC: 19 -> 65 km/h at the
-	-- press, 133 at the touchdown 1.1 s later). Its strike is a 0.3 s flight (the owner, #277 Q66: shorter, as RC's
-	-- ~0.3 s), then on the belly until the slide is under 2 studs/s (2.4 km/h), 1.5 s at most (the owner, #242: RC's
-	-- slid to 0-3 km/h in 0.7-0.8 s, and every action came back at the stop). It snaps to an opponent beside the diver,
-	-- even a little behind (Q64: the owner's dives missed opponents 10-19 studs away, 62-96 deg off the facing).
+	-- Roller Champions' dive (the owner's Videos 5 and 6), only as a follow-up and with the hands that move had (Q178):
+	-- the Tackle's empty, or the Dodge's on the ball (#314), which the carrier keeps (Q102) and dives with as hard
+	-- (Q152). 72 km/h along the way, or a faster skater's own speed, and in the air down the fall line, speeding up
+	-- (RC: 19 -> 65 km/h at the press, 133 at the touchdown 1.1 s later). Its strike is a 0.3 s flight (the owner, #277
+	-- Q66: shorter, as RC's ~0.3 s), then on the belly until the slide is under 2 studs/s (2.4 km/h), 1.5 s at most
+	-- (the owner, #242: RC's slid to 0-3 km/h in 0.7-0.8 s, and every action came back at the stop). It snaps to an
+	-- opponent beside the diver, even a little behind (Q64: the owner's dives missed opponents 10-19 studs away, 62-96
+	-- deg off the facing).
 	Dive = {
 		phases = { windup = 0, active = 0.3, recovery = 0.9 },
 		cooldown = 0.8,
