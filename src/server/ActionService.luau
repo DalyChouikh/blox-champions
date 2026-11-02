@@ -1,14 +1,16 @@
 --!strict
 -- The server's side of actions (spec §3.3, §8.1, §13). Every request a client sends is checked again in that player's
--- own ActionRunner and applied here, or refused with ActionRejected: a follow-up (the Tackle's Dive) only inside its
--- window after a Tackle the server itself started. Throws, rolls and passes go through BallService. Strikes are judged
--- each frame against the server's positions and knock down the nearest opponent they reach; every strike
+-- own ActionRunner and applied here, or refused with ActionRejected: a follow-up (the Dive) only inside its window
+-- after a Tackle or a Dodge the server itself started. Throws, rolls and passes go through BallService. Strikes are
+-- judged each frame against the server's positions and knock down the nearest opponent they reach; every strike
 -- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns (each with
 -- its kind, Attributes.Knockdown), the running action (until its recovery) and calls for a pass show as character
 -- attributes every client reads. Each frame the server casts its own ray along each skater's down: a hard landing
 -- (Skate/Fall), or any landing while their client reports the Air Pose (touching down posed, #245), knocks them down as
--- a fall, and so does a diver's first touch of the ground past the dive's active phase (an action with a landing ends
--- on the belly; nothing else starts meanwhile). No one scores those knockdowns. A player knocked down by a strike or a
+-- a fall, and a diver's first touch of the ground past the dive's active phase as a dive (an action with a landing
+-- ends on the belly; nothing but a carrier's throw starts meanwhile). A carrier keeps the ball through their own dive
+-- and can still be struck on the belly (#314); every other knockdown drops it. No one scores the knockdowns a player
+-- deals themselves. A player knocked down by a strike or a
 -- fall whose client asks to get up (GetUp, sent when they move) is up once Actions.getUpAfter has passed since the
 -- knockdown, never sooner; a diver is up once their root slides slower than the landing's stopSpeed along the ground,
 -- whatever they ask (#242); anyone, at the latest after the knockdown's seconds.
@@ -58,6 +60,8 @@ type Record = {
 	hitSeconds: number,
 	-- Seconds left knocked down; 0 when on their feet.
 	knockdownLeft: number,
+	-- The last knockdown's kind: theirs while knockdownLeft is above 0.
+	knockdown: Attributes.Knockdown,
 	-- When the last knockdown began (the service's clock), and whether they asked to get up since.
 	downSince: number,
 	getUp: boolean,
@@ -173,6 +177,7 @@ local function recordOf(self: ActionService, player: PlayerId): Record
 			hit = nil,
 			hitSeconds = 0,
 			knockdownLeft = 0,
+			knockdown = "Hit",
 			downSince = 0,
 			getUp = false,
 			stopSpeed = nil,
@@ -200,18 +205,21 @@ local function reject(self: ActionService, player: PlayerId, action: Config.Acti
 	self._net:fireTo(player, Remotes.names.ActionRejected, { action = action })
 end
 
-local function knockedDown(self: ActionService, player: PlayerId): boolean
+-- The kind of knockdown the player is down by; nil on their feet.
+local function knockdownOf(self: ActionService, player: PlayerId): Attributes.Knockdown?
 	local record = self._records[player]
-	return record ~= nil and record.knockdownLeft > 0
+	return if record ~= nil and record.knockdownLeft > 0 then record.knockdown else nil
 end
 
 -- A teammate who can catch a pass, or an opponent a strike can reach (Reach.strikable).
 local function reachable(self: ActionService, other: Holder, team: Team.Team?, teammates: boolean): boolean
-	local otherTeam: Team.Team? = self._teams:teamOf(other.player)
+	local player = other.player
+	local otherTeam: Team.Team? = self._teams:teamOf(player)
 	if teammates then
 		return otherTeam == team and other.canCatch
 	end
-	return Reach.strikable(team, otherTeam, knockedDown(self, other.player), self:isImmune(other.player))
+	local carrying = self._ball.state.carrier == player
+	return Reach.strikable(team, otherTeam, knockdownOf(self, player), carrying, self:isImmune(player))
 end
 
 -- Fills the reused candidate list with the other holders a player's action can reach (`reachable`).
@@ -244,9 +252,9 @@ local function addKnockdown(self: ActionService, attacker: PlayerId, victim: Pla
 end
 
 -- Down for `seconds` as `kind`: their action (a dive's landing with it) stops without a refund, and a carried ball
--- drops with their momentum. A request to get up made before it no longer counts. A diver's own touchdown passes its
--- landing's `stopSpeed`. Only a knockdown someone dealt is listed for the rules; a diver's own touchdown and a fall
--- have no `attacker`.
+-- drops with their momentum, except at a diver's own touchdown (#314, Q102: RC's carrier dives and slides with it). A
+-- request to get up made before it no longer counts. A diver's own touchdown passes its landing's `stopSpeed`. Only a
+-- knockdown someone dealt is listed for the rules; a diver's own touchdown and a fall have no `attacker`.
 local function knockDown(
 	self: ActionService,
 	attacker: PlayerId?,
@@ -257,6 +265,7 @@ local function knockDown(
 )
 	local record = recordOf(self, victim)
 	record.knockdownLeft = seconds
+	record.knockdown = kind
 	record.downSince = self._now
 	record.getUp = false
 	record.stopSpeed = stopSpeed
@@ -268,7 +277,7 @@ local function knockDown(
 	show(self, victim, record)
 	setAttribute(self, victim, Attributes.KnockedDown, kind)
 	local holder = self._holderOf[victim]
-	if holder ~= nil and self._ball.state.carrier == victim then
+	if kind ~= "Dive" and holder ~= nil and self._ball.state.carrier == victim then
 		self._ball:drop(holder.root.AssemblyLinearVelocity)
 	end
 	if attacker ~= nil then
@@ -496,7 +505,7 @@ local ActionService: ActionService = {
 		local record = recordOf(self, player)
 		local context = self._context
 		context.hasBall = self._ball.state.carrier == player
-		context.knockedDown = knockedDown(self, player) or record.landing ~= nil
+		context.knockedDown = knockdownOf(self, player) ~= nil or record.landing ~= nil
 		if record.runner:start(name, context, self._config.Network.actionTimingTolerance) ~= "Started" then
 			reject(self, player, name)
 			return

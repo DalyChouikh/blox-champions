@@ -4,6 +4,7 @@
 
 local Actions = require(script.Parent.Parent.Config.Actions)
 local Pickup = require(script.Parent.Parent.Ball.Pickup)
+local SkateTypes = require(script.Parent.Parent.Skate.Types)
 local Types = require(script.Parent.Parent.Rules.Types)
 
 -- A player and where they are: the shape pickups already use, so one list can serve both.
@@ -50,10 +51,19 @@ function Reach.nearest(
 	return best
 end
 
--- Whether a strike may reach, or home onto, a player of `otherTeam` (nil without a seat): an opponent on their
--- feet and not dodging. The server's hit and the client's homing (#277) share it.
-function Reach.strikable(team: string?, otherTeam: string?, knockedDown: boolean, dodging: boolean): boolean
-	return otherTeam ~= nil and otherTeam ~= team and not knockedDown and not dodging
+-- Whether a strike may reach, or home onto, a player of `otherTeam` (nil without a seat), down by `knockdown` (nil on
+-- their feet) and `carrying` the ball: an opponent not dodging, on their feet or a carrier sliding on the belly after
+-- their own dive (#314, the owner: Q153; the ball stays stealable). The server's hit and the client's homing (#277)
+-- share it.
+function Reach.strikable(
+	team: string?,
+	otherTeam: string?,
+	knockdown: SkateTypes.Knockdown?,
+	carrying: boolean,
+	dodging: boolean
+): boolean
+	local open = knockdown == nil or (knockdown == "Dive" and carrying)
+	return otherTeam ~= nil and otherTeam ~= team and open and not dodging
 end
 
 -- Whether `offset` (from the attacker) lies within the cone's angle, whatever its range: a homing strike keeps

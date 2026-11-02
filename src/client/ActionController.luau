@@ -9,10 +9,11 @@
 -- A throw charges while its key is held with the ball (RC's crosshair shows how far, #312), and starting any action
 -- ends the charge: a throw, or Roll Ball on the uppercut key, spends it; a Dodge drops it (Cancel & Dodge); no pass
 -- starts meanwhile, and the skating pumps nothing (SkateController.charging). A throw let go while another action
--- runs waits for it. The tackle key dives in the Tackle's follow-up window (#240). A Tackle, Dive or Uppercut homes
--- (#277): it turns the skater at once toward the nearest opponent it may reach in its snap zone, else its cone, around
--- the stick's way (else toward that way), and bends toward them while they stay in the cone, until its recovery; the
--- server still judges every hit. Nothing starts while the skater is held still (SkateController.frozen), knocked down
+-- runs waits for it. The tackle key dives in the Tackle's follow-up window (#240), and with the ball in the Dodge's
+-- (#314), the ball kept. A Tackle, Dive or Uppercut homes (#277): it turns the skater at once toward the nearest
+-- opponent it may reach in its snap zone, else its cone, around the stick's way (else toward that way), and bends
+-- toward them while they stay in the cone, until its recovery; the server still judges every hit. Nothing starts while
+-- the skater is held still (SkateController.frozen), and nothing but a carrier's throw (#314, Q154) while knocked down
 -- or diving: an action with a landing (the Dive) holds the skater (SkateController.diving) until the server knocks
 -- them down at their touchdown, or until the server's rule for that knockdown's end holds here (#286), and a
 -- knockdown stops the running action, as the server stops it.
@@ -77,10 +78,10 @@ export type ActionController = {
 	_goal: Goal,
 	_sendRequest: (payload: { [string]: any }) -> (),
 	_localId: PlayerId,
-	-- Records reused every step: the keys, an action's start, and which action a key names (never knocked down).
+	-- Records reused every step: the keys, and what the player is doing for an action's start and for which action a
+	-- key names (contextNow).
 	_keys: InputController.ActionKeys,
 	_context: ActionRunner.Context,
-	_keyContext: ActionRunner.Context,
 	-- Seconds the throw has been held with the ball; nil while not charging.
 	_charge: number?,
 	-- The throw key was seen up while the player held the ball, so holding it now charges a throw.
@@ -93,22 +94,33 @@ export type ActionController = {
 	_lungeEase: number,
 	-- The action holding the skater in a dive (one with a landing), from its start.
 	_landing: Config.ActionName?,
-	-- The running strike's target (#277): their root and team; nil when it homes onto nobody.
+	-- The running strike's target (#277): their root (nil when it homes onto nobody), team and player.
 	_target: BasePart?,
 	_targetTeam: string?,
+	_targetPlayer: PlayerId,
 	-- The opponents a strike may reach, refilled at each press.
 	_candidates: { Reach.Candidate },
 }
 
--- The action `key` starts: the first of Config.Input.actions[key] that may start now (ActionRunner.available: its
--- requirements fit the ball, the air and the charge, and a follow-up's window is open: the tackle key dives just after
--- a tackle); nil when none fits (an uppercut with the ball and no charge, a throw without the ball).
-local function actionFor(self: ActionController, key: Config.ActionKey, hasBall: boolean): Config.ActionName?
-	local skater = self._skate.skater
-	local context = self._keyContext
+-- What the player is doing now, in the reused context record: the ball, the air, whether the controls are locked
+-- (knocked down or diving: SkateController:controlsLocked) and the charge.
+local function contextNow(self: ActionController, hasBall: boolean): ActionRunner.Context
+	local skate = self._skate
+	local skater = skate.skater
+	local context = self._context
 	context.hasBall = hasBall
 	context.airborne = skater ~= nil and skater.mode == "Airborne"
+	context.knockedDown = skate:controlsLocked()
 	context.charging = self._charge ~= nil
+	return context
+end
+
+-- The action `key` starts: the first of Config.Input.actions[key] that may start now (ActionRunner.available: its
+-- requirements fit the ball, the air, the knockdown and the charge, and a follow-up's window is open: the tackle key
+-- dives just after a tackle, or a dodge with the ball); nil when none fits (an uppercut with the ball and no charge, a
+-- throw without the ball, anything but a carrier's throw while down).
+local function actionFor(self: ActionController, key: Config.ActionKey, hasBall: boolean): Config.ActionName?
+	local context = contextNow(self, hasBall)
 	for _, name in self._config.Input.actions[key] do
 		if self.runner:available(name, context) then
 			return name
@@ -227,16 +239,17 @@ local function easeLunge(self: ActionController, skater: SkateMath.Skater, dt: n
 end
 
 -- A homing strike's target is someone it may reach (Reach.strikable, the server's own rule) as this client sees them:
--- their character still in the world, showing no KnockedDown and no dodge running.
-local function homeable(self: ActionController, root: BasePart, team: string?): boolean
+-- their character still in the world, its KnockedDown and running dodge, and whether they carry the ball (BallCarrier:
+-- a carrier sliding after their own dive stays in reach, #314).
+local function homeable(self: ActionController, root: BasePart, team: string?, player: PlayerId): boolean
 	local character = root.Parent
 	if character == nil then
 		return false
 	end
 	local action = Actions.nameOf(character:GetAttribute(Attributes.Action) :: string?)
 	local dodging = action ~= nil and self._config.Actions[action].effect == "Dodge"
-	local knockedDown = character:GetAttribute(Attributes.KnockedDown) ~= nil
-	return Reach.strikable(self._skate:team(), team, knockedDown, dodging)
+	local knockdown: Attributes.Knockdown? = character:GetAttribute(Attributes.KnockedDown) :: Attributes.Knockdown?
+	return Reach.strikable(self._skate:team(), team, knockdown, self._carrier.carrier == player, dodging)
 end
 
 -- The other skaters a strike may home onto, into the reused candidate list.
@@ -244,7 +257,7 @@ local function opponents(self: ActionController, views: { SkateController.Skater
 	local list = self._candidates
 	local count = 0
 	for _, view in views do
-		if homeable(self, view.root, view.team) then
+		if homeable(self, view.root, view.team, view.player) then
 			count += 1
 			Pickup.setCandidate(list, count, view.player, view.root.Position)
 		end
@@ -270,6 +283,7 @@ local function aimStrike(self: ActionController, skater: SkateMath.Skater, root:
 		if view.player == player then
 			self._target = view.root
 			self._targetTeam = view.team
+			self._targetPlayer = view.player
 			toward = view.root.Position - origin
 			break
 		end
@@ -287,7 +301,7 @@ local function home(self: ActionController, skater: SkateMath.Skater, root: Base
 		return
 	end
 	local striking: Config.ActionName? = self.runner:striking()
-	if striking == nil or not homeable(self, target, self._targetTeam) then
+	if striking == nil or not homeable(self, target, self._targetTeam, self._targetPlayer) then
 		self._target = nil
 		return
 	end
@@ -371,12 +385,7 @@ local function begin(
 	hasBall: boolean
 )
 	local skate = self._skate
-	local context = self._context
-	context.hasBall = hasBall
-	context.airborne = skater.mode == "Airborne"
-	context.knockedDown = skate.knockedDown or skate.diving
-	context.charging = self._charge ~= nil
-	if self.runner:start(name, context) ~= "Started" then
+	if self.runner:start(name, contextNow(self, hasBall)) ~= "Started" then
 		return
 	end
 	-- Whatever starts ends a charge (#312): a throw or a roll spends it, a Dodge drops it (Cancel & Dodge), and a throw
@@ -423,7 +432,6 @@ local ActionController: ActionController = {
 	_localId = "",
 	_keys = nil :: any,
 	_context = nil :: any,
-	_keyContext = nil :: any,
 	_charge = nil,
 	_throwReady = false,
 	_lunge = nil,
@@ -433,6 +441,7 @@ local ActionController: ActionController = {
 	_landing = nil,
 	_target = nil,
 	_targetTeam = nil,
+	_targetPlayer = "",
 	_candidates = nil :: any,
 
 	-- deps.Camera, deps.SendRequest and deps.LocalId replace the live game in tests.
@@ -453,7 +462,6 @@ local ActionController: ActionController = {
 		self.runner = ActionRunner.new(config.Actions)
 		self._keys = InputController.newActionKeys()
 		self._context = { hasBall = false, airborne = false, knockedDown = false, charging = false }
-		self._keyContext = { hasBall = false, airborne = false, knockedDown = false, charging = false }
 		self._charge = nil
 		self._throwReady = false
 		self._lunge = nil

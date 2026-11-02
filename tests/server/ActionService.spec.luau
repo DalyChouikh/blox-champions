@@ -210,11 +210,20 @@ local function tackled(attacker: string, victim: string)
 	error(`{attacker}'s tackle never reached {victim}`)
 end
 
--- Roller Champions' tackle key (#240): `id` tackles, then dives as soon as the tackle's follow-up window opens.
-local function dive(id: string)
-	ActionService:request(id, { action = "Tackle" })
-	advance(FOLLOW_UP.from + 0.02)
+-- Roller Champions' tackle key (#240): `id` tackles, or with the ball dodges (`from`, #314), then dives as soon as
+-- that action's follow-up window opens.
+local function dive(id: string, from: Config.ActionName?)
+	local source: Config.ActionName = from or "Tackle"
+	ActionService:request(id, { action = source })
+	advance((config.Actions[source].followUp :: Config.FollowUp).from + 0.02)
 	ActionService:request(id, { action = "Dive" })
+end
+
+-- `id` past their dive's active phase on the floor: down on the belly, still sliding.
+local function onTheBelly(id: string)
+	local phases = config.Actions.Dive.phases
+	advance(phases.windup + phases.active + 0.05)
+	assert(attribute(id, Attributes.KnockedDown) == "Dive", `{id} should be on the belly`)
 end
 
 -- A validated GetUp from `id`, as its client sends one when it moves while knocked down.
@@ -1003,9 +1012,7 @@ describe("ActionService's Get Up, sooner than the whole slide", function()
 		stand(a, Vector3.zero)
 		slide(a, 30)
 		dive(a)
-		local phases = config.Actions.Dive.phases
-		advance(phases.windup + phases.active + 0.05)
-		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
+		onTheBelly(a)
 		getUp(a)
 		advance(config.Actions.getUpAfter + 0.1)
 		expect(attribute(a, Attributes.KnockedDown)).toBe("Dive")
@@ -1017,5 +1024,87 @@ describe("ActionService's Get Up, sooner than the whole slide", function()
 		tackled(orange[1], a)
 		advance(config.Actions.getUpAfter + 0.1)
 		expect(attribute(a, Attributes.KnockedDown)).toBe("Hit")
+	end)
+end)
+
+-- RC's Cancel & Dodge, then Dive (#314, Q102; Video 33 at 17.0-19.2 s): the carrier dives, slides on the belly to a
+-- stop and keeps the ball.
+describe("ActionService's Dive with the ball", function()
+	it("keeps a carrier's ball through a dive after a dodge: its flight, touchdown and slide", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		giveBall(a)
+		slide(a, 30)
+		dive(a, "Dodge")
+		expect(rejected(a)).toEqual({})
+		expect(attribute(a, Attributes.Action)).toBe("Dive")
+		onTheBelly(a)
+		expect(BallService.state.carrier).toBe(a)
+		slide(a, 0)
+		advance(DT)
+		expect(attribute(a, Attributes.KnockedDown)).toBeNil()
+		expect(BallService.state.carrier).toBe(a)
+	end)
+
+	it("refuses a dive with the ball with no dodge before it, or past the dodge's follow-up window", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		giveBall(a)
+		ActionService:request(a, { action = "Dive" })
+		ActionService:request(a, { action = "Dodge" })
+		local window = config.Actions.Dodge.followUp :: Config.FollowUp
+		advance(window.to + config.Network.actionTimingTolerance + 0.05)
+		ActionService:request(a, { action = "Dive" })
+		expect(rejected(a)).toEqual({ "Dive", "Dive" })
+	end)
+
+	-- The owner (Q152): the carrier's dive strikes as the Tackle's does.
+	it("knocks down an opponent the carrier's dive reaches, and the carrier keeps the ball", function()
+		local a, b = blue[1], orange[1]
+		stand(a, AIR)
+		giveBall(a)
+		stand(b, AIR + Vector3.new(0, 0, -12))
+		dive(a, "Dodge")
+		expect(advance(0.4)).toEqual({ `{a}>{b}` })
+		expect(BallService.state.carrier).toBe(a)
+	end)
+
+	-- The owner (Q153): on the belly after their own dive a carrier can still be struck, which knocks the ball loose,
+	-- so the ball stays stealable; a diver without the ball stays out of reach there.
+	it("lets a strike reach a carrier sliding after their own dive, and knocks the ball loose", function()
+		local a, b, c = blue[1], blue[2], orange[1]
+		stand(b, Vector3.new(0, 0, -5))
+		slide(b, 30)
+		dive(b)
+		onTheBelly(b)
+		stand(c, Vector3.zero)
+		ActionService:request(c, { action = "Tackle" })
+		expect(advance(0.3)).toEqual({})
+		stand(b, PARKED)
+		stand(a, Vector3.new(0, 0, -5))
+		giveBall(a)
+		slide(a, 30)
+		dive(a, "Dodge")
+		onTheBelly(a)
+		advance(config.Actions.Tackle.cooldown)
+		stand(c, Vector3.zero)
+		ActionService:request(c, { action = "Tackle" })
+		expect(advance(0.3)).toEqual({ `{c}>{a}` })
+		expect(attribute(a, Attributes.KnockedDown)).toBe("Hit")
+		expect(BallService.state.status).toBe("Loose")
+	end)
+
+	-- The owner (Q154): RC keeps Charge Throw lit through the carrier's dive and slide (Video 33 at 17.6-19.0 s).
+	it("lets a carrier throw from the belly after their own dive, and roll nothing there", function()
+		local a = blue[1]
+		stand(a, Vector3.zero)
+		giveBall(a)
+		slide(a, 30)
+		dive(a, "Dodge")
+		onTheBelly(a)
+		ActionService:request(a, { action = "RollBall", aim = -Vector3.zAxis, charge = 1 })
+		throwAt(a, SPOT, 1)
+		expect(rejected(a)).toEqual({ "RollBall" })
+		expect(BallService.state.carrier).toBeNil()
 	end)
 end)

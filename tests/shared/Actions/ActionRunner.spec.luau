@@ -158,6 +158,27 @@ describe("ActionRunner", function()
 		expect(late:start("Tackle", context())).toBe("Started")
 	end)
 
+	-- With the ball the same key dodges, then dives in the Dodge's own window (#314, Q102: RC's Dodge row reads "Dive"
+	-- for ~1 s after it, Video 32 at 4.6-5.6 s). Two actions now name the Dive: the test above keeps the Tackle's.
+	it("starts a dive with the ball only inside its dodge's follow-up window, replacing the dodge", function()
+		local window = actions.Dodge.followUp :: Config.FollowUp
+		local runner = ActionRunner.new(actions)
+		expect(runner:start("Dive", context(true))).toBe("NotAllowed")
+		expect(runner:start("Dodge", context(true))).toBe("Started")
+		runner:step(window.from / 2)
+		expect(runner:available("Dive", context(true))).toBe(false)
+		runner:step(window.from / 2 + 0.01)
+		expect(runner:available("Dive", context(true))).toBe(true)
+		-- Inside the dodge's 0.3 s active phase: the dive replaces it.
+		expect(runner.action).toBe("Dodge")
+		expect(runner:start("Dive", context(true))).toBe("Started")
+		expect(runner.action).toBe("Dive")
+		local late = ActionRunner.new(actions)
+		late:start("Dodge", context(true))
+		late:step(window.to + 0.02)
+		expect(late:available("Dive", context(true))).toBe(false)
+	end)
+
 	it("opens no dive window for a tackle the server refused, nor after a reset", function()
 		local refused = ActionRunner.new(actions)
 		refused:start("Tackle", context())

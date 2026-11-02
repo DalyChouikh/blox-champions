@@ -1372,6 +1372,20 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   ring's centre when it passes the opening; out of the charge's reach, the farthest point of that line it reaches),
   at 90 studs/s for a tap to 240 for a full charge (Roll Ball the same); no predicted arc; the trail behind a thrown
   ball stays. Built on #313's PR #334 as a second commit. Not chosen: faster (~300); slower (~200).
+- **Q152-Q153 the Dive after a Dodge with the ball** (session 59, #314). RC first (Video 33 at 5 frames a second,
+  16.0-19.6 s): charging 16.2-17.0, a Cancel & Dodge at ~17.0, the Dodge hint reads "Dive" at 17.2-17.4 (pressed at
+  17.4), the dive in the air at 17.6, on the belly 17.8-19.0 sliding to a stop, every hint back at 19.2, "Charge
+  Throw" lit throughout (the ball kept); no opponent near, so the clip cannot show a strike or a tackle. Ours: a
+  dive's belly slide is a knockdown, which drops a carried ball and makes the player untouchable. **Q152** (not the
+  recommended): **the carrier's dive knocks down an opponent it reaches, like the Tackle's Dive** (11 studs, homing),
+  and the carrier keeps the ball. Not chosen: an escape that hits nobody. **Q153** (recommended): **a carrier sliding
+  on the belly after that dive can be tackled like any carrier**, which knocks the ball loose. Not chosen: today's
+  rule (nobody on the ground can be hit), which with the Dodge's 0.3 s would leave ~2 s nobody could take the ball.
+- **Q154 a throw during the carrier's dive** (session 59, #314, recommended). RC (Video 33 at 17.6-19.0 s): while
+  the carrier flies in the dive and slides on the belly, every hint is greyed but "Charge Throw", which stays lit (no
+  throw from the belly is shown, so that it works there is not proven). Ours: no action until the skater is up.
+  **Q154**: **yes, like RC's lit hint**: during their own dive and belly slide the carrier's throw key charges and
+  throws as usual; Roll Ball, Pump and Jump stay off (RC greys them). Not chosen: throw once up.
 
 ## Roller Champions
 
