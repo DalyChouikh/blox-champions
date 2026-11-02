@@ -65,8 +65,11 @@ export type ThrowSettings = {
 	maxSpeed: number,
 	-- The share of the carrier's velocity the ball keeps.
 	inheritCarrierVelocity: number,
-	-- How far the crosshair's line runs from the camera looking for the spot a throw comes down on (#313).
+	-- How far the crosshair's line runs from the camera looking for the spot a throw aims at (#313).
 	aimReach: number,
+	-- A throw comes down on its spot only if it gets there within this much of its flight; a farther one goes through
+	-- the point of the crosshair's line it reaches by then and falls under the spot (#342).
+	exactSeconds: number,
 }
 export type PassSettings = {
 	speed: number,
@@ -137,8 +140,8 @@ local function spendsCharge(effect: Effect): boolean
 	return effect == "Throw" or effect == "Roll"
 end
 
--- Whether an action with this effect comes down on the crosshair's spot: a throw does (#313, Q148), so the client
--- sends where the crosshair points; a roll keeps to the floor and a pass homes on its target.
+-- Whether an action with this effect aims at the crosshair's spot: a throw does (#313, Q148), so the client sends
+-- where the crosshair points; a roll keeps to the floor and a pass homes on its target.
 local function aimsAtSpot(effect: Effect): boolean
 	return effect == "Throw"
 end
@@ -245,8 +248,13 @@ local defaults: ActionsConfig = {
 	-- (trial 150 kept, Q151; was 60-160): 90 studs/s at a tap to 240 at a full charge (15-41 body lengths a second). A
 	-- spot 100 studs out then takes a 6 deg throw, one 177 out a 15 deg one rising 2.4 body heights in 0.76 s (RC's
 	-- ball reaches the far end of Video 31's straight in about 1 s). The crosshair's line looks 1000 studs for the
-	-- spot, past any arena's far side. Down too: through the carrier's own dive and belly slide (#314, Q154: RC's hints
-	-- keep Charge Throw lit there, Video 33 at 17.6-19.0 s), the one knockdown that keeps the ball.
+	-- spot, past any arena's far side. But only so far, like RC's (Video 35: a goal ~0.85 s away went in dead centre,
+	-- one far down a straight sank under the ring and missed): a throw is exact only if it gets to the spot within
+	-- 0.8 s of flight (a full charge ~190 studs, 33 body lengths; a half ~100); farther, it goes through the point of
+	-- the crosshair's line it reaches by then and falls on under the spot (3.85 body heights under one 260 out at a
+	-- full charge), so a far target needs a higher aim (the owner, #342: Q166, Q169; trial 342 kept, Q170). Down too:
+	-- through the carrier's own dive and belly slide (#314, Q154: RC's hints keep Charge Throw lit there, Video 33 at
+	-- 17.6-19.0 s), the one knockdown that keeps the ball.
 	ChargeThrow = {
 		phases = INSTANT,
 		cooldown = 0,
@@ -259,6 +267,7 @@ local defaults: ActionsConfig = {
 			maxSpeed = 240,
 			inheritCarrierVelocity = 0.5,
 			aimReach = 1000,
+			exactSeconds = 0.8,
 		},
 	},
 	-- RC's Roll Ball (the owner, Q100; Video 31 at 1:19.4: the ball drops to the floor beside the skater and rolls
@@ -324,6 +333,7 @@ local throw = Validate.check(
 		maxSpeed = positive,
 		inheritCarrierVelocity = fraction,
 		aimReach = positive,
+		exactSeconds = positive,
 	}),
 	function(settings: ThrowSettings): boolean
 		return settings.maxSpeed >= settings.minSpeed

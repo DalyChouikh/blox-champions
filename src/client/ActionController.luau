@@ -351,11 +351,11 @@ local function settle(self: ActionController, skater: SkateMath.Skater)
 	end
 end
 
--- Where a throw along the crosshair's line from `origin` along `direction` (unit) comes down (#313, the owner: Q148):
--- where the line first meets the arena's solid surfaces within the throw's aimReach, or where it ends there, unless it
--- passes through the goal ring's opening on the way (Throw.spot). On a surface the ball's centre aims a radius off it
--- along its normal, so the ball itself touches the spot: aimed with its centre on the floor, a full throw at a spot 67
--- studs out first touched the floor 19 studs short of it (measured in Play).
+-- The spot a throw along the crosshair's line from `origin` along `direction` (unit) aims at (#313, the owner: Q148;
+-- a far one falls under it, #342): where the line first meets the arena's solid surfaces within the throw's aimReach,
+-- or where it ends there, unless it passes through the goal ring's opening on the way (Throw.spot). On a surface the
+-- ball's centre aims a radius off it along its normal, so the ball itself touches the spot: aimed with its centre on
+-- the floor, a full throw at a spot 67 studs out first touched the floor 19 studs short of it (measured in Play).
 local function spotAlong(
 	self: ActionController,
 	origin: Vector3,

@@ -65,19 +65,19 @@ end
 -- The velocity that takes the ball from `from` to `to` as Trajectory.launch's does when the thrower moves at `carry`
 -- and the ball keeps it: a launch at `speed` from the hand, plus `carry`. The carry alone moves the ball by carry x
 -- time, so the launch aims at `to` less that, and the time follows the aim: CARRY_ROUNDS rounds settle both. Returns
--- the velocity and whether it reaches `to`.
+-- the velocity, whether it reaches `to`, and how long its flight takes to get there (Throw.aimed's exact part, #342).
 function Trajectory.toward(
 	speed: number,
 	from: Vector3,
 	to: Vector3,
 	carry: Vector3,
 	gravity: Vector3
-): (Vector3, boolean)
+): (Vector3, boolean, number)
 	local direction, time, reaches = Trajectory.launch(speed, from, to, gravity)
 	for _ = 1, CARRY_ROUNDS do
 		direction, time, reaches = Trajectory.launch(speed, from, to - carry * time, gravity)
 	end
-	return direction * speed + carry, reaches
+	return direction * speed + carry, reaches, time
 end
 
 -- t must be strictly ahead: like Crossing, a ball already on the plane has crossed it.

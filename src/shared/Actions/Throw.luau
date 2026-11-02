@@ -1,7 +1,7 @@
 --!strict
--- The ball's velocity as it leaves a player's hands (spec §8.2): a charged throw down onto the crosshair's spot, a
--- charged roll along the floor, or a pass at a fixed speed to where its receiver will be; and the charge a held throw
--- key gives. Aims need not be unit.
+-- The ball's velocity as it leaves a player's hands (spec §8.2): a charged throw at the crosshair's spot (down onto it
+-- if near, under it if far), a charged roll along the floor, or a pass at a fixed speed to where its receiver will be;
+-- and the charge a held throw key gives. Aims need not be unit.
 
 local Actions = require(script.Parent.Parent.Config.Actions)
 local Crossing = require(script.Parent.Parent.Rules.Crossing)
@@ -11,8 +11,8 @@ local Vectors = require(script.Parent.Parent.Util.Vectors)
 
 local Throw = {}
 
--- How many halvings Throw.aimed takes to find the farthest point of the crosshair's line a throw reaches: 16 pin it
--- within aimReach / 65536 (0.015 studs over the default 1000).
+-- How many halvings Throw.aimed takes to find the farthest point of the crosshair's line a throw reaches in time: 16
+-- pin it within aimReach / 65536 (0.015 studs over the default 1000).
 local SEARCH_ROUNDS = 16
 
 -- The charge of a throw key held `heldSeconds`: a share of a full one (0..1), full after chargeMaxSeconds. What a
@@ -55,11 +55,27 @@ function Throw.spot(origin: Vector3, finish: Vector3, goal: Crossing.Disc?): Vec
 	return finish
 end
 
--- A charged throw from the hand at `from` (#313, the owner: Q148, Q151): the velocity that brings the ball down on
--- `spot` under `gravity` on the flatter arc, with the carrier's share of `carrierVelocity` in it. A spot out of the
--- charge's reach falls back along the crosshair's line (`aim`, the way it runs to the spot) toward the thrower: the
--- throw goes to the farthest point of the line the charge reaches, so on the thrower's screen it still flies into the
--- crosshair. A spot behind the hand along the line leaves no line to fall back on: the least-speed arc toward it.
+-- The arc at `speed` from the hand at `from` down onto `to`, with `carry` in the ball, and whether the throw is exact
+-- there: it gets there within exactSeconds of flight (#342).
+local function exactArc(
+	throw: Actions.ThrowSettings,
+	speed: number,
+	from: Vector3,
+	to: Vector3,
+	carry: Vector3,
+	gravity: Vector3
+): (Vector3, boolean)
+	local velocity, reaches, time = Trajectory.toward(speed, from, to, carry, gravity)
+	return velocity, reaches and time <= throw.exactSeconds
+end
+
+-- A charged throw from the hand at `from` (#313, the owner: Q148, Q151; #342: Q169, Q170): the velocity that brings
+-- the ball down on `spot` under `gravity` on the flatter arc, with the carrier's share of `carrierVelocity` in it,
+-- when it gets there within exactSeconds of flight. A farther spot, or one out of the charge's reach, falls back along
+-- the crosshair's line (`aim`, the way it runs to the spot) toward the thrower: the throw goes through the farthest
+-- point of the line it reaches in time, so on the thrower's screen it flies into the crosshair and, past that point,
+-- falls under it more the farther it goes, like RC's (Video 35). A spot behind the hand along the line leaves no line
+-- to fall back on: the least-speed arc toward it.
 function Throw.aimed(
 	throw: Actions.ThrowSettings,
 	charge: number,
@@ -71,19 +87,19 @@ function Throw.aimed(
 ): Vector3
 	local speed = Throw.speed(throw, charge)
 	local carry = carrierVelocity * throw.inheritCarrierVelocity
-	local velocity, reaches = Trajectory.toward(speed, from, spot, carry, gravity)
+	local velocity, exact = exactArc(throw, speed, from, spot, carry, gravity)
 	local way = aim.Unit
 	-- How far back along the line from the spot its point level with the hand lies.
 	local back = (spot - from):Dot(way)
-	if reaches or back <= 0 then
+	if exact or back <= 0 then
 		return velocity
 	end
-	-- Distances back from the spot: `reached` one the charge reaches, `short` one it does not.
+	-- Distances back from the spot: `reached` one the throw reaches in time, `short` one it does not.
 	local reached, short = back, 0
 	for _ = 1, SEARCH_ROUNDS do
 		local middle = (reached + short) / 2
-		local _, inReach = Trajectory.toward(speed, from, spot - way * middle, carry, gravity)
-		if inReach then
+		local _, onTime = exactArc(throw, speed, from, spot - way * middle, carry, gravity)
+		if onTime then
 			reached = middle
 		else
 			short = middle

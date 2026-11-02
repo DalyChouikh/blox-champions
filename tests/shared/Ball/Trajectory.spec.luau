@@ -103,10 +103,12 @@ describe("Trajectory.toward", function()
 
 	it("meets the target with the thrower's velocity in the ball, at the speed from the hand", function()
 		local sideways = Vector3.new(0, 0, 15)
-		local velocity, reaches = Trajectory.toward(SPEED, Vector3.zero, Vector3.new(60, 0, 0), sideways, GRAVITY)
+		local velocity, reaches, time = Trajectory.toward(SPEED, Vector3.zero, Vector3.new(60, 0, 0), sideways, GRAVITY)
 		Fixtures.expectNear(velocity, Vector3.new(44.9236, 16.0272, 0), 1e-3)
 		expect((velocity - sideways).Magnitude).toBeCloseTo(SPEED, 3)
 		expect(reaches).toBe(true)
+		-- How long the flight takes to get there (#342: a throw is exact only that soon, Throw.aimed).
+		expect(time).toBeCloseTo(1.33560, 4)
 		Fixtures.expectNear(
 			Trajectory.positionAt(Vector3.zero, velocity, GRAVITY, 1.33560),
 			Vector3.new(60, 0, 0),
@@ -118,10 +120,12 @@ describe("Trajectory.toward", function()
 	end)
 
 	it("is the plain launch for a thrower standing still", function()
-		local velocity, reaches = Trajectory.toward(SPEED, Vector3.zero, Vector3.new(100, 0, 0), Vector3.zero, GRAVITY)
+		local velocity, reaches, time =
+			Trajectory.toward(SPEED, Vector3.zero, Vector3.new(100, 0, 0), Vector3.zero, GRAVITY)
 		-- Within a Vector3's float32 step at 30 (1.9e-6), not the closed form's exactness.
 		Fixtures.expectNear(velocity, Vector3.new(40, 30, 0), 1e-4)
 		expect(reaches).toBe(true)
+		expect(time).toBeCloseTo(2.5, 6)
 		local _, short = Trajectory.toward(SPEED, Vector3.zero, Vector3.new(200, 0, 0), Vector3.zero, GRAVITY)
 		expect(short).toBe(false)
 	end)

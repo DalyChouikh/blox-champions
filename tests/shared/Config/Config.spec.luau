@@ -222,13 +222,15 @@ describe("Config defaults", function()
 				effect = "Throw",
 				pose = "None",
 				-- A full charge in 0.5 s (Q99, Q133), as RC's crosshair closes; faster after trial 150 (Q151), so a
-				-- far spot takes a flatter arc; the crosshair's line runs 1000 studs looking for the spot (Q148).
+				-- far spot takes a flatter arc; the crosshair's line runs 1000 studs looking for the spot (Q148); the
+				-- throw is exact only as far as it flies in 0.8 s, then falls under it (#342, trial 342 kept, Q170).
 				throw = {
 					chargeMaxSeconds = 0.5,
 					minSpeed = 90,
 					maxSpeed = 240,
 					inheritCarrierVelocity = 0.5,
 					aimReach = 1000,
+					exactSeconds = 0.8,
 				},
 			},
 			-- The uppercut key while a throw charges, on a surface (#312, Q100): the charge spent along the floor.
@@ -1326,6 +1328,11 @@ describe("Config.forMode", function()
 		expect((actions.ChargeThrow.throw :: Config.ThrowSettings).aimReach).toBe(0.01)
 	end)
 
+	it("accepts a throw exact for just a moment of its flight", function()
+		local actions = Fixtures.config({ Actions = { ChargeThrow = { throw = { exactSeconds = 0.01 } } } }).Actions
+		expect((actions.ChargeThrow.throw :: Config.ThrowSettings).exactSeconds).toBe(0.01)
+	end)
+
 	it("rejects actions that contradict themselves", function()
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			{
@@ -1336,6 +1343,11 @@ describe("Config.forMode", function()
 			{
 				overrides = { ChargeThrow = { throw = { aimReach = 0 } } },
 				message = "Actions.ChargeThrow.throw.aimReach: must be > 0 (got 0)",
+			},
+			-- A throw is exact for some time of its flight before it falls under the crosshair (#342).
+			{
+				overrides = { ChargeThrow = { throw = { exactSeconds = 0 } } },
+				message = "Actions.ChargeThrow.throw.exactSeconds: must be > 0 (got 0)",
 			},
 			-- The Tackle's follow-up (#240): another action, in a window that ends after it starts.
 			{
@@ -1436,6 +1448,7 @@ describe("Config.forMode", function()
 							maxSpeed = 2,
 							inheritCarrierVelocity = 0,
 							aimReach = 1,
+							exactSeconds = 1,
 						},
 					},
 				},
