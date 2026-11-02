@@ -8,6 +8,7 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 local Client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 local ArenaParts = require(Client.ArenaParts)
 local BallCarrier = require(Client.BallCarrier)
+local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local HudStore = require(Client.HudStore)
@@ -111,6 +112,35 @@ describe("WorldMarkers", function()
 		snapshot({ possessingTeam = "Blue" })
 		WorldMarkers:step(DT)
 		expect(stroke().Color == colors.Blue).toBe(true)
+	end)
+
+	-- The owner (#327, Q158, Q159): RC's ball wears the colour of the team that last held it, carried, flying and
+	-- loose (Video 31 at 27.8, 39.1-39.5 and 47.4-48.8 s), and its own neutral colour from GO until a team holds it.
+	-- The match keeps the possessing team through throws, passes, drops and respawns until a kickoff.
+	it("wears the colour of the team that last held the ball, its skin's own until a team has", function()
+		local function worn(): string
+			return (ball :: Part).Color:ToHex()
+		end
+		local neutral = BallSkins.get(BallSkins.DEFAULT).color:ToHex()
+		WorldMarkers:step(DT)
+		expect(worn()).toBe(neutral)
+		snapshot({ possessingTeam = "Orange" })
+		WorldMarkers:step(DT)
+		expect(worn()).toBe(colors.Orange:ToHex())
+		-- Stolen.
+		snapshot({ possessingTeam = "Blue" })
+		WorldMarkers:step(DT)
+		expect(worn()).toBe(colors.Blue:ToHex())
+		-- A new ball (the server rebuilds it for a respawn) while Blue still has possession.
+		local rebuilt = Instance.new("Part")
+		rebuilt.Parent = folder
+		ball = rebuilt
+		WorldMarkers:step(DT)
+		expect(worn()).toBe(colors.Blue:ToHex())
+		-- A kickoff: nobody has held the new ball yet.
+		snapshot()
+		WorldMarkers:step(DT)
+		expect(worn()).toBe(neutral)
 	end)
 
 	it("sizes the ring to the ball at any distance: its width in studs, ringSize pixels wider", function()

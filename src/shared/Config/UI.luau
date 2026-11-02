@@ -366,9 +366,9 @@ local defaults: UIConfig = {
 		beam = { width = 2, thickness = 0.5 },
 	},
 	-- The owner asked for a trail behind the ball (Q98; RC's thrown ball leaves a white streak, Video 4 at
-	-- 366.8-367.0 s and Video 31 at 39.1 s; Illegal Soccer's a white dashed one), white as the crosshair is (Q141),
-	-- and bolder once a thin faint one was seen from the side (Q146): as wide as the ball, solid at it, 0.4 s long: 96
-	-- studs behind a full throw (16 body lengths).
+	-- 366.8-367.0 s and Video 31 at 39.1 s; Illegal Soccer's a white dashed one), white as the crosshair is (Q141)
+	-- and behind a team-coloured ball too, as RC's (Q160), and bolder once a thin faint one was seen from the side
+	-- (Q146): as wide as the ball, solid at it, 0.4 s long: 96 studs behind a full throw (16 body lengths).
 	ballTrail = { lifetime = 0.4, width = 2, color = Color3.new(1, 1, 1), transparency = 0 },
 }
 

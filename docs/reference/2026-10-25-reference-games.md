@@ -1407,6 +1407,17 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   pushes up a solid surface, gravity's part across the heading is dropped; its part along the heading still slows
   the climber, topped up by the climb as before; the glass unchanged) on the outer wall, the middle wall's bank and
   the bump, and W straight at the glass: **"Keep it, build it"** (test-first, as trialled).
+- **Q158-Q160 the team-coloured ball** (session 62, #327, all recommended). RC first (Video 31 at 10 frames a
+  second, full resolution): the ball dropping in at GO is neutral (white and dark, in a white marker ring, 27.2 s);
+  caught at ~27.7 s by the owner (Orange), it shows orange-red with a yellow glow in the hand by 27.8 s; thrown at
+  ~39.1 s it flies orange inside an orange ring, a white trail behind it; 8-10 s later (47.4-48.8 s) it still rolls
+  loose orange with an orange ring until picked up again. So RC colours the ball by the last team that held it. Ours:
+  the ball always warm yellow (the Default skin); its marker ring and arrows already take the last team's colour
+  (white after a kickoff). **Q158**: **the ball wears the colour of the team that last held it**, carried, flying and
+  loose, on every screen, until the other team picks it up; neutral from a kickoff until the first pickup; it changes
+  the moment the pickup happens. Not chosen: only while carried. **Q159**: **the neutral ball is white, like RC** (the
+  Default skin; yellow sat close to our orange). Not chosen: keep yellow. **Q160**: **the thrown ball's trail stays
+  white, like RC** (the ball itself shows the team). Not chosen: the team's colour.
 
 ## Roller Champions
 
