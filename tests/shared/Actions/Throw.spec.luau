@@ -7,6 +7,7 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Throw = require(ReplicatedStorage.Shared.Actions.Throw)
+local Trajectory = require(ReplicatedStorage.Shared.Ball.Trajectory)
 
 local config = Config.defaults()
 local actions = config.Actions
@@ -97,9 +98,10 @@ describe("Throw", function()
 		end
 	)
 
-	-- A charged throw lands on the crosshair's spot (#313, the owner: Q148 on real gravity, Q151 kept it): from the
-	-- hand at the charge's speed, on the flatter of the two arcs through the spot. A floor spot 100 studs out, 3
-	-- below the hand, the crosshair's line coming down to it.
+	-- A charged throw lands on the crosshair's spot (#313, the owner: Q148 on real gravity, Q151 kept it) when it gets
+	-- there within exactSeconds of flight (#342, Q169): from the hand at the charge's speed, on the flatter of the two
+	-- arcs through the spot. A floor spot 100 studs out, 3 below the hand, the crosshair's line coming down to it: a
+	-- full charge gets there in 0.42 s, a half in 0.61.
 	it("comes down on the spot from the hand on the flatter arc, at the charge's speed", function()
 		local from, spot = Vector3.new(0, 3, 0), Vector3.new(0, 0, -100)
 		local aim = Vector3.new(0, -0.05, -1)
@@ -122,16 +124,43 @@ describe("Throw", function()
 		Fixtures.expectNear(whereAcross(from, velocity, 100), spot, 1e-2)
 	end)
 
-	-- Out of the charge's reach, the farthest point of the crosshair's line it reaches: on a level line 6 studs over
-	-- the hand that is where speed^2 = g (6 + distance), x = sqrt(distance^2 - 36) (55.60 studs out for a tap at 90
-	-- under 130.8, s58\worked313b.py).
-	it("goes as far along the crosshair's line as the charge reaches when the spot is out of reach", function()
-		local g = -GRAVITY.Y
-		local distance = MIN * MIN / g - 6
-		local farthest = Vector3.new(math.sqrt(distance * distance - 36), 6, 0)
+	-- RC's throw is exact only so far (#342, Video 35: a goal ~0.85 s away went in dead centre, one far down a straight
+	-- sank under the ring), so a spot it would get to after exactSeconds is not: the ball goes on the arc through the
+	-- farthest point of the crosshair's line it reaches in exactSeconds and falls on past it (Q169-Q170). Worked apart
+	-- from the code (s63\worked342.py: earliest flight times by scanning, the farthest point by bisection): a full
+	-- charge along a level line through the hand at a spot 260 out passes the line 187.3822 out at 0.8 s, leaving at
+	-- (234.2277, 52.32, 0), and is 22.507 studs (3.85 body heights) under the spot when it gets there.
+	it("falls under a spot it would reach only after exactSeconds, through the line's point it reaches then", function()
+		local velocity =
+			Throw.aimed(throw, 1, Vector3.zero, Vector3.xAxis, Vector3.new(260, 0, 0), Vector3.zero, GRAVITY)
+		Fixtures.expectNear(velocity, Vector3.new(234.2277, 52.32, 0), 1e-2)
+		local onLine = Trajectory.positionAt(Vector3.zero, velocity, GRAVITY, throw.exactSeconds)
+		Fixtures.expectNear(onLine, Vector3.new(187.3822, 0, 0), 1e-2)
+		expect(whereAcross(Vector3.zero, velocity, 260).Y).toBeCloseTo(-22.507, 2)
+	end)
+
+	-- The aim still allows for the thrower's own motion (Q167): moving at (20, 0, -10), half of it in the ball, the
+	-- same throw passes the line 195.3395 out at 0.8 s, leaving at (244.1743, 52.32, 0), 240 from the hand.
+	it("still allows for the carrier's share of their velocity when it falls under a far spot", function()
+		local carrier = Vector3.new(20, 0, -10)
+		local velocity = Throw.aimed(throw, 1, Vector3.zero, Vector3.xAxis, Vector3.new(260, 0, 0), carrier, GRAVITY)
+		Fixtures.expectNear(velocity, Vector3.new(244.1743, 52.32, 0), 1e-2)
+		expect((velocity - carrier * SHARE).Magnitude).toBeCloseTo(MAX, 3)
+		local onLine = Trajectory.positionAt(Vector3.zero, velocity, GRAVITY, throw.exactSeconds)
+		Fixtures.expectNear(onLine, Vector3.new(195.3395, 0, 0), 1e-2)
+	end)
+
+	-- Out of the charge's reach, the farthest point of the crosshair's line it reaches within exactSeconds: on a level
+	-- line 6 studs over the hand a tap at 90 under 130.8 could reach 55.60 studs out (where speed^2 = g (6 + r)), but
+	-- only after 0.8 s: in 0.8 s it reaches 53.7941 out, leaving at (67.2426, 59.82, 0) (s63\worked342.py). The
+	-- search pins the point within 500 / 65536 = 0.008 studs along the line, which turns this steep arc's launch by up
+	-- to ~0.02 studs/s.
+	it("goes as far along the crosshair's line as the charge reaches in time when the spot is out of reach", function()
+		local farthest = Vector3.new(53.7941, 6, 0)
 		local velocity =
 			Throw.aimed(throw, 0, Vector3.zero, Vector3.xAxis, Vector3.new(500, 6, 0), Vector3.zero, GRAVITY)
 		expect(velocity.Magnitude).toBeCloseTo(MIN, 3)
+		Fixtures.expectNear(velocity, Vector3.new(67.2426, 59.82, 0), 0.03)
 		Fixtures.expectNear(whereAcross(Vector3.zero, velocity, farthest.X), farthest, 0.05)
 	end)
 

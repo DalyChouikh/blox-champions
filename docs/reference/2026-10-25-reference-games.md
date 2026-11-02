@@ -1451,6 +1451,31 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   **the aim still corrects for the thrower's own motion** (the ball keeps half the carrier's speed and still leaves
   heading at the spot). Not chosen: no correction. **Q168**: **built right after #329** (its own issue, a playable
   trial first, before the playtest record #317). Not chosen: now, before #329.
+- **Video 35 studied** (session 63, #342; RC 'Fallen Stadium', the owner's full-charge throws; 2 frames a second
+  throughout, 10-15 at each throw, full-resolution crops round the crosshair (959, 342), s63\v35\): **throw 1**
+  (released ~5.97 s, aimed across the curved end at the far side): the ball rises from the hand to the crosshair's
+  height 0.3 s after the release, sits ~10 px above it (6.33-6.53), crosses back under it at ~0.75 s and is ~50 px
+  under it by 1.3 s; "Lap 1 Completed" at 6.93 while the thrower stood still: the thrown ball through the lit marker
+  counts the lap (ours already counts the ball's own path, MatchEngine.ballMoved). **Throw 3** (released ~44.73 s,
+  aimed dead centre at the goal ring far down the straight, worth +3): the ball sits on the ring for ~0.8 s, then
+  sinks under it (45.6-46.0) and lands under the ring (~46.1-46.3): a miss. **Throw 4** (released ~58.1 s, aimed at
+  the goal from across the curved end, ~1.6x nearer by the ring's size on screen): on the ring the whole flight, in
+  at ~58.95 (0.85 s): GOAL, +3. So RC's full-charge throw is exact out to about 0.8 s of flight, then falls under
+  the crosshair more and more; its flight looks flat (only ~10 px above the crosshair). Also seen: the goal shows its
+  current worth on its housing ("+1", "+3"); a "Lap n Completed" caption and a fiery streak on each lap (Presentation).
+- **Q169 the throw is exact, then falls** (session 63, #342, recommended; refines Q166): **a charged throw comes down
+  on the crosshair's spot when it gets there within ~0.8 s of flight** (a full charge, 240 studs/s: ~190 studs, 33
+  body lengths, most of a straight); **a farther spot: the ball flies the same arc through the point that far along
+  the crosshair's line and goes on falling under the line** (full charge, aimed level: 1.8 body heights under at
+  230 studs, 3.6 at 260, a whole straight, 6.6 at 300), so far targets need a higher aim; weaker throws stop being
+  exact sooner. A playable trial first. Not chosen: falls from the start (Q166 as first read: straight at the spot,
+  then gravity from the hand: 1.9 body heights under at 100 studs, 7.8 at 200; RC's goal at ~0.85 s would have
+  missed by ~8); keep it always exact (today).
+- **Q170 trial 342 kept** (session 63): the owner played trial 342 (Studio copies of Ball/Trajectory and
+  Actions/Throw: a charged throw comes down on the crosshair's spot when it gets there within 0.8 s of flight; a
+  farther spot, the arc through the farthest point of the crosshair's line it reaches within 0.8 s, falling on past
+  it; measured in Play at a full charge: a floor spot 101 studs out hit, a wall spot 224 out hit 12.6 studs, 2.2 body
+  heights, under it): **"Keep it, build it"** (test-first, as trialled).
 
 ## Roller Champions
 
