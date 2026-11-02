@@ -97,6 +97,39 @@ function Fixtures.flightAcross(from: Vector3, velocity: Vector3, gravity: Vector
 	return from + velocity * time + gravity * (0.5 * time * time)
 end
 
+-- A slope of the arena beside a carrier (#345): a slab in `parent` whose top face is the plane through `point`, rising
+-- `degrees` from the root's own floor toward its right. A root upright over it leans less than the slope, as a skater
+-- just landed on one does, so the hand on its uphill side dips into it. Returns the face's normal too.
+function Fixtures.slopeBeside(parent: Instance, root: CFrame, point: Vector3, degrees: number): (Part, Vector3)
+	local tilt = math.rad(degrees)
+	local rising = root.RightVector * math.cos(tilt) + root.UpVector * math.sin(tilt)
+	local normal = root.UpVector * math.cos(tilt) - root.RightVector * math.sin(tilt)
+	local slab = Instance.new("Part")
+	slab.Anchored = true
+	slab.Size = Vector3.new(40, 1, 40)
+	slab.CFrame = CFrame.fromMatrix(point - normal * 0.5, rising, normal)
+	slab.Parent = parent
+	return slab, normal
+end
+
+-- Where a sphere of `radius` moving from `from` to `to` first touches the plane through `point` with `normal`, from
+-- the side the normal faces: its centre then, or nil if it stays clear of the plane all the way (#345). The closed
+-- form, to check a shapecast apart from Roblox's (it matched stepping the sphere in 1e-6 steps: s64\worked345.py).
+function Fixtures.sphereMeetsPlane(
+	from: Vector3,
+	to: Vector3,
+	radius: number,
+	point: Vector3,
+	normal: Vector3
+): Vector3?
+	local start = (from - point):Dot(normal) - radius
+	local finish = (to - point):Dot(normal) - radius
+	if finish >= 0 then
+		return nil
+	end
+	return from + (to - from) * (start / (start - finish))
+end
+
 -- Jest's toBeCloseTo as a plain check: `value` within half of 10^-digits of `expected`.
 function Fixtures.closeTo(value: number, expected: number, digits: number): boolean
 	return math.abs(value - expected) < 10 ^ -digits / 2

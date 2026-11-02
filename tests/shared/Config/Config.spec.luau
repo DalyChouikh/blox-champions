@@ -100,6 +100,7 @@ describe("Config defaults", function()
 			dropIn = { outerIn = 8, innerIn = 6, speed = 20, descent = 40 },
 			outOfBoundsMargin = 2,
 			carryOffset = Vector3.new(1.7, -0.8, -0.3),
+			releaseClearance = 0.05,
 		})
 		expect(d.Network).toEqual({
 			pickupLagToleranceStuds = 2,
@@ -1076,6 +1077,26 @@ describe("Config.forMode", function()
 		local ball = Fixtures.config({ Ball = { strandedSeconds = 0.01, restSpeed = 0.01 } }).Ball
 		expect(ball.strandedSeconds).toBe(0.01)
 		expect(ball.restSpeed).toBe(0.01)
+	end)
+
+	-- #345: a ball let go from a hand in the arena starts a hair off it, on the way out from a root that hovers clear
+	-- of the floor.
+	it("rejects a ball let go at no clearance, or one that cannot start clear under a hovering root", function()
+		expect(function()
+			Fixtures.config({ Ball = { releaseClearance = 0 } })
+		end).toThrow("Ball.releaseClearance: must be > 0 (got 0)")
+		expect(function()
+			-- 1.5 + 1 reaches the hover's 2.5.
+			Fixtures.config({ Ball = { radius = 1.5, releaseClearance = 1 } })
+		end).toThrow(
+			"Ball: a ball let go must start clear under a hovering root (radius + releaseClearance < "
+				.. "Movement.hoverHeight)"
+		)
+	end)
+
+	it("accepts a release clearance just inside its limits", function()
+		expect(Fixtures.config({ Ball = { releaseClearance = 0.01 } }).Ball.releaseClearance).toBe(0.01)
+		expect(Fixtures.config({ Ball = { releaseClearance = 1.49 } }).Ball.releaseClearance).toBe(1.49)
 	end)
 
 	-- The owner (Q91, Q132, Q139, #311, #316): a caught ball flies into the hand over 0.2 s on every screen.

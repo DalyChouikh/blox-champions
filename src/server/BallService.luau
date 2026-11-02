@@ -11,11 +11,13 @@
 -- on where its receiver will be (Homing.lead, #315), until it touches anything or anyone (glass between them bounces it
 -- off, loose) or the receiver can no longer catch; a drop-in falls steadily the lap's way, its weight cancelled too,
 -- until it touches anything or anyone; then either falls like any ball. A roll (Roll Ball, #312) leaves from the floor
--- under the hand, already rolling. A ball passes through the player who let go of it until it is clear of them. A loose
--- ball slows rolling as a coasting skater does (#311, Q124), and never passes through the arena: Roblox lets a fast
--- small ball through a thin part, so a loose ball whose centre crossed a solid face since the last frame goes back
--- there, bounced off that face (#311). From a throw, a pass or a roll until the next catch, drop-in or kickoff the
--- ball's part says it was thrown (Attributes.Thrown), and every screen trails it (Client/BallTrail, #313).
+-- under the hand, already rolling. A ball let go never starts in the arena: from a hand in it (a carrier just landed on
+-- a slope leans less than it, #345), it leaves from the nearest point toward the hand that is clear of the arena. A
+-- ball passes through the player who let go of it until it is clear of them. A loose ball slows rolling as a coasting
+-- skater does (#311, Q124), and never passes through the arena: Roblox lets a fast small ball through a thin part, so a
+-- loose ball whose centre crossed a solid face since the last frame goes back there, bounced off that face (#311). From
+-- a throw, a pass or a roll until the next catch, drop-in or kickoff the ball's part says it was thrown
+-- (Attributes.Thrown), and every screen trails it (Client/BallTrail, #313).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -75,12 +77,16 @@ export type BallService = {
 	hide: (self: BallService) -> (),
 	spawn: (self: BallService) -> (),
 	kill: (self: BallService) -> (),
+	-- Where the carried ball leaves the hand if let go now (#345): the hand, or, when the hand is in the arena, the
+	-- nearest point toward it from the carrier's root that is clear of it. A throw and a pass are aimed from there.
+	releasePoint: (self: BallService) -> Vector3,
 	throw: (self: BallService, player: PlayerId, velocity: Vector3) -> (),
 	-- A throw that flies flat and homes on its receiver, `target` (#315: every pass has one).
 	pass: (self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId) -> (),
 	-- A throw along the floor (Roll Ball, #312): it leaves from the floor under the hand (Ball.carryOffset across the
-	-- carrier's root, a radius above the floor the root hovers Movement.hoverHeight over), rolling at `velocity`, which
-	-- runs along that floor.
+	-- carrier's root, a radius above the floor the root hovers Movement.hoverHeight over; on a slope the root leans
+	-- less than, where the ball first meets it on the way there, #345), rolling at `velocity`, which runs along that
+	-- floor.
 	roll: (self: BallService, player: PlayerId, velocity: Vector3) -> (),
 	-- A given velocity replaces the ball's (a knocked-down carrier's momentum). Either is held to the speed limit.
 	drop: (self: BallService, velocity: Vector3?) -> (),
@@ -225,11 +231,24 @@ local function markThrown(self: BallService, thrown: boolean)
 	self.part:SetAttribute(Attributes.Thrown, if thrown then true else nil)
 end
 
+-- Where a ball let go toward `spot` from its carrier's root at `from` starts (#345): at `spot` when the way there is
+-- clear of the arena, else where it would first touch the arena on the way, Ball.releaseClearance off it. The root
+-- hovers clear of the floor (a Config rule), so the way out starts clear: a shapecast starting in a part never meets
+-- it (measured). It allocates only when it meets something (its RaycastResult).
+local function clearToward(self: BallService, from: Vector3, spot: Vector3): Vector3
+	local way = spot - from
+	local hit = workspace:Spherecast(from, self._config.Ball.radius, way, self._arenaParams)
+	if hit == nil then
+		return spot
+	end
+	return from + way.Unit * hit.Distance + hit.Normal * self._config.Ball.releaseClearance
+end
+
 -- Lets go of the ball if someone carries it: a free physics part again, simulated by the server. The weld goes
 -- first: network ownership is set for a whole assembly, and while welded the ball is part of its carrier's. The ball
--- leaves from the carrier's hand, within touch of their collider, so it passes through them until it is clear of
--- them: a throw across their body would otherwise bounce off it. It keeps the carrier's velocity, read while still
--- welded into their assembly, up to the speed limit.
+-- leaves from the carrier's hand, or clear of the arena near it (releasePoint, #345), within touch of their collider,
+-- so it passes through them until it is clear of them: a throw across their body would otherwise bounce off it. It
+-- keeps the carrier's velocity, read while still welded into their assembly, up to the speed limit.
 local function release(self: BallService)
 	local weld = self._weld
 	if weld == nil then
@@ -237,6 +256,7 @@ local function release(self: BallService)
 	end
 	local part = self.part
 	local carried = part.AssemblyLinearVelocity
+	local from = self:releasePoint()
 	local root = weld.Part0
 	local character = if root then root.Parent else nil
 	local collider = if character then character:FindFirstChild(SkaterRig.collider) :: BasePart? else nil
@@ -249,6 +269,7 @@ local function release(self: BallService)
 	end
 	weld:Destroy()
 	self._weld = nil
+	part.Position = from
 	part.Massless = false
 	part.CanCollide = true
 	part.CanTouch = true
@@ -557,6 +578,16 @@ local BallService: BallService = {
 		self.state:kill()
 	end,
 
+	releasePoint = function(self: BallService): Vector3
+		local part = self.part
+		local weld = self._weld
+		local root = if weld ~= nil then weld.Part0 else nil
+		if root == nil then
+			return part.Position
+		end
+		return clearToward(self, root.Position, part.Position)
+	end,
+
 	throw = function(self: BallService, player: PlayerId, velocity: Vector3)
 		local carrier = self.state.carrier
 		if carrier ~= player then
@@ -583,7 +614,8 @@ local BallService: BallService = {
 		local frame = (root :: BasePart).CFrame
 		local ball, offset = self._config.Ball, self._config.Ball.carryOffset
 		local part = self.part
-		part.Position = frame * Vector3.new(offset.X, ball.radius - self._config.Movement.hoverHeight, offset.Z)
+		local under = frame * Vector3.new(offset.X, ball.radius - self._config.Movement.hoverHeight, offset.Z)
+		part.Position = clearToward(self, frame.Position, under)
 		-- Already rolling, its bottom still on the floor: Roblox's friction turns a sliding ball's slide into a roll at
 		-- 5/7 of its speed (measured for #311), so this keeps the charge's whole speed.
 		part.AssemblyAngularVelocity = frame.UpVector:Cross(velocity) / ball.radius

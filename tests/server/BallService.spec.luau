@@ -383,6 +383,106 @@ describe("BallService", function()
 		Fixtures.expectNear(velocity + spin:Cross(-up * ball.radius), Vector3.zero)
 	end)
 
+	-- The playtest's finding (#345, Q172): a carrier just landed on a slope leans less than it, so the hand on its
+	-- uphill side dips into the floor, and a ball let go from there touched the arena at once (a pass dropped dead).
+	-- Here an upright carrier over a slope rising to their right at the rise's steepest, 38 deg, where the server saw
+	-- the hand 0.7 into it: the ball leaves from where it would first touch the slope on the way from the root to the
+	-- hand, Ball.releaseClearance off it.
+	local SLOPE_DEG = 38
+
+	-- Catches the ball, then puts a slope under the carrier, rising into their hand: the rig, a point of the slope's
+	-- face (the floor under the root) and its normal.
+	local function leaningIntoSlope(): (Model, Vector3, Vector3)
+		local rig = caughtBy("A")
+		local root = Fixtures.root(rig).CFrame
+		local under = root.Position - root.UpVector * config.Movement.hoverHeight
+		local _, normal = Fixtures.slopeBeside(arena, root, under, SLOPE_DEG)
+		return rig, under, normal
+	end
+
+	-- Where a ball let go toward `spot` from the rig's root starts, clear of the slope through `under`.
+	local function clearOfSlope(rig: Model, spot: Vector3, under: Vector3, normal: Vector3): Vector3
+		local meets = Fixtures.sphereMeetsPlane(Fixtures.root(rig).Position, spot, config.Ball.radius, under, normal)
+		assert(meets ~= nil, "the spot should be in the slope")
+		return meets + normal * config.Ball.releaseClearance
+	end
+
+	-- Whether the ball overlaps any part of the test's arena.
+	local function inArena(): boolean
+		local params = OverlapParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { arena }
+		return #workspace:GetPartsInPart(BallService.part, params) > 0
+	end
+
+	local LET_GO: { [string]: (velocity: Vector3) -> () } = {
+		throw = function(velocity: Vector3)
+			BallService:throw("A", velocity)
+		end,
+		pass = function(velocity: Vector3)
+			BallService:pass("A", velocity, "B")
+		end,
+		drop = function(velocity: Vector3)
+			BallService:drop(velocity)
+		end,
+	}
+	for _, way in { "throw", "pass", "drop" } do
+		it(
+			`lets go of a ball from the nearest point toward a hand in the arena that is clear of it: a {way}`,
+			function()
+				local rig, under, normal = leaningIntoSlope()
+				local hand = BallService.part.Position
+				expect(inArena()).toBe(true)
+				local clear = clearOfSlope(rig, hand, under, normal)
+				local velocity = Vector3.new(0, 10, -30)
+				LET_GO[way](velocity)
+				Fixtures.expectNear(BallService.part.Position, clear)
+				Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, velocity)
+				expect(inArena()).toBe(false)
+			end
+		)
+	end
+
+	-- Leaning with the slope (its up the slope's normal), the hand is as clear of it as of a flat floor.
+	it("lets go of a ball whose hand is clear of the arena from the hand, over a slope or not", function()
+		local rig = caughtBy("A")
+		rig:PivotTo(Fixtures.root(rig).CFrame * CFrame.Angles(0, 0, math.rad(SLOPE_DEG)))
+		local root = Fixtures.root(rig).CFrame
+		Fixtures.slopeBeside(arena, root, root.Position - root.UpVector * config.Movement.hoverHeight, 0)
+		local hand = root * config.Ball.carryOffset
+		Fixtures.expectNear(BallService:releasePoint(), hand)
+		BallService:throw("A", Vector3.new(0, 0, -30))
+		Fixtures.expectNear(BallService.part.Position, hand)
+		expect(inArena()).toBe(false)
+	end)
+
+	it("says where a carried ball will leave the hand: the hand, or the nearest clear point toward it", function()
+		local rig, under, normal = leaningIntoSlope()
+		local hand = BallService.part.Position
+		Fixtures.expectNear(BallService:releasePoint(), clearOfSlope(rig, hand, under, normal))
+		arena:ClearAllChildren()
+		Fixtures.expectNear(BallService:releasePoint(), hand)
+		-- Saying it lets nothing go.
+		expect(BallService.state.carrier).toBe("A")
+		Fixtures.expectNear(BallService.part.Position, hand)
+		-- A ball nobody carries leaves nobody's hand: it is where it is.
+		BallService:throw("A", Vector3.new(0, 0, -30))
+		BallService.part.Position = ON_TRACK
+		Fixtures.expectNear(BallService:releasePoint(), ON_TRACK)
+	end)
+
+	-- Roll Ball starts on the floor under the hand; on a slope the carrier leans into, on the slope, not in it.
+	it("rolls a ball from a slope the carrier leans into: on it, not in it", function()
+		local rig, under, normal = leaningIntoSlope()
+		local root = Fixtures.root(rig).CFrame
+		local ball, offset = config.Ball, config.Ball.carryOffset
+		local spot = root * Vector3.new(offset.X, ball.radius - config.Movement.hoverHeight, offset.Z)
+		local clear = clearOfSlope(rig, spot, under, normal)
+		BallService:roll("A", Vector3.new(0, 0, -30))
+		Fixtures.expectNear(BallService.part.Position, clear)
+		expect(inArena()).toBe(false)
+	end)
+
 	it("respawns a ball that leaves the arena, without reporting the jump", function()
 		BallService:spawn()
 		BallService:step(1 / 60, {})

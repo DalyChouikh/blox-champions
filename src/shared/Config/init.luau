@@ -105,6 +105,16 @@ local crossAreaRules: { Validate.Rule } = {
 		end,
 	},
 	{
+		-- A ball let go from a hand in the arena starts on the way out from its carrier's root (#345), which hovers
+		-- Movement.hoverHeight over the floor: a shapecast starting in a part never meets it (measured), so the ball
+		-- must fit clear there, its clearance too.
+		message = "Ball: a ball let go must start clear under a hovering root (radius + releaseClearance < "
+			.. "Movement.hoverHeight)",
+		holds = function(config: GameConfig): boolean
+			return config.Ball.radius + config.Ball.releaseClearance < config.Movement.hoverHeight
+		end,
+	},
+	{
 		-- A knockdown lasts at least getUpAfter, so an honest client asks to get up once per knockdown
 		-- (Network.maxGetUpsPerSecond; the review, #303).
 		message = "Actions: getUpAfter must not exceed any hit's knockdownSeconds nor "
