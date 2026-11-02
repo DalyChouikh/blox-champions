@@ -7,16 +7,17 @@
 -- frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose body it touched.
 -- Jumps the server makes (a drop-in's start, the snap into a catcher's hand, a carrier it moves, a drop it places, a
 -- roll it puts on the floor) are never reported as movement, so they can never cross a gate or the ring; each screen
--- draws the catch's flight into the hand itself (Client/BallView). A pass flies flat, its weight cancelled, and homes
--- on where its receiver will be (Homing.lead, #315), until it touches anything or anyone (glass between them bounces it
--- off, loose) or the receiver can no longer catch; a drop-in falls steadily the lap's way, its weight cancelled too,
--- until it touches anything or anyone; then either falls like any ball. A roll (Roll Ball, #312) leaves from the floor
--- under the hand, already rolling. A ball let go never starts in the arena: from a hand in it (a carrier just landed on
--- a slope leans less than it, #345), it leaves from the nearest point toward the hand that is clear of the arena. A
--- ball passes through the player who let go of it until it is clear of them. A loose ball slows rolling as a coasting
--- skater does (#311, Q124), and never passes through the arena: Roblox lets a fast small ball through a thin part, so a
--- loose ball whose centre crossed a solid face since the last frame goes back there, bounced off that face (#311). From
--- a throw, a pass or a roll until the next catch, drop-in or kickoff the ball's part says it was thrown
+-- draws the catch's flight into the hand itself (Client/BallView). A pass flies flat at a steady speed, its weight
+-- cancelled, turning toward where its receiver's chest will be (Homing, #315, #346), until it touches anything or
+-- anyone (glass between them bounces it off, loose) or the receiver can no longer catch; a drop-in falls steadily the
+-- lap's way, its weight cancelled too, until it touches anything or anyone; then either falls like any ball. A roll
+-- (Roll Ball, #312) leaves from the floor under the hand, already rolling. A ball let go never starts in the arena:
+-- from a hand in it (a carrier just landed on a slope leans less than it, #345), it leaves from the nearest point
+-- toward the hand that is clear of the arena; a pass from beside the chest (#346), or the nearest clear point toward
+-- there. A ball passes through the player who let go of it until it is clear of them. A loose ball slows rolling as a
+-- coasting skater does (#311, Q124), and never passes through the arena: Roblox lets a fast small ball through a thin
+-- part, so a loose ball whose centre crossed a solid face since the last frame goes back there, bounced off that face
+-- (#311). From a throw, a pass or a roll until the next catch, drop-in or kickoff the ball's part says it was thrown
 -- (Attributes.Thrown), and every screen trails it (Client/BallTrail, #313).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -78,10 +79,14 @@ export type BallService = {
 	spawn: (self: BallService) -> (),
 	kill: (self: BallService) -> (),
 	-- Where the carried ball leaves the hand if let go now (#345): the hand, or, when the hand is in the arena, the
-	-- nearest point toward it from the carrier's root that is clear of it. A throw and a pass are aimed from there.
+	-- nearest point toward it from the carrier's root that is clear of it. A throw is aimed from there.
 	releasePoint: (self: BallService) -> Vector3,
+	-- Where it leaves for a Magnetic Pass (#346, Q175): Actions.Pass.pass.releaseHeight straight above the hand
+	-- (beside the chest), or the nearest point toward there clear of the arena. A pass is aimed from there.
+	passPoint: (self: BallService) -> Vector3,
 	throw: (self: BallService, player: PlayerId, velocity: Vector3) -> (),
-	-- A throw that flies flat and homes on its receiver, `target` (#315: every pass has one).
+	-- A throw from passPoint that flies flat at the pass's steady speed, turning after its receiver, `target` (#315,
+	-- #346: every pass has one).
 	pass: (self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId) -> (),
 	-- A throw along the floor (Roll Ball, #312): it leaves from the floor under the hand (Ball.carryOffset across the
 	-- carrier's root, a radius above the floor the root hovers Movement.hoverHeight over; on a slope the root leans
@@ -107,7 +112,8 @@ export type BallService = {
 	_reach: number,
 	-- How close a body is to touch the ball: the ball's and the collider's radii, plus the lag tolerance.
 	_contact: number,
-	_homingAccel: number,
+	-- The Magnetic Pass (#346): its steady speed, its turn, where it aims on its receiver and where it leaves.
+	_pass: Config.PassSettings,
 	-- The fastest a ball leaving a carrier may keep moving: their client sets their velocity, and the ball's with it.
 	_speedLimit: number,
 	-- The pass's target while it homes.
@@ -244,19 +250,32 @@ local function clearToward(self: BallService, from: Vector3, spot: Vector3): Vec
 	return from + way.Unit * hit.Distance + hit.Normal * self._config.Ball.releaseClearance
 end
 
+-- Where the carried ball leaves if let go now, `rise` straight above the hand: there, or the nearest point toward it
+-- from the carrier's root that is clear of the arena (#345). A ball nobody carries leaves from where it is.
+local function leavingFrom(self: BallService, rise: number): Vector3
+	local part = self.part
+	local weld = self._weld
+	local root = if weld ~= nil then weld.Part0 else nil
+	if root == nil then
+		return part.Position
+	end
+	return clearToward(self, root.Position, part.Position + Vector3.yAxis * rise)
+end
+
 -- Lets go of the ball if someone carries it: a free physics part again, simulated by the server. The weld goes
 -- first: network ownership is set for a whole assembly, and while welded the ball is part of its carrier's. The ball
--- leaves from the carrier's hand, or clear of the arena near it (releasePoint, #345), within touch of their collider,
--- so it passes through them until it is clear of them: a throw across their body would otherwise bounce off it. It
--- keeps the carrier's velocity, read while still welded into their assembly, up to the speed limit.
-local function release(self: BallService)
+-- leaves `rise` above the carrier's hand, or clear of the arena near there (leavingFrom, #345), within touch of
+-- their collider, so it passes through them until it is clear of them: a throw across their body would otherwise
+-- bounce off it. It keeps the carrier's velocity, read while still welded into their assembly, up to the speed
+-- limit.
+local function release(self: BallService, rise: number)
 	local weld = self._weld
 	if weld == nil then
 		return
 	end
 	local part = self.part
 	local carried = part.AssemblyLinearVelocity
-	local from = self:releasePoint()
+	local from = leavingFrom(self, rise)
 	local root = weld.Part0
 	local character = if root then root.Parent else nil
 	local collider = if character then character:FindFirstChild(SkaterRig.collider) :: BasePart? else nil
@@ -277,6 +296,19 @@ local function release(self: BallService)
 	if part:IsDescendantOf(workspace) then
 		part:SetNetworkOwner(nil)
 	end
+end
+
+-- Lets the carrier's ball go at `velocity`, `rise` above the hand (release), flying loose from their throw.
+local function letGo(self: BallService, player: PlayerId, velocity: Vector3, rise: number)
+	local carrier = self.state.carrier
+	if carrier ~= player then
+		error(`BallService: only the carrier can throw (carrier: {carrier or "none"}, thrower: {player})`, 0)
+	end
+	release(self, rise)
+	self.part.AssemblyLinearVelocity = velocity
+	markThrown(self, true)
+	self.state:throw()
+	self._pendingThrower = player
 end
 
 -- Welds the ball in the carrier's hand at once (Ball.carryOffset in their root's frame): the server decides the catch
@@ -303,7 +335,7 @@ end
 -- Into play from above at a random start (Ball/DropIn), holding the drop-in's velocity there, its weight cancelled.
 local function dropIn(self: BallService)
 	rebuiltIfDestroyed(self)
-	release(self)
+	release(self, 0)
 	endGuidance(self)
 	markThrown(self, false)
 	local config = self._config
@@ -323,7 +355,7 @@ end
 -- Back into play by a drop-in from wherever it was, a carried ball taken from its carrier first.
 local function respawn(self: BallService, frame: BallFrame)
 	if self.state.status == "Carried" then
-		release(self)
+		release(self, 0)
 		self.state:drop()
 	end
 	dropIn(self)
@@ -374,9 +406,9 @@ local function clearOfReleaser(self: BallService, position: Vector3)
 	end
 end
 
--- Steers a pass toward where its target will be when it gets there (Homing.lead, #315), from their velocity as their
--- client reports it, held to the speed limit, while the pass flies and the target can catch. Once either stops, the
--- pass is over.
+-- Turns a pass at its steady speed toward where its target's chest will be when it gets there (Homing: #315, #346),
+-- from their velocity as their client reports it, held to the speed limit, while the pass flies and the target can
+-- catch. Once either stops, the pass is over.
 local function home(self: BallService, holders: { Holder }, position: Vector3, dt: number)
 	local target = self._passTarget
 	if target == nil then
@@ -387,11 +419,11 @@ local function home(self: BallService, holders: { Holder }, position: Vector3, d
 		endGuidance(self)
 		return
 	end
-	local part, root, accel = self.part, holder.root, self._homingAccel
-	local velocity = part.AssemblyLinearVelocity
+	local pass, part, root = self._pass, self.part, holder.root
 	local running = Vectors.clampMagnitude(root.AssemblyLinearVelocity, self._speedLimit)
-	local meet = Homing.lead(position, velocity.Magnitude, accel, root.Position, running)
-	part.AssemblyLinearVelocity = Homing.step(position, velocity, meet, accel, dt)
+	local meet = Homing.lead(position, pass.speed, Homing.aimOn(root.Position, pass.aimHeight), running)
+	part.AssemblyLinearVelocity =
+		Homing.turn(part.AssemblyLinearVelocity, meet - position, pass.speed, pass.turnAccel, dt)
 end
 
 -- Holds a drop-in's velocity where the ball now is (Q116): the lap's way round a curved end too.
@@ -473,7 +505,7 @@ local BallService: BallService = {
 	_random = Random.new(),
 	_reach = 0,
 	_contact = 0,
-	_homingAccel = 0,
+	_pass = nil :: any,
 	_speedLimit = 0,
 	_passTarget = nil,
 	_droppingIn = false,
@@ -510,7 +542,7 @@ local BallService: BallService = {
 		local lagTolerance = config.Network.pickupLagToleranceStuds
 		self._reach = config.Ball.pickupRadius + lagTolerance
 		self._contact = config.Ball.radius + config.Movement.colliderDiameter / 2 + lagTolerance
-		self._homingAccel = (config.Actions.Pass.pass :: Config.PassSettings).homingAccel
+		self._pass = config.Actions.Pass.pass :: Config.PassSettings
 		self._speedLimit = MovementCheck.speedLimit(config.Movement, config.Network)
 		self._passTarget = nil
 		self._droppingIn = false
@@ -572,36 +604,26 @@ local BallService: BallService = {
 	end,
 
 	kill = function(self: BallService)
-		release(self)
+		release(self, 0)
 		endGuidance(self)
 		markThrown(self, false)
 		self.state:kill()
 	end,
 
 	releasePoint = function(self: BallService): Vector3
-		local part = self.part
-		local weld = self._weld
-		local root = if weld ~= nil then weld.Part0 else nil
-		if root == nil then
-			return part.Position
-		end
-		return clearToward(self, root.Position, part.Position)
+		return leavingFrom(self, 0)
+	end,
+
+	passPoint = function(self: BallService): Vector3
+		return leavingFrom(self, self._pass.releaseHeight)
 	end,
 
 	throw = function(self: BallService, player: PlayerId, velocity: Vector3)
-		local carrier = self.state.carrier
-		if carrier ~= player then
-			error(`BallService: only the carrier can throw (carrier: {carrier or "none"}, thrower: {player})`, 0)
-		end
-		release(self)
-		self.part.AssemblyLinearVelocity = velocity
-		markThrown(self, true)
-		self.state:throw()
-		self._pendingThrower = player
+		letGo(self, player, velocity, 0)
 	end,
 
 	pass = function(self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId)
-		self:throw(player, velocity)
+		letGo(self, player, velocity, self._pass.releaseHeight)
 		self._passTarget = target
 		self._lift.Enabled = true
 	end,
@@ -623,7 +645,7 @@ local BallService: BallService = {
 	end,
 
 	drop = function(self: BallService, velocity: Vector3?)
-		release(self)
+		release(self, 0)
 		if velocity ~= nil then
 			self.part.AssemblyLinearVelocity = Vectors.clampMagnitude(velocity, self._speedLimit)
 		end

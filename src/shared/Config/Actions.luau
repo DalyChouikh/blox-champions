@@ -72,8 +72,14 @@ export type ThrowSettings = {
 	exactSeconds: number,
 }
 export type PassSettings = {
+	-- A Magnetic Pass flies at this steady speed, never faster (#346).
 	speed: number,
-	homingAccel: number,
+	-- How hard it turns toward its receiver: its sideways acceleration, its speed kept (#346).
+	turnAccel: number,
+	-- It aims this far straight above its receiver's root (the chest) and leaves releaseHeight straight above the
+	-- hand (beside the chest), so its line clears the floors and banks between them (#346).
+	aimHeight: number,
+	releaseHeight: number,
 	-- A pass goes only to a teammate within coneDeg of the aim and maxRange (PassTarget, #315).
 	coneDeg: number,
 	maxRange: number,
@@ -291,11 +297,18 @@ local defaults: ActionsConfig = {
 		effect = "Pass",
 		pose = "None",
 		pass = {
-			-- The owner's trial on the smooth ball (Q139: #316's 2-player test, my bot passing to them 8 times) kept
-			-- 100 (was 90); 150 felt instant and nobody could step into it (Q129), 90 with homing 150 too slow (Q131).
-			speed = 100,
-			-- The same trial: homing 150 (was 60), so a pass 40 studs out reaches a still teammate in 0.28 s at ~142.
-			homingAccel = 150,
+			-- The owner's pick (Q175, Q176, #346): a steady 150 studs/s, RC's (Video 34: ~4 body lengths in 0.15 s,
+			-- Q105). Replayed over real receivers' paths it caught 90% of passes clean, against 64% at 100 speeding up
+			-- by homing 150 (Q139), which turned too slowly late on; the owner's trial caught 37 of 42. (150 speeding
+			-- up by 300 felt instant, Q129.)
+			speed = 150,
+			-- At most 2 rad/s at 150: a receiver who holds their line or cuts catches it, one who turns back can still
+			-- miss (Q173); harder turning caught no more in the replay.
+			turnAccel = 300,
+			-- The chest and beside the chest (Q175): from the low hand toward the root, a pass's straight line clipped
+			-- the floor or a bank in 1 of 3 passes; straight up, as the replay caught as many as along the body.
+			aimHeight = 1.5,
+			releaseHeight = 0.8,
 			-- Magnetic Pass (#315, Q105): a teammate within 70 deg of the aim and 120 studs (20 body lengths).
 			coneDeg = 70,
 			maxRange = 120,
@@ -342,7 +355,9 @@ local throw = Validate.check(
 )
 local pass = Validate.record({
 	speed = positive,
-	homingAccel = nonNegative,
+	turnAccel = nonNegative,
+	aimHeight = nonNegative,
+	releaseHeight = nonNegative,
 	coneDeg = cone,
 	maxRange = positive,
 })

@@ -1,7 +1,7 @@
 --!strict
 -- The ball's velocity as it leaves a player's hands (spec §8.2): a charged throw at the crosshair's spot (down onto it
--- if near, under it if far), a charged roll along the floor, or a pass at a fixed speed to where its receiver will be;
--- and the charge a held throw key gives. Aims need not be unit.
+-- if near, under it if far), a charged roll along the floor, or a pass at its steady speed to where its receiver's
+-- chest will be; and the charge a held throw key gives. Aims need not be unit.
 
 local Actions = require(script.Parent.Parent.Config.Actions)
 local Crossing = require(script.Parent.Parent.Rules.Crossing)
@@ -108,17 +108,17 @@ function Throw.aimed(
 	return (Trajectory.toward(speed, from, spot - way * reached, carry, gravity))
 end
 
--- A Magnetic Pass (#315): straight at the pass's speed to where its receiver, now at `target` and moving at
--- `targetVelocity`, will be when it gets there (Homing.lead, as its homing then steers), or along the aim where that is
--- right at the hand.
+-- A Magnetic Pass (#315, #346): straight at the pass's steady speed to where the chest of its receiver, whose root is
+-- now at `root` and moving at `rootVelocity`, will be when it gets there (Homing.aimOn, Homing.lead, as its steering
+-- then turns), or along the aim where that is right at the hand.
 function Throw.pass(
 	pass: Actions.PassSettings,
 	from: Vector3,
 	aim: Vector3,
-	target: Vector3,
-	targetVelocity: Vector3
+	root: Vector3,
+	rootVelocity: Vector3
 ): Vector3
-	local offset = Homing.lead(from, pass.speed, pass.homingAccel, target, targetVelocity) - from
+	local offset = Homing.lead(from, pass.speed, Homing.aimOn(root, pass.aimHeight), rootVelocity) - from
 	local way = if offset.Magnitude > Vectors.EPSILON then offset else aim
 	return way.Unit * pass.speed
 end

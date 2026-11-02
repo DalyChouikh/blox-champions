@@ -1476,6 +1476,71 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   farther spot, the arc through the farthest point of the crosshair's line it reaches within 0.8 s, falling on past
   it; measured in Play at a full charge: a floor spot 101 studs out hit, a wall spot 224 out hit 12.6 studs, 2.2 body
   heights, under it): **"Keep it, build it"** (test-first, as trialled).
+- **Q171 the Ball & rules playtest, alone** (session 64, #317; the published stack head 494333e, 09:19:15Z, in the
+  Roblox Player at Camera Sensitivity 1; AskUserQuestion in four groups, each with RC beside ours): start and scoring
+  (the on-screen count and GO <TEAM> TEAM! #307, the drop-in #321, +1/+3/+5 after 1/2/3 laps from the goal's gate
+  #305, the 7:00 clock #306, a loose ball stays #308), the ball (2 studs low in the right hand, the 0.2 s magnet,
+  the rolling slow-down #311, smooth on every screen #316, no bobbing #337, the last holding team's colour, white
+  until then, a white trail #327), throwing (the 0.5 s charge, the ring a third down blinking every 0.4 s, no pump
+  or pass while charging, Cancel & Dodge, Roll Ball #312, exact to ~0.8 s of flight then falling #313/#342, the
+  Dodge -> Dive keeping the ball and throwing from the belly #314) and skating and the arena (the diagonal climb
+  #326, the stride 51 #328, the 260-stud straights #329): **"Feels right"**, all four. Next: the two-player items
+  (the Magnetic Pass #315, switching team #310, leavers #309, Last Chance and overtime #306).
+- **Q172 the playtest's two-player round** (session 64, #317; a 2-player Studio test, the owner Player2 and my bot
+  Player1, the clock shortened in Studio's copy only to 1:40 + 1:10, restored after): the bot switched team both ways
+  with T on the open tab (#310); the Magnetic Pass to the bot: the key's letter over it, greyed aiming away or through
+  the middle glass, Switch team greyed while holding the ball (#315, #310); overtime at 0-0 with its 60 and 30
+  SECONDS banners and a draw at its 0:00 (#306, Q95, Q107); Last Chance: the bot scored +1 (a lap from the goal's
+  gate), the owner held the ball at 0:00 (LAST CHANCE), scored 1-1 and overtime began (Q94); the bot left: its row
+  gone at once, Orange kept its point (#309, Q96): **"Feels right"**, all of them. One finding, measured: a pass
+  released on the straight's rise (~32 deg) died: the carried ball's bottom sat 0.14 studs inside the floor, so the
+  pass touched it at once (its lift off 0.02 s after the release) and rolled away, 50 studs from the receiver; on
+  flat floor the ball sits 0.74 clear (that pass was caught in 0.37 s). A bug, its own issue, fixed test-first.
+- **Q173 a slightly faster Magnetic Pass** (session 64, the owner's words while Connecting Rojo for #345): "after
+  fixing this bug, can you make the magnetic pass just a little [faster], the reason for it, is I want to give the
+  players more room to pass accurately when the player that is getting the magnetic ball from a pass where he is in
+  a high speed to get the ball accurately, and not just the ball miss his place, just a little more speed I guess, we
+  still want high speedy players going left and right have a chance to miss the magnetic pass ... RC is like that,
+  players most of the time get the ball, but can still miss it if they leave the place where the other teamate have
+  passed to them too fast". So: a little faster than today's 100 studs/s (homing 150, Q139), so a fast receiver
+  holding their line catches it; one cutting away hard can still miss. Its own issue after #345, a playable trial.
+- **Q174 the pass trial's finding** (session 64, #346; trial 346, the pass at 120 studs/s, Studio copy, a 2-player
+  test with my bot weaving at full stride and passing back): the owner: "can we try to predict where the player is
+  going to move based on his movements, and try to fix the ball trajectory?, currently it is missing quite often ...
+  take a thorough look, never speculate". Measured (a server recorder, 40 released passes): 24 caught, 15 missed;
+  every miss touched the arena first (10 a floor or bank, 5 the glass), which ends a pass's steering; in 13 of the 15
+  the receiver turned 88-159 deg during the flight (round a curved end, a hard cut); the server's view of the
+  receiver's velocity matched their motion (a few studs/s, 2-22 deg); the ball sped up to 180-240 studs/s by its
+  closest approach (homing adds 150 studs/s^2 toward a straight-line lead), so it turns slowly late on; 3 passes lost
+  their steering in their very first frame (cause not yet traced). **Q174** (recommended): **predict along the
+  receiver's curve** (their turning now), **steer by turning the ball at a steady speed** instead of speeding it up,
+  **aim at the chest** so it does not graze floors and banks; first replay the receivers' real paths in Studio to
+  show how many each change would have caught, then a playable trial. Widens #346.
+- **#346's replay** (session 65): a fresh 2-player test at today's pass (100, homing 150), the owner Player1 and my
+  bot weaving lanes 20/36 at full stride; a server recorder kept every frame (443 s, 52 released passes: 26 caught
+  clean, 10 caught after touching the arena, 15 missed, 1 back to the passer). Session 64's first-frame losses traced:
+  9 of 52 passes touched the floor or a bank within 0.12 s, because the ball leaves the low hand (0.8 under the root,
+  0.06-1.0 studs off the floor) on a straight line toward the receiver's root that dips into the floor or a bank's
+  rise at once. A replay harness then stepped pass models frame by frame over the receivers' real paths against the
+  real arena (it reproduced 50 of the 52 real outcomes); 1,414 passes (the 52 + one every quarter second between the
+  two players): **today 64% caught clean** (32% touched a floor or bank, 4% the glass); curve prediction alone 66%;
+  turning at a steady speed (no speeding up) 75-78%; + aiming 1.5 above the root (the chest) 83%; + letting go at root
+  height (0.8 above the hand) 86%; curve prediction on top gave nothing (81-83%: weaves reverse within the window).
+- **Q175 the pass to trial** (session 65, #346, recommended): **a steady 150 studs/s** (RC's ~4 body lengths in
+  0.15 s, Video 34; today speeds up from 100 to 200+), **turning toward the receiver** at most 300 studs/s^2 sideways
+  instead of speeding up, **aimed at the chest** (1.5 above the root) and **let go beside the chest** (0.8 above the
+  hand); **no curve prediction** (measured: no gain). Replay: 90% caught clean (today 64%), arriving in 0.22 s within
+  10 body lengths, 0.48 s at 10-15, 0.69 s at 15-20 (today 0.26/0.51/0.64); a receiver turning more than a right angle
+  within 0.6 s still misses 1 in 5 (today 2 in 3). Not chosen: the same at 160 (91%, a touch quicker) or 140 (90%,
+  slower far); keeping the speeding-up pass with the chest aim and the higher release (79%, quickest). Next: a playable
+  trial in Studio copies.
+- **Q176 trial 346b kept** (session 65): the owner played trial 346b (Studio copies: a steady 150 studs/s pass
+  turning toward where its receiver will be at most 300 studs/s^2 sideways, aimed 1.5 above their root, let go 0.8
+  above the hand, clear of the arena) in a 2-player test with my bot weaving at full stride: **"Keep it, build it"**
+  (test-first, as trialled). Recorded (the same server recorder): 42 released passes in 117 s, **37 caught clean
+  (88%)**, 1 caught after touching the arena, 3 missed, 1 back to the passer (before, at today's pass: 26 of 52
+  clean, 50%); clean catches in 0.20 / 0.49 / 0.77 s within 10, at 10-15 and 15-20 body lengths; 2 of the misses
+  touched the glass at the release (the passer skating along it).
 
 ## Roller Champions
 
