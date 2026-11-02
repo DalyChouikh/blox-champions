@@ -266,20 +266,6 @@ function Features.teamSpawns(arena: ArenaConfig, teamSize: number): Types.TeamSp
 	return spawns
 end
 
--- ballSpawnHeight above the surface as built across the middle of the track at each curved end's apex: equally far
--- from both teams' spawns.
-function Features.ballSpawns(arena: ArenaConfig): { CFrame }
-	local middle = arena.trackWidth / 2
-	local spawns: { CFrame } = {}
-	for _, section in CURVED_ENDS do
-		local apex = sectionMiddle(arena, section)
-		-- The section runs from one glass face to the other, so it has a height across the middle.
-		local floor = Profile.heightAt(Surface.section(arena, apex), middle) :: number
-		table.insert(spawns, Centerline.at(arena, apex, middle, floor + arena.ballSpawnHeight))
-	end
-	return spawns
-end
-
 -- The infield floor behind the inner glass (Arena spec §5.5): a slab surfaceThickness thick, its top at the lower
 -- floor's height, meeting the back of the glass's slab (surfaceThickness behind its face) instead of overlapping it:
 -- a block between the straights, and under each curved end a fan of prisms from the end's center to the glass's back

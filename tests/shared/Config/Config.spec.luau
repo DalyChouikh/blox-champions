@@ -46,6 +46,7 @@ describe("Config defaults", function()
 			rethrowPickupDelay = 0.4,
 			strandedSeconds = 5,
 			restSpeed = 1,
+			dropIn = { outerIn = 8, innerIn = 6, speed = 20, descent = 40 },
 			outOfBoundsMargin = 2,
 			carryOffset = Vector3.new(2.5, 0, -0.5),
 		})
@@ -588,14 +589,12 @@ describe("Config defaults", function()
 		expect(a.gatePanel).toEqual({ depth = 0.2 })
 		expect((a :: any).marker).toBeNil()
 		expect(a.teamSpawnSpacing).toBe(10)
-		expect(a.ballSpawnHeight).toBe(6)
 	end)
 
 	it("size and shade the arena parts that only carry a tag", function()
 		local a = Config.defaults().Arena
 		expect(a.gateThickness).toBe(0.2)
 		expect(a.spawnPad).toEqual({ width = 4, thickness = 0.2, transparency = 0.4 })
-		expect(a.ballSpawnSize).toBe(1)
 	end)
 
 	it("give each team and each arena part a color", function()
@@ -951,7 +950,8 @@ describe("Config.forMode", function()
 				message = "Network.pickupLagToleranceStuds: must be >= 0 (got -1)",
 			},
 			{
-				overrides = { Ball = { radius = 7 } },
+				-- Its drop-in lines clear of so wide a ball (#321).
+				overrides = { Ball = { radius = 7, dropIn = { innerIn = 8 } } },
 				message = "Ball: radius must be smaller than the goal ring's opening (Arena.goal.ringRadius)",
 			},
 		}
@@ -982,6 +982,38 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Ball = { ballIdleResetSeconds = 15 } })
 		end).toThrow("Ball.ballIdleResetSeconds: unknown key")
+	end)
+
+	-- The owner (Q111-Q116, #321): the ball drops in at a random spot by either wall, as trialled.
+	it("rejects a drop starting in the glass, on lines that cross, that never falls or rolls backwards", function()
+		local clear = "Ball: the drop-in must start clear of the glass (dropIn.innerIn and dropIn.outerIn >= radius)"
+		local apart = "Ball: the drop-in's two lines must lie apart across the track "
+			.. "(dropIn.innerIn + dropIn.outerIn < Arena.trackWidth)"
+		local cases: { { dropIn: { [string]: number }, message: string } } = {
+			{ dropIn = { innerIn = 1 }, message = clear },
+			{ dropIn = { outerIn = 1 }, message = clear },
+			{ dropIn = { innerIn = 40, outerIn = 40 }, message = apart },
+			{ dropIn = { descent = 0 }, message = "Ball.dropIn.descent: must be > 0 (got 0)" },
+			{ dropIn = { speed = -1 }, message = "Ball.dropIn.speed: must be >= 0 (got -1)" },
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config({ Ball = { dropIn = case.dropIn } })
+			end).toThrow(case.message)
+		end
+	end)
+
+	it("accepts a drop just inside its limits", function()
+		local inside = { innerIn = 1.5, outerIn = 78.4, speed = 0, descent = 0.01 }
+		expect(Fixtures.config({ Ball = { dropIn = inside } }).Ball.dropIn).toEqual(inside)
+	end)
+
+	it("rejects the old ball spawn settings as unknown", function()
+		for _, key in { "ballSpawnHeight", "ballSpawnSize" } do
+			expect(function()
+				Fixtures.config({ Arena = { [key] = 1 } })
+			end).toThrow(`Arena.{key}: unknown key`)
+		end
 	end)
 
 	it("rejects skating speeds, turn rates and sizes that contradict each other", function()

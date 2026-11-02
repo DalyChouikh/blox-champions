@@ -1177,6 +1177,18 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   studs/s** (3.4 body lengths/s), so it rolls along the wall's foot and round the curved ends. Not chosen: a random
   way; no push. **Q115** respawns (out of the arena; 5 s on something nobody skates, #308): **drop the same way**. Not
   chosen: only at kickoffs. Built after a playable Studio trial (the owner's rule for feel choices).
+- **Trial 321 kept; Q116** (session 52). Trial 1 (Studio copies only, as Q112-Q115 said: a quarter of gravity until
+  the first touch, launched along the heading): on a curved end the ball flew straight on (the tangent), touched the
+  outer glass high up 1.8 s after appearing, then fell at full gravity and rolled across the arena at 50-70 studs/s.
+  **Trial 2**: it appears just under the lip (~102 studs, 17 body heights), half the time 8 studs in from the outer
+  wall's face, half 6 studs in from the middle glass's, anywhere round the loop; until its first touch it falls
+  steadily at 42 studs/s while moving 20 studs/s (3.4 body lengths/s) the lap's way **along the track's curve** (no
+  drift into the glass); first touch 2.0 s after appearing (the outer foot, ~17 up) or 2.3 s (the inner bank, ~5 up);
+  then real physics: our cross-section slopes from the outer wall down into a low lane beside the inner bank, so the
+  ball rolls down across the track and rocks across that lane while creeping along (it does not hug the outer wall as
+  RC's did on a flatter floor). Said before playing: the steady fall replaces Q113's quarter of gravity. The owner
+  played it (re-dropped every 12 s while nobody held the ball): **Q116 "Keep it as it is"** (build it test-first as
+  trialled). Not chosen: landing in the low lane beside the inner bank; other numbers.
 
 ## Roller Champions
 

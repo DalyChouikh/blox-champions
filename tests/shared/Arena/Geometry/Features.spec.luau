@@ -468,22 +468,6 @@ describe("Features spawns and infield", function()
 		end
 	end)
 
-	it("drops the ball above the apex of each curved end, equally far from both teams", function()
-		local balls = Features.ballSpawns(arena)
-		expect(#balls).toBe(2)
-		-- ballSpawnHeight (6) over the bowl as built across the track's middle (u 40), on the chord from (39.732,
-		-- 2.679) to (43.595, 3.622): 2.744 high.
-		Fixtures.expectNear(balls[1].Position, Vector3.new(-160, 8.744, 0))
-		Fixtures.expectNear(balls[2].Position, Vector3.new(160, 8.744, 0))
-		local spawns = Features.teamSpawns(arena, 3)
-		for _, ball in balls do
-			expect((ball.Position - spawns.Blue[2].Position).Magnitude).toBeCloseTo(
-				(ball.Position - spawns.Orange[2].Position).Magnitude,
-				4
-			)
-		end
-	end)
-
 	it(
 		"lays the infield floor between the straights at the lower floor's height, out to the inner glass's back",
 		function()

@@ -8,7 +8,8 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local BallService = require(game:GetService("ServerScriptService").Server.BallService)
 local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
-local Features = require(ReplicatedStorage.Shared.Arena.Geometry.Features)
+local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
+local DropIn = require(ReplicatedStorage.Shared.Ball.DropIn)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local SkaterBody = require(game:GetService("ServerScriptService").Server.SkaterBody)
@@ -16,18 +17,20 @@ local SkaterRig = require(ReplicatedStorage.Shared.Skate.SkaterRig)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
 local config = Fixtures.config()
-local SPAWNS = Features.ballSpawns(config.Arena)
 local OUTSIDE = Fixtures.outsideArena(config)
 -- How long a loose ball rests on something nobody skates before it respawns (#308).
 local STRANDED = config.Ball.strandedSeconds
+-- The middle of the top straight at a standing root's height, well inside the arena: where tests catch the ball (a
+-- drop-in starts high beside a wall, #321) or rest it.
+local ON_TRACK = Vector3.new(0, 3, -60)
 
 local folder: Folder
 beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "BallServiceTest"
 	folder.Parent = workspace
-	-- The test's folder is the arena a resting ball lies in (#308).
-	BallService:init({ Config = config, ArenaService = { model = folder, arena = { ballSpawns = SPAWNS } } })
+	-- The test's folder is the arena a resting ball lies in (#308); the drops' spots repeat (#321).
+	BallService:init({ Config = config, ArenaService = { model = folder }, Random = Random.new(1) })
 end)
 afterEach(function()
 	BallService:destroy()
@@ -50,8 +53,8 @@ local function holder(name: string, rig: Model, canCatch: boolean?): BallService
 	}
 end
 
--- Whether the ball's lift is on: a pass flies against gravity.
-local function flyingFlat(): boolean
+-- Whether the ball's lift is on: a pass, or a drop (#321), flies with its weight cancelled.
+local function weightless(): boolean
 	local lift = BallService.part:FindFirstChildOfClass("VectorForce")
 	if lift then
 		return lift.Enabled
@@ -59,9 +62,11 @@ local function flyingFlat(): boolean
 	return false
 end
 
-local function isSpawn(position: Vector3): boolean
-	for _, spawn in SPAWNS do
-		if (spawn.Position - position).Magnitude < 1e-3 then
+-- Whether a drop starts at `position`: just under the lip, on the line by either wall (#321).
+local function isDropInStart(position: Vector3): boolean
+	local distance = Centerline.distanceOf(config.Arena, position)
+	for _, outer in { false, true } do
+		if (DropIn.start(config.Arena, config.Ball, distance, outer) - position).Magnitude < 1e-3 then
 			return true
 		end
 	end
@@ -70,7 +75,7 @@ end
 
 -- A slab of the arena just under a ball resting still at `position`: a ride surface (a part in a folder tagged
 -- RideSurface, as the floors are) or not (as the goal's rim is, #308).
-local function slabUnder(position: Vector3, rideSurface: boolean)
+local function slabUnder(position: Vector3, rideSurface: boolean): Part
 	local parent: Instance = folder
 	if rideSurface then
 		parent = Instance.new("Folder")
@@ -82,6 +87,17 @@ local function slabUnder(position: Vector3, rideSurface: boolean)
 	slab.Size = Vector3.new(8, 1, 8)
 	slab.CFrame = CFrame.new(position - Vector3.new(0, config.Ball.radius + 0.5, 0))
 	slab.Parent = parent
+	return slab
+end
+
+-- Spawns the ball and rests it still at ON_TRACK on a slab it has touched: a ride surface or not (#308).
+local function spawnResting(rideSurface: boolean): Part
+	BallService:spawn()
+	BallService.part.CFrame = CFrame.new(ON_TRACK)
+	BallService.part.AssemblyLinearVelocity = Vector3.zero
+	local slab = slabUnder(ON_TRACK, rideSurface)
+	BallService:onTouched(slab)
+	return slab
 end
 
 -- Steps the ball a second at a time for `seconds`; true if it respawned on any step.
@@ -93,10 +109,11 @@ local function respawnsWithin(seconds: number, holders: { BallService.Holder }?)
 	return respawned
 end
 
--- Spawns the ball and has a rig standing on it catch it.
+-- Spawns the ball and has a rig standing on the track catch it there.
 local function caughtBy(name: string): Model
 	BallService:spawn()
-	local rig = Fixtures.rig(folder, name, CFrame.new(BallService.part.Position))
+	BallService.part.CFrame = CFrame.new(ON_TRACK)
+	local rig = Fixtures.rig(folder, name, CFrame.new(ON_TRACK))
 	BallService:step(1 / 60, { holder(name, rig) })
 	return rig
 end
@@ -120,11 +137,11 @@ describe("BallService", function()
 		expect(CollectionService:HasTag(BallService.part, Tags.Ball)).toBe(true)
 	end)
 
-	it("spawns the ball loose at a ball spawn and reports only real movement", function()
+	it("spawns the ball loose at a drop's start and reports only real movement", function()
 		BallService:spawn()
 		local ball = BallService.part
 		expect(ballAt()).toBe("Workspace")
-		expect(isSpawn(ball.Position)).toBe(true)
+		expect(isDropInStart(ball.Position)).toBe(true)
 		expect(BallService.state.status).toBe("Loose")
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
 		local start = ball.Position
@@ -135,9 +152,51 @@ describe("BallService", function()
 		Fixtures.expectNear(frame.to, start + Vector3.new(4, 0, 0))
 	end)
 
+	-- The owner (Q111-Q116, #321): Roller Champions' drop from above, as trialled.
+	it("drops the ball in falling steadily the lap's way, weightless, until it first touches the arena", function()
+		BallService:spawn()
+		local ball = BallService.part
+		local dropIn = config.Ball.dropIn
+		Fixtures.expectNear(ball.AssemblyLinearVelocity, DropIn.velocity(config.Arena, config.Ball, ball.Position))
+		expect(weightless()).toBe(true)
+		-- Wherever it has fallen to, it holds the drop's way there: past the left curved end's apex, +Z.
+		ball.CFrame = CFrame.new(-126, 60, 0)
+		BallService:step(1 / 60, {})
+		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(0, -dropIn.descent, dropIn.speed))
+		local floor = Instance.new("Part")
+		floor.Parent = folder
+		BallService:onTouched(floor)
+		expect(weightless()).toBe(false)
+		ball.AssemblyLinearVelocity = Vector3.new(5, 0, 0)
+		BallService:step(1 / 60, {})
+		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(5, 0, 0))
+	end)
+
+	it("ends a drop when it touches a body, is caught, or play stops for a point or a kickoff", function()
+		BallService:spawn()
+		local down = Fixtures.rig(folder, "B", CFrame.new(BallService.part.Position + Vector3.new(2, 0, 0)))
+		expect(BallService:step(1 / 60, { holder("B", down, false) }).toucher).toBe("B")
+		expect(weightless()).toBe(false)
+		BallService:kill()
+		BallService:spawn()
+		local rig = Fixtures.rig(folder, "A", CFrame.new(BallService.part.Position))
+		BallService:step(1 / 60, { holder("A", rig) })
+		expect(BallService.state.carrier).toBe("A")
+		expect(weightless()).toBe(false)
+		BallService:kill()
+		BallService:spawn()
+		expect(weightless()).toBe(true)
+		BallService:kill()
+		expect(weightless()).toBe(false)
+		BallService:spawn()
+		BallService:hide()
+		expect(weightless()).toBe(false)
+	end)
+
 	it("gives the ball to the nearest player in reach with its velocity from before the catch", function()
 		BallService:spawn()
-		local at = BallService.part.Position
+		BallService.part.CFrame = CFrame.new(ON_TRACK)
+		local at = ON_TRACK
 		BallService.part.AssemblyLinearVelocity = Vector3.new(20, 0, 0)
 		local closest = Fixtures.rig(folder, "Near", CFrame.new(at + Vector3.new(3, 0, 0)))
 		local farther = Fixtures.rig(folder, "Far", CFrame.new(at + Vector3.new(6, 0, 0)))
@@ -186,9 +245,7 @@ describe("BallService", function()
 	end)
 
 	it("carries the ball at the carrier's side, clear of the floor", function()
-		BallService:spawn()
-		local rig = Fixtures.rig(folder, "A", CFrame.new(BallService.part.Position.X, 3, BallService.part.Position.Z))
-		BallService:step(1 / 60, { holder("A", rig) })
+		caughtBy("A")
 		expect(BallService.state.carrier).toBe("A")
 		expect(BallService.part.Position.Y - config.Ball.radius >= 0).toBe(true)
 	end)
@@ -217,50 +274,49 @@ describe("BallService", function()
 		expect(out.moved).toBe(true)
 		Fixtures.expectNear(out.to, OUTSIDE)
 		expect(out.respawned).toBe(true)
-		expect(isSpawn(BallService.part.Position)).toBe(true)
+		expect(isDropInStart(BallService.part.Position)).toBe(true)
+		expect(weightless()).toBe(true)
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
 		-- Found over the top (only a fault puts it there, R9): out at once, never flying on.
 		BallService.part.CFrame = CFrame.new(0, Profile.topHeight(config.Arena) + 5, 57)
 		expect(BallService:step(1 / 60, {}).respawned).toBe(true)
-		expect(isSpawn(BallService.part.Position)).toBe(true)
+		expect(isDropInStart(BallService.part.Position)).toBe(true)
 	end)
 
 	-- The owner (Q93): no idle respawn; a loose ball stays where it rolls until someone picks it up.
 	it("leaves a loose ball resting on a ride surface where it is, however long", function()
-		BallService:spawn()
-		local resting = BallService.part.Position
-		slabUnder(resting, true)
+		spawnResting(true)
 		expect(respawnsWithin(60)).toBe(false)
-		Fixtures.expectNear(BallService.part.Position, resting)
+		Fixtures.expectNear(BallService.part.Position, ON_TRACK)
 		expect(BallService.state.status).toBe("Loose")
 	end)
 
-	it("respawns a loose ball resting on something nobody skates, the whole wait again after each respawn", function()
-		for _, spawn in SPAWNS do
-			slabUnder(spawn.Position, false)
-		end
-		BallService:spawn()
+	it("respawns a loose ball resting on something nobody skates, the whole wait again once it is back", function()
+		local slab = spawnResting(false)
 		expect(respawnsWithin(STRANDED - 1)).toBe(false)
 		expect(BallService:step(1, {}).respawned).toBe(true)
-		expect(isSpawn(BallService.part.Position)).toBe(true)
+		expect(isDropInStart(BallService.part.Position)).toBe(true)
 		expect(BallService.state.status).toBe("Loose")
+		-- It drops a moment, then comes to rest there again.
+		BallService:step(1 / 60, {})
+		BallService.part.CFrame = CFrame.new(ON_TRACK)
+		BallService.part.AssemblyLinearVelocity = Vector3.zero
+		BallService:onTouched(slab)
 		expect(respawnsWithin(STRANDED - 1)).toBe(false)
 		expect(BallService:step(1, {}).respawned).toBe(true)
 	end)
 
 	it("never respawns a ball rolling there, hanging still over it, or resting there in shorter spells", function()
-		BallService:spawn()
-		local resting = BallService.part.Position
-		slabUnder(resting, false)
+		spawnResting(false)
 		local ball = BallService.part
 		ball.AssemblyLinearVelocity = Vector3.new(config.Ball.restSpeed, 0, 0)
 		expect(respawnsWithin(2 * STRANDED)).toBe(false)
 		-- A ball's width over it, still (only for an instant at the top of a throw).
 		ball.AssemblyLinearVelocity = Vector3.zero
-		ball.CFrame = CFrame.new(resting + Vector3.new(0, 2 * config.Ball.radius, 0))
+		ball.CFrame = CFrame.new(ON_TRACK + Vector3.new(0, 2 * config.Ball.radius, 0))
 		expect(respawnsWithin(2 * STRANDED)).toBe(false)
 		-- Resting, rolling a moment, resting again: each spell short of the wait.
-		ball.CFrame = CFrame.new(resting)
+		ball.CFrame = CFrame.new(ON_TRACK)
 		expect(respawnsWithin(STRANDED - 1)).toBe(false)
 		ball.AssemblyLinearVelocity = Vector3.new(0, 0, 2 * config.Ball.restSpeed)
 		expect(respawnsWithin(1)).toBe(false)
@@ -269,9 +325,8 @@ describe("BallService", function()
 	end)
 
 	it("lets a carrier stand still anywhere with the ball", function()
-		BallService:spawn()
-		slabUnder(BallService.part.Position, false)
-		local rig = Fixtures.rig(folder, "A", CFrame.new(BallService.part.Position))
+		spawnResting(false)
+		local rig = Fixtures.rig(folder, "A", CFrame.new(ON_TRACK))
 		BallService:step(1 / 60, { holder("A", rig) })
 		expect(BallService.state.carrier).toBe("A")
 		expect(respawnsWithin(2 * STRANDED, { holder("A", rig) })).toBe(false)
@@ -293,7 +348,7 @@ describe("BallService", function()
 		expect(BallService.part).never.toBe(old)
 		expect(BallService.part.Parent == BallService.model).toBe(true)
 		expect(ballAt()).toBe("Workspace")
-		expect(isSpawn(BallService.part.Position)).toBe(true)
+		expect(isDropInStart(BallService.part.Position)).toBe(true)
 		expect(BallService.state.status).toBe("Loose")
 	end)
 
@@ -313,7 +368,7 @@ describe("BallService", function()
 		expect(frame.respawned).toBe(true)
 		expect(BallService.state.carrier).toBeNil()
 		expect(BallService.state.status).toBe("Loose")
-		expect(isSpawn(BallService.part.Position)).toBe(true)
+		expect(isDropInStart(BallService.part.Position)).toBe(true)
 	end)
 
 	it("drops the ball loose where its carrier is", function()
@@ -419,9 +474,9 @@ describe("BallService", function()
 
 	it("flies a pass flat against gravity until it lands, and a plain throw falls", function()
 		local a = caughtBy("A")
-		expect(flyingFlat()).toBe(false)
+		expect(weightless()).toBe(false)
 		BallService:pass("A", Vector3.new(0, 0, -90), nil)
-		expect(flyingFlat()).toBe(true)
+		expect(weightless()).toBe(true)
 		-- As strong as the free ball's weight in the world's gravity (#279), upward, at its center (a welded massless
 		-- part weighs 0 by GetMass).
 		local lift = BallService.part:FindFirstChildOfClass("VectorForce") :: VectorForce
@@ -429,17 +484,17 @@ describe("BallService", function()
 		expect(lift.RelativeTo).toBe(Enum.ActuatorRelativeTo.World)
 		expect(lift.ApplyAtCenterOfMass).toBe(true)
 		BallService:step(1 / 60, { holder("A", a) })
-		expect(flyingFlat()).toBe(true)
+		expect(weightless()).toBe(true)
 		local wall = Instance.new("Part")
 		wall.Parent = folder
 		BallService:onTouched(wall)
-		expect(flyingFlat()).toBe(false)
+		expect(weightless()).toBe(false)
 		-- A throw is not a pass.
 		BallService.part.CFrame = CFrame.new(Fixtures.root(a).Position)
 		BallService:step(config.Ball.rethrowPickupDelay, { holder("A", a) })
 		expect(BallService.state.carrier).toBe("A")
 		BallService:throw("A", Vector3.new(0, 0, -90))
-		expect(flyingFlat()).toBe(false)
+		expect(weightless()).toBe(false)
 	end)
 
 	it("lets a pass fall once it is caught, touches a body, loses its receiver, or leaves play", function()
@@ -454,34 +509,38 @@ describe("BallService", function()
 			BallService:step(config.Ball.rethrowPickupDelay, { holder("A", a) })
 			assert(BallService.state.carrier == "A", "A should carry the ball")
 			BallService:pass("A", Vector3.new(0, 0, -90), target)
-			assert(flyingFlat(), "a pass should fly flat")
+			assert(weightless(), "a pass should fly flat")
 		end
 		-- Caught by its receiver.
 		passFromA("B")
 		BallService.part.CFrame = CFrame.new(bRoot.Position)
 		BallService:step(1 / 60, { holder("A", a), holder("B", b) })
 		expect(BallService.state.carrier).toBe("B")
-		expect(flyingFlat()).toBe(false)
+		expect(weightless()).toBe(false)
 		-- Touching a knocked-down body.
 		BallService:pass("B", Vector3.new(0, 0, 90), nil)
 		BallService.part.CFrame = CFrame.new(cRoot.Position + Vector3.new(3, 0, 0))
 		BallService:step(1 / 60, { holder("B", b), holder("C", c, false) })
-		expect(flyingFlat()).toBe(false)
+		expect(weightless()).toBe(false)
 		-- Its receiver knocked down.
 		passFromA("B")
 		BallService:step(1 / 60, { holder("A", a), holder("B", b, false) })
-		expect(flyingFlat()).toBe(false)
-		-- Back in play from a spawn, dead after a point, or hidden for a kickoff.
-		passFromA(nil)
+		expect(weightless()).toBe(false)
+		-- Back in play from a spawn: a drop, homing on no one (#321).
+		passFromA("B")
 		BallService:spawn()
-		expect(flyingFlat()).toBe(false)
+		BallService:step(0.1, { holder("A", a), holder("B", b) })
+		local dropping = BallService.part
+		local dropVelocity = DropIn.velocity(config.Arena, config.Ball, dropping.Position)
+		Fixtures.expectNear(dropping.AssemblyLinearVelocity, dropVelocity)
+		-- Dead after a point, or hidden for a kickoff.
 		passFromA(nil)
 		BallService:kill()
-		expect(flyingFlat()).toBe(false)
+		expect(weightless()).toBe(false)
 		BallService:spawn()
 		passFromA(nil)
 		BallService:hide()
-		expect(flyingFlat()).toBe(false)
+		expect(weightless()).toBe(false)
 	end)
 
 	it("reports a knocked-down defender's touch even beside the thrower", function()
