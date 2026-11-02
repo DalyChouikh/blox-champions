@@ -629,7 +629,8 @@ describe("Config defaults", function()
 
 	it("match the spec's arena layout", function()
 		local a = Config.defaults().Arena
-		expect(a.straightLength).toBe(200)
+		-- The owner (#329, Q164-Q165): only the straights grew, 200 -> 260; the curved ends kept their shape.
+		expect(a.straightLength).toBe(260)
 		expect(a.endRadius).toBe(60)
 		expect(a.trackWidth).toBe(80)
 		-- The owner's pick (#268, trial 6): the straights' foot curve tops out at 34.2, so the wall rises to 40.
@@ -893,8 +894,13 @@ describe("Config.forMode", function()
 				message = "Arena: the lips must leave the top open between them",
 			},
 			{
-				-- Longer than a straight (200), so the blends at its two ends would overlap.
-				overrides = { profileBlendLength = 250 },
+				-- Longer than a straight of 150, so the blends at its ends would overlap; within a curved end (188.5).
+				overrides = { straightLength = 150, profileBlendLength = 160 },
+				message = "Arena: profileBlendLength must fit within a straight and a curved end",
+			},
+			{
+				-- Longer than a curved end (π · 60 = 188.5); within a straight of 240.
+				overrides = { straightLength = 240, profileBlendLength = 200 },
 				message = "Arena: profileBlendLength must fit within a straight and a curved end",
 			},
 			-- The ring's centre lies between the glass faces, as a fraction of the track's width.
@@ -977,13 +983,16 @@ describe("Config.forMode", function()
 
 	-- Each just inside the limit the rejections above cross: the incline ending at 63.3, before the straights' foot
 	-- curve starts (63.32); the wall at 34.2, over that curve's top (34.16); a curved end's bowl at 21.9, its bound
-	-- (+ 18) under the wall's 40; a bank of 61.9, leaving its bowl room before 80 − 18.
+	-- (+ 18) under the wall's 40; a bank of 61.9, leaving its bowl room before 80 − 18; blends as long as a straight
+	-- of 150 and just shorter than a curved end (188.5).
 	it("accepts arena shapes just inside the limits of the straights, the curved ends and the outer wall", function()
 		local shapes: { { [string]: any } } = {
 			{ straight = { riseEnd = 63.3 } },
 			{ outerWallHeight = 34.2 },
 			{ curvedEnd = { bowlHeight = 21.9 } },
 			{ innerBankHeight = 61.9 },
+			{ straightLength = 150, profileBlendLength = 150 },
+			{ profileBlendLength = 188.4 },
 		}
 		for _, overrides in shapes do
 			expect(function()

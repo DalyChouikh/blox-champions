@@ -1428,6 +1428,29 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
 - **Q163 trial 328 kept** (session 62): the owner played trial 328 (Studio copy of the movement settings: the
   stride's top 46 -> 51 studs/s and its push 30 -> 33, so the top still comes in ~1.8 s; measured in Play: 51.0
   steady, 98% of it at 1.77 s; every player the same speed, Q162): **"Keep it, build it"** (test-first, as trialled).
+- **Q164 the straights' length** (session 62, #329, recommended). RC's straight-to-end proportion could not be read
+  cleanly (the only overhead view, Video 4's flyover at 3 s, is oblique: the far rail and the ends sit at different
+  depths). Ours: each straight 200 studs (34 body lengths), a lap along the spawn lane ~13.5 s at #328's stride.
+  **Q164**: **trial straights of 260 studs (+30%, 44 body lengths)**, the curved ends unchanged (Q136): a lap ~897
+  studs, ~15.6 s; the gates, lap markers, spawns, drop-in spots, the goal's place and the beams move with it. Not
+  chosen: 240 (+20%); 300 (+50%). Next: trial 329 in Studio copies.
+- **Q165 trial 329 kept** (session 62): the owner played trial 329 (Studio copy of the arena settings: both
+  straights 200 -> 260 studs, the curved ends unchanged; the gates, lap markers, the goal beside gate 2, the spawns,
+  the drop-in spots and the beams moved with them; 12,772 parts built): **"Keep it, build it"** (test-first).
+- **Q166-Q168 a throw drops with distance** (session 62, after #328; changes #313's Q148/Q151 rule). The owner's
+  words: "about the ball throwing, I noticed, that whereever the crosshair aims, the ball hits that, but that
+  shouldn't be the case, it should also depend on the distance, like if the player is aiming at something far away,
+  the ball should have more drop, so the player needs to aim higher to hit the target". Told first: RC's throw down
+  Video 31's straight (38.5-40.5 s) did land on the crosshair. The owner recorded **Video 35** (RC, throws at the goal
+  from several distances, 1:07, 1918x1078, 30 fps): `D:\Screenshots\Videos\Screen Recording 2026-11-01 211344.mp4`
+  (not yet studied frame by frame: next session). **Q166**: **the farther, the more it falls** ("and watch the video
+  if it is going to correct something or you notice something"): close throws land almost on the crosshair, far ones
+  fall below it more and more (read as: the ball leaves the hand straight at the crosshair's spot at the charge's
+  speed, 90-240, and real gravity pulls it down from there; full charge ~0.5 body height under at 50 studs, ~1.9 at
+  100, ~6.1 at 177). Not chosen: exact within ~50 studs then falling; copying the video without a rule. **Q167**:
+  **the aim still corrects for the thrower's own motion** (the ball keeps half the carrier's speed and still leaves
+  heading at the spot). Not chosen: no correction. **Q168**: **built right after #329** (its own issue, a playable
+  trial first, before the playtest record #317). Not chosen: now, before #329.
 
 ## Roller Champions
 

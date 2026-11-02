@@ -17,11 +17,13 @@ local config = Config.defaults()
 local arena = config.Arena
 local beam = config.UI.arenaGlow.beam
 local DT = 1 / 60
--- The beam covers the vertical outer glass, from the solid wall's top (28) up to where the lip starts (108), its back
+-- The beam covers the vertical outer glass, from the solid wall's top (40) up to where the lip starts (108), its back
 -- on the glass's face.
 local LIP_START = arena.glass.top - arena.glass.lipRadius
 local LATERAL = arena.trackWidth - beam.thickness / 2
 local HEIGHT = (arena.outerWallHeight + LIP_START) / 2
+-- The curved ends' axes stand at x ±HALF, however long the straights are.
+local HALF = arena.straightLength / 2
 
 local folder: Folder
 local ball: Part?
@@ -101,8 +103,9 @@ describe("CarrierBeam", function()
 		ballAt(50)
 		CarrierBeam:step(DT)
 		local part = CarrierBeam.part
-		-- 50 along the top straight: x 50, its back on the outer glass's face (z -100), halfway up the vertical glass.
-		Fixtures.expectNear(part.Position, Vector3.new(50, HEIGHT, -100 + beam.thickness / 2))
+		-- 50 along the top straight from gate 1 (x HALF): x HALF - 50, its back on the outer glass's face (z -100),
+		-- halfway up the vertical glass.
+		Fixtures.expectNear(part.Position, Vector3.new(HALF - 50, HEIGHT, -100 + beam.thickness / 2))
 		Fixtures.expectNear(part.Size, Vector3.new(beam.thickness, LIP_START - arena.outerWallHeight, beam.width))
 		expect(part.Color == config.UI.teamColors.Orange and part.Transparency == 0).toBe(true)
 		expect(part.Material == config.UI.arenaGlow.material and part.Anchored).toBe(true)
@@ -116,7 +119,9 @@ describe("CarrierBeam", function()
 		snapshot({ possessingTeam = "Blue" })
 		local part = CarrierBeam.part
 		-- Around the left end, its apex, and around the right end.
-		for _, distance in { 230, 200 + 30 * math.pi, 700 } do
+		local leftEnd, rightEnd = Centerline.gateDistance(arena, 2), Centerline.gateDistance(arena, 4)
+		local apex = leftEnd + 30 * math.pi
+		for _, distance in { leftEnd + 30, apex, rightEnd + 110 } do
 			ballAt(distance)
 			CarrierBeam:step(DT)
 			local expected = Centerline.at(arena, distance, LATERAL, HEIGHT)
@@ -125,10 +130,11 @@ describe("CarrierBeam", function()
 			-- Its thickness across the track (toward the outer glass), its width along it.
 			Fixtures.expectNear(part.CFrame.RightVector, expected.RightVector)
 		end
-		-- At the left end's apex the outer glass faces +X: the beam stands at x -160 - 40 + its half thickness.
-		ballAt(200 + 30 * math.pi)
+		-- At the left end's apex the outer glass faces +X: the beam stands 60 + 40 out from the end's axis (x -HALF),
+		-- less its half thickness.
+		ballAt(apex)
 		CarrierBeam:step(DT)
-		Fixtures.expectNear(part.Position, Vector3.new(-200 + beam.thickness / 2, HEIGHT, 0))
+		Fixtures.expectNear(part.Position, Vector3.new(-HALF - 100 + beam.thickness / 2, HEIGHT, 0))
 		Fixtures.expectNear(part.CFrame.RightVector, Vector3.new(-1, 0, 0))
 	end)
 

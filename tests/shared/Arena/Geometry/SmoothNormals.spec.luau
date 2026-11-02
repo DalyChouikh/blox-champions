@@ -11,13 +11,14 @@ local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local SmoothNormals = require(ReplicatedStorage.Shared.Arena.Geometry.SmoothNormals)
 local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
--- The defaults (Profile.spec's header): the track is 80 wide round ends of radius 60 about (±100, 0), so the inner
--- glass's face (u = 0) is a cylinder of radius 20 about each end's axis; the outer lip is a quarter circle of radius 12
--- centred at (68, 108) across a section. The expected normals are the exact shape's, worked out independently.
+-- The defaults (Profile.spec's header): the track is 80 wide round ends of radius 60 about (±straightLength / 2, 0),
+-- so the inner glass's face (u = 0) is a cylinder of radius 20 about each end's axis; the outer lip is a quarter
+-- circle of radius 12 centred at (68, 108) across a section. The expected normals are the exact shape's, worked out
+-- independently.
 local config = Config.defaults()
 local arena = config.Arena
 local field = SmoothNormals.prepare(arena, config.Movement.cornerDeg)
--- Round the +X end: the loop's last section, from 2 × 200 + π × 60 along it.
+-- Round the +X end: the loop's last section, from 2 × straightLength + π × 60 along it.
 local END_START = 2 * arena.straightLength + math.pi * arena.endRadius
 local END_AXIS = Vector3.new(arena.straightLength / 2, 0, 0)
 

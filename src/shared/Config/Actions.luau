@@ -243,10 +243,10 @@ local defaults: ActionsConfig = {
 	-- at 2.6-3.2 s). The throw comes down where the crosshair points (#313, Q148: RC's ball leaves the hand and flies
 	-- into the crosshair, Video 31 at 39.0-39.3 s) under real gravity (Q150), flattened the realistic way, by speed
 	-- (trial 150 kept, Q151; was 60-160): 90 studs/s at a tap to 240 at a full charge (15-41 body lengths a second). A
-	-- spot 100 studs out then takes a 6 deg throw; a straight's far end, 177 out, a 15 deg one rising 2.4 body heights
-	-- in 0.76 s (RC's ball reaches the far end in about 1 s). The crosshair's line looks 1000 studs for the spot, past
-	-- any arena's far side. Down too: through the carrier's own dive and belly slide (#314, Q154: RC's hints keep
-	-- Charge Throw lit there, Video 33 at 17.6-19.0 s), the one knockdown that keeps the ball.
+	-- spot 100 studs out then takes a 6 deg throw, one 177 out a 15 deg one rising 2.4 body heights in 0.76 s (RC's
+	-- ball reaches the far end of Video 31's straight in about 1 s). The crosshair's line looks 1000 studs for the
+	-- spot, past any arena's far side. Down too: through the carrier's own dive and belly slide (#314, Q154: RC's hints
+	-- keep Charge Throw lit there, Video 33 at 17.6-19.0 s), the one knockdown that keeps the ball.
 	ChargeThrow = {
 		phases = INSTANT,
 		cooldown = 0,

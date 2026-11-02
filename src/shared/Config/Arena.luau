@@ -11,6 +11,8 @@ local Validate = require(script.Parent.Validate)
 export type TopKind = "Closed" | "Open"
 
 export type ArenaConfig = {
+	-- Each straight's length, 44 body lengths: only the straights grew, the curved ends kept their shape (the owner,
+	-- #329: Q124 "longer straights", Q136; trial 329 kept, Q164-Q165; was 200).
 	straightLength: number,
 	-- Radius of the track's centerline around each curved end.
 	endRadius: number,
@@ -86,7 +88,7 @@ export type ArenaConfig = {
 }
 
 local defaults: ArenaConfig = {
-	straightLength = 200,
+	straightLength = 260,
 	endRadius = 60,
 	trackWidth = 80,
 	outerWallHeight = 40,

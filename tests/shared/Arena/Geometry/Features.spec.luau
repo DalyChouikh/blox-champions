@@ -17,11 +17,12 @@ local arena = Config.defaults().Arena
 local openArena = Fixtures.config({ Arena = { top = { kind = "Open" } } }).Arena
 -- Station steps around each curved end.
 local steps = #Centerline.sectionStations(arena, 2) - 1
+-- The gates and the curved ends' axes stand at x ±HALF, however long the straights are.
+local HALF = arena.straightLength / 2
 
 -- How far across the track a point is, from the inner glass's face (u in the profile), seen from above.
 local function lateral(position: Vector3): number
-	local half = arena.straightLength / 2
-	local fromAxis = Vector2.new(position.X - math.clamp(position.X, -half, half), position.Z).Magnitude
+	local fromAxis = Vector2.new(position.X - math.clamp(position.X, -HALF, HALF), position.Z).Magnitude
 	return fromAxis - (arena.endRadius - arena.trackWidth / 2)
 end
 
@@ -45,14 +46,14 @@ describe("Features.gates", function()
 	it("spans the track at each corner, facing the travel direction, as tall as the top", function()
 		local gates = Features.gates(arena)
 		expect(#gates).toBe(4)
-		Fixtures.expectNear(gates[1].frame.Position, Vector3.new(100, 60, -60))
+		Fixtures.expectNear(gates[1].frame.Position, Vector3.new(HALF, 60, -60))
 		Fixtures.expectNear(gates[1].frame.LookVector, Vector3.new(-1, 0, 0))
-		Fixtures.expectNear(gates[3].frame.Position, Vector3.new(-100, 60, 60))
+		Fixtures.expectNear(gates[3].frame.Position, Vector3.new(-HALF, 60, 60))
 		expect(gates[2].width).toBe(80)
 		expect(gates[2].height).toBe(120)
 		local open = Features.gates(openArena)
 		expect(open[2].height).toBe(140)
-		Fixtures.expectNear(open[1].frame.Position, Vector3.new(100, 70, -60))
+		Fixtures.expectNear(open[1].frame.Position, Vector3.new(HALF, 70, -60))
 	end)
 end)
 
@@ -222,7 +223,7 @@ describe("Features.goal", function()
 			.. "skaters",
 		function()
 			local goal = Features.goal(arena)
-			Fixtures.expectNear(goal.frame.Position, Vector3.new(-100, 29, -80))
+			Fixtures.expectNear(goal.frame.Position, Vector3.new(-HALF, 29, -80))
 			Fixtures.expectNear(goal.frame.LookVector, Vector3.new(-1, 0, 0))
 			expect(goal.openingRadius).toBe(7)
 		end
@@ -473,9 +474,10 @@ describe("Features spawns and infield", function()
 		function()
 			local pieces = Features.infield(arena)
 			expect(pieces[1].shape).toBe("Block")
-			-- 2 · (endRadius − trackWidth / 2 − surfaceThickness) = 38 deep behind the glass's slab, its top at 0.
+			-- As long as a straight; 2 · (endRadius − trackWidth / 2 − surfaceThickness) = 38 deep behind the glass's
+			-- slab, its top at 0.
 			Fixtures.expectNear(pieces[1].cframe.Position, Vector3.new(0, -0.5, 0))
-			Fixtures.expectNear(pieces[1].size, Vector3.new(200, 1, 38))
+			Fixtures.expectNear(pieces[1].size, Vector3.new(arena.straightLength, 1, 38))
 		end
 	)
 
@@ -495,7 +497,7 @@ describe("Features spawns and infield", function()
 				expect(piece.size.X).toBeCloseTo(arena.surfaceThickness, 4)
 				for _, corner in Fixtures.wedgeFace(piece, Vector3.yAxis) do
 					expect(corner.Y).toBeCloseTo(0, 3)
-					local center = Vector3.new(if corner.X < 0 then -100 else 100, 0, 0)
+					local center = Vector3.new(if corner.X < 0 then -HALF else HALF, 0, 0)
 					expect((corner - center).Magnitude <= reach + 1e-3).toBe(true)
 					table.insert(fanCorners, corner)
 				end

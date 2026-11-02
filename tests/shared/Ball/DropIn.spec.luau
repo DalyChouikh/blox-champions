@@ -14,9 +14,10 @@ local ball = config.Ball
 local dropIn = ball.dropIn
 -- The glass's top (120) less its lip (12) and the ball's width (2 since #311).
 local HEIGHT = arena.glass.top - arena.glass.lipRadius - 2 * ball.radius
--- Halfway along the top straight (heading -X at z -60) and round the left curved end (centred on x -100, heading
--- +Z at its apex).
-local MID_STRAIGHT = 100
+-- Halfway along the top straight (x 0, heading -X at z -60) and round the left curved end (centred on x -HALF,
+-- heading +Z at its apex), however long the straights are.
+local HALF = arena.straightLength / 2
+local MID_STRAIGHT = HALF
 local APEX = arena.straightLength + math.pi * arena.endRadius / 2
 
 describe("DropIn", function()
@@ -25,8 +26,8 @@ describe("DropIn", function()
 		-- The middle glass's face lies 40 inside the centerline, the outer wall's 40 outside: 6 and 8 studs in.
 		Fixtures.expectNear(DropIn.start(arena, ball, MID_STRAIGHT, false), Vector3.new(0, HEIGHT, -26))
 		Fixtures.expectNear(DropIn.start(arena, ball, MID_STRAIGHT, true), Vector3.new(0, HEIGHT, -92))
-		Fixtures.expectNear(DropIn.start(arena, ball, APEX, false), Vector3.new(-126, HEIGHT, 0))
-		Fixtures.expectNear(DropIn.start(arena, ball, APEX, true), Vector3.new(-192, HEIGHT, 0))
+		Fixtures.expectNear(DropIn.start(arena, ball, APEX, false), Vector3.new(-HALF - 26, HEIGHT, 0))
+		Fixtures.expectNear(DropIn.start(arena, ball, APEX, true), Vector3.new(-HALF - 92, HEIGHT, 0))
 	end)
 
 	-- Q112: a new random spot every time, anywhere round the loop, half by each wall.
@@ -80,7 +81,7 @@ describe("DropIn", function()
 			Vector3.new(-dropIn.speed, -dropIn.descent, 0)
 		)
 		Fixtures.expectNear(
-			DropIn.velocity(arena, ball, Vector3.new(-126, 60, 0)),
+			DropIn.velocity(arena, ball, Vector3.new(-HALF - 26, 60, 0)),
 			Vector3.new(0, -dropIn.descent, dropIn.speed)
 		)
 		-- The bottom straight, back the other way.
