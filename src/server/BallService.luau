@@ -13,11 +13,14 @@
 -- roll (Roll Ball, #312) leaves from the floor under the hand, already rolling. A ball passes through the player who
 -- let go of it until it is clear of them. A loose ball slows rolling as a coasting skater does (#311, Q124), and never
 -- passes through the arena: Roblox lets a fast small ball through a thin part, so a loose ball whose centre crossed a
--- solid face since the last frame goes back there, bounced off that face (#311).
+-- solid face since the last frame goes back there, bounced off that face (#311). From a throw, a pass or a roll until
+-- the next catch, drop-in or kickoff the ball's part says it was thrown (Attributes.Thrown), and every screen trails it
+-- (Client/BallTrail, #313).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local BallState = require(ReplicatedStorage.Shared.Ball.BallState)
 local Bounds = require(ReplicatedStorage.Shared.Arena.Geometry.Bounds)
@@ -214,6 +217,12 @@ local function endGuidance(self: BallService)
 	self._lift.Enabled = false
 end
 
+-- Whether the ball flies loose from a throw, a pass or a roll (#313): set as it leaves the hand, cleared by a catch, a
+-- drop-in or a kickoff; absent rather than false, as the other attributes are.
+local function markThrown(self: BallService, thrown: boolean)
+	self.part:SetAttribute(Attributes.Thrown, if thrown then true else nil)
+end
+
 -- Lets go of the ball if someone carries it: a free physics part again, simulated by the server. The weld goes
 -- first: network ownership is set for a whole assembly, and while welded the ball is part of its carrier's. The ball
 -- leaves from the carrier's hand, within touch of their collider, so it passes through them until it is clear of
@@ -252,6 +261,7 @@ end
 -- explicit offset puts it in the same place on every machine; while carried it is weightless and touches nothing.
 local function attach(self: BallService, holder: Holder)
 	endGuidance(self)
+	markThrown(self, false)
 	local part = self.part
 	local offset = CFrame.new(self._config.Ball.carryOffset)
 	part.CFrame = holder.root.CFrame * offset
@@ -272,6 +282,7 @@ local function dropIn(self: BallService)
 	rebuiltIfDestroyed(self)
 	release(self)
 	endGuidance(self)
+	markThrown(self, false)
 	local config = self._config
 	local part = self.part
 	local start = DropIn.pick(config.Arena, config.Ball, self._random)
@@ -516,9 +527,7 @@ local BallService: BallService = {
 
 	hide = function(self: BallService)
 		rebuiltIfDestroyed(self)
-		release(self)
-		endGuidance(self)
-		self.state:kill()
+		self:kill()
 		self.model.Parent = ServerStorage
 		self._hidden = true
 		self._teleported = true
@@ -536,6 +545,7 @@ local BallService: BallService = {
 	kill = function(self: BallService)
 		release(self)
 		endGuidance(self)
+		markThrown(self, false)
 		self.state:kill()
 	end,
 
@@ -546,6 +556,7 @@ local BallService: BallService = {
 		end
 		release(self)
 		self.part.AssemblyLinearVelocity = velocity
+		markThrown(self, true)
 		self.state:throw()
 		self._pendingThrower = player
 	end,

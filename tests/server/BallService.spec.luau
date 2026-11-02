@@ -6,6 +6,7 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallService = require(game:GetService("ServerScriptService").Server.BallService)
 local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
@@ -290,6 +291,46 @@ describe("BallService", function()
 		expect(function()
 			BallService:throw("B", Vector3.zero)
 		end).toThrow("BallService: only the carrier can throw (carrier: A, thrower: B)")
+	end)
+
+	-- The ball's trail on every screen (#313) follows this mark: from a throw, a pass or a roll (all let go through
+	-- `throw`) until the next catch, drop-in, kill or hide. Landing does not end it: a rolled ball lands at once.
+	it("marks the ball thrown from a throw, a pass or a roll until a catch, drop-in, kill or hide", function()
+		local part = BallService.part
+		-- The mark as the server left it: true, or absent (never false).
+		local function thrown(): unknown
+			return part:GetAttribute(Attributes.Thrown)
+		end
+		local rig = caughtBy("A")
+		local function catch()
+			part.CFrame = CFrame.new(ON_TRACK)
+			BallService:jumped()
+			BallService:step(1 / 60, {})
+			BallService:step(config.Ball.rethrowPickupDelay, { holder("A", rig) })
+			expect(BallService.state.carrier).toBe("A")
+		end
+		expect(thrown()).toBeNil()
+		BallService:throw("A", Vector3.new(0, 0, 30))
+		expect(thrown()).toBe(true)
+		BallService:onTouched(slabUnder(ON_TRACK, true))
+		expect(BallService.state.status).toBe("Loose")
+		expect(thrown()).toBe(true)
+		catch()
+		expect(thrown()).toBeNil()
+		BallService:pass("A", Vector3.new(0, 0, 30), nil)
+		expect(thrown()).toBe(true)
+		BallService:spawn()
+		expect(thrown()).toBeNil()
+		catch()
+		BallService:roll("A", Vector3.new(0, 0, 30))
+		expect(thrown()).toBe(true)
+		BallService:kill()
+		expect(thrown()).toBeNil()
+		BallService:spawn()
+		catch()
+		BallService:throw("A", Vector3.new(0, 0, 30))
+		BallService:hide()
+		expect(thrown()).toBeNil()
 	end)
 
 	-- Roll Ball (#312): a throw along the floor. It leaves from the floor under the hand (the hand's spot across the

@@ -1,5 +1,5 @@
 --!strict
--- Names of the attributes the server sets on Player and character instances; Roblox replicates them to every
+-- Names of the attributes the server sets on Player, character and ball instances; Roblox replicates them to every
 -- client.
 
 local SkateTypes = require(script.Parent.Parent.Skate.Types)
@@ -24,4 +24,7 @@ return table.freeze({
 	-- On a character: how many times the server has placed it (on its spawn at each kickoff, or back inside the
 	-- arena); each new count tells its client to start the skater over from rest there.
 	Placed = "Placed",
+	-- On the ball's part: true from a throw, a pass or a roll until the next catch, drop-in or kickoff; absent
+	-- otherwise. Every screen trails the ball meanwhile (#313).
+	Thrown = "Thrown",
 })

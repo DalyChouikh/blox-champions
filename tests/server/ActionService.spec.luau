@@ -35,6 +35,9 @@ local PARKED = Vector3.new(0, 300, 0)
 local ON_TRACK = Vector3.new(0, 3, config.Arena.endRadius)
 -- High over the track spot: a root there is out of the ground ray's reach (Movement.groundProbeLength).
 local AIR = Vector3.new(0, 30, 0)
+-- Where a thrower's crosshair points (#313): the floor 100 studs along -Z from the track spot, under the world's pull.
+local SPOT = Vector3.new(ON_TRACK.X, 0, ON_TRACK.Z - 100)
+local GRAVITY = Config.gravity(config)
 
 type Sent = { to: string, name: string, payload: any }
 
@@ -230,21 +233,53 @@ local function rejected(id: string): { string }
 	return names
 end
 
+-- Asserts the ball just thrown from `hand` comes down on `spot` under the world's pull (#313): where its flight is once
+-- it has covered the spot's distance across.
+local function expectLandsOn(hand: Vector3, spot: Vector3)
+	local offset = spot - hand
+	local across = Vector3.new(offset.X, 0, offset.Z).Magnitude
+	local velocity = BallService.part.AssemblyLinearVelocity
+	Fixtures.expectNear(Fixtures.flightAcross(hand, velocity, GRAVITY, across), spot, 1e-2)
+end
+
+-- A throw at the crosshair's spot (#313).
+local function throwAt(id: string, spot: Vector3, charge: number)
+	ActionService:request(id, { action = "ChargeThrow", aim = Vector3.new(0, -0.05, -1), spot = spot, charge = charge })
+end
+
 describe("ActionService", function()
-	it("throws the carrier's ball at the charged speed along the aim", function()
+	-- A throw comes down on the crosshair's spot (#313, the owner: Q148, Q151), from the hand at the charged speed.
+	it("throws the carrier's ball from the hand at the charged speed, down onto the crosshair's spot", function()
 		local a = blue[1]
 		stand(a, Vector3.zero)
 		giveBall(a)
 		-- Held long enough for a full charge.
 		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
+		local hand = BallService.part.Position
 		-- A validated message reaches the request the service listens with.
 		fakeNet.handlers[Remotes.names.ActionRequest](
 			a,
-			{ action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 }
+			{ action = "ChargeThrow", aim = Vector3.new(0, -0.05, -1), spot = SPOT, charge = 1 }
 		)
 		expect(BallService.state.status).toBe("Flying")
-		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -160))
+		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(throwSettings.maxSpeed, 3)
+		expectLandsOn(hand, SPOT)
 		expect(rejected(a)).toEqual({})
+	end)
+
+	-- On a bank (30 deg) and turned a quarter left, the hand is wherever the turned root holds it: the throw still
+	-- comes down on the spot, under the world's pull rather than the floor's.
+	it("lands a tilted, turned carrier's throw on the crosshair's spot", function()
+		local a = blue[1]
+		rigs[a]:PivotTo(CFrame.new(ON_TRACK) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(0, 0, math.rad(30)))
+		CharacterService.placed:Fire(a)
+		giveBall(a)
+		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
+		local hand = BallService.part.Position
+		local spot = ON_TRACK + Vector3.new(-80, -3, 20)
+		ActionService:request(a, { action = "ChargeThrow", aim = -Vector3.xAxis, spot = spot, charge = 1 })
+		expect(rejected(a)).toEqual({})
+		expectLandsOn(hand, spot)
 	end)
 
 	-- RC's Roll Ball (#312, Q100; Video 31 at 1:19.4): the charge spent along the floor. Aimed (3, 4, -4) from a
@@ -298,18 +333,18 @@ describe("ActionService", function()
 		stand(a, Vector3.zero)
 		giveBall(a)
 		-- Thrown at once, claiming a full charge: none.
-		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 })
+		throwAt(a, SPOT, 1)
 		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(throwSettings.minSpeed, 3)
 		-- Held for half the charge time, claiming a full charge: half.
 		giveBall(a)
 		BallService:step(throwSettings.chargeMaxSeconds / 2, CharacterService:holders())
-		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 })
+		throwAt(a, SPOT, 1)
 		local half = (throwSettings.minSpeed + throwSettings.maxSpeed) / 2
 		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(half, 3)
 		-- A smaller claim stands.
 		giveBall(a)
 		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
-		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 0 })
+		throwAt(a, SPOT, 0)
 		expect(BallService.part.AssemblyLinearVelocity.Magnitude).toBeCloseTo(throwSettings.minSpeed, 3)
 	end)
 
@@ -318,13 +353,16 @@ describe("ActionService", function()
 		local a, b = blue[1], orange[1]
 		stand(a, Vector3.zero)
 		stand(b, Vector3.new(0, 0, -4))
-		-- A thrower whose client claims 10000 studs/s keeps only the allowed speed's share.
+		-- A thrower whose client claims 10000 studs/s keeps only the allowed speed's share, and the throw still comes
+		-- down on the spot.
 		giveBall(a)
 		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
 		Fixtures.root(rigs[a]).AssemblyLinearVelocity = Vector3.new(0, 0, -10000)
-		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.new(0, 0, -1), charge = 1 })
-		local thrown = throwSettings.maxSpeed + throwSettings.inheritCarrierVelocity * limit
-		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -thrown))
+		local hand = BallService.part.Position
+		throwAt(a, SPOT, 1)
+		local carried = Vector3.new(0, 0, -limit) * throwSettings.inheritCarrierVelocity
+		expect((BallService.part.AssemblyLinearVelocity - carried).Magnitude).toBeCloseTo(throwSettings.maxSpeed, 3)
+		expectLandsOn(hand, SPOT)
 		-- A knocked-down carrier whose client claims 10000 studs/s drops it at the allowed speed.
 		Fixtures.root(rigs[a]).AssemblyLinearVelocity = Vector3.zero
 		giveBall(b)
@@ -451,7 +489,7 @@ describe("ActionService", function()
 		stand(c, Vector3.new(50, 0, 0))
 		giveBall(c)
 
-		ActionService:request(a, { action = "ChargeThrow", aim = Vector3.xAxis, charge = 1 })
+		throwAt(a, SPOT, 1)
 		ActionService:request(a, { action = "RollBall", aim = Vector3.xAxis, charge = 1 })
 		expect(rejected(a)).toEqual({ "ChargeThrow", "RollBall" })
 		expect(BallService.state.carrier).toBe(c)

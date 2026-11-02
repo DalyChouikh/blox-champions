@@ -88,6 +88,14 @@ function Fixtures.expectNear2(actual: Vector2, expected: Vector2, tolerance: num
 	JestGlobals.expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-3)
 end
 
+-- Where a gravity-only flight from `from` at `velocity` is once it has covered `across` studs at right angles to
+-- `gravity`: the kinematics alone, to check where a throw comes down apart from how it was aimed (#313).
+function Fixtures.flightAcross(from: Vector3, velocity: Vector3, gravity: Vector3, across: number): Vector3
+	local down = gravity.Unit
+	local time = across / (velocity - down * velocity:Dot(down)).Magnitude
+	return from + velocity * time + gravity * (0.5 * time * time)
+end
+
 -- Jest's toBeCloseTo as a plain check: `value` within half of 10^-digits of `expected`.
 function Fixtures.closeTo(value: number, expected: number, digits: number): boolean
 	return math.abs(value - expected) < 10 ^ -digits / 2
@@ -326,8 +334,9 @@ end
 export type HudArena = { hoop: Model, rim: { BasePart }, panel: BasePart, markers: { Model } }
 
 -- The arena parts the HUD lights and points at, tagged as the arena builder tags them: a goal hoop of two rim parts,
--- its panel, and four corner markers 100 studs apart along x, by gate index, each a model of two panes pivoted between
--- them (as a gate panel is at its wall's middle). Anchored, in `folder`.
+-- pivoted at its opening's centre between them, facing along z, with the builder's opening radius (Arena.goal
+-- .ringRadius); its panel; and four corner markers 100 studs apart along x, by gate index, each a model of two panes
+-- pivoted between them (as a gate panel is at its wall's middle). Anchored, in `folder`.
 function Fixtures.hudArena(folder: Instance): HudArena
 	local function part(name: string, position: Vector3, parent: Instance): Part
 		local made = Instance.new("Part")
@@ -342,6 +351,8 @@ function Fixtures.hudArena(folder: Instance): HudArena
 	hoop.Name = "GoalHoop"
 	local rim: { BasePart } =
 		{ part("Rim1", Vector3.new(0, 20, -40), hoop), part("Rim2", Vector3.new(4, 20, -40), hoop) }
+	hoop.WorldPivot = CFrame.new(2, 20, -40)
+	hoop:SetAttribute(Tags.Attribute.OpeningRadius, Config.defaults().Arena.goal.ringRadius)
 	hoop.Parent = folder
 	hoop:AddTag(Tags.GoalHoop)
 	local panel = part("GoalPanel", Vector3.new(2, 20, -40), folder)

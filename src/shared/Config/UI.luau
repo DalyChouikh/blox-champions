@@ -184,6 +184,10 @@ export type ArenaGlowSettings = {
 	beam: { width: number, thickness: number },
 }
 
+-- The trail behind a thrown, passed or rolled ball on every screen (§9.4, #313): `lifetime` seconds long and `width`
+-- studs wide in `color`, `transparency` see-through behind the ball, fading to nothing at its end.
+export type BallTrailSettings = { lifetime: number, width: number, color: Color3, transparency: number }
+
 export type UIConfig = {
 	clockWarnings: { number },
 	teamColors: { Blue: Color3, Orange: Color3 },
@@ -197,6 +201,7 @@ export type UIConfig = {
 	markers: MarkerSettings,
 	nameTag: NameTagSettings,
 	arenaGlow: ArenaGlowSettings,
+	ballTrail: BallTrailSettings,
 }
 
 local defaults: UIConfig = {
@@ -354,6 +359,11 @@ local defaults: UIConfig = {
 		panelSlideSeconds = 0.4,
 		beam = { width = 2, thickness = 0.5 },
 	},
+	-- The owner asked for a trail behind the ball (Q98; RC's thrown ball leaves a white streak, Video 4 at
+	-- 366.8-367.0 s and Video 31 at 39.1 s; Illegal Soccer's a white dashed one), white as the crosshair is (Q141),
+	-- and bolder once a thin faint one was seen from the side (Q146): as wide as the ball, solid at it, 0.4 s long: 96
+	-- studs behind a full throw (16 body lengths).
+	ballTrail = { lifetime = 0.4, width = 2, color = Color3.new(1, 1, 1), transparency = 0 },
 }
 
 local function noDuplicates(values: { number }): boolean
@@ -410,8 +420,11 @@ end
 
 local textSize = Validate.number({ min = 1, max = 100, integer = true })
 local transparency = Validate.number({ min = 0, max = 1 })
+-- A transparency that still shows something.
+local seen = Validate.number({ min = 0, below = 1 })
 local positive = Validate.number({ above = 0 })
-local beamSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
+-- A part's size along one axis, inside the limits Roblox would silently clamp it to.
+local partSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
 local udim2 = Validate.datatype("UDim2")
 local pixels = Validate.pixels()
 local place = Validate.record({ position = udim2, size = pixels })
@@ -566,7 +579,13 @@ local fields = Validate.record({
 		panelSlide = positive,
 		panelSlideSeconds = Validate.number({ min = 0 }),
 		-- The beam is one part: Roblox would silently clamp a size outside its part limits.
-		beam = Validate.record({ width = beamSize, thickness = beamSize }),
+		beam = Validate.record({ width = partSize, thickness = partSize }),
+	}),
+	ballTrail = Validate.record({
+		lifetime = positive,
+		width = positive,
+		color = Validate.datatype("Color3"),
+		transparency = seen,
 	}),
 })
 

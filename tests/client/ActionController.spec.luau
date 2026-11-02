@@ -11,6 +11,7 @@ local ActionController = require(Client.ActionController)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallCarrier = require(Client.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(Client.InputController)
 local RideSurfaces = require(Client.RideSurfaces)
@@ -37,6 +38,9 @@ local CAMERA = Fixtures.camera(CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(
 local LOCAL_ID = "1"
 -- The other skaters the skating sees (SkateController's views), reset before each test.
 local others: { any } = {}
+-- The arena's parts as ArenaParts holds them: only the goal ring's opening matters here (#313), none until a test
+-- hangs one.
+local arenaParts: { parts: { goal: Crossing.Disc }? } = { parts = nil }
 
 local folder: Folder
 -- Roblox's menu: opening it pauses the controls.
@@ -72,6 +76,15 @@ local function flying(velocity: Vector3)
 	skater().mode = "Airborne"
 	skater().velocity = velocity
 	skater().forward = -Vector3.zAxis
+end
+
+-- A wall across the way ahead, its near face 59.5 studs ahead of the camera along -Z (#313: what a throw's spot meets).
+local function wallAhead(): BasePart
+	local wall = Instance.new("Part")
+	wall.Anchored = true
+	wall.Size = Vector3.new(400, 400, 1)
+	wall.CFrame = CFrame.new(0, 0, -50)
+	return wall
 end
 
 -- The controllers over a floor, on a skater facing -Z. `surfaces` become ride surfaces too, before the rays read them.
@@ -113,6 +126,8 @@ local function setup(surfaces: { BasePart }?)
 		InputController = InputController,
 		BallCarrier = BallCarrier,
 		SkateController = SkateController,
+		RideSurfaces = RideSurfaces,
+		ArenaParts = arenaParts,
 		Camera = CAMERA,
 		SendRequest = function(payload: { [string]: any })
 			table.insert(requests, payload)
@@ -213,6 +228,7 @@ beforeEach(function()
 	requests = {}
 	bindings = {}
 	others = {}
+	arenaParts.parts = nil
 	table.clear(CAMERA.asked)
 end)
 afterEach(function()
@@ -480,9 +496,10 @@ describe("ActionController", function()
 	end)
 
 	-- Through the crosshair above the skater (#312, Q123/Q127), so aiming forward or up never drops the camera to the
-	-- skater's feet.
-	it("charges a throw for as long as it is held, and throws it through the crosshair", function()
-		setup()
+	-- skater's feet, and at the spot where the crosshair's line first meets the arena (#313, Q148): the wall ahead,
+	-- with the ball's centre a radius off its face there, so the ball itself touches it at the spot.
+	it("charges a throw for as long as it is held, and throws it at the crosshair's spot", function()
+		setup({ wallAhead() })
 		local half = math.round(THROW.chargeMaxSeconds / 2 / DT)
 		local throw = charging(half)
 		expect(#requests).toBe(0)
@@ -492,7 +509,32 @@ describe("ActionController", function()
 		local request = requests[1]
 		expect(request.action).toBe("ChargeThrow")
 		expectAimedThroughCrosshair(request)
+		local way = AIM.Unit
+		local face = CAMERA.CFrame.Position + way * (59.5 / -way.Z)
+		Fixtures.expectNear(request.spot, face + Vector3.zAxis * config.Ball.radius, 1e-3)
 		expect(request.charge).toBeCloseTo(half * DT / THROW.chargeMaxSeconds, 6)
+	end)
+
+	-- A line that meets nothing on its way (#313): the spot is where it ends, aimReach studs out.
+	it("throws at the end of the crosshair's line when it meets nothing", function()
+		setup()
+		local throw = charging(6)
+		throw:Fire(false)
+		frame()
+		Fixtures.expectNear(requests[1].spot, CAMERA.CFrame.Position + AIM.Unit * THROW.aimReach, 1e-3)
+	end)
+
+	-- Through the goal ring's opening before the wall (#313): at the ring's centre, though the line passes 3 studs
+	-- beside it.
+	it("throws at the goal ring's centre when the crosshair's line passes through its opening", function()
+		setup({ wallAhead() })
+		local onLine = CAMERA.CFrame.Position + AIM.Unit * 30
+		local centre = onLine + Vector3.new(3, 0, 0)
+		arenaParts.parts = { goal = { frame = CFrame.new(centre), radius = config.Arena.goal.ringRadius } }
+		local throw = charging(6)
+		throw:Fire(false)
+		frame()
+		Fixtures.expectNear(requests[1].spot, centre, 1e-6)
 	end)
 
 	-- The key's time goes on past a full charge: the crosshair's closed ring blinks then (Q142).
@@ -579,6 +621,8 @@ describe("ActionController", function()
 		local request = requests[1]
 		expect(request.action).toBe("RollBall")
 		expectAimedThroughCrosshair(request)
+		-- Along the floor the aim's way: no spot to come down on (#313).
+		expect(request.spot).toBeNil()
 		-- Twelve steps held, and the press's own: the throw key is still down.
 		expect(request.charge).toBeCloseTo(13 * DT / THROW.chargeMaxSeconds, 6)
 		-- The ball leaves at once, as a throw's does; no leap.

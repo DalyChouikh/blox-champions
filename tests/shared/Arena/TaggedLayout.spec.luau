@@ -230,6 +230,20 @@ describe("TaggedLayout.read", function()
 		end).toThrow('TaggedLayout: TeamSpawn "Blue1" has Team "Red"; expected Blue or Orange')
 	end)
 
+	-- One reading of the goal's opening, for the layout and for the client's arena parts (#313).
+	it("reads a hoop's opening as its pivot and a positive opening radius, and nothing else as one", function()
+		local hoop = child(arenaRoot(), "GoalHoop")
+		local disc = TaggedLayout.goalDisc(hoop)
+		expect(disc ~= nil and disc.frame == CFrame.new(0, 18, -73) and disc.radius == 7).toBe(true)
+		hoop:SetAttribute(Tags.Attribute.OpeningRadius, 0)
+		expect(TaggedLayout.goalDisc(hoop)).toBeNil()
+		hoop:SetAttribute(Tags.Attribute.OpeningRadius, "7")
+		expect(TaggedLayout.goalDisc(hoop)).toBeNil()
+		local folder = Instance.new("Folder")
+		folder:SetAttribute(Tags.Attribute.OpeningRadius, 7)
+		expect(TaggedLayout.goalDisc(folder)).toBeNil()
+	end)
+
 	it("rejects a tagged non-part, a gate without an index, an arena with no gates and a team with no spawn", function()
 		local root = arenaRoot()
 		-- Of several, the first by name is the one named, whatever order they were tagged in.

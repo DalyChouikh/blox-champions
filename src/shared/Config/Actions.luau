@@ -64,6 +64,8 @@ export type ThrowSettings = {
 	maxSpeed: number,
 	-- The share of the carrier's velocity the ball keeps.
 	inheritCarrierVelocity: number,
+	-- How far the crosshair's line runs from the camera looking for the spot a throw comes down on (#313).
+	aimReach: number,
 }
 export type PassSettings = {
 	speed: number,
@@ -135,6 +137,12 @@ end
 -- it.
 local function spendsCharge(effect: Effect): boolean
 	return effect == "Throw" or effect == "Roll"
+end
+
+-- Whether an action with this effect comes down on the crosshair's spot: a throw does (#313, Q148), so the client
+-- sends where the crosshair points; a roll keeps to the floor and a pass homes on its target.
+local function aimsAtSpot(effect: Effect): boolean
+	return effect == "Throw"
 end
 
 -- On the ground or in the air alike, charging or not, unless `grounded` or `charge` says otherwise (a mode can too,
@@ -230,14 +238,25 @@ local defaults: ActionsConfig = {
 	},
 	-- Held with the ball to charge, let go to throw. A full charge in 0.5 s (the owner, Q99, kept in trial #311, Q133;
 	-- was 1 s): RC's crosshair closes 0.4-0.6 s after the press (Video 4 at 6:05.9-6:06.4, Video 3 at 36:58, Video 32
-	-- at 2.6-3.2 s). The speeds stay 60 at a tap and 160 at a full charge (10-27 body lengths a second).
+	-- at 2.6-3.2 s). The throw comes down where the crosshair points (#313, Q148: RC's ball leaves the hand and flies
+	-- into the crosshair, Video 31 at 39.0-39.3 s) under real gravity (Q150), flattened the realistic way, by speed
+	-- (trial 150 kept, Q151; was 60-160): 90 studs/s at a tap to 240 at a full charge (15-41 body lengths a second). A
+	-- spot 100 studs out then takes a 6 deg throw; a straight's far end, 177 out, a 15 deg one rising 2.4 body heights
+	-- in 0.76 s (RC's ball reaches the far end in about 1 s). The crosshair's line looks 1000 studs for the spot, past
+	-- any arena's far side.
 	ChargeThrow = {
 		phases = INSTANT,
 		cooldown = 0,
 		requires = requires("with"),
 		effect = "Throw",
 		pose = "None",
-		throw = { chargeMaxSeconds = 0.5, minSpeed = 60, maxSpeed = 160, inheritCarrierVelocity = 0.5 },
+		throw = {
+			chargeMaxSeconds = 0.5,
+			minSpeed = 90,
+			maxSpeed = 240,
+			inheritCarrierVelocity = 0.5,
+			aimReach = 1000,
+		},
 	},
 	-- RC's Roll Ball (the owner, Q100; Video 31 at 1:19.4: the ball drops to the floor beside the skater and rolls
 	-- away ahead): the uppercut key while a throw charges puts the ball on the floor under the hand, rolling the
@@ -292,6 +311,7 @@ local throw = Validate.check(
 		minSpeed = positive,
 		maxSpeed = positive,
 		inheritCarrierVelocity = fraction,
+		aimReach = positive,
 	}),
 	function(settings: ThrowSettings): boolean
 		return settings.maxSpeed >= settings.minSpeed
@@ -391,4 +411,5 @@ return {
 	nameOf = nameOf,
 	releasesBall = releasesBall,
 	spendsCharge = spendsCharge,
+	aimsAtSpot = aimsAtSpot,
 }

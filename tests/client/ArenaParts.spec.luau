@@ -24,6 +24,18 @@ afterEach(function()
 end)
 
 describe("ArenaParts", function()
+	-- Where a throw through the goal ring aims (#313): the hoop's opening, read as the arena's layout reads it.
+	it("holds the goal ring's opening, and no parts while the hoop has no opening radius", function()
+		local arena = Fixtures.hudArena(folder)
+		ArenaParts:refresh()
+		local goal = (ArenaParts.parts :: any).goal
+		expect(goal.frame == arena.hoop:GetPivot()).toBe(true)
+		expect(goal.radius).toBe(arena.hoop:GetAttribute(Tags.Attribute.OpeningRadius))
+		arena.hoop:SetAttribute(Tags.Attribute.OpeningRadius, nil)
+		ArenaParts:refresh()
+		expect(ArenaParts.parts).toBeNil()
+	end)
+
 	it("finds the corner markers by gate index, the goal hoop's parts and the panel once the arena is there", function()
 		expect(ArenaParts.parts).toBeNil()
 		local arena = Fixtures.hudArena(folder)

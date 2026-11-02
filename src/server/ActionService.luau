@@ -12,8 +12,9 @@
 -- fall whose client asks to get up (GetUp, sent when they move) is up once Actions.getUpAfter has passed since the
 -- knockdown, never sooner; a diver is up once their root slides slower than the landing's stopSpeed along the ground,
 -- whatever they ask (#242); anyone, at the latest after the knockdown's seconds.
--- A throw or a roll keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held
--- for. The server never sees the throw key: an action that needs a charge under way (Roll Ball) or none (a pass, #312)
+-- A throw comes down on the spot its client's crosshair points at, from the ball's own spot in the hand (#313). A throw
+-- or a roll keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held for.
+-- The server never sees the throw key: an action that needs a charge under way (Roll Ball) or none (a pass, #312)
 -- starts either way here.
 -- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
 -- sum of the frames it is stepped, so a request between frames counts as the last frame's.
@@ -97,6 +98,8 @@ export type ActionService = {
 	_characters: CharacterService.CharacterService,
 	-- The fastest a skater may move: a client-reported velocity is never trusted beyond it.
 	_speedLimit: number,
+	-- The world's pull on a thrown ball (World.gravity, as Bootstrap sets the workspace's).
+	_gravity: Vector3,
 	_now: number,
 	_records: { [PlayerId]: Record },
 	-- Players with a record, in the order they got it, so a frame's strikes resolve the same way every time.
@@ -361,8 +364,10 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Roll: Effect, 
 	Dodge = noEffect,
 	Throw = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
 		local throw = action.throw :: Config.ThrowSettings
+		local charge = heldCharge(self, payload, throw)
+		local from = self._ball.part.Position
 		local velocity =
-			Throw.charged(throw, payload.aim, heldCharge(self, payload, throw), carrierVelocity(self, holder))
+			Throw.aimed(throw, charge, from, payload.aim, payload.spot, carrierVelocity(self, holder), self._gravity)
 		self._ball:throw(player, velocity)
 	end,
 	-- Roll Ball (#312): ChargeThrow's charge at ChargeThrow's speeds (one charge, one speed range), along the floor
@@ -405,6 +410,7 @@ local ActionService: ActionService = {
 	_teams = nil :: any,
 	_characters = nil :: any,
 	_speedLimit = 0,
+	_gravity = Vector3.zero,
 	_now = 0,
 	_records = {},
 	_order = {},
@@ -427,6 +433,7 @@ local ActionService: ActionService = {
 		self._teams = deps.TeamService
 		self._characters = deps.CharacterService
 		self._speedLimit = MovementCheck.speedLimit(config.Movement, config.Network)
+		self._gravity = Config.gravity(config)
 		self._now = 0
 		self._records = {}
 		self._order = {}

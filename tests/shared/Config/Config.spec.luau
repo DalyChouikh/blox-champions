@@ -27,15 +27,25 @@ describe("Config.Actions", function()
 	end)
 
 	-- What each effect carries (Net/Schemas) and does to the ball (ActionController): a throw and a roll leave the
-	-- hands spending the charge (#312), a pass leaves them along the aim, the rest keep the ball where it is.
-	it("says which effects let go of the ball and which spend the charge", function()
-		local releases, spends = {}, {}
+	-- hands spending the charge (#312), a pass leaves them along the aim, the rest keep the ball where it is; only a
+	-- throw comes down on the crosshair's spot (#313, Q148).
+	it("says which effects let go of the ball, spend the charge and aim at the crosshair's spot", function()
+		local releases, spends, spots = {}, {}, {}
 		for _, effect: Actions.Effect in
 			{ "Knockdown", "Dodge", "Throw", "Roll", "Pass", "CallPass" } :: { Actions.Effect }
 		do
 			releases[effect] = Actions.releasesBall(effect)
 			spends[effect] = Actions.spendsCharge(effect)
+			spots[effect] = Actions.aimsAtSpot(effect)
 		end
+		expect(spots).toEqual({
+			Knockdown = false,
+			Dodge = false,
+			Throw = true,
+			Roll = false,
+			Pass = false,
+			CallPass = false,
+		})
 		expect(releases).toEqual({
 			Knockdown = false,
 			Dodge = false,
@@ -208,8 +218,15 @@ describe("Config defaults", function()
 				requires = requires("with"),
 				effect = "Throw",
 				pose = "None",
-				-- A full charge in 0.5 s (Q99, Q133), as RC's crosshair closes.
-				throw = { chargeMaxSeconds = 0.5, minSpeed = 60, maxSpeed = 160, inheritCarrierVelocity = 0.5 },
+				-- A full charge in 0.5 s (Q99, Q133), as RC's crosshair closes; faster after trial 150 (Q151), so a
+				-- far spot takes a flatter arc; the crosshair's line runs 1000 studs looking for the spot (Q148).
+				throw = {
+					chargeMaxSeconds = 0.5,
+					minSpeed = 90,
+					maxSpeed = 240,
+					inheritCarrierVelocity = 0.5,
+					aimReach = 1000,
+				},
 			},
 			-- The uppercut key while a throw charges, on a surface (#312, Q100): the charge spent along the floor.
 			RollBall = {
@@ -605,6 +622,8 @@ describe("Config defaults", function()
 			panelSlideSeconds = 0.4,
 			beam = { width = 2, thickness = 0.5 },
 		})
+		-- The ball's trail (#313), bolder after the screenshots (Q146); the thrower's arc went (Q149).
+		expect(ui.ballTrail).toEqual({ lifetime = 0.4, width = 2, color = Color3.new(1, 1, 1), transparency = 0 })
 	end)
 
 	it("match the spec's arena layout", function()
@@ -1282,11 +1301,21 @@ describe("Config.forMode", function()
 		expect(movement.climbAccel).toBe(0.01)
 	end)
 
+	it("accepts a crosshair's line just long enough to find a throw's spot", function()
+		local actions = Fixtures.config({ Actions = { ChargeThrow = { throw = { aimReach = 0.01 } } } }).Actions
+		expect((actions.ChargeThrow.throw :: Config.ThrowSettings).aimReach).toBe(0.01)
+	end)
+
 	it("rejects actions that contradict themselves", function()
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			{
 				overrides = { ChargeThrow = { throw = { maxSpeed = 50 } } },
 				message = "Actions.ChargeThrow.throw: maxSpeed must be at least minSpeed",
+			},
+			-- The crosshair's line must run somewhere to find a throw's spot (#313).
+			{
+				overrides = { ChargeThrow = { throw = { aimReach = 0 } } },
+				message = "Actions.ChargeThrow.throw.aimReach: must be > 0 (got 0)",
 			},
 			-- The Tackle's follow-up (#240): another action, in a window that ends after it starts.
 			{
@@ -1376,7 +1405,13 @@ describe("Config.forMode", function()
 			{
 				overrides = {
 					RollBall = {
-						throw = { chargeMaxSeconds = 1, minSpeed = 1, maxSpeed = 2, inheritCarrierVelocity = 0 },
+						throw = {
+							chargeMaxSeconds = 1,
+							minSpeed = 1,
+							maxSpeed = 2,
+							inheritCarrierVelocity = 0,
+							aimReach = 1,
+						},
 					},
 				},
 				message = "Actions.RollBall.throw: unknown key",
@@ -1700,6 +1735,17 @@ describe("Config.forMode", function()
 		expect(top.UI.hud.layout.reticle.height).toBe(0.001)
 	end)
 
+	-- The ball's trail (#313).
+	it("accepts a ball's trail just inside its limits", function()
+		local trail = Fixtures.config({ UI = { ballTrail = { lifetime = 0.01, width = 0.01, transparency = 0.99 } } })
+		expect(trail.UI.ballTrail).toEqual({
+			lifetime = 0.01,
+			width = 0.01,
+			color = Color3.new(1, 1, 1),
+			transparency = 0.99,
+		})
+	end)
+
 	it("accepts a kickoff count whose digit just fits inside its ring", function()
 		-- 116 - 2 x 8 = 100: a 99 px digit fits.
 		local countdown =
@@ -1746,6 +1792,19 @@ describe("Config.forMode", function()
 			{
 				overrides = { UI = { arenaGlow = { beam = { thickness = 3000 } } } },
 				message = "UI.arenaGlow.beam.thickness: must be <= 2048 (got 3000)",
+			},
+			-- The ball's trail (#313): some time long, some width, seen.
+			{
+				overrides = { UI = { ballTrail = { lifetime = 0 } } },
+				message = "UI.ballTrail.lifetime: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { ballTrail = { width = 0 } } },
+				message = "UI.ballTrail.width: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { ballTrail = { transparency = 1 } } },
+				message = "UI.ballTrail.transparency: must be < 1 (got 1)",
 			},
 			{ overrides = { UI = { hud = { screenMargin = -1 } } }, message = "UI.hud.screenMargin: must be >= 0" },
 			{ overrides = { UI = { keyNames = { Banana = "B" } } }, message = "UI.keyNames: Banana must name a key" },
