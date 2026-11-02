@@ -62,12 +62,27 @@ describe("DropIn", function()
 				distinct += 1
 			end
 		end
-		-- Half each way within 5 standard deviations (10 at 400 picks); every section about its share of the loop.
-		expect(math.abs(sides.inner - 200) <= 50).toBe(true)
+		-- outerShare by the outer wall (half, Q112) within 5 standard deviations (10 at 400 picks); every section
+		-- about its share of the loop.
+		expect(math.abs(sides.outer - 400 * dropIn.outerShare) <= 50).toBe(true)
 		for _, count in sections do
 			expect(count >= 60).toBe(true)
 		end
 		expect(distinct).toBe(400)
+	end)
+
+	-- The share by the outer wall is a setting (Q112's half): all of them, or none.
+	it("picks the outer wall's line for outerShare of the drops", function()
+		for _, share in { 0, 1 } do
+			local custom = Fixtures.config({ Ball = { dropIn = { outerShare = share } } })
+			local random = Random.new(350)
+			for _ = 1, 20 do
+				local start = DropIn.pick(custom.Arena, custom.Ball, random)
+				local distance = Centerline.distanceOf(arena, start)
+				local lateral = if share == 1 then arena.trackWidth - dropIn.outerIn else dropIn.innerIn
+				Fixtures.expectNear(start, Centerline.pose(arena, distance, lateral, HEIGHT), 1e-3)
+			end
+		end
 	end)
 
 	-- Q114, Q116: falling steadily while moving the lap's way along the track's curve, whatever the height or lane.

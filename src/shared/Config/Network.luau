@@ -70,9 +70,10 @@ local defaults: NetworkConfig = {
 	maxTeamSwitchesPerSecond = 1,
 	-- #316 (Q101), measured in a 2-player test: Roblox's own replication drew a steady 90-studs/s pass 0.19 s late at
 	-- 46-248 studs/s a frame, and other screens drew a thrown ball still for 0.29 s. Drawn from these states (the
-	-- prototype): no lag, 83-107 studs/s a frame, within 2 studs of the server's path through a bounce, 0.07 s. A
-	-- frame's travel at the fastest throw (~233) is ~4 studs, well under the snap. A still ball costs four states a
-	-- second, and a lost last one is set right within a quarter second.
+	-- prototype): no lag, 83-107 studs/s a frame, within 2 studs of the server's path through a bounce, 0.07 s. The
+	-- fastest throw (~313 studs/s: a full charge's 240 and half the 145.2 speed limit) moves ~5 studs a frame at 60
+	-- frames a second, well under the snap. A still ball costs four states a second, and a lost last one is set right
+	-- within a quarter second.
 	ballStream = { correctionSeconds = 0.08, snapStuds = 10, maxAgeSeconds = 0.3, restSeconds = 0.25 },
 }
 

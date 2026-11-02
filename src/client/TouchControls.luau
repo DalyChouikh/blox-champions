@@ -20,6 +20,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local ControlLabels = require(script.Parent.ControlLabels)
 local InputController = require(script.Parent.InputController)
 local SkateController = require(script.Parent.SkateController)
+local Style = require(script.Parent.Hud.Style)
 local TouchArea = require(ReplicatedStorage.Shared.Input.TouchArea)
 local TouchStick = require(ReplicatedStorage.Shared.Input.TouchStick)
 
@@ -112,7 +113,7 @@ local function show(self: TouchControls, control: Config.TouchControl, label: st
 		self._texts[control] = label
 		button.Text = label
 	end
-	local fade = if greyed then self._config.UI.hud.dimTransparency else 0
+	local fade = Style.dim(self._config, greyed)
 	if self._fades[control] ~= fade then
 		self._fades[control] = fade
 		button.TextTransparency = fade

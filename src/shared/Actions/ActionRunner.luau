@@ -71,13 +71,8 @@ local function windowFor(self: Runner, source: Actions.ActionName?, name: Action
 	return if followUp ~= nil and followUp.action == name then followUp else nil
 end
 
--- Whether an action's ball requirement lets a player who holds the ball (or doesn't) start it.
-function ActionRunner.ballFits(ball: Actions.BallRequirement, hasBall: boolean): boolean
-	return ball == "any" or (ball == "with") == hasBall
-end
-
 -- Whether a three-way requirement (`yes`, its opposite, or "any") lets an action start in a state that is `yes` or
--- not, or that this side can't tell (nil): then either may.
+-- not, or that this side can't tell (nil): then either may. The ball's is always told.
 local function fits(requirement: string, yes: string, state: boolean?): boolean
 	return requirement == "any" or state == nil or (requirement == yes) == state
 end
@@ -87,10 +82,9 @@ local function allows(requires: Actions.Requires, context: Context): boolean
 	if requires.notKnockedDown and context.knockedDown then
 		return false
 	end
-	if not ActionRunner.ballFits(requires.ball, context.hasBall) then
-		return false
-	end
-	return fits(requires.grounded, "airborne", context.airborne) and fits(requires.charge, "charging", context.charging)
+	return fits(requires.ball, "with", context.hasBall)
+		and fits(requires.grounded, "airborne", context.airborne)
+		and fits(requires.charge, "charging", context.charging)
 end
 
 local function stop(self: Runner)
@@ -143,7 +137,9 @@ end
 
 -- Whether `name` may start as far as the context and, for a follow-up, its window go (not its cooldown, nor what
 -- runs): the action started last names it, and started between its window's `from` and `to` seconds ago, each edge
--- moved by `tolerance`. What an action key would start now (ActionController).
+-- moved by `tolerance`. A follow-up keeps to the move it follows, so it needs what that one needed of the ball (the
+-- owner, Q178: the Dive after a Tackle with empty hands, after a Dodge on the ball). What an action key would start
+-- now (ActionController).
 function ActionRunner.available(self: Runner, name: Actions.ActionName, context: Context, tolerance: number?): boolean
 	if not allows(self._actions[name].requires, context) then
 		return false
@@ -151,9 +147,18 @@ function ActionRunner.available(self: Runner, name: Actions.ActionName, context:
 	if not self._followUps[name] then
 		return true
 	end
-	local window = windowFor(self, self._lastStarted, name)
+	local source: Actions.ActionName? = self._lastStarted
+	local window = windowFor(self, source, name)
+	if window == nil then
+		return false
+	end
+	-- Only a source's own follow-up has a window, so `source` is set here.
+	local followed = self._actions[source :: Actions.ActionName]
+	if not fits(followed.requires.ball, "with", context.hasBall) then
+		return false
+	end
 	local slack, since = tolerance or 0, self._sinceStart
-	return window ~= nil and since >= window.from - slack and since <= window.to + slack
+	return since >= window.from - slack and since <= window.to + slack
 end
 
 -- Starts `name` when it is available, nothing else runs (a follow-up replaces the action it follows) and its cooldown

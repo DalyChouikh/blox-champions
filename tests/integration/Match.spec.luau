@@ -24,7 +24,7 @@ local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 type Fired = { name: string, payload: any, to: string?, ballAt: string? }
 
 local FRAME = 1 / 60
--- The middle of the track, where the ball spawns: carried and lined-up rigs skate along it.
+-- The middle of the track, where catchWith lands the ball: carried and lined-up rigs skate along it.
 local MIDDLE = Config.defaults().Arena.trackWidth / 2
 
 local config: Config.GameConfig
@@ -292,27 +292,24 @@ end
 
 describe("A match on the generated arena", function()
 	-- The owner (Q92): everyone is placed on their spawn, free to skate and act through the count.
-	it(
-		"starts once a player is seated, free through the count with the ball hidden, then drops it at a ball spawn",
-		function()
-			setup()
-			local rigs = seat(2)
-			frames(FRAME)
-			expect(events()).toEqual({ "MatchStarted", "KickoffStarted" })
-			expect(ballAt()).toBe("ServerStorage")
-			expect(Fixtures.root(rigs[1]).Anchored).toBe(false)
-			expect(rigs[1]:GetAttribute(Attributes.Placed)).toBe(1)
-			lineUp(rigs[1], rigs[2], 4)
-			ActionService:request("1", { action = "Tackle" })
-			frames(0.2)
-			expect(eventsNamed("TackleKnockdown")).toEqual({})
-			expect(rigs[2]:GetAttribute(Attributes.KnockedDown)).toBe("Hit")
-			frames(config.Match.kickoffCountdownSeconds + 0.05)
-			expect(table.find(events(), "KickoffEnded")).never.toBeNil()
-			expect(ballAt()).toBe("Workspace")
-			expect(BallService.state.status).toBe("Loose")
-		end
-	)
+	it("starts once a player is seated, free through the count with the ball hidden, then drops it in", function()
+		setup()
+		local rigs = seat(2)
+		frames(FRAME)
+		expect(events()).toEqual({ "MatchStarted", "KickoffStarted" })
+		expect(ballAt()).toBe("ServerStorage")
+		expect(Fixtures.root(rigs[1]).Anchored).toBe(false)
+		expect(rigs[1]:GetAttribute(Attributes.Placed)).toBe(1)
+		lineUp(rigs[1], rigs[2], 4)
+		ActionService:request("1", { action = "Tackle" })
+		frames(0.2)
+		expect(eventsNamed("TackleKnockdown")).toEqual({})
+		expect(rigs[2]:GetAttribute(Attributes.KnockedDown)).toBe("Hit")
+		frames(config.Match.kickoffCountdownSeconds + 0.05)
+		expect(table.find(events(), "KickoffEnded")).never.toBeNil()
+		expect(ballAt()).toBe("Workspace")
+		expect(BallService.state.status).toBe("Loose")
+	end)
 
 	it("counts a lap carried around the generated track and opens the goal", function()
 		setup()

@@ -81,6 +81,7 @@ export type ActionController = {
 	_skate: SkateController.SkateController,
 	_camera: AimCamera,
 	_surfaces: Surfaces,
+	_inTheOpen: PassTarget.InTheOpen,
 	_goal: Goal,
 	_sendRequest: (payload: { [string]: any }) -> (),
 	_localId: PlayerId,
@@ -396,7 +397,7 @@ local function aimPass(self: ActionController, root: BasePart): PlayerId?
 	Pickup.trimCandidates(list, count)
 	local _, aim = self._camera:crosshair()
 	local pass = self._config.Actions.Pass.pass :: Config.PassSettings
-	return PassTarget.choose(pass, root.Position, aim, list, calls, self._surfaces.params)
+	return PassTarget.choose(pass, root.Position, aim, list, calls, self._inTheOpen)
 end
 
 -- What the server is told: the action, with the aim when it lets go of the ball, the crosshair's spot when it comes
@@ -480,6 +481,7 @@ local ActionController: ActionController = {
 	_skate = nil :: any,
 	_camera = nil :: any,
 	_surfaces = nil :: any,
+	_inTheOpen = nil :: any,
 	_goal = nil :: any,
 	_sendRequest = function(_payload: { [string]: any }) end,
 	_localId = "",
@@ -509,6 +511,9 @@ local ActionController: ActionController = {
 		self._skate = deps.SkateController
 		self._camera = deps.Camera or deps.CameraController
 		self._surfaces = deps.RideSurfaces
+		self._inTheOpen = function(from: Vector3, offset: Vector3): boolean
+			return workspace:Raycast(from, offset, self._surfaces.params) == nil
+		end
 		self._goal = deps.ArenaParts
 		self._sendRequest = deps.SendRequest
 			or function(payload: { [string]: any })

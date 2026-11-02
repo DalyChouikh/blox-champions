@@ -59,7 +59,8 @@ export type InputConfig = {
 	pump: { Enum.KeyCode },
 	brake: { Enum.KeyCode },
 	attach: { Enum.KeyCode },
-	-- A Tackle, a Dive just after one (#240), or a Dodge with the ball, which drops a charge (Cancel & Dodge, #312).
+	-- A Tackle, or a Dodge with the ball, which drops a charge (Cancel & Dodge, #312); then a Dive just after either
+	-- (#240, #314), with the hands that move had (Q178).
 	tackle: { Enum.KeyCode },
 	-- An Uppercut without the ball, Roll Ball while a throw charges (#312).
 	uppercut: { Enum.KeyCode },

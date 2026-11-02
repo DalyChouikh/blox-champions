@@ -20,10 +20,10 @@ describe("Trajectory.positionAt", function()
 	end)
 end)
 
--- A throw that comes down where the crosshair points (#313, the owner: Q148, Q151). Worked examples at 50 studs/s
--- under 24 studs/s^2, computed apart from the code (a brute-force scan for the earliest time the ball can be there,
--- s58\worked313b.py): 100 studs out on the level the two arcs leave at tan 3/4 and 4/3, so the flatter one is (0.8,
--- 0.6) and covers the 100 studs at 40 studs/s in 2.5 s.
+-- A throw that comes down where the crosshair points (#313, the owner: Q148, Q151). Worked examples at 50 studs/s under
+-- 24 studs/s^2, computed apart from the code (a brute-force scan for the earliest time the ball can be there): 100
+-- studs out on the level the two arcs leave at tan 3/4 and 4/3, so the flatter one is (0.8, 0.6) and covers the 100
+-- studs at 40 studs/s in 2.5 s.
 describe("Trajectory.launch", function()
 	local GRAVITY = Vector3.new(0, -24, 0)
 	local SPEED = 50

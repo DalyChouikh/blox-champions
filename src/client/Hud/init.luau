@@ -446,11 +446,10 @@ local Hud: Hud = {
 			show(self._speed, self._text:speed(skater:shownSpeed()))
 		end
 		local config, actions = self._config, self._actions
-		local dim = config.UI.hud.dimTransparency
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
 			local label, greyed = ControlLabels.label(control, config, actions, skate)
 			show(self._labels[control], label or "")
-			show(self._fades[control], if greyed then dim else 0)
+			show(self._fades[control], Style.dim(config, greyed))
 		end
 		show(self._charge, actions:chargeSeconds() or 0)
 	end,

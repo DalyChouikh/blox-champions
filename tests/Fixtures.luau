@@ -3,6 +3,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
@@ -114,7 +115,7 @@ end
 
 -- Where a sphere of `radius` moving from `from` to `to` first touches the plane through `point` with `normal`, from
 -- the side the normal faces: its centre then, or nil if it stays clear of the plane all the way (#345). The closed
--- form, to check a shapecast apart from Roblox's (it matched stepping the sphere in 1e-6 steps: s64\worked345.py).
+-- form, to check a shapecast apart from Roblox's (it matched stepping the sphere in 1e-6 steps, #345).
 function Fixtures.sphereMeetsPlane(
 	from: Vector3,
 	to: Vector3,
@@ -358,6 +359,13 @@ function Fixtures.rig(parent: Instance, name: string, cframe: CFrame, rigType: E
 	model.PrimaryPart = root
 	model.Parent = parent
 	return model
+end
+
+-- A server placement as the rig's client sees it (#307): its Placed count moves on, which holds the skater still
+-- for that step and starts them over from rest.
+function Fixtures.placed(rig: Model)
+	local count: number? = rig:GetAttribute(Attributes.Placed) :: number?
+	rig:SetAttribute(Attributes.Placed, (count or 0) + 1)
 end
 
 -- A rig's root part, found by the name Roblox gives it in every character.

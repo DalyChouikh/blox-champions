@@ -1,8 +1,7 @@
 --!strict
 -- Everything in the arena besides the solid riding surface (spec §9.1, Arena spec §5): the rideable glass walls with
 -- their lips, the top that closes the arena (a roof, or an open map's ceiling), the lap gates, the goal ring hanging
--- from its arm with its panel, the glass walls across the track at the gates, the team and ball spawns, and the infield
--- floor.
+-- from its arm with its panel, the glass walls across the track at the gates, the team spawns, and the infield floor.
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)

@@ -1225,6 +1225,27 @@ describe("ActionService's Dive with the ball", function()
 		expect(rejected(a)).toEqual({ "Dive", "Dive" })
 	end)
 
+	-- The owner (Q178; #314: "no Dive with the ball without a Dodge first"): a Dive keeps to the move it follows. A
+	-- tackler the ball reached inside the tackle's window cannot dive holding it, nor a carrier whose ball has gone
+	-- dive after their dodge.
+	it("refuses a dive holding the ball after a tackle, and with empty hands after a dodge", function()
+		local a, b = blue[1], blue[2]
+		stand(a, Vector3.zero)
+		ActionService:request(a, { action = "Tackle" })
+		giveBall(a)
+		advance(FOLLOW_UP.from + 0.05)
+		ActionService:request(a, { action = "Dive" })
+		BallService:drop()
+		stand(b, Vector3.new(20, 0, 0))
+		giveBall(b)
+		ActionService:request(b, { action = "Dodge" })
+		BallService:drop()
+		advance((config.Actions.Dodge.followUp :: Config.FollowUp).from + 0.05)
+		ActionService:request(b, { action = "Dive" })
+		expect(rejected(a)).toEqual({ "Dive" })
+		expect(rejected(b)).toEqual({ "Dive" })
+	end)
+
 	-- The owner (Q152): the carrier's dive strikes as the Tackle's does.
 	it("knocks down an opponent the carrier's dive reaches, and the carrier keeps the ball", function()
 		local a, b = blue[1], orange[1]

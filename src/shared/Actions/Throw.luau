@@ -69,13 +69,14 @@ local function exactArc(
 	return velocity, reaches and time <= throw.exactSeconds
 end
 
--- A charged throw from the hand at `from` (#313, the owner: Q148, Q151; #342: Q169, Q170): the velocity that brings
--- the ball down on `spot` under `gravity` on the flatter arc, with the carrier's share of `carrierVelocity` in it,
--- when it gets there within exactSeconds of flight. A farther spot, or one out of the charge's reach, falls back along
--- the crosshair's line (`aim`, the way it runs to the spot) toward the thrower: the throw goes through the farthest
--- point of the line it reaches in time, so on the thrower's screen it flies into the crosshair and, past that point,
--- falls under it more the farther it goes, like RC's (Video 35). A spot behind the hand along the line leaves no line
--- to fall back on: the least-speed arc toward it.
+-- A charged throw from the hand at `from` (#313, the owner: Q148, Q151; #342: Q169, Q170): the velocity that brings the
+-- ball down on `spot` under `gravity` on the flatter arc, with the carrier's share of `carrierVelocity` in it, when it
+-- gets there within exactSeconds of flight. A farther spot, or one out of the charge's reach, falls back toward the
+-- thrower along the aim's way through the spot (`aim`: the crosshair's line, or for a throw at the goal the parallel
+-- through the ring's centre, Throw.spot): the throw goes through the farthest point of that line it reaches in time, so
+-- on the thrower's screen it flies into the crosshair and, past that point, falls under it more the farther it goes,
+-- like RC's (Video 35). A spot behind the hand along the line leaves no line to fall back on: the least-speed arc
+-- toward it.
 function Throw.aimed(
 	throw: Actions.ThrowSettings,
 	charge: number,

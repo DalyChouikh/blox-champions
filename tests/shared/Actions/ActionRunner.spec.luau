@@ -179,6 +179,24 @@ describe("ActionRunner", function()
 		expect(late:available("Dive", context(true))).toBe(false)
 	end)
 
+	-- A Dive keeps to the move it follows (the owner, Q178; #314: "no Dive with the ball without a Dodge first"): after
+	-- a Tackle only with empty hands, not once a magnet catch put the ball in them; after a Dodge only while the ball
+	-- is still held, not once it was thrown.
+	it("dives only with the hands the move it follows had: a tackle's empty, a dodge's on the ball", function()
+		local tackled = ActionRunner.new(actions)
+		tackled:start("Tackle", context(false))
+		tackled:step((actions.Tackle.followUp :: Config.FollowUp).from + 0.01)
+		expect(tackled:available("Dive", context(true))).toBe(false)
+		expect(tackled:start("Dive", context(true))).toBe("NotAllowed")
+		expect(tackled:start("Dive", context(false))).toBe("Started")
+		local dodged = ActionRunner.new(actions)
+		dodged:start("Dodge", context(true))
+		dodged:step((actions.Dodge.followUp :: Config.FollowUp).from + 0.01)
+		expect(dodged:available("Dive", context(false))).toBe(false)
+		expect(dodged:start("Dive", context(false))).toBe("NotAllowed")
+		expect(dodged:start("Dive", context(true))).toBe("Started")
+	end)
+
 	it("opens no dive window for a tackle the server refused, nor after a reset", function()
 		local refused = ActionRunner.new(actions)
 		refused:start("Tackle", context())
