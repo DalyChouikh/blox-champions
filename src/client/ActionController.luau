@@ -1,17 +1,20 @@
 --!strict
 -- The local player's actions (spec §3.3, §8.1–8.3). Each physics step, after the skating (FrameController), it reads
 -- the action keys and starts at most one action at once in its own ActionRunner: it pushes the skater, then asks the
--- server, which checks the action again. A throw or pass predicts the ball leaving. A refusal (ActionRejected) stops
--- the action, refunds its cooldown and gives a refused throw's ball back; a push already given stays (the movement
--- guard tolerates it), but a lunge eases back to the speed before over its recovery, and drops to it at once when its
--- action stops early (#241). A throw let go while another action runs waits for it. The tackle key dives in the
--- Tackle's follow-up window (#240). A Tackle, Dive or Uppercut homes (#277): it turns the skater at once toward the
--- nearest opponent it may reach in its snap zone, else its cone, around the stick's way (else toward that way), and
--- bends toward them while they stay in the cone, until its recovery; the server still judges every hit. Nothing
--- starts while the skater is held still (SkateController.frozen), knocked down or diving: an action with a landing
--- (the Dive) holds the skater (SkateController.diving) until the server knocks them down at their touchdown, or until
--- the server's rule for that knockdown's end holds here (#286), and a knockdown stops the running action, as the
--- server stops it.
+-- server, which checks the action again. A throw, roll or pass predicts the ball leaving, aimed through the crosshair
+-- (the camera's ray through its point on the screen, #312). A refusal (ActionRejected) stops the action, refunds its
+-- cooldown and gives a refused throw's ball back; a push already given stays (the movement guard tolerates it), but a
+-- lunge eases back to the speed before over its recovery, and drops to it at once when its action stops early (#241).
+-- A throw charges while its key is held with the ball (RC's crosshair shows how far, #312), and starting any action
+-- ends the charge: a throw, or Roll Ball on the uppercut key, spends it; a Dodge drops it (Cancel & Dodge); no pass
+-- starts meanwhile, and the skating pumps nothing (SkateController.charging). A throw let go while another action
+-- runs waits for it. The tackle key dives in the Tackle's follow-up window (#240). A Tackle, Dive or Uppercut homes
+-- (#277): it turns the skater at once toward the nearest opponent it may reach in its snap zone, else its cone, around
+-- the stick's way (else toward that way), and bends toward them while they stay in the cone, until its recovery; the
+-- server still judges every hit. Nothing starts while the skater is held still (SkateController.frozen), knocked down
+-- or diving: an action with a landing (the Dive) holds the skater (SkateController.diving) until the server knocks
+-- them down at their touchdown, or until the server's rule for that knockdown's end holds here (#286), and a
+-- knockdown stops the running action, as the server stops it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,10 +31,17 @@ local Reach = require(ReplicatedStorage.Shared.Actions.Reach)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local SkateController = require(script.Parent.SkateController)
 local SkateMath = require(ReplicatedStorage.Shared.Skate.SkateMath)
+local Throw = require(ReplicatedStorage.Shared.Actions.Throw)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 local Vectors = require(ReplicatedStorage.Shared.Util.Vectors)
 
 type PlayerId = Types.PlayerId
+
+-- What the actions read of the camera (a fake in tests): throws, rolls and passes aim through a point of its viewport.
+type AimCamera = {
+	ViewportSize: Vector2,
+	ViewportPointToRay: (self: AimCamera, x: number, y: number, depth: number?) -> Ray,
+}
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
 export type ActionController = {
@@ -45,6 +55,10 @@ export type ActionController = {
 	-- The action `key` would start now (Config.Input.actions), or nil when none fits: what touch buttons and hints
 	-- show.
 	keyAction: (self: ActionController, key: Config.ActionKey) -> Config.ActionName?,
+	-- While a throw charges, how long its key has been held (on past a full charge); nil otherwise: what the
+	-- crosshair's ring shows (#312: it closes at a full charge, then blinks) and what tells a Dodge it cancels the
+	-- charge.
+	chargeSeconds: (self: ActionController) -> number?,
 	step: (self: ActionController, dt: number) -> (),
 	-- What an ActionRejected message runs (tests call it directly).
 	rejected: (self: ActionController, payload: any) -> (),
@@ -52,7 +66,7 @@ export type ActionController = {
 	_input: InputController.InputController,
 	_carrier: BallCarrier.BallCarrier,
 	_skate: SkateController.SkateController,
-	_camera: { CFrame: CFrame },
+	_camera: AimCamera,
 	_sendRequest: (payload: { [string]: any }) -> (),
 	_localId: PlayerId,
 	-- Records reused every step: the keys, an action's start, and which action a key names (never knocked down).
@@ -79,13 +93,14 @@ export type ActionController = {
 }
 
 -- The action `key` starts: the first of Config.Input.actions[key] that may start now (ActionRunner.available: its
--- requirements fit the ball and the air, and a follow-up's window is open: the tackle key dives just after a tackle);
--- nil when none fits (an uppercut with the ball, a throw without).
+-- requirements fit the ball, the air and the charge, and a follow-up's window is open: the tackle key dives just after
+-- a tackle); nil when none fits (an uppercut with the ball and no charge, a throw without the ball).
 local function actionFor(self: ActionController, key: Config.ActionKey, hasBall: boolean): Config.ActionName?
 	local skater = self._skate.skater
 	local context = self._keyContext
 	context.hasBall = hasBall
 	context.airborne = skater ~= nil and skater.mode == "Airborne"
+	context.charging = self._charge ~= nil
 	for _, name in self._config.Input.actions[key] do
 		if self.runner:available(name, context) then
 			return name
@@ -101,7 +116,8 @@ end
 -- At most one action a step, in this order: the tackle key, the uppercut, the pass key, then a throw, each starting
 -- what `actionFor` names. The throw charges while held with the ball, from a press made while holding it (a key held
 -- through the catch, for Ball Focus, throws nothing), and goes when it is let go, or as soon after as the runner
--- allows. Losing the ball, or Roblox's menu letting go of the key, drops the charge.
+-- allows. Losing the ball, or Roblox's menu letting go of the key, drops the charge, as starting another action does
+-- (begin).
 local function chosen(
 	self: ActionController,
 	keys: InputController.ActionKeys,
@@ -295,12 +311,15 @@ local function settle(self: ActionController, skater: SkateMath.Skater)
 	end
 end
 
--- A throw or a pass: the ball leaves the player's hands.
-local function letsGoOfBall(action: Config.ActionConfig): boolean
-	return action.effect == "Throw" or action.effect == "Pass"
+-- Through the crosshair (#312, the owner: Q123/Q127): the camera's ray through the screen's point centred across it
+-- and UI.hud.layout.reticle.height down it, where the HUD draws the reticle, above the skater as RC's sits.
+local function crosshairAim(self: ActionController): Vector3
+	local camera = self._camera
+	local size = camera.ViewportSize
+	return camera:ViewportPointToRay(size.X / 2, size.Y * self._config.UI.hud.layout.reticle.height).Direction
 end
 
--- What the server is told: the action, with the camera's aim for a throw or a pass and the charge for a throw. The
+-- What the server is told: the action, with the aim when it lets go of the ball and the charge when it spends it. The
 -- shape follows the action's effect, as Net/Schemas checks it.
 local function request(
 	self: ActionController,
@@ -309,12 +328,12 @@ local function request(
 	held: number?
 ): { [string]: any }
 	local payload: { [string]: any } = { action = name }
-	if letsGoOfBall(action) then
-		payload.aim = self._camera.CFrame.LookVector
+	if Actions.releasesBall(action.effect) then
+		payload.aim = crosshairAim(self)
 	end
-	if action.effect == "Throw" then
-		local throw = action.throw :: Config.ThrowSettings
-		payload.charge = math.clamp((held or 0) / throw.chargeMaxSeconds, 0, 1)
+	if Actions.spendsCharge(action.effect) then
+		-- One charge, ChargeThrow's: Roll Ball spends it too.
+		payload.charge = Throw.share(self._config.Actions.ChargeThrow.throw :: Config.ThrowSettings, held or 0)
 	end
 	return payload
 end
@@ -331,12 +350,16 @@ local function begin(
 	context.hasBall = hasBall
 	context.airborne = skater.mode == "Airborne"
 	context.knockedDown = skate.knockedDown or skate.diving
+	context.charging = self._charge ~= nil
 	if self.runner:start(name, context) ~= "Started" then
 		return
 	end
+	-- Whatever starts ends a charge (#312): a throw or a roll spends it, a Dodge drops it (Cancel & Dodge), and a throw
+	-- key still held must come up before it charges again.
 	local held = self._charge
-	if name == "ChargeThrow" then
-		self._charge = nil
+	self._charge = nil
+	if self._keys.throw then
+		self._throwReady = false
 	end
 	local action = self._config.Actions[name]
 	if action.landing ~= nil then
@@ -355,7 +378,7 @@ local function begin(
 	end
 	push(self, skater, action)
 	self._sendRequest(request(self, name, action, held))
-	if letsGoOfBall(action) then
+	if Actions.releasesBall(action.effect) then
 		self._carrier:predictRelease()
 	end
 end
@@ -400,8 +423,8 @@ local ActionController: ActionController = {
 		self._localId = deps.LocalId or PlayerIds.of(Players.LocalPlayer :: Player)
 		self.runner = ActionRunner.new(config.Actions)
 		self._keys = InputController.newActionKeys()
-		self._context = { hasBall = false, airborne = false, knockedDown = false }
-		self._keyContext = { hasBall = false, airborne = false, knockedDown = false }
+		self._context = { hasBall = false, airborne = false, knockedDown = false, charging = false }
+		self._keyContext = { hasBall = false, airborne = false, knockedDown = false, charging = false }
 		self._charge = nil
 		self._throwReady = false
 		self._lunge = nil
@@ -426,6 +449,10 @@ local ActionController: ActionController = {
 		return actionFor(self, key, holdsBall(self))
 	end,
 
+	chargeSeconds = function(self: ActionController): number?
+		return self._charge
+	end,
+
 	step = function(self: ActionController, dt: number)
 		local skate = self._skate
 		local skater = skate.skater
@@ -437,6 +464,7 @@ local ActionController: ActionController = {
 			self._charge = nil
 			self._throwReady = false
 			self._lunge = nil
+			skate.charging = false
 			return
 		end
 		-- Bound with the skater.
@@ -455,6 +483,8 @@ local ActionController: ActionController = {
 		if name ~= nil then
 			begin(self, skater, root, name, hasBall)
 		end
+		-- The skating steps first: it pumps nothing from the step after a press (the owner, Q106).
+		skate.charging = self._charge ~= nil
 	end,
 
 	rejected = function(self: ActionController, payload: any)
@@ -462,7 +492,7 @@ local ActionController: ActionController = {
 		if name ~= nil then
 			self.runner:cancel(name, true)
 			local action = self._config.Actions[name]
-			if letsGoOfBall(action) then
+			if Actions.releasesBall(action.effect) then
 				self._carrier:undoPrediction()
 			end
 			if action.landing ~= nil then

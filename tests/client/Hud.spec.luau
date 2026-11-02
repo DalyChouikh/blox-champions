@@ -472,6 +472,22 @@ describe("Hud", function()
 		expect(reticle()).toBe(false)
 	end)
 
+	-- RC's crosshair (#312): the ring builds round the dot from the throw's press, through a binding.
+	it("builds the reticle's ring while a throw charges, without rendering again", function()
+		Fixtures.spawnSkater(folder, config)
+		BallCarrier:set(LOCAL_ID)
+		Hud:step(DT)
+		local ring = (Hud.centre:FindFirstChild("Reticle") :: any).Ring :: Frame
+		expect(ring.Visible).toBe(false)
+		local renders = Hud.renders
+		ActionController:step(DT) -- the throw key seen up while holding the ball
+		Fixtures.scriptedBinding(InputController.context, "Throw"):Fire(true)
+		ActionController:step(DT)
+		Hud:step(DT)
+		expect(ring.Visible).toBe(true)
+		expect(Hud.renders).toBe(renders)
+	end)
+
 	it("measures the stage again when the device changes or the screen turns", function()
 		preferred = Enum.PreferredInput.Touch
 		Hud:step(0)

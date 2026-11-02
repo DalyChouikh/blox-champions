@@ -1293,6 +1293,30 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   to them 8 times): "Keep 100 and 0.2": a pass flies at **100 studs/s** with **homing 150** (as trialled; the repo
   still had 90 and 60, so #315 sets both), and a caught ball flies into the hand over **0.2 s** (was 0.3, Q132; RC's
   took ~0.2 s, Video 13 at 1:36.8), set with #316.
+- **Q140 no pass while charging** (session 55, #312, recommended): RC's hints grey Pump AND Magnetic Pass while a
+  throw charges (Video 32 at 2.6-3.2 s: Throw, Cancel & Dodge, Roll Ball lit); ours likewise: while charging the pass
+  key does nothing and its hint hides; Cancel & Dodge or letting go are the ways out.
+- **Q141 the crosshair's colour** (session 55, #312, recommended): RC's charge crosshair is an orange ring of four
+  arcs building round the aim dot (Video 32 at 3.2 s, ~31.5% down the screen); ours is **white, the HUD's text
+  colour**, readable on both teams' floors (orange is one of our team colours).
+- **RC's charge ring, read again** (session 56, #312; corrects Q141's "four arcs"): at full resolution (Video 32,
+  1918x1078, 2.5-4.2 s) the ring is **two halves**, left and right, a gap apart at the top and the bottom, growing
+  from the bottom up both sides at once until they close: short arcs at the bottom at 2.7 s, past the middle at 3.0,
+  closed at 3.2 (the press at ~2.6); fixed size round the dot, ~130 px across, a ~4-5 px stroke, the dot ~8 px, the
+  bottom gap ~29 px (the top one ~60 px at 3.2); past the full charge it fades and pulses (3.5-4.2). #312 builds
+  that shape in white (Q141), the gap 29 px top and bottom, no pulse.
+- **RC's ring past a full charge, measured** (session 57, Video 32 at 30 fps, 2.4-5.4 s, the ring's crop at full
+  resolution): closed at ~3.23 s, it then **blinks until the release**: lit ~0.2 s, almost gone ~0.2 s (its red
+  0-8% of lit at 3.47, 3.87, 4.27), lit again at 3.67, 4.07, 4.47: **every 0.40 s**. While carrying and not
+  charging RC shows a **small ring** round the dot (centre-line radius ~27.5 px, ~55-60 px across; the charge ring's
+  is ~59, 130 outer): before the press (2.4-2.55) and again after the Cancel & Dodge (4.7-5.4); Video 3 at 36:58.15
+  showed the same. **Q142** (recommended): **add RC's blink**: once full, the white ring blinks every 0.4 s (lit
+  0.2, nearly gone 0.2) until a throw, a roll or a cancel; added to #312's PR #332. Not chosen: steady. **Q143**
+  (recommended): **the small carrying ring waits for Q55** (what the crosshair shows with and without the ball) in
+  the Presentation part; ours keeps the dot. Not chosen: now in #332. **Q144** (recommended): **file the
+  ring/scoreboard overlap now** as an M1 issue for the Presentation part (at 793 px tall the closed ring's top sits
+  ~8 px under the scoreboard panel; under ~770 px tall and on phones the 130-px ring 31.5% down overlaps it). Not
+  chosen: notes only.
 
 ## Roller Champions
 

@@ -11,10 +11,47 @@ local NormalChampions = require(ReplicatedStorage.Shared.Modes.NormalChampions)
 
 describe("Config.Actions", function()
 	it("names every action once, and finds an action by its name", function()
-		expect(Actions.names).toEqual({ "Tackle", "Dive", "Dodge", "Uppercut", "ChargeThrow", "Pass", "CallPass" })
+		expect(Actions.names).toEqual({
+			"Tackle",
+			"Dive",
+			"Dodge",
+			"Uppercut",
+			"ChargeThrow",
+			"RollBall",
+			"Pass",
+			"CallPass",
+		})
 		expect(Actions.nameOf("Dive")).toBe("Dive")
 		expect(Actions.nameOf("Fly")).toBeNil()
 		expect(Actions.nameOf(nil)).toBeNil()
+	end)
+
+	-- What each effect carries (Net/Schemas) and does to the ball (ActionController): a throw and a roll leave the
+	-- hands spending the charge (#312), a pass leaves them along the aim, the rest keep the ball where it is.
+	it("says which effects let go of the ball and which spend the charge", function()
+		local releases, spends = {}, {}
+		for _, effect: Actions.Effect in
+			{ "Knockdown", "Dodge", "Throw", "Roll", "Pass", "CallPass" } :: { Actions.Effect }
+		do
+			releases[effect] = Actions.releasesBall(effect)
+			spends[effect] = Actions.spendsCharge(effect)
+		end
+		expect(releases).toEqual({
+			Knockdown = false,
+			Dodge = false,
+			Throw = true,
+			Roll = true,
+			Pass = true,
+			CallPass = false,
+		})
+		expect(spends).toEqual({
+			Knockdown = false,
+			Dodge = false,
+			Throw = true,
+			Roll = true,
+			Pass = false,
+			CallPass = false,
+		})
 	end)
 end)
 
@@ -96,8 +133,8 @@ describe("Config defaults", function()
 	end)
 
 	it("match the spec's actions, plus this phase's", function()
-		local requires = function(ball: string, grounded: string?): any
-			return { ball = ball, grounded = grounded or "any", notKnockedDown = true }
+		local requires = function(ball: string, grounded: string?, charge: string?): any
+			return { ball = ball, grounded = grounded or "any", charge = charge or "any", notKnockedDown = true }
 		end
 		expect(Config.defaults().Actions).toEqual({
 			airMultiplier = 0.8,
@@ -171,12 +208,22 @@ describe("Config defaults", function()
 				requires = requires("with"),
 				effect = "Throw",
 				pose = "None",
-				throw = { chargeMaxSeconds = 1, minSpeed = 60, maxSpeed = 160, inheritCarrierVelocity = 0.5 },
+				-- A full charge in 0.5 s (Q99, Q133), as RC's crosshair closes.
+				throw = { chargeMaxSeconds = 0.5, minSpeed = 60, maxSpeed = 160, inheritCarrierVelocity = 0.5 },
 			},
+			-- The uppercut key while a throw charges, on a surface (#312, Q100): the charge spent along the floor.
+			RollBall = {
+				phases = { windup = 0, active = 0, recovery = 0 },
+				cooldown = 0,
+				requires = requires("with", "grounded", "charging"),
+				effect = "Roll",
+				pose = "None",
+			},
+			-- Never while a throw charges (Q140).
 			Pass = {
 				phases = { windup = 0, active = 0, recovery = 0 },
 				cooldown = 0,
-				requires = requires("with"),
+				requires = requires("with", nil, "notCharging"),
 				effect = "Pass",
 				pose = "None",
 				pass = {
@@ -334,7 +381,7 @@ describe("Config defaults", function()
 		expect(input.switchTeam).toEqual({ Enum.KeyCode.T, Enum.KeyCode.DPadUp })
 		expect(input.actions).toEqual({
 			tackle = { "Dive", "Tackle", "Dodge" },
-			uppercut = { "Uppercut" },
+			uppercut = { "Uppercut", "RollBall" },
 			pass = { "Pass", "CallPass" },
 			throw = { "ChargeThrow" },
 		})
@@ -420,6 +467,9 @@ describe("Config defaults", function()
 			Dodge = "Dodge",
 			Uppercut = "Uppercut",
 			ChargeThrow = "Throw",
+			-- RC's hints while a throw charges (#312; Video 32 at 3.2 s).
+			RollBall = "Roll Ball",
+			CancelDodge = "Cancel & Dodge",
 			Pass = "Pass",
 			CallPass = "Call",
 			BallFocus = "Focus",
@@ -510,7 +560,16 @@ describe("Config defaults", function()
 					touchPosition = UDim2.fromOffset(16, 8),
 					size = UDim2.fromOffset(160, 40),
 				},
-				reticle = { size = 6 },
+				-- RC's crosshair (#312): 31.5% down (Q123/Q127), its ring 130 px across at 1918 x 1078 (Video 32),
+				-- blinking every 0.4 s once closed (Q142).
+				reticle = {
+					size = 6,
+					height = 0.315,
+					ringSize = 130,
+					ringThickness = 4,
+					ringGap = 29,
+					blinkSeconds = 0.4,
+				},
 				scoreTab = {
 					position = UDim2.fromScale(0.5, 0.5),
 					size = UDim2.fromOffset(640, 360),
@@ -1308,6 +1367,24 @@ describe("Config.forMode", function()
 				overrides = { Dodge = { seek = { turnDegPerSecond = 1 } } },
 				message = "Actions.Dodge.seek: unknown key",
 			},
+			-- Whether a throw charges (#312): it must, it must not, or either.
+			{
+				overrides = { Pass = { requires = { charge = "sometimes" } } },
+				message = 'Actions.Pass.requires.charge: must be one of charging, notCharging, any (got "sometimes")',
+			},
+			-- A roll spends ChargeThrow's own charge, at its speeds: one charge, one speed range.
+			{
+				overrides = {
+					RollBall = {
+						throw = { chargeMaxSeconds = 1, minSpeed = 1, maxSpeed = 2, inheritCarrierVelocity = 0 },
+					},
+				},
+				message = "Actions.RollBall.throw: unknown key",
+			},
+			{
+				overrides = { RollBall = { effect = "Throw" } },
+				message = 'Actions.RollBall.effect: must be one of Roll (got "Throw")',
+			},
 		}
 		for _, case in cases do
 			expect(function()
@@ -1607,6 +1684,22 @@ describe("Config.forMode", function()
 		end
 	end)
 
+	-- RC's crosshair (#312): 130 - 2 x 4 leaves 122 px inside the ring.
+	it("accepts a crosshair just inside its limits", function()
+		local inside = { size = 121, height = 0.999, ringGap = 129, blinkSeconds = 0.01 }
+		local reticle = Fixtures.config({ UI = { hud = { layout = { reticle = inside } } } }).UI.hud.layout.reticle
+		expect(reticle).toEqual({
+			size = 121,
+			height = 0.999,
+			ringSize = 130,
+			ringThickness = 4,
+			ringGap = 129,
+			blinkSeconds = 0.01,
+		})
+		local top = Fixtures.config({ UI = { hud = { layout = { reticle = { height = 0.001, ringGap = 0 } } } } })
+		expect(top.UI.hud.layout.reticle.height).toBe(0.001)
+	end)
+
 	it("accepts a kickoff count whose digit just fits inside its ring", function()
 		-- 116 - 2 x 8 = 100: a 99 px digit fits.
 		local countdown =
@@ -1693,6 +1786,37 @@ describe("Config.forMode", function()
 			{
 				overrides = { UI = { hud = { layout = { scoreTab = { size = UDim2.fromOffset(0, 360) } } } } },
 				message = "UI.hud.layout.scoreTab.size: must be in pixels (scales 0, offsets > 0)",
+			},
+			-- RC's crosshair (#312): on the screen, a ring that holds its dot, halves that keep some arc, a blink that
+			-- takes some time.
+			{
+				overrides = { UI = { hud = { layout = { reticle = { height = 0 } } } } },
+				message = "UI.hud.layout.reticle.height: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { reticle = { height = 1 } } } } },
+				message = "UI.hud.layout.reticle.height: must be < 1 (got 1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { reticle = { ringThickness = 0 } } } } },
+				message = "UI.hud.layout.reticle.ringThickness: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { reticle = { ringGap = -1 } } } } },
+				message = "UI.hud.layout.reticle.ringGap: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { reticle = { blinkSeconds = 0 } } } } },
+				message = "UI.hud.layout.reticle.blinkSeconds: must be > 0 (got 0)",
+			},
+			-- 130 - 2 x 4 leaves 122 px inside the ring: a 122 px dot would touch it.
+			{
+				overrides = { UI = { hud = { layout = { reticle = { size = 122 } } } } },
+				message = "UI: the reticle's dot must fit inside its ring (size < ringSize - 2 × ringThickness)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { reticle = { ringGap = 130 } } } } },
+				message = "UI: the reticle ring's gap must leave its halves some arc (ringGap < ringSize)",
 			},
 			-- Five number columns of 120 and their gaps, inside the padding: 642 px, wider than the 640 px tab.
 			{

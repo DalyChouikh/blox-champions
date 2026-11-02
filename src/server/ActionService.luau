@@ -1,8 +1,8 @@
 --!strict
 -- The server's side of actions (spec §3.3, §8.1, §13). Every request a client sends is checked again in that player's
 -- own ActionRunner and applied here, or refused with ActionRejected: a follow-up (the Tackle's Dive) only inside its
--- window after a Tackle the server itself started. Throws and passes go through BallService. Strikes are judged each
--- frame against the server's positions and knock down the nearest opponent they reach; every strike
+-- window after a Tackle the server itself started. Throws, rolls and passes go through BallService. Strikes are judged
+-- each frame against the server's positions and knock down the nearest opponent they reach; every strike
 -- of a frame aims before any lands, so two opponents who reach each other at once both go down. Knockdowns (each with
 -- its kind, Attributes.Knockdown), the running action (until its recovery) and calls for a pass show as character
 -- attributes every client reads. Each frame the server casts its own ray along each skater's down: a hard landing
@@ -12,7 +12,9 @@
 -- fall whose client asks to get up (GetUp, sent when they move) is up once Actions.getUpAfter has passed since the
 -- knockdown, never sooner; a diver is up once their root slides slower than the landing's stopSpeed along the ground,
 -- whatever they ask (#242); anyone, at the latest after the knockdown's seconds.
--- A throw keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held for.
+-- A throw or a roll keeps no more of the carrier's speed than skating allows, and no more charge than the ball was held
+-- for. The server never sees the throw key: an action that needs a charge under way (Roll Ball) or none (a pass, #312)
+-- starts either way here.
 -- MatchService steps it first in each frame and reports its knockdowns to the rules; a kickoff resets it. Time is the
 -- sum of the frames it is stepped, so a request between frames counts as the last frame's.
 
@@ -341,18 +343,42 @@ end
 
 local function noEffect() end
 
-local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Pass: Effect, CallPass: Effect } = {
+-- The charge the client claims, up to how long the thrower has held the ball: an honest client only charges once it
+-- learns it carries, so its hold is never longer than the server's.
+local function heldCharge(self: ActionService, payload: any, throw: Config.ThrowSettings): number
+	return math.min(payload.charge, Throw.share(throw, self._ball.state.heldSeconds))
+end
+
+-- The carrier's velocity as their client reports it, held to what the movement guard allows.
+local function carrierVelocity(self: ActionService, holder: Holder): Vector3
+	return Vectors.clampMagnitude(holder.root.AssemblyLinearVelocity, self._speedLimit)
+end
+
+local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Roll: Effect, Pass: Effect, CallPass: Effect } = {
 	-- Strikes land in `step`, during their active phase.
 	Knockdown = noEffect,
 	-- A dodge only makes its player immune (isImmune).
 	Dodge = noEffect,
-	-- The charge the client claims, up to how long the thrower has held the ball: an honest client only charges
-	-- once it learns it carries, so its hold is never longer than the server's.
 	Throw = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
 		local throw = action.throw :: Config.ThrowSettings
-		local charge = math.min(payload.charge, self._ball.state.heldSeconds / throw.chargeMaxSeconds)
-		local carrier = Vectors.clampMagnitude(holder.root.AssemblyLinearVelocity, self._speedLimit)
-		self._ball:throw(player, Throw.charged(throw, payload.aim, charge, carrier))
+		local velocity =
+			Throw.charged(throw, payload.aim, heldCharge(self, payload, throw), carrierVelocity(self, holder))
+		self._ball:throw(player, velocity)
+	end,
+	-- Roll Ball (#312): ChargeThrow's charge at ChargeThrow's speeds (one charge, one speed range), along the floor
+	-- under the carrier, from the floor under the hand.
+	Roll = function(self: ActionService, player: PlayerId, holder: Holder, payload: any)
+		local throw = self._config.Actions.ChargeThrow.throw :: Config.ThrowSettings
+		local frame = holder.root.CFrame
+		local velocity = Throw.rolled(
+			throw,
+			payload.aim,
+			heldCharge(self, payload, throw),
+			carrierVelocity(self, holder),
+			frame.UpVector,
+			frame.LookVector
+		)
+		self._ball:roll(player, velocity)
 	end,
 	Pass = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
 		local pass = action.pass :: Config.PassSettings
@@ -408,7 +434,8 @@ local ActionService: ActionService = {
 		self._holderOf = {}
 		self._calls = {}
 		self._candidates = {}
-		-- No `airborne`: the server's view of a jump lags the client's, so it lets an action needing either start.
+		-- No `airborne`: the server's view of a jump lags the client's; no `charging`: it never sees the throw key.
+		-- Without either, an action needing either may start.
 		self._context = { hasBall = false, knockedDown = false }
 		local rideParams = RaycastParams.new()
 		rideParams.FilterType = Enum.RaycastFilterType.Include

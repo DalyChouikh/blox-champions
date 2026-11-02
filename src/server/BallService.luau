@@ -6,13 +6,14 @@
 -- nobody skates (the goal's rim, #308) too, and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt.
 -- Each frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose body it
 -- touched. Jumps the server makes (a drop-in's start, the snap into a catcher's hand, a carrier it moves, a drop it
--- places) are never reported as movement, so they can never cross a gate or the ring; each screen draws the catch's
--- flight into the hand itself (Client/BallView). A pass flies flat, its weight cancelled, and homes on its target,
--- until it touches anything or anyone or the target can no longer catch; a drop-in falls steadily the lap's way, its
--- weight cancelled too, until it touches anything or anyone; then either falls like any ball. A ball passes through
--- the player who let go of it until it is clear of them. A loose ball slows rolling as a coasting skater does (#311,
--- Q124), and never passes through the arena: Roblox lets a fast small ball through a thin part, so a loose ball whose
--- centre crossed a solid face since the last frame goes back there, bounced off that face (#311).
+-- places, a roll it puts on the floor) are never reported as movement, so they can never cross a gate or the ring; each
+-- screen draws the catch's flight into the hand itself (Client/BallView). A pass flies flat, its weight cancelled, and
+-- homes on its target, until it touches anything or anyone or the target can no longer catch; a drop-in falls steadily
+-- the lap's way, its weight cancelled too, until it touches anything or anyone; then either falls like any ball. A
+-- roll (Roll Ball, #312) leaves from the floor under the hand, already rolling. A ball passes through the player who
+-- let go of it until it is clear of them. A loose ball slows rolling as a coasting skater does (#311, Q124), and never
+-- passes through the arena: Roblox lets a fast small ball through a thin part, so a loose ball whose centre crossed a
+-- solid face since the last frame goes back there, bounced off that face (#311).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -74,6 +75,10 @@ export type BallService = {
 	throw: (self: BallService, player: PlayerId, velocity: Vector3) -> (),
 	-- A throw that flies flat and homes on `target`, or flies flat along `velocity` with none.
 	pass: (self: BallService, player: PlayerId, velocity: Vector3, target: PlayerId?) -> (),
+	-- A throw along the floor (Roll Ball, #312): it leaves from the floor under the hand (Ball.carryOffset across the
+	-- carrier's root, a radius above the floor the root hovers Movement.hoverHeight over), rolling at `velocity`, which
+	-- runs along that floor.
+	roll: (self: BallService, player: PlayerId, velocity: Vector3) -> (),
 	-- A given velocity replaces the ball's (a knocked-down carrier's momentum). Either is held to the speed limit.
 	drop: (self: BallService, velocity: Vector3?) -> (),
 	-- Lets go of a carried ball, still, at `position`: where its carrier was last in the arena (MovementGuard).
@@ -549,6 +554,21 @@ local BallService: BallService = {
 		self:throw(player, velocity)
 		self._passTarget = target
 		self._lift.Enabled = true
+	end,
+
+	roll = function(self: BallService, player: PlayerId, velocity: Vector3)
+		local weld = self._weld
+		local root = if weld ~= nil then weld.Part0 else nil
+		self:throw(player, velocity)
+		-- A carried ball is welded to its carrier's root: `throw` refused anyone else.
+		local frame = (root :: BasePart).CFrame
+		local ball, offset = self._config.Ball, self._config.Ball.carryOffset
+		local part = self.part
+		part.Position = frame * Vector3.new(offset.X, ball.radius - self._config.Movement.hoverHeight, offset.Z)
+		-- Already rolling, its bottom still on the floor: Roblox's friction turns a sliding ball's slide into a roll at
+		-- 5/7 of its speed (measured for #311), so this keeps the charge's whole speed.
+		part.AssemblyAngularVelocity = frame.UpVector:Cross(velocity) / ball.radius
+		self._teleported = true
 	end,
 
 	drop = function(self: BallService, velocity: Vector3?)

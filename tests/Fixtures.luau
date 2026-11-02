@@ -27,12 +27,38 @@ export type Menu = { MenuOpened: Signal.Signal<>, MenuClosed: Signal.Signal<>, M
 -- Roblox's 58 px top bar.
 export type Screen = { hud: Rect, controls: Rect }
 
+-- A stand-in for the camera the controllers read: the skating steers by its CFrame, and throws and passes aim through
+-- a point of its viewport (#312). Every ViewportPointToRay call is recorded in `asked` and answered with a ray along
+-- `aim`.
+export type Camera = {
+	CFrame: CFrame,
+	ViewportSize: Vector2,
+	aim: Vector3,
+	asked: { Vector2 },
+	ViewportPointToRay: (self: Camera, x: number, y: number, depth: number?) -> Ray,
+}
+
 -- A round gravity for the pure math that takes gravity as an argument (skating, the ball's path, saves): Roblox's
 -- default 196.2, pointing down. The game itself pulls with the config's World.gravity (#279).
 Fixtures.GRAVITY = Vector3.new(0, -196.2, 0)
 
 -- The gates in a lap, one at each corner of the arena (spec §4.2): every fixture's gates and markers.
 Fixtures.GATE_COUNT = 4
+
+-- A camera at `cframe` with a 1000 x 600 px viewport, whose rays through any point go along `aim` (its look without
+-- one): a test reads what was asked from `asked`.
+function Fixtures.camera(cframe: CFrame, aim: Vector3?): Camera
+	return {
+		CFrame = cframe,
+		ViewportSize = Vector2.new(1000, 600),
+		aim = aim or cframe.LookVector,
+		asked = {},
+		ViewportPointToRay = function(self: Camera, x: number, y: number): Ray
+			table.insert(self.asked, Vector2.new(x, y))
+			return Ray.new(self.CFrame.Position, self.aim)
+		end,
+	}
+end
 
 -- A point outside the arena: 10 studs past the outer glass's face and 5 up, at the top straight's middle. The ball
 -- there is out, and a skater there is placed back on their spawn.
@@ -363,6 +389,7 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 	local RideSurfaces = require(Client.RideSurfaces) :: any
 	local SkateController = require(Client.SkateController) :: any
 	local ActionController = require(Client.ActionController) :: any
+	local camera = Fixtures.camera(CFrame.new())
 	InputController:init({ Config = config, Parent = folder })
 	BallCarrier:init({})
 	RideSurfaces:init({})
@@ -371,7 +398,7 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 		InputController = InputController,
 		RideSurfaces = RideSurfaces,
 		SmoothNormal = Fixtures.faceNormal,
-		Camera = { CFrame = CFrame.new() },
+		Camera = camera,
 		Skaters = function(): { any }
 			return {}
 		end,
@@ -386,7 +413,7 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 		InputController = InputController,
 		BallCarrier = BallCarrier,
 		SkateController = SkateController,
-		Camera = { CFrame = CFrame.new() },
+		Camera = camera,
 		SendRequest = function() end,
 		LocalId = localId,
 	})

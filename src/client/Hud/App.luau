@@ -38,6 +38,8 @@ export type HudBindings = {
 	-- The HUD's stage in pixels, where the banner, the feed, the score tab and the end screen centre and fit; zero
 	-- until it is known.
 	stage: React.Binding<Vector2>,
+	-- How long the throw key has been held while a throw charges, 0 otherwise: the reticle's ring (#312).
+	charge: React.Binding<number>,
 }
 
 -- Everything the HUD shows; the Hud renders App again whenever one of them changes.
@@ -77,7 +79,10 @@ local function App(props: AppProps): React.ReactElement
 	local scoreTab = props.scoreTabOpen and match ~= nil and (ended == nil or touch)
 	return React.createElement(React.Fragment, nil, {
 		Reticle = ReactRoblox.createPortal({
-			Reticle = React.createElement(Reticle, { config = config, visible = not scoreTab and ended == nil }),
+			Reticle = React.createElement(
+				Reticle,
+				{ config = config, visible = not scoreTab and ended == nil, charge = bindings.charge }
+			),
 		}, props.centre),
 		Root = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1) }), {
 			Scoreboard = if match ~= nil and ended == nil
