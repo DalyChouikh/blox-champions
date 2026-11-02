@@ -1541,6 +1541,11 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   (88%)**, 1 caught after touching the arena, 3 missed, 1 back to the passer (before, at today's pass: 26 of 52
   clean, 50%); clean catches in 0.20 / 0.49 / 0.77 s within 10, at 10-15 and 15-20 body lengths; 2 of the misses
   touched the glass at the release (the passer skating along it).
+- **Q177 the built pass played** (session 65, #346's Play check, logged in session 66): the owner played the built
+  code (not the trial) in a fresh 2-player test with my bot weaving at full stride: **"Same as the trial"**. Recorded
+  (the same server recorder): 72 released passes in 169 s, **70 caught clean (97%)**, 1 after touching the arena, 1
+  missed; 2 first touches on a floor (both within 0.15 s of the release), none on the glass; clean catches in 0.24 /
+  0.56 / 0.75 s within 10, at 10-15 and 15-20 body lengths. Built as PR #348 and published (65adf98, 17:50:59Z).
 
 ## Roller Champions
 
