@@ -34,6 +34,8 @@ export type NetworkConfig = {
 	-- report, but sees the touchdown behind this client's screen, and the character's physics and remote events reach
 	-- it in no fixed order. The server's knockdown ends the report sooner.
 	posedLandingTolerance: number,
+	-- How many requests to switch team a client may send (a burst of this many, refilled per second, #310).
+	maxTeamSwitchesPerSecond: number,
 }
 
 local defaults: NetworkConfig = {
@@ -49,6 +51,8 @@ local defaults: NetworkConfig = {
 	actionTimingTolerance = 0.1,
 	maxGetUpsPerSecond = 2,
 	posedLandingTolerance = 0.3,
+	-- The owner (Q120): no cooldown between switches; the server only drops spam.
+	maxTeamSwitchesPerSecond = 1,
 }
 
 local schema = Validate.record({
@@ -64,6 +68,7 @@ local schema = Validate.record({
 	actionTimingTolerance = Validate.number({ min = 0 }),
 	maxGetUpsPerSecond = Validate.number({ above = 0 }),
 	posedLandingTolerance = Validate.number({ min = 0 }),
+	maxTeamSwitchesPerSecond = Validate.number({ above = 0 }),
 })
 
 return {

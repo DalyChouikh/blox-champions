@@ -7,6 +7,7 @@
 --   ActionRequest  client → server   { action, aim?, charge? } when a player starts an action (Net/Schemas)
 --   ActionRejected server → client   { action } when the server refuses it, so the client cancels it
 --   GetUp          client → server   {} once per knockdown, when the knocked-down player moves (Net/Schemas)
+--   SwitchTeam     client → server   {} when a player asks to switch to the other team (#310; Net/Schemas)
 
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 
@@ -23,6 +24,7 @@ local names: { [string]: string } = {
 	ActionRequest = "ActionRequest",
 	ActionRejected = "ActionRejected",
 	GetUp = "GetUp",
+	SwitchTeam = "SwitchTeam",
 }
 Remotes.names = Freeze.deep(names)
 

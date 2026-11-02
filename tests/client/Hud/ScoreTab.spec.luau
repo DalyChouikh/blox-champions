@@ -31,19 +31,26 @@ local function stats(): Types.MatchStats
 	return { scores = { Blue = 3, Orange = 1 }, players = { ana, kai, rex } }
 end
 
--- The tab of `listed` (default: stats()), mounted.
-local function tab(listed: Types.MatchStats?): Frame
+-- The tab of `listed` (default: stats()), with `switchTeam`'s button if given, mounted.
+local function tab(listed: Types.MatchStats?, switchTeam: ScoreTab.SwitchTeam?): Frame
 	local mounted = Fixtures.mount(
 		React.createElement(React.Fragment, nil, {
-			ScoreTab = React.createElement(
-				ScoreTab,
-				{ config = config, text = text, stats = listed or stats(), names = NAMES, localId = "1", area = area }
-			),
+			ScoreTab = React.createElement(ScoreTab, {
+				config = config,
+				text = text,
+				stats = listed or stats(),
+				names = NAMES,
+				localId = "1",
+				area = area,
+				switchTeam = switchTeam,
+			}),
 		}),
 		folder
 	)
 	return mounted:FindFirstChild("ScoreTab") :: Frame
 end
+
+local function noop() end
 
 -- A row's cell: the text of its column called `column`.
 local function cell(frame: Frame, row: string, column: string): TextLabel
@@ -102,6 +109,47 @@ describe("ScoreTab", function()
 		setArea(Vector2.new(750, 323))
 		local listed: Types.MatchStats = { scores = { Blue = 0, Orange = 0 }, players = Fixtures.roster(12) }
 		local fit = tab(listed):FindFirstChild("Fit") :: UIScale
+		expect(fit.Scale).toBeCloseTo((323 - 2 * hud.screenMargin) / tall, 4)
+	end)
+
+	-- The owner (Q117, Q118, #310): under the table, its key and "Switch team", greyed while a switch can't happen.
+	it("offers Switch team under the table with its key, greyed while a switch can't happen", function()
+		local frame = tab(nil, { open = true, key = { text = "T" }, onActivated = noop })
+		local button = frame:FindFirstChild("SwitchTeam") :: TextButton
+		expect(button:IsA("TextButton")).toBe(true)
+		expect(button.Selectable).toBe(false)
+		expect(button.LayoutOrder > (frame:FindFirstChild("Table") :: Frame).LayoutOrder).toBe(true)
+		-- The table stays at the top, however few its rows.
+		expect((frame:FindFirstChild("Layout") :: UIListLayout).VerticalAlignment).toBe(Enum.VerticalAlignment.Top)
+		expect((button:FindFirstChild("Key") :: TextLabel).Text).toBe("T")
+		local label = button:FindFirstChild("Label") :: TextLabel
+		expect(label.Text).toBe(config.UI.text.switchTeam)
+		expect(label.TextTransparency).toBe(0)
+		local dim = config.UI.hud.dimTransparency
+		local greyed = tab(nil, { open = false, key = { image = "rbxasset://glyph" }, onActivated = noop })
+		local row = greyed:FindFirstChild("SwitchTeam") :: TextButton
+		expect((row:FindFirstChild("Glyph") :: ImageLabel).ImageTransparency).toBeCloseTo(dim, 5)
+		expect((row:FindFirstChild("Label") :: TextLabel).TextTransparency).toBeCloseTo(dim, 5)
+		local keyed = tab(nil, { open = false, key = { text = "T" }, onActivated = noop })
+		local cap = (keyed:FindFirstChild("SwitchTeam") :: TextButton):FindFirstChild("Key") :: TextLabel
+		expect(cap.TextTransparency).toBeCloseTo(dim, 5)
+	end)
+
+	it("shows no Switch team where none is offered, and only its label on touch", function()
+		expect(tab():FindFirstChild("SwitchTeam")).toBeNil()
+		local touch = tab(nil, { open = true, onActivated = noop }):FindFirstChild("SwitchTeam") :: TextButton
+		expect(touch:FindFirstChild("Label") ~= nil).toBe(true)
+		expect(touch:FindFirstChild("Key")).toBeNil()
+		expect(touch:FindFirstChild("Glyph")).toBeNil()
+	end)
+
+	it("fits by its rows and the Switch team row", function()
+		-- The header, twelve rows and the Switch team row, spacing apart, inside the padding.
+		local hud = config.UI.hud
+		local tall = 2 * hud.spacing + 14 * hud.layout.scoreTab.rowHeight + 13 * hud.spacing
+		setArea(Vector2.new(750, 323))
+		local listed: Types.MatchStats = { scores = { Blue = 0, Orange = 0 }, players = Fixtures.roster(12) }
+		local fit = tab(listed, { open = true, onActivated = noop }):FindFirstChild("Fit") :: UIScale
 		expect(fit.Scale).toBeCloseTo((323 - 2 * hud.screenMargin) / tall, 4)
 	end)
 

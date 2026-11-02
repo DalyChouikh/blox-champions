@@ -73,6 +73,8 @@ export type InputConfig = {
 	touchBallFocusMode: FocusMode,
 	-- Held to show the score tab.
 	scoreTab: { Enum.KeyCode },
+	-- Pressed while the score tab is open, to switch team (#310).
+	switchTeam: { Enum.KeyCode },
 	-- The actions each action key may start, in order: the first that may start now (its requires fit the ball, the
 	-- ground or the air; a follow-up only in its window, #240) is the one.
 	actions: {
@@ -113,6 +115,9 @@ local defaults: InputConfig = {
 	ballFocusMode = "Hold",
 	touchBallFocusMode = "Toggle",
 	scoreTab = { Enum.KeyCode.Tab, Enum.KeyCode.ButtonSelect },
+	-- The owner (Q117, #310): the score tab shows only while its key is held, with the mouse locked, so its Switch team
+	-- button names a key to press meanwhile.
+	switchTeam = { Enum.KeyCode.T, Enum.KeyCode.DPadUp },
 	actions = {
 		tackle = { "Dive", "Tackle", "Dodge" },
 		uppercut = { "Uppercut" },
@@ -217,6 +222,7 @@ local fields = Validate.record({
 	ballFocusMode = focusMode,
 	touchBallFocusMode = focusMode,
 	scoreTab = keys,
+	switchTeam = keys,
 	actions = Validate.record({ tackle = actionList, uppercut = actionList, pass = actionList, throw = actionList }),
 	touch = Validate.checkAll(
 		Validate.record({
@@ -283,6 +289,7 @@ local function boundKeys(input: InputConfig): { Enum.KeyCode }
 		input.pass,
 		input.throw,
 		input.scoreTab,
+		input.switchTeam,
 		{ input.look.mouse.key, input.look.stick.key, input.look.touch.key },
 	}
 	for _, list in lists do

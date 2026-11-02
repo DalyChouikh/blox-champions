@@ -145,6 +145,25 @@ describe("InputController", function()
 		expect(InputController:scoreTabHeld()).toBe(false)
 	end)
 
+	-- The owner (Q117, #310): T, or D-pad Up, while the score tab is open.
+	it("counts a Switch team press on T or D-pad Up once", function()
+		local context = InputController.context
+		local action = context:FindFirstChild("SwitchTeam") :: InputAction
+		expect(action.Type).toBe(Enum.InputActionType.Bool)
+		local keys: { string } = {}
+		for _, binding in action:GetChildren() do
+			table.insert(keys, (binding :: InputBinding).KeyCode.Name)
+		end
+		table.sort(keys)
+		expect(keys).toEqual({ "DPadUp", "T" })
+		local press = Fixtures.scriptedBinding(context, "SwitchTeam")
+		expect(InputController:switchTeamPressed()).toBe(false)
+		press:Fire(true)
+		task.wait() -- Pressed is deferred
+		expect(InputController:switchTeamPressed()).toBe(true)
+		expect(InputController:switchTeamPressed()).toBe(false)
+	end)
+
 	it("keeps the skating keys and the action keys apart", function()
 		local context = InputController.context
 		local jump = Fixtures.scriptedBinding(context, "Jump")
