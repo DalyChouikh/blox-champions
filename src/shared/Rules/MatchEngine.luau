@@ -244,27 +244,21 @@ local function goalScored(self: MatchEngine)
 	local team: Team = self._possession.team :: Team
 	local scorer: PlayerId = self._possession.lastHolder :: PlayerId
 	local assister = self._assists:assister(scorer, self._now)
-	emit(self, { name = "GoalScored", team = team, scorer = scorer, assister = assister })
+	local points = GoalJudge.worth(self._config.Match.goalPointsByLap, self._laps.streak)
+	emit(self, { name = "GoalScored", team = team, scorer = scorer, assister = assister, points = points })
 	if assister ~= nil then
 		emit(self, { name = "AssistAwarded", player = assister })
 	end
 	pointScored(self, team)
 end
 
--- Returns true when the lap earned the streak point, which stops play.
-local function lapCompleted(self: MatchEngine, team: Team): boolean
+local function lapCompleted(self: MatchEngine, team: Team)
 	local streak = self._laps.streak
 	local holder = self._possession.lastHolder :: PlayerId
 	emit(self, { name = "LapCompleted", team = team, streak = streak, holder = holder })
 	if self._goal:lapCompleted(team, streak) then
 		emit(self, { name = "GoalOpened", team = team })
 	end
-	if streak >= self._config.Match.lapsForStreakPoint then
-		emit(self, { name = "StreakPointScored", team = team, holder = holder })
-		pointScored(self, team)
-		return true
-	end
-	return false
 end
 
 function MatchEngine.new(options: EngineOptions): MatchEngine
@@ -294,7 +288,7 @@ function MatchEngine.new(options: EngineOptions): MatchEngine
 			_possession = Possession.new(),
 			-- Every streak starts at the goal's gate, so a lap ends just before the goal (spec §4.2).
 			_laps = LapTracker.new(arena.gates, config.Arena.goalGateIndex),
-			_goal = GoalJudge.new(arena.goal, match.lapsToOpenGoal),
+			_goal = GoalJudge.new(arena.goal),
 			_clock = MatchClock.new(match.durationSeconds, config.UI.clockWarnings),
 			_assists = AssistTracker.new(config.Scoring.assistWindowSeconds),
 			_saves = SaveDetector.new(arena.goal, Config.gravity(config), config.Scoring.saveLookaheadSeconds),
@@ -383,8 +377,8 @@ function MatchEngine.ballMoved(self: MatchEngine, from: Vector3, to: Vector3)
 		local progress = self._laps:accept(gateIndex)
 		if progress ~= nil then
 			emit(self, { name = "GateCrossed", team = team, gateIndex = gateIndex, progress = progress })
-			if progress == self._laps.gateCount and lapCompleted(self, team) then
-				return
+			if progress == self._laps.gateCount then
+				lapCompleted(self, team)
 			end
 		end
 	end

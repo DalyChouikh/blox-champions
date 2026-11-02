@@ -140,18 +140,19 @@ blox-champions/
 ### 4.3 Goal (`GoalJudge`)
 
 - One **goal ring** (upright, raised) at the configured gate (§9.1). Closed: a **panel** covers it and the ball bounces off.
-- The goal **opens for the possessing team** when its streak ≥ `Match.lapsToOpenGoal` (4). Emits `GoalOpened { team }`. It closes on possession change to the other team or on any point (`GoalClosed`).
+- The goal **opens for the possessing team** when its streak completes its first lap (4 markers from the goal's gate). Emits `GoalOpened { team }`. It closes on possession change to the other team or on any point (`GoalClosed`).
 - A **goal** is scored when the ball's tick segment passes through the ring's disc **either way**, front or back, while the goal is open for the possessing team (the owner, 2026-10-27: "also the goal should be able to get scored by either way, front or back"), by the same crossing rule as a lap gate (§4.2). *(Until 2026-10-27: only front-to-back, with the track direction, scored.)*
 - The goal is credited to the possessing team; the **scorer** is the possessing-team player who last held the ball. A defender's deflection that still goes in counts.
-- Emits `GoalScored { team, scorer, assister? }`.
+- **A goal is worth what its streak's laps make it**, `Match.goalPointsByLap` = { 1, 3, 5 }: +1 after 1 lap (4 markers), +3 after 2 (8), +5 after 3 or more (12+; more laps add nothing). *The owner (sessions 20-21, #305): Roller Champions' "points depend on the number of laps your team completes before scoring: 1 lap 1 pt, 2 laps 3 pts, 3 laps 5 pts" (Video 1's tutorial); was a goal of 1 after 4 laps and a streak point at 12.*
+- Emits `GoalScored { team, scorer, assister?, points }`.
 
-### 4.4 Streak point
+### 4.4 Streak point (removed)
 
-- When the possessing team's streak reaches `Match.lapsForStreakPoint` (12), it earns `Match.pointValue.streak` (1) point, credited to the teammate who holds or last held the ball. Emits `StreakPointScored { team, holder }`.
+- None: laps alone score nothing; a long streak only makes the goal worth +5 (§4.3). *The owner (#305); was a point at 12 laps (`StreakPointScored`).*
 
 ### 4.5 Points and kickoff reset
 
-- Goal and streak point are worth `Match.pointValue.goal` = 1 and `Match.pointValue.streak` = 1.
+- A goal adds its `points` (§4.3) to its team's score; the first team to `Match.pointsToWin` (5) or more wins at once (§5.2), so a +5 goal from 0 ends the match (RC: "first team to 5 points wins instantly").
 - After any point: celebration (`Match.celebrationSeconds` = 3), then **kickoff reset**: both streaks → 0, goal closed, possession neutral, all players respawn at their team's spawn points, movement frozen for `Match.kickoffCountdownSeconds` = 3, ball spawns at a **uniformly random** point from the arena's `BallSpawn` set (positioned on the line equidistant from both team spawns, §9.1).
 
 ### 4.6 `MatchEngine`
@@ -160,7 +161,7 @@ A single pure state machine composing the modules above. States: `Waiting → Ki
 
 ### 4.7 Event catalogue
 
-`MatchStarted`, `KickoffStarted`, `KickoffEnded`, `PossessionChanged`, `GateCrossed`, `LapCompleted`, `GoalOpened`, `GoalClosed`, `GoalScored`, `StreakPointScored`, `AssistAwarded`, `SaveMade`, `Steal`, `TackleKnockdown`, `ClockWarning { secondsLeft }`, `LastChanceStarted`, `OvertimeStarted`, `MatchEnded { winner, mvp, stats }`.
+`MatchStarted`, `KickoffStarted`, `KickoffEnded`, `PossessionChanged`, `GateCrossed`, `LapCompleted`, `GoalOpened`, `GoalClosed`, `GoalScored`, `AssistAwarded`, `SaveMade`, `Steal`, `TackleKnockdown`, `ClockWarning { secondsLeft }`, `LastChanceStarted`, `OvertimeStarted`, `MatchEnded { winner, mvp, stats }`.
 
 ---
 
@@ -176,14 +177,14 @@ A single pure state machine composing the modules above. States: `Waiting → Ki
 
 1. A team reaches `Match.pointsToWin` (5) → that team wins immediately.
 2. Clock reaches 0:00:
-   - Scores tied → **golden-goal overtime**: unlimited time; the next point (goal or streak point) wins. The HUD shows "OVERTIME" with a clock counting up from 0:00.
+   - Scores tied → **golden-goal overtime**: unlimited time; the next goal wins. The HUD shows "OVERTIME" with a clock counting up from 0:00.
    - Trailing team behind by exactly `Match.lastChance.maxDeficit` (1) **and** is the possessing team → **Last Chance** (§5.3).
    - Otherwise → leader wins.
 
 ### 5.3 Last Chance (`LastChance`)
 
 - Play continues with a "LAST CHANCE" banner.
-- If the trailing team scores (goal or streak point) → scores tied → kickoff reset → **golden-goal overtime**.
+- If the trailing team scores → scores tied → kickoff reset → **golden-goal overtime**.
 - If a **leading-team player picks up the ball** → match ends, leader wins.
 - A loose ball last held by the trailing team does **not** end Last Chance (possession unchanged, §4.1).
 - `Match.lastChance.enabled = true`.
@@ -201,7 +202,6 @@ A single pure state machine composing the modules above. States: `Waiting → Ki
 | Event | Default points |
 |---|---|
 | Goal (scorer) | 100 |
-| Streak point (holder) | 100 |
 | Assist | 50 |
 | Save | 50 |
 | Lap completed (possessing-team player who holds or last held the ball when the 4th gate is crossed) | 10 |
@@ -210,7 +210,7 @@ A single pure state machine composing the modules above. States: `Waiting → Ki
 
 ### 6.2 Assist (`AssistTracker`)
 
-The last **different** teammate who held the ball before the scorer, if the handoff to the scorer happened within `Scoring.assistWindowSeconds` = 8. At most one assist per point. Streak points have no assist.
+The last **different** teammate who held the ball before the scorer, if the handoff to the scorer happened within `Scoring.assistWindowSeconds` = 8. At most one assist per goal.
 
 ### 6.3 Save (`SaveDetector`)
 

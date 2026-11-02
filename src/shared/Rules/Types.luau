@@ -40,8 +40,8 @@ export type Event =
 	| { name: "LapCompleted", team: Team, streak: number, holder: PlayerId }
 	| { name: "GoalOpened", team: Team }
 	| { name: "GoalClosed" }
-	| { name: "GoalScored", team: Team, scorer: PlayerId, assister: PlayerId? }
-	| { name: "StreakPointScored", team: Team, holder: PlayerId }
+	-- `points`: what the goal is worth to the team, by its streak's laps (GoalJudge.worth).
+	| { name: "GoalScored", team: Team, scorer: PlayerId, assister: PlayerId?, points: number }
 	| { name: "AssistAwarded", player: PlayerId }
 	| { name: "SaveMade", player: PlayerId, kind: SaveKind }
 	| { name: "Steal", player: PlayerId, fromTeam: Team }

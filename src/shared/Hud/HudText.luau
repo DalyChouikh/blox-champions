@@ -3,6 +3,7 @@
 -- frame, so their strings are cached per whole second and per km/h: once seen, a value costs no allocation.
 
 local Config = require(script.Parent.Parent.Config)
+local GoalJudge = require(script.Parent.Parent.Rules.GoalJudge)
 local HudState = require(script.Parent.HudState)
 local MatchEngine = require(script.Parent.Parent.Rules.MatchEngine)
 local Team = require(script.Parent.Parent.Rules.Team)
@@ -47,18 +48,19 @@ function HudText.speed(self: HudText, studsPerSecond: number): string
 	return cached
 end
 
--- The possessing team's laps toward opening the goal, or their streak once it has opened it; nil while neutral. A
--- point closes the goal, but the streak that opened it stays until the kickoff (or the match's end), so it is still
--- the streak then.
+-- The possessing team's laps, and once the goal is open for them what a goal is worth (GoalJudge.worth); nil while
+-- neutral. A point closes the goal, but the streak that opened it stays until the kickoff (or the match's end), so
+-- it is still shown then.
 function HudText.lap(self: HudText, match: MatchEngine.Snapshot): string?
 	if match.possessingTeam == nil then
 		return nil
 	end
-	local text, rules = self._config.UI.text, self._config.Match
-	if match.streak >= rules.lapsToOpenGoal then
-		return string.format(text.streak, match.streak, rules.lapsForStreakPoint)
+	local text = self._config.UI.text
+	local worth = GoalJudge.worth(self._config.Match.goalPointsByLap, match.streak)
+	if worth > 0 then
+		return string.format(text.goalWorth, match.streak, worth)
 	end
-	return string.format(text.lap, match.streak, rules.lapsToOpenGoal)
+	return string.format(text.lap, match.streak)
 end
 
 -- The period named under the clock for as long as it lasts: OVERTIME or LAST CHANCE; nil in regulation.
@@ -80,8 +82,6 @@ function HudText.banner(self: HudText, banner: HudState.Banner): string
 		return tostring(banner.value)
 	elseif kind == "Goal" then
 		return text.goal
-	elseif kind == "StreakPoint" then
-		return text.streakPoint
 	elseif kind == "Denied" then
 		return text.denied
 	elseif kind == "ClockWarning" then
@@ -121,8 +121,6 @@ function HudText.feed(self: HudText, entry: HudState.FeedEntry, names: { [Player
 		return string.format(text.possession, name)
 	elseif kind == "Goal" then
 		return string.format(text.scored, name)
-	elseif kind == "StreakPoint" then
-		return string.format(text.scoredStreak, name)
 	end
 	-- HudState.FeedKind has only the kinds above: any other is a wiring bug.
 	error(`HudText: no feed text for kind "{kind}"`, 0)

@@ -112,13 +112,10 @@ end
 function ScoreKeeper.apply(self: ScoreKeeper, event: Types.Event)
 	local points = self._config.Scoring.points
 	if event.name == "GoalScored" then
-		self._scores[event.team] += self._config.Match.pointValue.goal
+		self._scores[event.team] += event.points
 		local scorer = entry(self, event.scorer)
 		scorer.score += points.goal
 		scorer.goals += 1
-	elseif event.name == "StreakPointScored" then
-		self._scores[event.team] += self._config.Match.pointValue.streak
-		entry(self, event.holder).score += points.streakPoint
 	elseif event.name == "AssistAwarded" then
 		local assister = entry(self, event.player)
 		assister.score += points.assist

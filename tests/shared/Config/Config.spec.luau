@@ -25,9 +25,7 @@ describe("Config defaults", function()
 		expect(m.minPlayersToStart).toBe(1)
 		expect(m.pointsToWin).toBe(5)
 		expect(m.durationSeconds).toBe(300)
-		expect(m.lapsToOpenGoal).toBe(4)
-		expect(m.lapsForStreakPoint).toBe(12)
-		expect(m.pointValue).toEqual({ goal = 1, streak = 1 })
+		expect(m.goalPointsByLap).toEqual({ 1, 3, 5 })
 		expect(m.celebrationSeconds).toBe(3)
 		expect(m.kickoffCountdownSeconds).toBe(3)
 		expect(m.clockPausesDuringKickoff).toBe(true)
@@ -386,7 +384,6 @@ describe("Config defaults", function()
 		local s = Config.defaults().Scoring
 		expect(s.points).toEqual({
 			goal = 100,
-			streakPoint = 100,
 			assist = 50,
 			save = 50,
 			lapCompleted = 10,
@@ -441,11 +438,10 @@ describe("Config defaults", function()
 		})
 		expect(ui.text).toEqual({
 			clock = "%d:%02d",
-			lap = "Lap %d/%d",
-			streak = "Streak %d/%d",
+			lap = "Lap %d",
+			goalWorth = "Lap %d: goal +%d",
 			overtime = "OVERTIME",
 			goal = "GOAL!",
-			streakPoint = "STREAK POINT!",
 			denied = "DENIED!",
 			clockWarning = "%d SECONDS",
 			lastChance = "LAST CHANCE",
@@ -454,7 +450,6 @@ describe("Config defaults", function()
 			lapCompleted = "Lap %d completed",
 			goalOpen = "%s goal is active",
 			scored = "%s scored!",
-			scoredStreak = "%s scored a streak point!",
 			wins = "%s WINS",
 			mvp = "MVP",
 			scores = "SCORES",
@@ -664,10 +659,38 @@ describe("Config.forMode", function()
 		end).toThrow("Match.pointsToWin: expected number, got string")
 	end)
 
-	it("rejects a streak target that does not exceed the goal-opening laps", function()
+	it("rejects goal points that are missing, not whole, or do not rise lap by lap", function()
 		expect(function()
-			Fixtures.config({ Match = { lapsForStreakPoint = 4 } })
-		end).toThrow("Match: lapsForStreakPoint must be greater than lapsToOpenGoal")
+			Fixtures.config({ Match = { goalPointsByLap = {} } })
+		end).toThrow("Match.goalPointsByLap: must not be empty")
+		expect(function()
+			Fixtures.config({ Match = { goalPointsByLap = { 1, 0.5 } } })
+		end).toThrow("Match.goalPointsByLap[2]: must be an integer")
+		expect(function()
+			Fixtures.config({ Match = { goalPointsByLap = { 0, 3 } } })
+		end).toThrow("Match.goalPointsByLap[1]: must be >= 1")
+		expect(function()
+			Fixtures.config({ Match = { goalPointsByLap = { 1, 3, 3 } } })
+		end).toThrow("Match.goalPointsByLap: must rise, each lap worth more than the one before")
+	end)
+
+	-- The owner (#305): the streak point goes; the goal's worth by laps replaces the laps to open it.
+	it("rejects the old lap-target and streak-point settings as unknown", function()
+		for _, key in { "lapsToOpenGoal", "lapsForStreakPoint", "pointValue" } do
+			expect(function()
+				Fixtures.config({ Match = { [key] = 1 } })
+			end).toThrow(`Match.{key}: unknown key`)
+		end
+		expect(function()
+			Fixtures.config({ Scoring = { points = { streakPoint = 100 } } })
+		end).toThrow("Scoring.points.streakPoint: unknown key")
+	end)
+
+	it("accepts goal points just inside their limits", function()
+		local config = Fixtures.config({ Match = { goalPointsByLap = { 1 } } })
+		expect(config.Match.goalPointsByLap).toEqual({ 1 })
+		config = Fixtures.config({ Match = { goalPointsByLap = { 1, 2 } } })
+		expect(config.Match.goalPointsByLap).toEqual({ 1, 2 })
 	end)
 
 	it("rejects more required players than two full teams", function()
@@ -1423,8 +1446,8 @@ describe("Config.forMode", function()
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			-- A text takes exactly as many values as the HUD gives it.
 			{
-				overrides = { UI = { text = { lap = "Lap %d" } } },
-				message = "UI.text.lap: placeholder count must be 2",
+				overrides = { UI = { text = { goalWorth = "goal +%d" } } },
+				message = "UI.text.goalWorth: placeholder count must be 2",
 			},
 			{
 				overrides = { UI = { text = { possession = "has the ball" } } },
