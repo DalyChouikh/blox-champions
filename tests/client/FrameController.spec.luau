@@ -30,6 +30,7 @@ beforeEach(function()
 		SkateController = recorder("skate"),
 		ActionController = recorder("actions"),
 		PoseController = recorder("poses"),
+		BallPull = recorder("ballPull"),
 		CameraController = recorder("camera"),
 		TouchControls = recorder("touch"),
 		HudStore = recorder("hudStore"),
@@ -42,9 +43,9 @@ beforeEach(function()
 end)
 
 describe("FrameController", function()
-	it("steps the skating, then the actions, then the poses", function()
+	it("steps the skating, then the actions, then the poses, then a caught ball's pull", function()
 		FrameController:step(0.5)
-		expect(order).toEqual({ "skate 0.5", "actions 0.5", "poses 0.5" })
+		expect(order).toEqual({ "skate 0.5", "actions 0.5", "poses 0.5", "ballPull 0.5" })
 	end)
 
 	it(

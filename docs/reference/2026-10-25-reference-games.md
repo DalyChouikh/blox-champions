@@ -1200,6 +1200,85 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   leaver's does today); nothing blocks a switch after a throw. Not chosen: greyed until a pickup or a kickoff.
   **Q120 cooldown:** **none**; each switch puts the player back on the new team's spawn, and the server drops spam (at
   most one request a second). Not chosen: a cooldown between switches.
+- **Trial 311, Q121** (session 54). The trial (Studio copies only): the ball 1 stud across, carried low in the right
+  hand at the hip with the arm down, the magnet at 6 studs (+2 lag) pulling the ball into the hand over 0.2 s, a full
+  charge in 0.5 s (60-160 studs/s), passes at 150, plus an anti-tunnel guard (a loose ball whose centre crossed a
+  solid face since the last frame goes back there, bounced; holds the floor, the closed goal panel, the outer wall
+  and both glasses at 400-500 studs/s). The owner played it solo and answered in their own words: "increase the ball
+  size by a bit more, it is too small now, it is hard to see from far away, and also, when a player holding a ball
+  and he is charing it, zoom the camera out a little, so if player tries to aim straight forward, the camera doesn't
+  be under the player and fades him out, it is not like that in RC, and bring the crosshair a little bit more above
+  the player like RC, i don't know, basically check RC videos, I think RC is not zooming the camera out, but the
+  crosshair is above the player: [Video 32] and [Video 34] also the ball feels more faster then the player, like when
+  I try to reach it, it is more faster, and while we are at it, I want to note two things to do: first: make the
+  player climb diagonaly the walls and the bump easily and faster and of course not the glass walls and second, the
+  ball should be on the color of the holding team". So: **the ball a bit bigger** (1 stud is hard to see from far);
+  **aiming a charge must not drop the camera under the skater and fade them**: study RC's camera and crosshair while
+  charging (Videos 32 and 34; the owner thinks RC keeps the camera and puts the crosshair higher, above the
+  skater); **a loose ball feels faster than the skater chasing it** (to measure); two new to-dos: **climbing the
+  walls and the bump diagonally, easier and faster** (never the glass), and **the ball in the carrying team's
+  colour**. Not commented on: the carry spot, the magnet and its pull, the 0.5 s charge; passes not yet played.
+- **Trial 311 round 2, Q122-Q125** (session 54, AskUserQuestion after Q121; RC frames first: Video 32 at 2.0, 3.2
+  and 4.4 s, the crosshair's centre about 31% of the screen's height from the top, above the skater's head, with and
+  without a charge; the skater's size on screen the same before and while charging, so RC does not zoom; Video 34's
+  catch flash centred ~38% down). Measured in the trial: a loose ball never slows rolling on the flat (Roblox gives a
+  rolling ball no resistance): after a tap throw (60) it still rolls ~40 studs/s seconds later, after a full throw
+  ~110 at 1.5 s and ~60 at 6 s, while a skater strides to 46 and coasting loses 4 studs/s each second. **Q122 the
+  ball's size** (recommended): **1.5 studs**, a quarter of a skater (the trial's 1 stud was hard to see from far);
+  the carry spot moves out so it still sits in the hand. Not chosen: 1.25; 2. **Q123 aiming** (recommended): **RC's
+  crosshair above the skater**: while carrying, the dot sits about a third of the way down the screen (~15 deg above
+  where the camera looks) and throws and passes aim through it; the camera stays as today, no zoom while charging.
+  Not chosen: zooming out while charging; both. **Q124 a loose ball rolling**, the owner's words: "Slow like a
+  coasting skater, and also make players a little faster, and if possible, make the arena more longer, like longer
+  straights": **a loose ball loses 4 studs/s each second on any surface, as a coasting skater does** (a 40 roll
+  stops in ~10 s, ~34 body lengths; bounces and slopes stay real physics); and two new requests, **skaters a little
+  faster** and **a longer arena, longer straights** (to grill). Not chosen: 10 studs/s each second; no slow-down.
+  **Q125 the two to-dos** (recommended): **filed now, built after #316** (before the playtest record #317), each
+  grilled with RC frames first; the owner on the climbing: "what I mean never the glass, is like if player go
+  straight into the outer wall or middle wall, without any mechanics, like jump or uppercut or anything, he can't
+  climb the glass, just like what we have now, but I just noticed if he goes diaganoly, he can't reach the end of the
+  gray wall that is next to the glass, players don't have good speed": so W keeps stopping at the glass as today,
+  and **a skater riding diagonally up the grey (solid) walls and the bump must reach the glass's foot**, with more
+  speed. Not chosen: right after #311; a later part.
+- **Trial 311 round 2, Q126-Q129** (session 54). Round 2 (Studio copies): the ball 1.5 studs carried low in the
+  right hand, RC's crosshair a third of the way down the screen (throws and passes aim through it), a loose ball
+  slowing 4 studs/s each second, the magnet (6 studs, a 0.2 s pull), a 0.5 s charge, passes at 150 homing hard
+  (homingAccel 300). Played in a 2-player Studio test with my bot teammate (it caught the owner's passes and passed
+  back 10 times, 16-133 studs). **Q126 the ball's size**, the owner: "let's try 2 studs" (a third of a skater;
+  another round). **Q127 the crosshair**: **keep it** (build in #312). **Q128 the rolling slow-down**: **keep it**
+  (4 studs/s each second). **Q129 the pass and the magnet**, the owner's words: "first passing is snapping like
+  insatant, shouldn't be that fast, because other players should be able to intercept it when they are on its way,
+  slow it more, same magnet pulling, slow it a little bit more, but not too much for the magnet": **a slower pass**
+  that opponents can step into on its way, and **a slightly slower magnet pull**. Not commented on: the 0.5 s charge.
+  The anti-tunnel guard fired twice in ~8 minutes of their play: both real crossings (a ball landing at 63-109
+  studs/s whose centre passed the face of a thin triangle-filler wedge in a curved end's floor), bounced back.
+- **Trial 311 round 3, Q130-Q133** (session 54, AskUserQuestion before it: Q129's follow-ups chosen as recommended,
+  passes at 90 studs/s with gentler homing (150), the magnet's pull 0.3 s). Round 3 (Studio copies, a 2-player test
+  with my bot teammate): the ball 2 studs (a third of a skater) carried low in the right hand, passes at 90 homing
+  150, the pull 0.3 s, the crosshair above, the rolling slow-down, the 0.5 s charge. **Q130**: **keep the 2-stud
+  ball**. **Q131 the pass**, the owner's words: "more speed, but also I don't know maybe it is a server networking
+  issue but basically the ball snaps to the player's hands, can we fix that?": **faster than 90** (150 felt
+  instant), and **the ball must not snap into the hands** (to measure: how the ball replicates to each screen).
+  **Q132**: **keep the 0.3 s pull**. **Q133**: **keep the 0.5 s charge** (60 at a tap, 160 full).
+- **The snap measured, Q134-Q135** (session 54). In solo Play a screen shows the flying ball every frame and the
+  pull in 9 steps (no snap); in a 2-player test (my probes driving both skaters) a 50-stud pass at 90: the
+  receiver's screen last showed the free ball 36.6 studs out and the next frame (0.067 s later) the ball welded
+  5.8 from them, a 31-stud jump: the catch (decided by the server 8 studs out) reaches a screen while it still
+  shows the ball short of the hand. **Q134 the order** (recommended): **#311 now** (the 2-stud ball, the magnet,
+  each screen drawing the 0.3 s pull from where it last showed the ball, the rolling slow-down, the anti-tunnel
+  guard), **then the smooth ball #316 right after**, then #312 (the throw, the crosshair above, the 0.5 s charge),
+  #313, #314, #315 (the Magnetic Pass; its speed, Q131 "more speed" than 90, judged on the smooth ball). Not
+  chosen: the planned order (#316 last). **Q135** (recommended): **skaters a little faster and a longer arena with
+  longer straights** (Q124) are filed as issues with the diagonal climb and the team-coloured ball (Q125), grilled
+  with RC measured by time and body lengths, trialled, and built **after #316, before the playtest record #317**.
+  Not chosen: right after #311; a separate part later.
+- **Q136 the new issues** (session 54, to-tickets breakdown): four issues, each grilled with RC frames (time and
+  body lengths) and trialled before it is built, all after #316 and blocking the playtest record #317: diagonal
+  climbing of the grey walls and the bump (skate), the team-coloured ball (ball), skaters a little faster (skate),
+  a longer arena (arena, after the speed issue: together they set the lap time). The owner approved ("yes file
+  them") and clarified the arena in their words: "what I meant by logner arena and longer straights is just to make
+  the arena straight ends like the top and bottom of the arena longer, the curved ends the same": **only the two
+  straights grow** (today 200 studs each, Arena.straightLength); the curved ends keep their shape and size.
 
 ## Roller Champions
 

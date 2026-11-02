@@ -50,10 +50,11 @@ local function inParentAxes(joint: Motor6D): CFrame
 	return axes * joint.Transform * axes:Inverse()
 end
 
-local function setup()
+-- `using` replaces the default config (a carry that raises the arm, which the default hangs down).
+local function setup(using: Config.GameConfig?)
 	RideSurfaces:init({})
 	PoseController:init({
-		Config = config,
+		Config = using or config,
 		RideSurfaces = RideSurfaces,
 		SkateController = skate,
 		BallCarrier = BallCarrier,
@@ -119,7 +120,9 @@ describe("PoseController", function()
 		expect((inParentAxes(rightHip).Rotation * -Vector3.yAxis).Z).toBeLessThan(0) -- the thigh comes forward
 	end)
 
-	it("raises the carrier's arm and shows another player's pump from their character's attribute", function()
+	it("poses the carrier's arm and shows another player's pump from their character's attribute", function()
+		-- A carry that raises the arm, so the carry shows (the default hangs it down: RC's carry, #311).
+		setup(Fixtures.config({ Pose = { carryArmDeg = 75 } }))
 		local carrier = Fixtures.jointedRig(folder, "Carrier", HOVER_CFRAME)
 		playerIds.Carrier = "7"
 		PoseController:track(carrier, false)

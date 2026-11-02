@@ -1,11 +1,12 @@
 --!strict
 -- The client's frame, in one fixed order. Each physics step: the skating, then the actions, which read the skater as
--- the skating just left it, then the poses, which read both. Before each frame is drawn: whether Roblox's Developer
--- Console is open (InputController, which pauses the controls), then the camera, which shows the skater where physics
--- left them, then the touch controls, which show what each button does now, then the HUD's state, whose clocks count
--- on, then the HUD, which shows it, then the world's markers, the arena's glow and the carrier's beam, which read that
--- state too, then the name tags. Roblox gives RunService handlers no documented order (they ran in reverse of their
--- connection order when measured), so only this module connects them, one per phase.
+-- the skating just left it, then the poses, which read both, then a caught ball's pull into the hand (BallPull), so
+-- the spot it writes is the one drawn and read before the frame. Before each frame is drawn: whether Roblox's
+-- Developer Console is open (InputController, which pauses the controls), then the camera, which shows the skater where
+-- physics left them, then the touch controls, which show what each button does now, then the HUD's state, whose clocks
+-- count on, then the HUD, which shows it, then the world's markers, the arena's glow and the carrier's beam, which read
+-- that state too, then the name tags. Roblox gives RunService handlers no documented order (they ran in reverse of
+-- their connection order when measured), so only this module connects them, one per phase.
 
 local RunService = game:GetService("RunService")
 
@@ -26,6 +27,7 @@ export type FrameController = {
 	_skate: Steppable,
 	_actions: Steppable,
 	_poses: Steppable,
+	_ballPull: Steppable,
 	_camera: Steppable,
 	_touch: Steppable,
 	_hudStore: Steppable,
@@ -43,6 +45,7 @@ local FrameController: FrameController = {
 		"SkateController",
 		"ActionController",
 		"PoseController",
+		"BallPull",
 		"CameraController",
 		"TouchControls",
 		"HudStore",
@@ -56,6 +59,7 @@ local FrameController: FrameController = {
 	_skate = nil :: any,
 	_actions = nil :: any,
 	_poses = nil :: any,
+	_ballPull = nil :: any,
 	_camera = nil :: any,
 	_touch = nil :: any,
 	_hudStore = nil :: any,
@@ -70,6 +74,7 @@ local FrameController: FrameController = {
 		self._skate = deps.SkateController
 		self._actions = deps.ActionController
 		self._poses = deps.PoseController
+		self._ballPull = deps.BallPull
 		self._camera = deps.CameraController
 		self._touch = deps.TouchControls
 		self._hudStore = deps.HudStore
@@ -93,6 +98,7 @@ local FrameController: FrameController = {
 		self._skate:step(dt)
 		self._actions:step(dt)
 		self._poses:step(dt)
+		self._ballPull:step(dt)
 	end,
 
 	render = function(self: FrameController, dt: number)

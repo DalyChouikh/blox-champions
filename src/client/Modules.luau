@@ -15,6 +15,7 @@ local modules: { Loader.LoadableModule } = {
 	require(script.Parent.SkateController),
 	require(script.Parent.ActionController),
 	require(script.Parent.PoseController),
+	require(script.Parent.BallPull),
 	require(script.Parent.CameraController),
 	require(script.Parent.TouchControls),
 	require(script.Parent.HudStore),
