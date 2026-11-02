@@ -29,9 +29,9 @@ local function screen(
 	compact: boolean?,
 	draw: boolean?
 ): React.ReactElement
-	local ana = Fixtures.playerStats("1", "Blue", true)
+	local ana = Fixtures.playerStats("1", "Blue")
 	ana.score, ana.goals = 5, 5
-	local rex = Fixtures.playerStats("2", "Orange", true)
+	local rex = Fixtures.playerStats("2", "Orange")
 	rex.score = 3
 	local ended: HudState.Ended = {
 		winner = if draw then nil else "Blue",

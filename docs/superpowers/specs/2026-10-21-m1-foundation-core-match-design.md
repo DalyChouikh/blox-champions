@@ -229,6 +229,8 @@ One action that satisfies both counts as **one** save. Emits `SaveMade { player,
 
 Per player: score, goals, assists, saves, steals; grouped by team, sorted by score. Opened by Tab (PC), Select/View (gamepad), HUD button (mobile).
 
+Only players still in the match are listed, here and on the end screen (#309). A leaver's row goes at once; their team's score keeps their goals. If they rejoin the same match, they return to the team they played for, with their row and numbers back. A leaver is never the MVP (§6.5). *The owner's issue list: "When a player leaves, remove their name from scoreboard"; Q96 (recommended): the row disappears at once, and a rejoin brings it back. Not chosen: gone for good, or kept dimmed (before #309).* The wire's `PlayerStats` has no `present` flag, since every listed row is present; `ScoreKeeper` keeps each leaver's entry (`{ stats, present }`) for their return.
+
 ### 6.5 MVP
 
 Highest score on the **winning team**, or on either team after a draw. Tie-breakers in order: more goals, more saves, more assists, earliest join order. *The draw's MVP is a ruling (#306): a draw still had a best player, so the end screen keeps its MVP card.*
@@ -531,7 +533,7 @@ All strings and colors in `Config/UI` (team colors: Blue and Orange).
 - **Remotes:** malformed or rate-exceeding payloads are dropped and counted per player; never trusted.
 - **Actions:** a server-rejected action sends the client a correction (cancel pose/motion).
 - **Ball:** out of bounds, or stranded on something nobody skates → respawn (§9.3). A carrier leaving the game drops the ball as `Loose` at their last position.
-- **Players leaving mid-match:** their team plays short; the slot reopens for joiners. Stats of departed players remain on the score tab.
+- **Players leaving mid-match:** their team plays short; the slot reopens for joiners. A leaver's stats go off the score tab until they return (§6.4).
 - **Arena generation failure:** server logs and refuses to start the match (no partial arena).
 
 ---
