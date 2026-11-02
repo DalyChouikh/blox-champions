@@ -29,8 +29,8 @@ local STRANDED = config.Ball.strandedSeconds
 local ON_TRACK = Vector3.new(0, 3, -60)
 -- How far from a skater's middle the server hands them a loose ball (#311): the magnet plus the lag tolerance.
 local REACH = config.Ball.pickupRadius + config.Network.pickupLagToleranceStuds
--- How hard a pass homes (#315, the owner's trial: Q139).
-local HOMING = (config.Actions.Pass.pass :: Config.PassSettings).homingAccel
+-- A Magnetic Pass: its steady speed, its turn, where it aims and where it leaves (#346, the owner's trial: Q176).
+local PASS = config.Actions.Pass.pass :: Config.PassSettings
 -- The fastest a throw ever leaves the hand: a full charge plus its share of the carrier's speed, which the movement
 -- guard holds to its limit.
 local THROW = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
@@ -415,6 +415,8 @@ describe("BallService", function()
 		return #workspace:GetPartsInPart(BallService.part, params) > 0
 	end
 
+	-- How far above the hand each way of letting go starts: a pass beside the chest (#346, Q175).
+	local RISE: { [string]: number } = { throw = 0, pass = PASS.releaseHeight, drop = 0 }
 	local LET_GO: { [string]: (velocity: Vector3) -> () } = {
 		throw = function(velocity: Vector3)
 			BallService:throw("A", velocity)
@@ -428,12 +430,12 @@ describe("BallService", function()
 	}
 	for _, way in { "throw", "pass", "drop" } do
 		it(
-			`lets go of a ball from the nearest point toward a hand in the arena that is clear of it: a {way}`,
+			`lets go of a ball from the nearest point toward its start in the arena that is clear of it: a {way}`,
 			function()
 				local rig, under, normal = leaningIntoSlope()
 				local hand = BallService.part.Position
 				expect(inArena()).toBe(true)
-				local clear = clearOfSlope(rig, hand, under, normal)
+				local clear = clearOfSlope(rig, hand + Vector3.new(0, RISE[way], 0), under, normal)
 				local velocity = Vector3.new(0, 10, -30)
 				LET_GO[way](velocity)
 				Fixtures.expectNear(BallService.part.Position, clear)
@@ -469,6 +471,26 @@ describe("BallService", function()
 		BallService:throw("A", Vector3.new(0, 0, -30))
 		BallService.part.Position = ON_TRACK
 		Fixtures.expectNear(BallService:releasePoint(), ON_TRACK)
+	end)
+
+	-- A pass leaves Actions.Pass.pass.releaseHeight above the hand (#346, Q175: beside the chest, so its line clears
+	-- the floor), still in this slope: from the nearest point toward there that is clear of it.
+	it("says where a pass will leave: releaseHeight above the hand, or the nearest clear point toward it", function()
+		local rig, under, normal = leaningIntoSlope()
+		local hand = BallService.part.Position
+		local spot = hand + Vector3.new(0, PASS.releaseHeight, 0)
+		Fixtures.expectNear(BallService:passPoint(), clearOfSlope(rig, spot, under, normal))
+		arena:ClearAllChildren()
+		Fixtures.expectNear(BallService:passPoint(), spot)
+		Fixtures.expectNear(BallService:releasePoint(), hand)
+		-- Saying it lets nothing go.
+		expect(BallService.state.carrier).toBe("A")
+		Fixtures.expectNear(BallService.part.Position, hand)
+		BallService:pass("A", Vector3.new(0, 0, -30), "B")
+		Fixtures.expectNear(BallService.part.Position, spot)
+		-- A ball nobody carries leaves nobody's hand: it is where it is.
+		BallService.part.Position = ON_TRACK
+		Fixtures.expectNear(BallService:passPoint(), ON_TRACK)
 	end)
 
 	-- Roll Ball starts on the floor under the hand; on a slope the carrier leans into, on the slope, not in it.
@@ -661,29 +683,44 @@ describe("BallService", function()
 		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -limit))
 	end)
 
-	-- A pass leads its receiver (#315): it homes on where they will be when it gets there (Homing.lead), from their
-	-- velocity as their client reports it, held to what the movement guard allows.
-	it("homes a pass on where its target will be when it gets there", function()
+	-- A pass leads its receiver (#315) at its steady speed (#346, Q175): each step it turns toward where their chest
+	-- will be when it gets there (Homing.lead), at most turnAccel sideways, from their velocity as their client
+	-- reports it, held to what the movement guard allows.
+	it("turns a pass at its steady speed toward where its target's chest will be when it gets there", function()
 		local a = caughtBy("A")
 		local b = Fixtures.rig(folder, "B", CFrame.new(BallService.part.Position + Vector3.new(20, 0, -30)))
-		BallService:pass("A", Vector3.new(0, 0, -100), "B")
+		BallService:pass("A", Vector3.new(0, 0, -PASS.speed), "B")
 		expect(BallService.state.status).toBe("Flying")
 		local root = Fixtures.root(b)
-		local turn = (root.Position - BallService.part.Position).Unit * HOMING * 0.1
+		local up = Vector3.new(0, PASS.aimHeight, 0)
+		-- The heading turned toward `toward` by at most turnAccel / speed x dt radians, at the pass's speed.
+		local function turned(velocity: Vector3, toward: Vector3, dt: number): Vector3
+			local heading = velocity.Unit
+			local most = PASS.turnAccel / PASS.speed * dt
+			if math.atan2(heading:Cross(toward).Magnitude, heading:Dot(toward)) <= most then
+				return toward.Unit * PASS.speed
+			end
+			local side = (toward - heading * toward:Dot(heading)).Unit
+			return (heading * math.cos(most) + side * math.sin(most)) * PASS.speed
+		end
+		-- Standing still, 33.7 deg off the heading: turned 0.2 rad toward their chest.
+		local position = BallService.part.Position
 		BallService:step(0.1, { holder("A", a), holder("B", b) })
-		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, Vector3.new(0, 0, -100) + turn)
+		local first = turned(Vector3.new(0, 0, -PASS.speed), root.Position + up - position, 0.1)
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, first, 1e-3)
 		local limit = MovementCheck.speedLimit(config.Movement, config.Network)
 		for _, run in { Vector3.new(30, 0, 0), Vector3.new(10000, 0, 0) } do
-			local position = BallService.part.Position
-			local velocity = BallService.part.AssemblyLinearVelocity
+			position = BallService.part.Position
+			-- Slowed by anything, it still leads them at its own speed and comes back to it.
+			local velocity = BallService.part.AssemblyLinearVelocity * 0.6
+			BallService.part.AssemblyLinearVelocity = velocity
 			root.AssemblyLinearVelocity = run
 			local seen = run.Unit * math.min(run.Magnitude, limit)
-			local meet = Homing.lead(position, velocity.Magnitude, HOMING, root.Position, seen)
+			local meet = Homing.lead(position, PASS.speed, root.Position + up, seen)
 			BallService:step(0.1, { holder("A", a), holder("B", b) })
-			Fixtures.expectNear(
-				BallService.part.AssemblyLinearVelocity,
-				velocity + (meet - position).Unit * HOMING * 0.1
-			)
+			local now = BallService.part.AssemblyLinearVelocity
+			Fixtures.expectNear(now, turned(velocity, meet - position, 0.1), 1e-3)
+			expect(now.Magnitude).toBeCloseTo(PASS.speed, 3)
 		end
 	end)
 
@@ -903,13 +940,15 @@ describe("BallService", function()
 		ball.AssemblyLinearVelocity = Vector3.new(20, 0, 0)
 		BallService:step(0.5, {})
 		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(20, 0, 0))
-		-- A pass skimming the floor, its weight cancelled, homing straight on toward a receiver far along its way.
+		-- A pass skimming the floor, its weight cancelled, turning toward a receiver far along its way.
 		local rig = Fixtures.rig(folder, "A", CFrame.new(ON_TRACK))
 		BallService:step(1 / 60, { holder("A", rig) })
 		BallService:pass("A", Vector3.new(30, 0, 0), "B")
 		local receiver = Fixtures.rig(folder, "B", CFrame.new(ball.Position + Vector3.new(300, 0, 0)))
+		local chest = Fixtures.root(receiver).Position + Vector3.new(0, PASS.aimHeight, 0)
+		local steered = (chest - ball.Position).Unit * PASS.speed
 		BallService:step(0.5, { holder("B", receiver) })
-		Fixtures.expectNear(ball.AssemblyLinearVelocity, Vector3.new(30 + HOMING * 0.5, 0, 0))
+		Fixtures.expectNear(ball.AssemblyLinearVelocity, steered, 1e-3)
 	end)
 
 	-- RC (Q105): a pass into glass bounces off and is loose. Its centre crossing the pane in one frame, the ball goes

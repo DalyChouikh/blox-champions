@@ -29,6 +29,8 @@ local passCooldown = Fixtures.config({ Actions = { Pass = { cooldown = 1 } } })
 -- The config every service starts with (beforeEach).
 local config = defaults
 local throwSettings = config.Actions.ChargeThrow.throw :: Config.ThrowSettings
+-- A Magnetic Pass: its steady speed, where it aims and where it leaves (#346).
+local PASS = config.Actions.Pass.pass :: Config.PassSettings
 -- The Tackle's Dive (#240).
 local FOLLOW_UP = config.Actions.Tackle.followUp :: Config.FollowUp
 local DT = 1 / 60
@@ -284,6 +286,12 @@ local function leanIntoSlope(id: string): Vector3
 	return meets + normal * config.Ball.releaseClearance
 end
 
+-- The way a pass to `id`, standing still, leaves from where the ball now is: straight at their chest (#346).
+local function towardChest(id: string): Vector3
+	local chest = Fixtures.root(rigs[id]).Position + Vector3.new(0, PASS.aimHeight, 0)
+	return (chest - BallService.part.Position).Unit
+end
+
 describe("ActionService", function()
 	-- A throw comes down on the crosshair's spot (#313, the owner: Q148, Q151), from the hand at the charged speed.
 	it("throws the carrier's ball from the hand at the charged speed, down onto the crosshair's spot", function()
@@ -332,16 +340,20 @@ describe("ActionService", function()
 		expectLandsOn(from, SPOT)
 	end)
 
-	it("aims a pass from where the ball leaves a hand in a slope, straight at its receiver", function()
+	-- A pass leaves releaseHeight above the hand (#346, Q175: beside the chest), here clear of the slope the hand dips
+	-- into, straight at its receiver's chest.
+	it("aims a pass from beside the chest, clear of a slope the hand dips into, at its receiver's chest", function()
 		local a, b = blue[1], blue[2]
 		stand(a, Vector3.zero)
 		stand(b, Vector3.new(0, 0, -40))
 		giveBall(a)
-		local from = leanIntoSlope(a)
+		leanIntoSlope(a)
+		local from = BallService.part.Position + Vector3.new(0, PASS.releaseHeight, 0)
+		local chest = Fixtures.root(rigs[b]).Position + Vector3.new(0, PASS.aimHeight, 0)
 		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, -1) })
 		expect(rejected(a)).toEqual({})
 		Fixtures.expectNear(BallService.part.Position, from)
-		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, (Fixtures.root(rigs[b]).Position - from).Unit)
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, (chest - from).Unit * PASS.speed, 1e-3)
 	end)
 
 	-- RC's Roll Ball (#312, Q100; Video 31 at 1:19.4): the charge spent along the floor. Aimed (3, 4, -4) from a
@@ -449,16 +461,15 @@ describe("ActionService", function()
 		expect(attribute(b, Attributes.CallingPass)).toBeCloseTo(0.5, 6)
 		ActionService:request(a, { action = "Pass", aim = aim })
 		local velocity = BallService.part.AssemblyLinearVelocity
-		expect(velocity.Magnitude).toBeCloseTo(100, 3)
-		Fixtures.expectNear(velocity.Unit, (Fixtures.root(rigs[b]).Position - BallService.part.Position).Unit)
+		expect(velocity.Magnitude).toBeCloseTo(PASS.speed, 3)
+		Fixtures.expectNear(velocity.Unit, towardChest(b))
 		-- The call ends after its window.
 		advance(config.Actions.callPassWindow + 0.1)
 		expect(attribute(b, Attributes.CallingPass)).toBeNil()
 		-- With no caller, the teammate nearest the aim's line.
 		giveBall(a)
 		ActionService:request(a, { action = "Pass", aim = aim })
-		local toC = (Fixtures.root(rigs[c]).Position - BallService.part.Position).Unit
-		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, toC)
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, towardChest(c))
 		expect(rejected(a)).toEqual({})
 	end)
 
@@ -501,8 +512,7 @@ describe("ActionService", function()
 		giveBall(a)
 		ActionService:request(b, { action = "CallPass" })
 		ActionService:request(a, { action = "Pass", aim = aim })
-		local toC = (Fixtures.root(rigs[c]).Position - BallService.part.Position).Unit
-		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, toC)
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, towardChest(c))
 		expect(rejected(a)).toEqual({})
 		-- The open teammate gone behind: only the hidden caller is left in the aim.
 		stand(c, Vector3.new(0, 0, 40))
@@ -512,21 +522,22 @@ describe("ActionService", function()
 		expect(BallService.state.carrier).toBe(a)
 	end)
 
-	-- The pass leads its receiver (#315): straight to where they will be when it gets there.
+	-- The pass leads its receiver (#315): straight at its steady speed (#346) to where their chest will be when it gets
+	-- there, from beside the passer's chest.
 	it("passes to where a teammate skating across will be when it gets there", function()
 		local a, b = blue[1], blue[2]
 		stand(a, Vector3.zero)
 		stand(b, Vector3.new(0, 0, -40))
 		Fixtures.root(rigs[b]).AssemblyLinearVelocity = Vector3.new(30, 0, 0)
 		giveBall(a)
-		local hand = BallService.part.Position
-		local receiver = Fixtures.root(rigs[b]).Position
+		local from = BallService.part.Position + Vector3.new(0, PASS.releaseHeight, 0)
+		local chest = Fixtures.root(rigs[b]).Position + Vector3.new(0, PASS.aimHeight, 0)
 		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, -1) })
-		local pass = config.Actions.Pass.pass :: Config.PassSettings
-		local meet = Homing.lead(hand, pass.speed, pass.homingAccel, receiver, Vector3.new(30, 0, 0))
-		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity, (meet - hand).Unit * pass.speed, 1e-3)
+		local meet = Homing.lead(from, PASS.speed, chest, Vector3.new(30, 0, 0))
+		local velocity = BallService.part.AssemblyLinearVelocity
+		Fixtures.expectNear(velocity, (meet - from).Unit * PASS.speed, 1e-3)
 		-- Ahead of where they stand now.
-		expect((meet - receiver).X).toBeGreaterThan(5)
+		expect((meet - chest).X).toBeGreaterThan(5)
 	end)
 
 	it("knocks down the nearest opponent a tackle reaches, once", function()
@@ -1025,8 +1036,7 @@ describe("ActionService", function()
 		ActionService:request(b, { action = "CallPass" })
 		ActionService:resetPlayer(b)
 		ActionService:request(a, { action = "Pass", aim = Vector3.new(0, 0, -1) })
-		local toC = (Fixtures.root(rigs[c]).Position - BallService.part.Position).Unit
-		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, toC)
+		Fixtures.expectNear(BallService.part.AssemblyLinearVelocity.Unit, towardChest(c))
 	end)
 
 	it("forgets a player who leaves, and starts a respawned character clean", function()

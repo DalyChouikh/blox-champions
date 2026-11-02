@@ -40,21 +40,31 @@ describe("Throw", function()
 		expect(Throw.speed(throw, -1)).toBe(MIN)
 	end)
 
-	-- A Magnetic Pass flies straight at 100 studs/s (#315, the owner's trial: Q139) where its receiver will be when it
-	-- gets there (Homing.lead; worked by brute force in s60\worked315b.py).
-	it("passes straight at the pass's speed to where the receiver will be", function()
+	-- A Magnetic Pass flies straight at its steady 150 studs/s (#346, the owner's trial: Q175, Q176) to where its
+	-- receiver's chest will be when it gets there (Homing.lead, Homing.aimOn; worked in s65\worked346.py).
+	it("passes straight at the pass's speed to where the receiver's chest will be", function()
 		local aim = Vector3.new(2, 0, 0)
 		local from = Vector3.new(5, 3, 5)
 		local still = Vector3.zero
-		Fixtures.expectNear(Throw.pass(pass, from, aim, from + Vector3.new(0, 0, -30), still), Vector3.new(0, 0, -100))
-		Fixtures.expectNear(Throw.pass(pass, from, aim, from + Vector3.new(30, 0, 40), still), Vector3.new(60, 0, 80))
 		Fixtures.expectNear(
-			Throw.pass(pass, from, aim, from + Vector3.new(0, 0, -40), Vector3.new(30, 0, 0)),
-			Vector3.new(24.044092, 0, -97.066377),
+			Throw.pass(pass, from, aim, from + Vector3.new(0, 0, -30), still),
+			Vector3.new(0, 7.490643, -149.812851),
 			1e-3
 		)
-		-- A receiver exactly at the hand gives no direction: along the aim.
-		Fixtures.expectNear(Throw.pass(pass, from, aim, from, still), Vector3.new(100, 0, 0))
+		Fixtures.expectNear(
+			Throw.pass(pass, from, aim, from + Vector3.new(30, 0, 40), still),
+			Vector3.new(89.959527, 4.497976, 119.946036),
+			1e-3
+		)
+		-- Skating across at 30: a steady pass that meets them crosses at their pace.
+		Fixtures.expectNear(
+			Throw.pass(pass, from, aim, from + Vector3.new(0, 0, -40), Vector3.new(30, 0, 0)),
+			Vector3.new(30, 5.507481, -146.866156),
+			1e-3
+		)
+		-- A receiver whose chest is right at the hand gives no direction: along the aim.
+		local under = from - Vector3.new(0, pass.aimHeight, 0)
+		Fixtures.expectNear(Throw.pass(pass, from, aim, under, still), Vector3.xAxis * pass.speed)
 	end)
 
 	-- Roll Ball (#312): the aim's way across the ground at the charge's speed, plus the carrier's share of their

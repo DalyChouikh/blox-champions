@@ -115,6 +115,15 @@ local crossAreaRules: { Validate.Rule } = {
 		end,
 	},
 	{
+		-- A Magnetic Pass aims Actions.Pass.pass.aimHeight above its receiver's root (#346): one getting there must be
+		-- within the magnet's reach of it, or no pass on its aim is ever caught.
+		message = "Actions: a Magnetic Pass must aim within the magnet's reach of its receiver's root "
+			.. "(pass.aimHeight < Ball.pickupRadius)",
+		holds = function(config: GameConfig): boolean
+			return (config.Actions.Pass.pass :: Actions.PassSettings).aimHeight < config.Ball.pickupRadius
+		end,
+	},
+	{
 		-- A knockdown lasts at least getUpAfter, so an honest client asks to get up once per knockdown
 		-- (Network.maxGetUpsPerSecond; the review, #303).
 		message = "Actions: getUpAfter must not exceed any hit's knockdownSeconds nor "

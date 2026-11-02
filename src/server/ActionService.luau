@@ -13,14 +13,14 @@
 -- player deals themselves. A player knocked down by a strike or a fall whose client asks to get up (GetUp, sent when
 -- they move) is up once Actions.getUpAfter has passed since the knockdown, never sooner; a diver is up once their root
 -- slides slower than the landing's stopSpeed along the ground, whatever they ask (#242); anyone, at the latest after
--- the knockdown's seconds.
--- A throw comes down on the spot its client's crosshair points at, from where the ball leaves the hand (#313; clear of
--- the arena, BallService.releasePoint, #345). A throw or a roll keeps no more of the carrier's speed than skating
--- allows, and no more charge than the ball was held for. A Magnetic Pass goes to the teammate PassTarget names along
--- its aim, led to where they will be, or is refused (#315). The server never sees the throw key: an action that needs a
--- charge under way (Roll Ball) or none (a pass, #312) starts either way here. MatchService steps it first in each frame
--- and reports its knockdowns to the rules; a kickoff resets it. Time is the sum of the frames it is stepped, so a
--- request between frames counts as the last frame's.
+-- the knockdown's seconds. A throw comes down on the spot its client's crosshair points at, from where the ball leaves
+-- the hand (#313; clear of the arena, BallService.releasePoint, #345). A throw or a roll keeps no more of the carrier's
+-- speed than skating allows, and no more charge than the ball was held for. A Magnetic Pass goes to the teammate
+-- PassTarget names along its aim, from beside the chest at its steady speed, led to where their chest will be (#346),
+-- or is refused (#315). The server never sees the throw key: an action that needs a charge under way (Roll Ball) or
+-- none (a pass, #312) starts either way here. MatchService steps it first in each frame and reports its knockdowns to
+-- the rules; a kickoff resets it. Time is the sum of the frames it is stepped, so a request between frames counts as
+-- the last frame's.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -405,8 +405,8 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Roll: Effect, 
 		self._ball:roll(player, velocity)
 	end,
 	-- Magnetic Pass (#315): to the teammate PassTarget names along the aim in the open (nothing of the arena between
-	-- them, Q155), straight to where they will be when it gets there. With nobody there the client greys the key and
-	-- sends none, so only lag at the cone's edge or a line's gets here.
+	-- them, Q155), from beside the passer's chest straight to where theirs will be when it gets there (#346). With
+	-- nobody there the client greys the key and sends none, so only lag at the cone's edge or a line's gets here.
 	Pass = function(self: ActionService, player: PlayerId, holder: Holder, payload: any, action: Config.ActionConfig)
 		local pass = action.pass :: Config.PassSettings
 		local teammates = candidates(self, player, true)
@@ -417,12 +417,9 @@ local effects: { Knockdown: Effect, Dodge: Effect, Throw: Effect, Roll: Effect, 
 			refuse(self, player, payload.action)
 			return
 		end
-		local from, at = self._ball:releasePoint(), receiver.root.Position
-		self._ball:pass(
-			player,
-			Throw.pass(pass, from, payload.aim, at, reportedVelocity(self, receiver)),
-			receiver.player
-		)
+		local from = self._ball:passPoint()
+		local velocity = Throw.pass(pass, from, payload.aim, receiver.root.Position, reportedVelocity(self, receiver))
+		self._ball:pass(player, velocity, receiver.player)
 	end,
 	-- A call's time goes on the caller's character too, so every client ranks callers as the server does.
 	CallPass = function(self: ActionService, player: PlayerId)

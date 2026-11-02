@@ -1,55 +1,50 @@
 --!strict
--- A pass steering toward its receiver (spec §8.2): it leaves for, and each step adds `accel` toward, where the receiver
--- will be when it gets there (#315), so it flies straight into the hands of a teammate skating across, and curves only
--- after one who changes their way. Steered at the receiver's spot alone, a pass to a teammate 80 studs out skating
--- across at 55 studs/s passed 25.6 studs from them (the owner's trial values, Q139; worked in s60\lead315.py).
+-- A Magnetic Pass steering toward its receiver (spec §8.2): it flies at a steady speed, leaving for and each step
+-- turning toward where the receiver's chest will be when it gets there (#315, #346), so it flies straight into the
+-- hands of a teammate skating across and bends after one who cuts. Steered at the receiver's spot alone, a pass to a
+-- teammate 80 studs out skating across at 55 studs/s passed 25.6 studs from them (#315; s60\lead315.py). Speeding up
+-- toward them instead (#315's homing), a pass turned slower the faster it got, and missed receivers who turned late
+-- (the owner's trial, Q174; replayed over real receivers' paths: 64% caught, 90% at a steady speed, Q175).
 -- Allocates nothing.
 
 local Vectors = require(script.Parent.Parent.Util.Vectors)
 
 local Homing = {}
 
--- How many halvings Homing.lead takes to find when a pass meets its receiver: 24 pin it within 2^-24 of its bound.
-local LEAD_ROUNDS = 24
+local UP = Vector3.yAxis
 
--- The velocity after `dt` seconds of steering; unchanged when the ball is already at the target.
-function Homing.step(position: Vector3, velocity: Vector3, target: Vector3, accel: number, dt: number): Vector3
-	local offset = target - position
-	if offset.Magnitude <= Vectors.EPSILON then
-		return velocity
-	end
-	return velocity + offset.Unit * (accel * dt)
+-- Where a pass aims on a receiver whose root is at `root`: `height` straight above it (Q175: the chest, so the pass's
+-- line clears the floors and banks between the two skaters). Straight up, not along the receiver's lean: the replay
+-- caught as many (90.4% against 90.3%) without reading their frame every step.
+function Homing.aimOn(root: Vector3, height: number): Vector3
+	return root + UP * height
 end
 
--- Where a pass from `from` at `speed`, speeding up by `accel` along its way (Homing.step), meets a receiver now at
--- `target` moving at `velocity`: their place at the time t when the pass has covered as far as they are from `from`
--- then, |target + velocity t - from| = speed t + accel t^2 / 2. As the receiver closes or opens that distance no faster
--- than their speed, t comes no later than where speed t + accel t^2 / 2 = |target - from| + |velocity| t, so it is
--- halved down from there (the one t there is while the pass is the faster; for a receiver faster than it, a t where
--- they meet). With none (a receiver faster than a pass that never speeds up), their place now.
-function Homing.lead(from: Vector3, speed: number, accel: number, target: Vector3, velocity: Vector3): Vector3
-	local distance = (target - from).Magnitude
-	local closing = speed - velocity.Magnitude
-	local bound: number
-	if distance <= Vectors.EPSILON then
-		return target
-	elseif accel > 0 then
-		bound = (math.sqrt(closing * closing + 2 * accel * distance) - closing) / accel
-	elseif closing > 0 then
-		bound = distance / closing
-	else
+-- Where a pass from `from` at a steady `speed` meets a receiver now at `target` moving at `velocity`: their place at
+-- the time t when the pass has flown as far as they are from `from` then, |offset + velocity t| = speed t with offset
+-- = target - from: the root of (speed^2 - |velocity|^2) t^2 - 2 (offset . velocity) t - |offset|^2 = 0 that is not
+-- negative (0 at the receiver). With none (a receiver at least as fast as the pass), their place now.
+function Homing.lead(from: Vector3, speed: number, target: Vector3, velocity: Vector3): Vector3
+	local offset = target - from
+	local faster = speed * speed - velocity:Dot(velocity)
+	if faster <= 0 then
 		return target
 	end
-	local short, met = 0, bound
-	for _ = 1, LEAD_ROUNDS do
-		local middle = (short + met) / 2
-		if (target + velocity * middle - from).Magnitude > middle * (speed + accel * middle / 2) then
-			short = middle
-		else
-			met = middle
-		end
+	local along = offset:Dot(velocity)
+	return target + velocity * ((along + math.sqrt(along * along + faster * offset:Dot(offset))) / faster)
+end
+
+-- The velocity at a steady `speed` of a pass turning toward `toward` (from the ball to where it should go) after `dt`
+-- seconds: by at most turnAccel / speed x dt radians, its sideways acceleration turnAccel (Q175: it never speeds up,
+-- so it turns as quickly late in its flight as early). With nowhere to go it keeps its heading; with no heading it
+-- takes the way. Exactly opposite ways turn about the world's up.
+function Homing.turn(velocity: Vector3, toward: Vector3, speed: number, turnAccel: number, dt: number): Vector3
+	if toward.Magnitude <= Vectors.EPSILON then
+		return if velocity.Magnitude <= Vectors.EPSILON then velocity else velocity.Unit * speed
+	elseif velocity.Magnitude <= Vectors.EPSILON then
+		return toward.Unit * speed
 	end
-	return target + velocity * met
+	return Vectors.rotateToward(velocity.Unit, toward.Unit, turnAccel / speed * dt, UP) * speed
 end
 
 return table.freeze(Homing)

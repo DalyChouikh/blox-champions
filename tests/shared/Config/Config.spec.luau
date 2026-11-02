@@ -243,14 +243,22 @@ describe("Config defaults", function()
 				pose = "None",
 			},
 			-- Never while a throw charges (Q140). Magnetic Pass (#315): a teammate within 70 deg of the aim and 120
-			-- studs (Q105), at 100 studs/s with homing 150 (the owner's trial, Q139).
+			-- studs (Q105), at a steady 150 studs/s turning at most 300 studs/s^2 sideways, aimed 1.5 above the root
+			-- and let go 0.8 above the hand (#346, the owner's trial: Q175, Q176).
 			Pass = {
 				phases = { windup = 0, active = 0, recovery = 0 },
 				cooldown = 0,
 				requires = requires("with", nil, "notCharging"),
 				effect = "Pass",
 				pose = "None",
-				pass = { speed = 100, homingAccel = 150, coneDeg = 70, maxRange = 120 },
+				pass = {
+					speed = 150,
+					turnAccel = 300,
+					aimHeight = 1.5,
+					releaseHeight = 0.8,
+					coneDeg = 70,
+					maxRange = 120,
+				},
 			},
 			CallPass = {
 				phases = { windup = 0, active = 0, recovery = 0 },
@@ -1149,6 +1157,38 @@ describe("Config.forMode", function()
 				Fixtures.config({ Actions = { Pass = { pass = { [key] = 0.5 } } } })
 			end).toThrow(`Actions.Pass.pass.{key}: unknown key`)
 		end
+	end)
+
+	-- #346: a steady pass that turns after its receiver (turnAccel replaced homingAccel), aimed above their root
+	-- and let go above the hand.
+	it("rejects a pass with no speed, a negative turn, aim or release height, or the old homing", function()
+		local function passWith(settings: { [string]: any }): () -> ()
+			return function()
+				Fixtures.config({ Actions = { Pass = { pass = settings } } })
+			end
+		end
+		expect(passWith({ speed = 0 })).toThrow("Actions.Pass.pass.speed: must be > 0 (got 0)")
+		expect(passWith({ turnAccel = -1 })).toThrow("Actions.Pass.pass.turnAccel: must be >= 0 (got -1)")
+		expect(passWith({ aimHeight = -1 })).toThrow("Actions.Pass.pass.aimHeight: must be >= 0 (got -1)")
+		expect(passWith({ releaseHeight = -1 })).toThrow("Actions.Pass.pass.releaseHeight: must be >= 0 (got -1)")
+		expect(passWith({ homingAccel = 150 })).toThrow("Actions.Pass.pass.homingAccel: unknown key")
+		-- Aimed as far above the root as the magnet reaches: a pass on its aim is never caught.
+		expect(passWith({ aimHeight = Config.defaults().Ball.pickupRadius })).toThrow(
+			"Actions: a Magnetic Pass must aim within the magnet's reach of its receiver's root "
+				.. "(pass.aimHeight < Ball.pickupRadius)"
+		)
+	end)
+
+	it("accepts a pass's turn, aim and release heights just inside their limits", function()
+		local low =
+			Fixtures.config({ Actions = { Pass = { pass = { turnAccel = 0, aimHeight = 0, releaseHeight = 0 } } } })
+		local settings = low.Actions.Pass.pass :: Config.PassSettings
+		expect(settings.turnAccel).toBe(0)
+		expect(settings.aimHeight).toBe(0)
+		expect(settings.releaseHeight).toBe(0)
+		local reach = Config.defaults().Ball.pickupRadius
+		local high = Fixtures.config({ Actions = { Pass = { pass = { aimHeight = reach - 0.01 } } } })
+		expect((high.Actions.Pass.pass :: Config.PassSettings).aimHeight).toBe(reach - 0.01)
 	end)
 
 	it("rejects the old idle respawn as unknown", function()
