@@ -1279,6 +1279,20 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   them") and clarified the arena in their words: "what I meant by logner arena and longer straights is just to make
   the arena straight ends like the top and bottom of the arena longer, the curved ends the same": **only the two
   straights grow** (today 200 studs each, Arena.straightLength); the curved ends keep their shape and size.
+- **Q137 a slower carrier** (session 55, unprompted, while starting #316's 2-player measurement): "also wanted to
+  note something about making players more speedy, we need to also have a little debuff for players that are holding
+  the ball, like make them a little more slower than players without the ball, so we discourage players to play
+  selfish and encourage passing, but not too much debuff". Goes with #328 (skaters a little faster): the two set the
+  chase together, so they are grilled (RC frames first: does RC slow its carrier?) and trialled together.
+- **Q138 a pass at 100, a 0.2 s pull** (session 55, starting #316's 'after' 2-player test): "can you make it 100
+  instead of 90 for the ball, and 0.2 for the pull, want to see it". The first look at the pass speed on the smooth
+  ball (#316 built: each screen draws the loose ball from the server's stamped states, no lag, even steps), as Q131
+  asked; Q132 had kept the pull at 0.3. Trialled in Studio copies (Actions.Pass.pass.speed 100,
+  Ball.pickupPullSeconds 0.2) with my bot teammate passing to them.
+- **Q139 the trial's verdict** (session 55, after playing Q138's trial in a 2-player test, my bot teammate passing
+  to them 8 times): "Keep 100 and 0.2": a pass flies at **100 studs/s** with **homing 150** (as trialled; the repo
+  still had 90 and 60, so #315 sets both), and a caught ball flies into the hand over **0.2 s** (was 0.3, Q132; RC's
+  took ~0.2 s, Video 13 at 1:36.8), set with #316.
 
 ## Roller Champions
 

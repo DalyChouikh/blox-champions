@@ -38,6 +38,18 @@ describe("NetService", function()
 		NetService:destroy()
 	end)
 
+	-- #316: the loose ball's state goes to everyone each frame it moves, on an unreliable remote.
+	it("streams to every client and rejects an unknown stream", function()
+		NetService:init({ Parent = parent })
+		expect(function()
+			NetService:streamAll(Remotes.streams.BallState, Vector3.one, Vector3.zero, true, 1.5)
+		end).never.toThrow()
+		expect(function()
+			NetService:streamAll(Remotes.names.BallCarrier, {})
+		end).toThrow('NetService: unknown stream "BallCarrier"')
+		NetService:destroy()
+	end)
+
 	it("hands a valid message to its listener with the sender's id", function()
 		NetService:init({
 			Parent = parent,
