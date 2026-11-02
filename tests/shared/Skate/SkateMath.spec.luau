@@ -60,8 +60,8 @@ describe("SkateMath on the ground", function()
 	it("pushes off toward the stick and rolls against friction and drag", function()
 		local s = skater(Vector3.zero)
 		s:step(input({ move = -Vector3.zAxis }), ground(), 0.1)
-		-- 30 × 0.1 = 3, then 3 − (4 + 0.02 × 3) × 0.1
-		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -2.594))
+		-- 33 × 0.1 = 3.3, then 3.3 − (4 + 0.02 × 3.3) × 0.1
+		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -Fixtures.FIRST_STRIDE))
 		expect(s.mode).toBe("Grounded")
 	end)
 
@@ -73,31 +73,31 @@ describe("SkateMath on the ground", function()
 
 	-- The owner (#288, Q67-Q70): friction acts the same whether keys are pressed or not, so a skater let go at the
 	-- stride's top speed rolls on (RC's Video 27: ~11 s to a stop after ~2 s of W).
-	it("rolls from cruiseSpeed to a stop in about 10.4 s on flat ground with nothing pressed", function()
+	it("rolls from cruiseSpeed to a stop in about 11.4 s on flat ground with nothing pressed", function()
 		local s = skater(Vector3.new(0, 0, -movement.cruiseSpeed))
 		local steps = 0
 		while s.velocity.Magnitude > 0 and steps < 1200 do
 			s:step(input(), ground(), 1 / 60)
 			steps += 1
 		end
-		-- dv/dt = −(4 + 0.02 v): 50 × ln((4 + 0.92) / 4) = 10.35 s
-		expect(steps / 60).toBeCloseTo(10.35, 1)
+		-- dv/dt = −(4 + 0.02 v): 50 × ln((4 + 1.02) / 4) = 11.36 s (11.37 in steps of 1/60)
+		expect(steps / 60).toBeCloseTo(11.37, 1)
 	end)
 
 	it("strides only up to cruiseSpeed and settles there", function()
 		local forward = input({ move = -Vector3.zAxis })
-		local atCruise = skater(Vector3.new(0, 0, -46))
+		local atCruise = skater(Vector3.new(0, 0, -51))
 		atCruise:step(forward, ground(), 0.1)
-		-- No push at cruiseSpeed (55 km/h, #265): it coasts, 46 − (4 + 0.02 × 46) × 0.1.
-		Fixtures.expectNear(atCruise.velocity, Vector3.new(0, 0, -45.508))
+		-- No push at cruiseSpeed (#328): it coasts, 51 − (4 + 0.02 × 51) × 0.1.
+		Fixtures.expectNear(atCruise.velocity, Vector3.new(0, 0, -50.498))
 		local s = skater(Vector3.zero)
 		for _ = 1, 600 do
 			s:step(forward, ground(), 1 / 60)
 		end
 		for _ = 1, 120 do
 			s:step(forward, ground(), 1 / 60)
-			-- The reference model stays between 45.92 and 46.42: 46 − (4 + 0.92) / 60 and 46 + (30 − 4.93) / 60.
-			expect(s.velocity.Magnitude > 45.5 and s.velocity.Magnitude < 46.5).toBe(true)
+			-- The reference model stays between 50.92 and 51.47: 51 − (4 + 1.02) / 60 and 51 + (33 − 5.02) / 60.
+			expect(s.velocity.Magnitude > 50.5 and s.velocity.Magnitude < 51.5).toBe(true)
 		end
 	end)
 
@@ -141,7 +141,8 @@ describe("SkateMath on the ground", function()
 		expect(turned(121)).toBeCloseTo(0.2, 4)
 		local still = skater(Vector3.zero)
 		still:step(input({ move = Vector3.xAxis }), ground(), 0.1)
-		Fixtures.expectNear(still.velocity, Vector3.new(2.594, 0, 0)) -- from rest it faces the stick at once
+		-- From rest it faces the stick at once.
+		Fixtures.expectNear(still.velocity, Vector3.new(Fixtures.FIRST_STRIDE, 0, 0))
 	end)
 
 	-- Roller Champions (#266, Videos 14-15): a stick held against the motion brakes the skater to a stop before
@@ -149,24 +150,24 @@ describe("SkateMath on the ground", function()
 	-- key, from cruise stopped in 0.37 s over 1.5 body lengths (a stride's push took 1.33 s over 5.2).
 	it("brakes against a stick held straight back, then skates its way, never carving round", function()
 		local back = input({ move = Vector3.zAxis })
-		local s = skater(Vector3.new(0, 0, -46))
+		local s = skater(Vector3.new(0, 0, -51))
 		s:step(back, ground(), 0.1)
-		-- 46 − 120 × 0.1 = 34, then 34 − (4 + 0.02 × 34) × 0.1
-		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -33.532))
-		local held = skater(Vector3.new(0, 0, -46))
+		-- 51 − 120 × 0.1 = 39, then 39 − (4 + 0.02 × 39) × 0.1
+		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -38.522))
+		local held = skater(Vector3.new(0, 0, -51))
 		local steps = 0
 		while held.velocity.Z < 0 and steps < 600 do
 			held:step(back, ground(), 1 / 60)
 			expect(math.abs(held.velocity.X) < 1e-6).toBe(true)
 			steps += 1
 		end
-		-- dv/dt = −(120 + 4 + 0.02 v) from 46: 50 × ln(124.92 / 124) = 0.370 s, the 23rd step at 60 a second
-		expect(steps / 60).toBeCloseTo(0.38, 1)
+		-- dv/dt = −(120 + 4 + 0.02 v) from 51: 50 × ln(125.02 / 124) = 0.410 s, the 25th step at 60 a second
+		expect(steps / 60).toBeCloseTo(0.42, 1)
 		for _ = 1, 30 do
 			held:step(back, ground(), 1 / 60)
 		end
-		-- Then it strides the stick's way, 14.48 studs/s half a second later (an independent replica of the step).
-		expect(held.velocity.Z).toBeCloseTo(14.48, 1)
+		-- Then it strides the stick's way, 15.15 studs/s half a second later (an independent replica of the step).
+		expect(held.velocity.Z).toBeCloseTo(15.15, 1)
 	end)
 
 	it("brakes with the part of the stick against the motion and turns only with the part across", function()
@@ -181,11 +182,11 @@ describe("SkateMath on the ground", function()
 	it("strides and brakes as hard as the stick is pushed", function()
 		local half = skater(Vector3.zero)
 		half:step(input({ move = Vector3.new(0, 0, -0.5) }), ground(), 0.1)
-		Fixtures.expectNear(half.velocity, Vector3.new(0, 0, -1.097)) -- 30 × 0.5 × 0.1 = 1.5, then friction and drag
-		local back = skater(Vector3.new(0, 0, -46))
+		Fixtures.expectNear(half.velocity, Vector3.new(0, 0, -1.2467)) -- 33 × 0.5 × 0.1 = 1.65, then friction and drag
+		local back = skater(Vector3.new(0, 0, -51))
 		back:step(input({ move = Vector3.new(0, 0, 0.5) }), ground(), 0.1)
-		-- 46 − 120 × 0.5 × 0.1 = 40, then friction and drag
-		Fixtures.expectNear(back.velocity, Vector3.new(0, 0, -39.52))
+		-- 51 − 120 × 0.5 × 0.1 = 45, then friction and drag
+		Fixtures.expectNear(back.velocity, Vector3.new(0, 0, -44.51))
 	end)
 
 	it("brakes to a stop without reversing", function()
@@ -262,13 +263,13 @@ describe("SkateMath climbing", function()
 
 	it("leaves a skater faster than climbSpeed to gravity, down to it", function()
 		local normal, uphill = slope(20)
-		local fast = skater(uphill * 50)
+		local fast = skater(uphill * 55)
 		fast:step(UP_IT, ground(normal), 0.1)
-		-- Past cruise, no stride: 50 - 67.1046 x 0.1, then friction and drag.
-		Fixtures.expectNear(fast.velocity, uphill * 42.803)
+		-- Past cruise, no stride: 55 - 67.1046 x 0.1, then friction and drag.
+		Fixtures.expectNear(fast.velocity, uphill * 47.793)
 		local over = skater(uphill * 41)
 		over:step(UP_IT, ground(normal), 0.1)
-		-- 41 + (30 - 67.1046) x 0.1, then friction and drag: 36.81, under climbSpeed, so held at it.
+		-- 41 + (33 - 67.1046) x 0.1, then friction and drag: 37.11, under climbSpeed, so held at it.
 		Fixtures.expectNear(over.velocity, uphill * 40)
 	end)
 
@@ -355,7 +356,7 @@ describe("SkateMath climbing", function()
 		local gentle, upGentle = slope(2)
 		local starting = skater(Vector3.zero)
 		starting:step(UP_IT, ground(gentle), 0.1)
-		Fixtures.expectNear(starting.velocity, upGentle * 1.9106)
+		Fixtures.expectNear(starting.velocity, upGentle * 2.21)
 	end)
 end)
 
@@ -555,7 +556,7 @@ describe("SkateMath off the ground and on walls", function()
 		expect(s.airPoseReady).toBe(true)
 		Fixtures.expectNear(s.velocity, Vector3.zero)
 		s:step(input({ move = -Vector3.zAxis }), ground(), 0.1)
-		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -2.594))
+		Fixtures.expectNear(s.velocity, Vector3.new(0, 0, -Fixtures.FIRST_STRIDE))
 	end)
 end)
 

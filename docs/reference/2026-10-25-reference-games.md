@@ -1418,6 +1418,16 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   the moment the pickup happens. Not chosen: only while carried. **Q159**: **the neutral ball is white, like RC** (the
   Default skin; yellow sat close to our orange). Not chosen: keep yellow. **Q160**: **the thrown ball's trail stays
   white, like RC** (the ball itself shows the team). Not chosen: the team's colour.
+- **Q161-Q162 the stride and the carrier** (session 62, #328). RC's flat speed could not be measured by frames and
+  body heights in the clips at hand (Video 13 at 47.9-49.8 s and 55.6-56.0 s: the camera moves with the skater and
+  looks along the motion, or the floor's only marks are wood grain), so it is decided by playing. **Q161**
+  (recommended): **trial the stride's top 10% faster: 51 studs/s** (8.7 body lengths a second; today 46, 7.9), its
+  push 30 -> 33 so the top still comes in ~1.8 s; pumping, slopes, dives, climbs and the caps unchanged. Not chosen:
+  +20% (55); +5% (48). **Q162** (the owner's words): "ignore this issue, all players the same speed": **no slower
+  carrier**; Q137's debuff is dropped. Not chosen: 5/10/15% under the others.
+- **Q163 trial 328 kept** (session 62): the owner played trial 328 (Studio copy of the movement settings: the
+  stride's top 46 -> 51 studs/s and its push 30 -> 33, so the top still comes in ~1.8 s; measured in Play: 51.0
+  steady, 98% of it at 1.77 s; every player the same speed, Q162): **"Keep it, build it"** (test-first, as trialled).
 
 ## Roller Champions
 

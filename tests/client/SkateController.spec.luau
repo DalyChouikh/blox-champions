@@ -160,7 +160,8 @@ describe("SkateController", function()
 		expect((rig:FindFirstChildOfClass("Humanoid") :: Humanoid).EvaluateStateMachine).toBe(false)
 		Fixtures.scriptedBinding(InputController.context, "Move"):Fire(Vector2.new(0, 1))
 		SkateController:step(0.1)
-		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -2.594)) -- SkateMath's first push, at hover height
+		-- SkateMath's first push, at hover height.
+		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -Fixtures.FIRST_STRIDE))
 		Fixtures.expectNear(alignOf(rig).SecondaryAxis, Vector3.yAxis)
 		Fixtures.expectNear(alignOf(rig).PrimaryAxis, Vector3.xAxis)
 	end)
@@ -179,7 +180,7 @@ describe("SkateController", function()
 		RideSurfaces:refresh()
 		SkateController:step(0.1)
 		expect(SkateController.frozen).toBe(false)
-		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -2.594))
+		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -Fixtures.FIRST_STRIDE))
 	end)
 
 	it("holds still while the root is anchored, then starts from rest", function()
@@ -192,7 +193,7 @@ describe("SkateController", function()
 		Fixtures.expectNear((SkateController.skater :: any).velocity, Vector3.zero)
 		Fixtures.root(rig).Anchored = false
 		SkateController:step(0.1)
-		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -2.594))
+		Fixtures.expectNear(velocityOf(rig), Vector3.new(0, 0, -Fixtures.FIRST_STRIDE))
 	end)
 
 	-- Each kickoff stands everyone on their spawn, free to skate through its count (the owner, Q92): the server counts
@@ -823,7 +824,7 @@ describe("SkateController", function()
 		local respawned = skaterAt("Respawned", Vector3.new(50, 0, 0))
 		SkateController:bind(respawned)
 		SkateController:step(0.1)
-		Fixtures.expectNear(velocityOf(respawned), Vector3.new(0, 0, -2.594))
+		Fixtures.expectNear(velocityOf(respawned), Vector3.new(0, 0, -Fixtures.FIRST_STRIDE))
 		Fixtures.expectNear(velocityOf(rig), before)
 	end)
 
