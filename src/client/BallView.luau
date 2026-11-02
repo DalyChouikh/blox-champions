@@ -3,11 +3,13 @@
 -- markers, the carrier's beam).
 -- - Loose: where the server's last state (the BallState stream) says it is now. Roblox's own replication drew it 0.19 s
 --   late and unevenly (46-248 studs/s a frame for a steady 90, measured in a 2-player test), and other screens drew a
---   thrown ball still for 0.29 s. A state is carried on to now (Ball/Shown) and the drawn ball closes on it over
---   Network.ballStream.correctionSeconds, or jumps across a wider gap than snapStuds (a drop-in, a respawn). Between
---   states it is never drawn through the arena: the server's ball has bounced, and its next state says how. With no
---   state since it was let go, Roblox's spot stands. A state older than the newest, or from before the last catch this
---   screen saw, is stale: the stream is unreliable, and the catch reaches the screen by another road.
+--   thrown ball still for 0.29 s. A state is carried on to now (Ball/Shown), falling only while nothing bears its
+--   weight: the server says when a lift or the ground does (#337: carried on falling, a ball lying on the floor sank up
+--   to its radius into it between the quarter-second states of a ball at rest, and snapped back). The drawn ball closes
+--   on it over Network.ballStream.correctionSeconds, or jumps across a wider gap than snapStuds (a drop-in, a respawn).
+--   Between states it is never drawn through the arena: the server's ball has bounced, and its next state says how.
+--   With no state since it was let go, Roblox's spot stands. A state older than the newest, or from before the last
+--   catch this screen saw, is stale: the stream is unreliable, and the catch reaches the screen by another road.
 -- - Caught: the server welds it at the carry spot at once, but that weld can reach this screen while it still draws the
 --   ball short of the hand (36.6 studs, measured), so the pull is drawn here (the owner, Q91, Q131, Q132): the weld's
 --   C0 is written here (a client's write stays on its client, and the server never writes it again) from where this
@@ -33,7 +35,7 @@ export type BallView = {
 	init: (self: BallView, deps: { [string]: any }) -> (),
 	start: (self: BallView) -> (),
 	-- The server's state of the loose ball (#316), kept when it is the newest and from after the last catch.
-	receive: (self: BallView, position: Vector3, velocity: Vector3, lifted: boolean, time: number) -> (),
+	receive: (self: BallView, position: Vector3, velocity: Vector3, supported: boolean, time: number) -> (),
 	step: (self: BallView, dt: number) -> (),
 	_ballPart: BallPart.BallPart,
 	_surfaces: Surfaces,
@@ -59,7 +61,7 @@ export type BallView = {
 	_hasState: boolean,
 	_statePosition: Vector3,
 	_stateVelocity: Vector3,
-	_stateLifted: boolean,
+	_stateSupported: boolean,
 	_stateTime: number,
 	-- The server's time when this screen last saw a catch.
 	_caughtAt: number,
@@ -95,7 +97,7 @@ end
 -- The loose ball, drawn from the server's last state carried on to now.
 local function draw(self: BallView, part: BasePart, dt: number)
 	local age = math.clamp(self._serverTime() - self._stateTime, 0, self._maxAge)
-	local gravity = if self._stateLifted then Vector3.zero else self._gravity
+	local gravity = if self._stateSupported then Vector3.zero else self._gravity
 	local target, velocity = Shown.predict(self._statePosition, self._stateVelocity, gravity, age)
 	local from = self._shown or part.Position
 	local drawn, jumped = Shown.follow(from, target, velocity, dt, self._correctionSeconds, self._snapStuds)
@@ -134,7 +136,7 @@ local BallView: BallView = {
 	_hasState = false,
 	_statePosition = Vector3.zero,
 	_stateVelocity = Vector3.zero,
-	_stateLifted = false,
+	_stateSupported = false,
 	_stateTime = 0,
 	_caughtAt = -math.huge,
 
@@ -163,19 +165,19 @@ local BallView: BallView = {
 
 	start = function(self: BallView)
 		Remotes.getStream(ReplicatedStorage, Remotes.streams.BallState).OnClientEvent
-			:Connect(function(position: Vector3, velocity: Vector3, lifted: boolean, time: number)
-				self:receive(position, velocity, lifted, time)
+			:Connect(function(position: Vector3, velocity: Vector3, supported: boolean, time: number)
+				self:receive(position, velocity, supported, time)
 			end)
 	end,
 
-	receive = function(self: BallView, position: Vector3, velocity: Vector3, lifted: boolean, time: number)
+	receive = function(self: BallView, position: Vector3, velocity: Vector3, supported: boolean, time: number)
 		if time < self._caughtAt or (self._hasState and time <= self._stateTime) then
 			return
 		end
 		self._hasState = true
 		self._statePosition = position
 		self._stateVelocity = velocity
-		self._stateLifted = lifted
+		self._stateSupported = supported
 		self._stateTime = time
 	end,
 

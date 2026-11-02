@@ -63,9 +63,10 @@ local function init(overrides: { [string]: any }?)
 	})
 end
 
--- Where this screen draws the ball after a step from `shown` toward a state `age` seconds old.
-local function drawn(shown: Vector3, position: Vector3, velocity: Vector3, lifted: boolean, age: number): Vector3
-	local target, moving = Shown.predict(position, velocity, if lifted then Vector3.zero else GRAVITY, age)
+-- Where this screen draws the ball after a step from `shown` toward a state `age` seconds old, carried on falling
+-- unless something bears its weight (`supported`: a lift, or the ground it lies on).
+local function drawn(shown: Vector3, position: Vector3, velocity: Vector3, supported: boolean, age: number): Vector3
+	local target, moving = Shown.predict(position, velocity, if supported then Vector3.zero else GRAVITY, age)
 	return (Shown.follow(shown, target, moving, DT, STREAM.correctionSeconds, STREAM.snapStuds))
 end
 
@@ -97,7 +98,7 @@ end)
 -- 90, measured), and other screens drew it still for 0.29 s after a throw. The server now sends its state each frame
 -- it moves; each screen draws it there, carried on to now.
 describe("BallView: the loose ball", function()
-	it("draws the ball where the server's last state says it is now, falling unless its weight is cancelled", function()
+	it("draws the ball where the server's last state says it is now, falling unless something bears it", function()
 		local part = ball :: Part
 		local start = Vector3.new(0, 20, 0)
 		part.Position = start
