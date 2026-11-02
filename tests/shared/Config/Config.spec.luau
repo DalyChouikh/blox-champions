@@ -24,13 +24,14 @@ describe("Config defaults", function()
 		expect(m.teamSize).toBe(3)
 		expect(m.minPlayersToStart).toBe(1)
 		expect(m.pointsToWin).toBe(5)
-		expect(m.durationSeconds).toBe(300)
+		expect(m.durationSeconds).toBe(420)
+		expect(m.overtimeSeconds).toBe(180)
 		expect(m.goalPointsByLap).toEqual({ 1, 3, 5 })
 		expect(m.celebrationSeconds).toBe(3)
 		expect(m.kickoffCountdownSeconds).toBe(3)
 		expect(m.clockPausesDuringKickoff).toBe(true)
 		expect(m.postMatchSeconds).toBe(15)
-		expect(m.lastChance).toEqual({ enabled = true, maxDeficit = 1 })
+		expect(m.lastChance).toEqual({ enabled = true })
 		expect(m.respawnSeconds).toBe(3)
 	end)
 
@@ -451,6 +452,7 @@ describe("Config defaults", function()
 			goalOpen = "%s goal is active",
 			scored = "%s scored!",
 			wins = "%s WINS",
+			draw = "DRAW",
 			mvp = "MVP",
 			scores = "SCORES",
 			columns = {
@@ -628,11 +630,12 @@ describe("Config.forMode", function()
 	end)
 
 	it("deep-merges nested overrides without touching the defaults", function()
-		local c = Fixtures.config({ Match = { lastChance = { maxDeficit = 2 } } })
-		expect(c.Match.lastChance).toEqual({ enabled = true, maxDeficit = 2 })
+		local c = Fixtures.config({ Scoring = { points = { goal = 200 } } })
+		expect(c.Scoring.points.goal).toBe(200)
+		expect(c.Scoring.points.assist).toBe(50)
 		expect(c.Match.pointsToWin).toBe(5)
-		expect(Config.defaults().Match.lastChance.maxDeficit).toBe(1)
-		expect(table.isfrozen(c.Match)).toBe(true)
+		expect(Config.defaults().Scoring.points.goal).toBe(100)
+		expect(table.isfrozen(c.Scoring.points)).toBe(true)
 	end)
 
 	it("rejects an override key that does not exist", function()
@@ -684,6 +687,28 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ Scoring = { points = { streakPoint = 100 } } })
 		end).toThrow("Scoring.points.streakPoint: unknown key")
+	end)
+
+	it("rejects a regulation or overtime clock under a second", function()
+		expect(function()
+			Fixtures.config({ Match = { durationSeconds = 0.5 } })
+		end).toThrow("Match.durationSeconds: must be >= 1 (got 0.5)")
+		expect(function()
+			Fixtures.config({ Match = { overtimeSeconds = 0 } })
+		end).toThrow("Match.overtimeSeconds: must be >= 1 (got 0)")
+	end)
+
+	it("accepts regulation and overtime clocks just inside their limits", function()
+		local config = Fixtures.config({ Match = { durationSeconds = 1, overtimeSeconds = 1 } })
+		expect(config.Match.durationSeconds).toBe(1)
+		expect(config.Match.overtimeSeconds).toBe(1)
+	end)
+
+	-- The owner (Q94, #306): Last Chance is one attack at any deficit, so no deficit limits it.
+	it("rejects the old Last Chance deficit limit as unknown", function()
+		expect(function()
+			Fixtures.config({ Match = { lastChance = { maxDeficit = 2 } } })
+		end).toThrow("Match.lastChance.maxDeficit: unknown key")
 	end)
 
 	it("accepts goal points just inside their limits", function()
@@ -1493,6 +1518,7 @@ describe("Config.forMode", function()
 				message = "UI.controlLabels.AirPose: must not be empty",
 			},
 			{ overrides = { UI = { text = { touchMove = "" } } }, message = "UI.text.touchMove: must not be empty" },
+			{ overrides = { UI = { text = { draw = "" } } }, message = "UI.text.draw: must not be empty" },
 			{
 				overrides = { UI = { hud = { layout = { getUp = { size = UDim2.fromScale(0.5, 0.1) } } } } },
 				message = "UI.hud.layout.getUp.size: must be in pixels (scales 0, offsets > 0)",

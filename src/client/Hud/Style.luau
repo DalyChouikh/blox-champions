@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fit = require(ReplicatedStorage.Shared.Hud.Fit)
 local React = require(ReplicatedStorage.Packages.React)
+local Team = require(ReplicatedStorage.Shared.Rules.Team)
 
 -- Keyed by property name, or by a React event (React.Event.Activated).
 export type Props = { [any]: any }
@@ -33,6 +34,11 @@ function Style.text(config: Config.GameConfig, props: Props?): Props
 		TextSize = hud.textSize,
 		BackgroundTransparency = 1,
 	}, props)
+end
+
+-- What the HUD draws in `team`'s colour, or in its own text colour for no team (a draw, overtime, a loose ball).
+function Style.teamColor(config: Config.GameConfig, team: Team.Team?): Color3
+	return if team ~= nil then config.UI.teamColors[team] else config.UI.hud.textColor
 end
 
 -- A panel: the HUD's panel colour, see-through by panelTransparency.

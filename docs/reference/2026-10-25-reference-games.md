@@ -1142,6 +1142,11 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   their hand at 150 studs/s** (4 body lengths in ~0.15 s), homing hard so it arrives unless glass is in the way (then
   it bounces off, loose); the speed is judged in the Studio trial. Not chosen: another speed now. The owner also
   approved deleting the 45 merged local Feel branches (done).
+- **Q106 pumping while charging** (session 50, asked after #305's PR #318; RC greys Pump while a throw charges:
+  Videos 13, 31, 32): the owner, "yes pumping should stop, like RC": **no pumping while a throw charges** (#312).
+- **Q107 overtime's warnings** (session 51, while building #306: overtime now counts 3:00 down to a draw; no RC
+  clip shows an overtime reaching its end): **the same "60 SECONDS" and "30 SECONDS" banners in overtime** as in
+  regulation (recommended), since overtime now ends the match too. Not chosen: no banners in overtime.
 
 ## Roller Champions
 

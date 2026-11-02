@@ -15,7 +15,7 @@ A playable, fully tested **Normal Champions** 3v3 match on a graybox arena: play
 
 ### 1.2 Success criteria (Definition of Done for M1)
 
-1. A full match can be played in Studio's multi-client local test (2–6 players) from kickoff to a result, including golden-goal overtime and Last Chance, on PC (keyboard/mouse), gamepad, and mobile (touch, verified with Studio device emulation).
+1. A full match can be played in Studio's multi-client local test (2–6 players) from kickoff to a result, including overtime, a draw and Last Chance, on PC (keyboard/mouse), gamepad, and mobile (touch, verified with Studio device emulation).
 2. Every rule in §4–§6 is covered by unit tests; integration tests in §12.2 pass; CI (§12.3) is green on `main`.
 3. Every gameplay number lives in `src/shared/Config/*`. Changing a value never requires a code change. Config is validated at startup and by a test.
 4. All code is `--!strict` Luau, passes StyLua, selene, and luau-lsp analysis.
@@ -44,7 +44,7 @@ M1 does include the **registries** (ball skin, skate skin) holding one default e
 |---|---|---|
 | Q1 | How laps count | **Team streak.** Laps belong to the possessing team; passes keep the count; resets to 0 only when an opponent gains the ball. *Every streak starts at the goal's gate (2026-10-27, the owner's playtest of the Arena part; §4.2).* |
 | Q2 | After a point | **Full kickoff reset.** Both streaks → 0, everyone respawns at team spawns, countdown, ball drops at a **random** ball spawn point. |
-| Q3 | Tie at 0:00 | **Golden-goal overtime** (no time limit) **plus Last Chance** (user-defined, §5.3). |
+| Q3 | Tie at 0:00 | **Golden-goal overtime** (no time limit) **plus Last Chance** (user-defined, §5.3). *Since #306: overtime lasts 3:00, then a draw (§5.2).* |
 | Q4 | Extra moves | **Uppercut, Draft, Tiptoe, Air tackle / air dodge** added to the user's list. |
 | Q5 | Who can attach | **Any player** can attach behind a teammate. |
 | Q6 | Save definition | **Block or steal** (§6.3). |
@@ -161,7 +161,7 @@ A single pure state machine composing the modules above. States: `Waiting → Ki
 
 ### 4.7 Event catalogue
 
-`MatchStarted`, `KickoffStarted`, `KickoffEnded`, `PossessionChanged`, `GateCrossed`, `LapCompleted`, `GoalOpened`, `GoalClosed`, `GoalScored`, `AssistAwarded`, `SaveMade`, `Steal`, `TackleKnockdown`, `ClockWarning { secondsLeft }`, `LastChanceStarted`, `OvertimeStarted`, `MatchEnded { winner, mvp, stats }`.
+`MatchStarted`, `KickoffStarted`, `KickoffEnded`, `PossessionChanged`, `GateCrossed`, `LapCompleted`, `GoalOpened`, `GoalClosed`, `GoalScored`, `AssistAwarded`, `SaveMade`, `Steal`, `TackleKnockdown`, `ClockWarning { secondsLeft }`, `LastChanceStarted`, `OvertimeStarted`, `MatchEnded { winner?, mvp, stats }` (no `winner` after a draw, §5.2).
 
 ---
 
@@ -169,24 +169,27 @@ A single pure state machine composing the modules above. States: `Waiting → Ki
 
 ### 5.1 Clock (`MatchClock`)
 
-- Counts down from `Match.durationSeconds` = 300.
+- Counts down from `Match.durationSeconds` = 420 (7:00), then, in overtime, from `Match.overtimeSeconds` = 180 (3:00). *Roller Champions' 7:00 and 3:00 (Videos 3 and 4); the owner (session 21, #306); was 5:00 and an overtime counting up.*
 - **Paused** during kickoff countdowns and celebrations (`Match.clockPausesDuringKickoff = true`).
-- Emits `ClockWarning` at `UI.clockWarnings = {60, 30}` seconds.
+- Emits `ClockWarning` at `UI.clockWarnings = {60, 30}` seconds, in regulation and again in overtime (the owner, Q107).
 
 ### 5.2 Outcome (`MatchOutcome`), checked after every event
 
 1. A team reaches `Match.pointsToWin` (5) → that team wins immediately.
-2. Clock reaches 0:00:
-   - Scores tied → **golden-goal overtime**: unlimited time; the next goal wins. The HUD shows "OVERTIME" with a clock counting up from 0:00.
-   - Trailing team behind by exactly `Match.lastChance.maxDeficit` (1) **and** is the possessing team → **Last Chance** (§5.3).
-   - Otherwise → leader wins.
+2. Clock reaches 0:00 in regulation:
+   - Scores level → **overtime**, at once, with no reset and laps kept: the next goal wins. The HUD shows "OVERTIME" over its 3:00 counting down (§5.1).
+   - The trailing team is the possessing team, **whatever the deficit** → **Last Chance** (§5.3).
+   - Otherwise → leader wins, also when the leader holds the ball.
+3. Clock reaches 0:00 in overtime → **a draw** at once, even if a team holds the ball: `MatchEnded` names no winner and the end screen reads "DRAW" (`UI.text.draw`). *The owner (Q95, #306); was golden goal with no time limit.*
 
-### 5.3 Last Chance (`LastChance`)
+### 5.3 Last Chance (`MatchOutcome`)
 
-- Play continues with a "LAST CHANCE" banner.
-- If the trailing team scores → scores tied → kickoff reset → **golden-goal overtime**.
+**One attack at any deficit** (the owner, Q94, #306; was only 1 behind, and a goal that left the team behind gave a new kickoff and more Last Chance). RC: Last Chance ended the moment the attack was stopped (Video 3).
+
+- Play continues with a "LAST CHANCE" banner, the clock at 0:00.
 - If a **leading-team player picks up the ball** → match ends, leader wins.
-- A loose ball last held by the trailing team does **not** end Last Chance (possession unchanged, §4.1).
+- If the trailing team scores, Last Chance is over: scores level → kickoff reset → **overtime** (§5.2); ahead → the trailing team wins; still behind → the leader wins.
+- A loose ball last held by the trailing team (a missed throw) does **not** end Last Chance (possession unchanged, §4.1).
 - `Match.lastChance.enabled = true`.
 
 ### 5.4 After the match
@@ -227,7 +230,7 @@ Per player: score, goals, assists, saves, steals; grouped by team, sorted by sco
 
 ### 6.5 MVP
 
-Highest score on the **winning team**. Tie-breakers in order: more goals, more saves, more assists, earliest join order.
+Highest score on the **winning team**, or on either team after a draw. Tie-breakers in order: more goals, more saves, more assists, earliest join order. *The draw's MVP is a ruling (#306): a draw still had a best player, so the end screen keeps its MVP card.*
 
 ---
 
@@ -470,7 +473,7 @@ React Luau (Roblox's `roblox/react` 17.3.13 + `roblox/react-roblox` 17.3.13, A5)
 - **Speedometer (bottom right):** the speed along the surface, or across the ground in the air (§7.2).
 - **Get Up prompt (bottom center, above the feed):** while the local skater is knocked down by a strike or a hard landing (not a diver's own slide), the movement keys as the device shows them (the keyboard's first composite, up, left, down, right, named by the player's own layout, e.g. Z Q S D on AZERTY; the gamepad's stick glyph; "Move" on touch) and "Get Up" (§8.2).
 - **Mobile controls:** laid out from `Config/Input`; context buttons appear only when usable.
-- **Score tab** (§6.4) and **end screen** (winner banner, MVP card, team totals).
+- **Score tab** (§6.4) and **end screen** (winner banner, or "DRAW" in the HUD's text colour; MVP card, team totals).
 
 ### 11.2 Text and colors
 
