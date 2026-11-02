@@ -8,9 +8,10 @@
 -- Tackle's follow-up window (#240). A Tackle, Dive or Uppercut homes (#277): it turns the skater at once toward the
 -- nearest opponent it may reach in its snap zone, else its cone, around the stick's way (else toward that way), and
 -- bends toward them while they stay in the cone, until its recovery; the server still judges every hit. Nothing
--- starts while the skater is frozen for a kickoff, knocked down or diving: an action with a landing (the Dive) holds
--- the skater (SkateController.diving) until the server knocks them down at their touchdown, or until the server's
--- rule for that knockdown's end holds here (#286), and a knockdown stops the running action, as the server stops it.
+-- starts while the skater is held still (SkateController.frozen), knocked down or diving: an action with a landing
+-- (the Dive) holds the skater (SkateController.diving) until the server knocks them down at their touchdown, or until
+-- the server's rule for that knockdown's end holds here (#286), and a knockdown stops the running action, as the
+-- server stops it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -429,7 +430,7 @@ local ActionController: ActionController = {
 		local skate = self._skate
 		local skater = skate.skater
 		local keys = self._keys
-		-- Keys pressed while there is no skater to move, or during the freeze, are spent, not saved for later.
+		-- Keys pressed while there is no skater to move, or while it is held still, are spent, not saved for later.
 		if skater == nil or skate.frozen then
 			self._input:readActions(keys)
 			self.runner:reset()

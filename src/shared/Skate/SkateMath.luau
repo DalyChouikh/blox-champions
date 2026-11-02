@@ -804,7 +804,7 @@ function SkateMath.groundRay(self: Skater): Vector3
 	return if wall ~= nil then -wall else -self.up
 end
 
--- Still and on the ground: the kickoff freeze and a fresh character start from rest.
+-- Still and on the ground: a skater the server placed (a kickoff) and a fresh character start from rest.
 function SkateMath.stop(self: Skater)
 	self.velocity = Vector3.zero
 	self._backwards = false
