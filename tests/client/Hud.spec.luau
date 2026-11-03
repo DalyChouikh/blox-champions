@@ -290,11 +290,42 @@ describe("Hud", function()
 	it("shows the banner and the feed from the HUD's state", function()
 		HudStore:onEvents(Fixtures.ruleEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } }))
 		Hud:step(0)
-		local banner = part("Banner") :: TextLabel
+		local banner = part("Banner") :: Frame
 		expect(banner.Visible).toBe(true)
-		expect(banner.Text).toBe("GOAL!")
+		expect((banner:FindFirstChild("Front", true) :: TextLabel).Text).toBe("GOAL!")
 		local feed = part("Feed") :: Frame
 		expect((feed:FindFirstChild("1") :: TextLabel).Text).toBe("Ana scored!")
+	end)
+
+	-- One banner line under the scoreboard, the goal message at the stage's bottom (#356, the owner's Q210, Q211):
+	-- on this phone the stage starts 58 px under the safe area's top, below Roblox's top bar.
+	it("puts the banner line under the scoreboard and the goal message at the bottom, popping each in", function()
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "LapCompleted", team = "Blue", streak = 1, holder = "1" } }))
+		Hud:step(0)
+		local banner = part("Banner") :: Frame
+		local at = HudScreen.bannerAt(config, PHONE.whole, PHONE.controls)
+		local line = HudScreen.bannerLine(config, true, at, 8, false, HudScreen.bannerSize(config, true, "Lap"))
+		expect(banner.Position).toEqual(UDim2.new(0.5, 0, 0, line - 58))
+		expect((banner:FindFirstChild("Front", true) :: TextLabel).Text).toBe("LAP 1 COMPLETED")
+		local pop = banner:FindFirstChild("Pop", true) :: UIScale
+		expect(pop.Scale < 0.01).toBe(true)
+		Hud:step(config.UI.hud.motion.pop.seconds)
+		expect(pop.Scale).toBe(1)
+		-- Then the goal opens: the message pops in on its own line, the lap's stays as it is.
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "GoalOpened", team = "Blue" } }, 2))
+		Hud:step(0)
+		local message = part("Message") :: Frame
+		expect(message.Visible).toBe(true)
+		expect(message.Position).toEqual(UDim2.new(0.5, 0, 1, -HudScreen.messageBottom(config, true)))
+		expect((message:FindFirstChild("Front", true) :: TextLabel).Text).toBe("BLUE GOAL IS ACTIVE!")
+		expect((message:FindFirstChild("Pop", true) :: UIScale).Scale < 0.01).toBe(true)
+		expect(pop.Scale).toBe(1)
+		-- The lap's last moments: it fades as it leaves; the message, shown longer, stays whole.
+		HudStore:step(config.UI.hud.bannerSeconds.lap - config.UI.hud.motion.easeSeconds / 2)
+		Hud:step(0)
+		local group = banner:FindFirstChild("Group") :: CanvasGroup
+		expect(group.GroupTransparency).toBeCloseTo(0.875, 4)
+		expect((message:FindFirstChild("Group") :: CanvasGroup).GroupTransparency).toBe(0)
 	end)
 
 	it("counts the clock down on the scoreboard without rendering again", function()
@@ -715,12 +746,12 @@ describe("Hud", function()
 		-- With a keyboard the stage is the whole HUD area: the tab's height decides, less a margin at each side.
 		expect(part("Stage").Size).toEqual(UDim2.fromOffset(750, 323))
 		expect(fit("ScoreTab")).toBeCloseTo(307 / 360, 4)
-		-- On touch it ends where the buttons begin: (504 - 2 margins) / 640 for the tab, / 720 for the banner.
+		-- On touch it ends where the buttons begin: (504 - 2 margins) / 640 for the tab; the banner fits as it is.
 		preferred = Enum.PreferredInput.Touch
 		Hud:step(0)
 		expect(part("Stage").Size).toEqual(UDim2.fromOffset(504, 323))
 		expect(fit("ScoreTab")).toBeCloseTo(488 / 640, 4)
-		expect(fit("Banner")).toBeCloseTo(488 / 720, 4)
+		expect(fit("Banner")).toBe(1)
 		expect(fit("Feed")).toBe(1)
 		-- The compact end screen is as tall as its parts, so its width decides: (504 - 2 margins) / 720.
 		endMatch()
@@ -780,7 +811,7 @@ describe("Hud", function()
 		expect(count.Visible).toBe(true)
 		expect((count:FindFirstChild("Digit", true) :: TextLabel).Text).toBe("3")
 		expect(count.Position).toEqual(UDim2.fromScale(0.5, config.UI.hud.layout.reticle.height))
-		expect((part("Banner") :: TextLabel).Visible).toBe(false)
+		expect((part("Banner") :: Frame).Visible).toBe(false)
 		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3, period = "Overtime" }, 2))
 		Hud:step(0)
 		expect(count.Position.Y.Scale).toBeCloseTo(config.UI.hud.layout.reticle.height, 6)
@@ -808,6 +839,36 @@ describe("Hud", function()
 		expect(fit.Scale).toBe(1)
 		Hud:step(0)
 		expect(Hud.renders).toBe(renders + 1)
+	end)
+
+	-- The banner line is a share of the whole screen like the aim, but its own share; the stage starts under
+	-- Roblox's top bar (#356).
+	it("places the banner line again when only the line's height or the stage's top moves", function()
+		screen = BIG
+		Hud:resize()
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "ClockWarning", secondsLeft = 30 } }))
+		Hud:step(0)
+		local banner = part("Banner") :: Frame
+		local size = HudScreen.bannerSize(config, false, "ClockWarning")
+		local function line(whole: Rect): number
+			return HudScreen.bannerLine(config, false, HudScreen.bannerAt(config, whole, BIG.controls), 8, false, size)
+		end
+		-- On this desktop 0.22 of the 800 px screen decides the headline's place: 176 px down the safe area.
+		expect(banner.Position).toEqual(UDim2.new(0.5, 0, 0, line(BIG.whole) - 58))
+		-- A whole screen grown 31.5 px up and 68.5 down round the same safe area: the aim (0.315 down) stays where it
+		-- was; the line (0.22 down) moves up, to where the scoreboard's clearance holds it.
+		local whole = Rect.new(0, -89.5, 1280, 810.5)
+		screen = { whole = whole, hud = BIG.hud, controls = BIG.controls, topbar = BIG.topbar }
+		Hud:resize()
+		Hud:step(0)
+		expect(line(whole) < line(BIG.whole)).toBe(true)
+		expect(banner.Position).toEqual(UDim2.new(0.5, 0, 0, line(whole) - 58))
+		-- The stage starting 10 px lower (a taller top bar over the same safe area): the line keeps its place on the
+		-- screen, so it sits 10 px higher in the stage.
+		screen = { whole = whole, hud = Rect.new(0, 10, 1280, 742), controls = BIG.controls, topbar = BIG.topbar }
+		Hud:resize()
+		Hud:step(0)
+		expect(banner.Position).toEqual(UDim2.new(0.5, 0, 0, line(whole) - 68))
 	end)
 
 	it("hides the reticle while the score tab or the end screen shows", function()

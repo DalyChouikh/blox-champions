@@ -139,6 +139,11 @@ export type RingSizes = { carry: number, charge: number, thickness: number }
 -- across at its stroke's outer edge, the stroke ringThickness pixels wide over look C's ink.
 export type CountSizes = { textSize: number, ringSize: number, ringThickness: number }
 
+-- The banners on one kind of screen (Hud/Banner, #356): text sizes in pixels, the headline's (GO, DENIED!, the
+-- clock warnings, LAST CHANCE, OVERTIME), GOAL!'s, a completed lap's and the goal message's, each lettered in
+-- look C's ink with a ring of its team's colour `edge` pixels wide round that.
+export type BannerSizes = { headline: number, goal: number, lap: number, message: number, edge: number }
+
 -- A mouse on a mouse button's key cap (#354, the owner's Q207): a body width x height pixels in look C's ink `line`
 -- pixels thick, its buttons `buttons` pixels deep from its rounded top. Whole pixels (a UDim's offset drops a
 -- fraction).
@@ -172,8 +177,20 @@ export type HudLayout = {
 	compactBelow: number,
 	scoreboard: ScoreboardLayout,
 	compactScoreboard: CompactScoreboardLayout,
-	banner: Place,
-	feed: { position: UDim2, size: UDim2, rowHeight: number },
+	-- The banners (#356, the owner's Q210): one line centred `height` of the way down the whole screen, lower where
+	-- a banner's ink would come within `clearance` pixels of the scoreboard's (HudScreen.bannerLine); the goal
+	-- message on a line of its own, its drop shadow `bottom` pixels above the stage's bottom, the feed above it
+	-- (HudScreen.feedBottom). A leaving banner floats up `rise` of its text size as it fades. `sizes` on a
+	-- desktop's screen, compactSizes on a phone's.
+	banner: {
+		height: number,
+		clearance: number,
+		bottom: number,
+		rise: number,
+		sizes: BannerSizes,
+		compactSizes: BannerSizes,
+	},
+	feed: { size: UDim2, rowHeight: number },
 	hints: HintsLayout,
 	-- position is the bottom-right corner's; on touch, touchPosition is the top-left corner's, clear of the touch
 	-- buttons and the score button. The reading's digits over its unit, at textSizes, compactTextSizes on a phone.
@@ -269,8 +286,8 @@ export type HudSettings = {
 	corner: UDim,
 	textSize: number,
 	titleSize: number,
-	bannerSize: number,
-	bannerSeconds: number,
+	-- How long a banner shows (a headline, also GOAL! outside a celebration; a completed lap) and the goal message.
+	bannerSeconds: { headline: number, lap: number, message: number },
 	feedSeconds: number,
 	feedMaxEntries: number,
 	glowThickness: number,
@@ -396,8 +413,9 @@ local defaults: UIConfig = {
 		speed = "%d",
 		speedUnit = "KM/H",
 		possession = "%s has the ball",
-		lapCompleted = "Lap %d completed",
-		goalOpen = "%s goal is active",
+		-- Banners now (#356, the owner's Q210-Q211), in capitals like the others; the team's name capitalised as in GO.
+		lapCompleted = "LAP %d COMPLETED",
+		goalOpen = "%s GOAL IS ACTIVE!",
 		scored = "%s scored!",
 		wins = "%s WINS",
 		draw = "DRAW",
@@ -437,8 +455,9 @@ local defaults: UIConfig = {
 		corner = UDim.new(0, 8),
 		textSize = 20,
 		titleSize = 32,
-		bannerSize = 96,
-		bannerSeconds = 2,
+		-- Roller Champions' times, measured frame by frame (#356): GO shows 2.5 s (Video 31 at 20.9 s), a completed
+		-- lap 3.6 s and the goal message about 5 s (Video 4 at 7:22.7).
+		bannerSeconds = { headline = 2.5, lap = 3.6, message = 5 },
 		feedSeconds = 6,
 		feedMaxEntries = 5,
 		glowThickness = 3,
@@ -515,10 +534,20 @@ local defaults: UIConfig = {
 				gap = 8,
 				textSizes = { score = 38, clock = 30, worth = 22, period = 18 },
 			},
-			-- Its centre 200 px from the top: clear of the scoreboard on a phone too (the owner's choice); 720 px wide
-			-- for its longest line, GO ORANGE TEAM! (691 px at bannerSize).
-			banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(720, 110) },
-			feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
+			-- The banners as the design page drew them (the owner, Q210): GO's line 22% of the way down, where Roller
+			-- Champions centres it (Video 31 at 20.9 s), 3 px of the game kept under the scoreboard as for the
+			-- crosshair (Q203); the goal message at the bottom centre (RC's 94%, Video 4 at 7:23), in the feed's old
+			-- place. The page's round 4 sizes at 1.2 px a unit (GO 42, GOAL! 56, the lap 30, the message 24 units); on
+			-- a phone ~1.3x their share of the screen (Q191).
+			banner = {
+				height = 0.22,
+				clearance = 3,
+				bottom = 24,
+				rise = 0.4,
+				sizes = { headline = 50, goal = 67, lap = 36, message = 29, edge = 3 },
+				compactSizes = { headline = 32, goal = 43, lap = 23, message = 18, edge = 2 },
+			},
+			feed = { size = UDim2.fromOffset(460, 140), rowHeight = 24 },
 			-- Look C's hints (#354), at the page's sizes (1.2 px a unit: 34-unit rows 6 apart, a 28-unit cap, 18-unit
 			-- labels), in today's place at the right; RC's >> outside the row, over the game (the owner, Q195b),
 			-- where the page drew it: its left edge 30 px from the row's outline (a 14 px mark).
@@ -680,7 +709,7 @@ local pixels = Validate.pixels()
 -- Whole pixels, where a UDim's offset would drop a fraction (probed).
 local wholePixels = Validate.number({ min = 1, integer = true })
 local place = Validate.record({ position = udim2, size = pixels })
-local list = Validate.record({ position = udim2, size = pixels, rowHeight = positive })
+local list = Validate.record({ size = pixels, rowHeight = positive })
 local columns = Validate.record({ position = udim2, size = pixels, rowHeight = positive, columnWidth = positive })
 local nonNegative = Validate.number({ min = 0 })
 local boardTextSizes = Validate.record({ score = textSize, clock = textSize, worth = textSize, period = textSize })
@@ -688,6 +717,13 @@ local teamColors = Validate.record({ Blue = Validate.datatype("Color3"), Orange 
 local speedTextSizes = Validate.record({ speed = textSize, unit = textSize })
 local ringSizes = Validate.record({ carry = positive, charge = positive, thickness = positive })
 local countSizes = Validate.record({ textSize = textSize, ringSize = positive, ringThickness = positive })
+local bannerSizes = Validate.record({
+	headline = textSize,
+	goal = textSize,
+	lap = textSize,
+	message = textSize,
+	edge = nonNegative,
+})
 
 -- Each text of a scoreboard is drawn inside its box (Hud/Scoreboard): the scores in their shields or chips, the clock
 -- and the goal's worth, so none may be taller than its box.
@@ -804,8 +840,7 @@ local fields = Validate.record({
 		corner = Validate.datatype("UDim"),
 		textSize = textSize,
 		titleSize = textSize,
-		bannerSize = textSize,
-		bannerSeconds = positive,
+		bannerSeconds = Validate.record({ headline = positive, lap = positive, message = positive }),
 		feedSeconds = positive,
 		feedMaxEntries = Validate.number({ min = 1, integer = true }),
 		glowThickness = Validate.number({ min = 0 }),
@@ -871,7 +906,16 @@ local fields = Validate.record({
 				gap = nonNegative,
 				textSizes = boardTextSizes,
 			}),
-			banner = place,
+			banner = Validate.record({
+				-- On the screen, never on its top or bottom edge.
+				height = Validate.number({ above = 0, below = 1 }),
+				clearance = nonNegative,
+				bottom = nonNegative,
+				-- Within the banner's own height.
+				rise = Validate.number({ min = 0, max = 1 }),
+				sizes = bannerSizes,
+				compactSizes = bannerSizes,
+			}),
 			feed = list,
 			hints = Validate.record({
 				position = udim2,

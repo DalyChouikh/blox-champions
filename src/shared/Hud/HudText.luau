@@ -109,6 +109,10 @@ function HudText.banner(self: HudText, banner: HudState.Banner): string
 		return text.lastChance
 	elseif kind == "Overtime" then
 		return text.overtime
+	elseif kind == "Lap" then
+		return string.format(text.lapCompleted, banner.value :: number)
+	elseif kind == "GoalOpen" then
+		return string.format(text.goalOpen, string.upper(self:team(banner.team :: Team.Team)))
 	end
 	-- HudState.BannerKind has only the kinds above: any other is a wiring bug.
 	error(`HudText: no banner text for kind "{kind}"`, 0)
@@ -133,12 +137,7 @@ end
 function HudText.feed(self: HudText, entry: HudState.FeedEntry, names: { [PlayerId]: string }): string
 	local text = self._config.UI.text
 	local kind = entry.kind
-	if kind == "Lap" then
-		return string.format(text.lapCompleted, entry.value :: number)
-	elseif kind == "GoalOpen" then
-		return string.format(text.goalOpen, self:team(entry.team))
-	end
-	local name = self:name(entry.player :: PlayerId, names)
+	local name = self:name(entry.player, names)
 	if kind == "Possession" then
 		return string.format(text.possession, name)
 	elseif kind == "Goal" then

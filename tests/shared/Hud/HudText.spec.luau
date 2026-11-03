@@ -21,13 +21,8 @@ local function periodOf(period: string): any
 	return { period = period }
 end
 
-local function entry(
-	kind: HudState.FeedKind,
-	team: "Blue" | "Orange",
-	player: string?,
-	value: number?
-): HudState.FeedEntry
-	return { id = 1, kind = kind, team = team, player = player, value = value, timeLeft = 1 }
+local function entry(kind: HudState.FeedKind, team: "Blue" | "Orange", player: string): HudState.FeedEntry
+	return { id = 1, kind = kind, team = team, player = player, timeLeft = 1 }
 end
 
 describe("HudText", function()
@@ -79,9 +74,9 @@ describe("HudText", function()
 		expect(text:banner({ kind = "Overtime" })).toBe("OVERTIME")
 		expect(text:banner({ kind = "Countdown", value = 3 })).toBe("3")
 		expect(text:banner({ kind = "Go", team = "Orange" })).toBe("GO ORANGE TEAM!")
+		expect(text:banner({ kind = "Lap", team = "Blue", value = 3 })).toBe("LAP 3 COMPLETED")
+		expect(text:banner({ kind = "GoalOpen", team = "Orange" })).toBe("ORANGE GOAL IS ACTIVE!")
 		expect(text:feed(entry("Possession", "Blue", "1"), NAMES)).toBe("Ana has the ball")
-		expect(text:feed(entry("Lap", "Blue", "1", 3), NAMES)).toBe("Lap 3 completed")
-		expect(text:feed(entry("GoalOpen", "Orange"), NAMES)).toBe("Orange goal is active")
 		expect(text:feed(entry("Goal", "Orange", "2"), NAMES)).toBe("Rex scored!")
 		expect(text:feed(entry("Possession", "Blue", "77"), NAMES)).toBe("Player has the ball")
 		expect(text:result("Orange")).toBe("Orange WINS")

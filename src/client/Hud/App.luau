@@ -1,6 +1,7 @@
 --!strict
--- The whole HUD as one React element: a full-screen frame, "Root", that holds every part of the HUD. The banner, the
--- feed, the Get Up prompt, the score tab and the end screen sit in its frame "Stage", the HUD's stage (the Hud's
+-- The whole HUD as one React element: a full-screen frame, "Root", that holds every part of the HUD. The banner line
+-- (its place from HudScreen.bannerLine, measured from the safe area's top, less the stage's top), the goal message,
+-- the feed, the Get Up prompt, the score tab and the end screen sit in its frame "Stage", the HUD's stage (the Hud's
 -- binding): on touch the part of the HUD's area left of the touch buttons, so they centre there, clear of the buttons,
 -- and all but the small prompt shrink to fit it. The stage draws over the other parts. The scoreboard shows from the
 -- first snapshot on; the hints and the Get Up prompt wherever the Hud gives their keys; the score tab while it is open.
@@ -17,6 +18,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Banner = require(script.Parent.Banner)
+local BannerMotion = require(script.Parent.BannerMotion)
 local BoardMotion = require(script.Parent.BoardMotion)
 local Config = require(ReplicatedStorage.Shared.Config)
 local ControlHints = require(script.Parent.ControlHints)
@@ -62,8 +64,13 @@ export type AppProps = {
 	compact: boolean,
 	boardTop: number,
 	aim: number,
+	-- The banner line at its highest and the stage's top, in pixels from the safe area's top (HudScreen.bannerAt).
+	bannerAt: number,
+	stageTop: number,
 	-- How the scoreboard moves, having watched the state's match.
 	board: BoardMotion.BoardMotion,
+	-- How the banner line and the goal message move.
+	banners: BannerMotion.BannerMotion,
 	-- Whether the local player has a skater: a spectator has no speed and no hints.
 	hasSkater: boolean,
 	-- Whether the local player holds the ball: the reticle shows only then.
@@ -97,6 +104,9 @@ local function App(props: AppProps): React.ReactElement
 	local uncovered = not scoreTab and ended == nil
 	local compact, top, aim = props.compact, props.boardTop, props.aim
 	local period = match ~= nil and text:period(match) ~= nil
+	local banners = props.banners
+	local shownBanner = state.banner
+	local lineSize = HudScreen.bannerSize(config, compact, if shownBanner ~= nil then shownBanner.kind else "Go")
 	local viewer = Style.teamColor(config, HudState.teamOf(match, props.localId))
 	return React.createElement(React.Fragment, nil, {
 		Centre = ReactRoblox.createPortal({
@@ -151,14 +161,34 @@ local function App(props: AppProps): React.ReactElement
 				else nil,
 			-- Above the other parts, so the solid score tab and end screen cover them.
 			Stage = React.createElement("Frame", Style.holder(Style.above({ Size = bindings.stage:map(stageSize) })), {
-				Banner = React.createElement(
-					Banner,
-					{ config = config, text = text, banner = state.banner, area = bindings.stage }
-				),
-				Feed = React.createElement(
-					Feed,
-					{ config = config, text = text, feed = state.feed, names = state.names, area = bindings.stage }
-				),
+				Banner = React.createElement(Banner, {
+					config = config,
+					text = text,
+					banner = state.banner,
+					compact = compact,
+					line = HudScreen.bannerLine(config, compact, props.bannerAt, top, period, lineSize)
+						- props.stageTop,
+					scale = banners.line.scale.binding,
+					leave = banners.line.leave,
+					area = bindings.stage,
+				}),
+				Message = React.createElement(Banner, {
+					config = config,
+					text = text,
+					banner = state.message,
+					compact = compact,
+					scale = banners.message.scale.binding,
+					leave = banners.message.leave,
+					area = bindings.stage,
+				}),
+				Feed = React.createElement(Feed, {
+					config = config,
+					text = text,
+					feed = state.feed,
+					names = state.names,
+					compact = compact,
+					area = bindings.stage,
+				}),
 				GetUp = if props.getUpKeys ~= nil
 					then React.createElement(GetUp, { config = config, keys = props.getUpKeys })
 					else nil,

@@ -213,12 +213,55 @@ describe("Style (look C)", function()
 		expect(label.Font).toBe(config.UI.hud.look.font)
 	end)
 
+	-- Look C's banners (#356, the owner's Q191, Q210): white over ink, the team's ring round that, the shadow lower.
+	it("letters a banner in three layers inside a group that fades whole, nothing clipped", function()
+		local look = config.UI.hud.look
+		local width = Style.textWidth(config, "GOAL!", 40, look.bannerFont)
+		local group = mount(Style.banner(config, {}, "GOAL!", 40, RED, 3, 6)):FindFirstChild("Box") :: CanvasGroup
+		expect(group.ClassName).toBe("CanvasGroup")
+		-- The text and 6 px of ink each side, and the shadow's 5 px under that.
+		expect(group.Size).toEqual(UDim2.fromOffset(width + 12, 40 + 12 + 5))
+		local front = group:FindFirstChild("Front") :: TextLabel
+		local edge = group:FindFirstChild("Edge") :: TextLabel
+		local shadow = group:FindFirstChild("Shadow") :: TextLabel
+		for _, label in { front, edge, shadow } do
+			expect(label.Text).toBe("GOAL!")
+			expect(label.Font).toBe(look.bannerFont)
+			expect(label.TextSize).toBe(40)
+			expect(label.Size).toEqual(UDim2.fromOffset(width, 40))
+		end
+		expect(front.Position).toEqual(UDim2.fromOffset(6, 6))
+		expect(edge.Position).toEqual(UDim2.fromOffset(6, 6))
+		expect(shadow.Position).toEqual(UDim2.fromOffset(6, 11))
+		expect(near(front.TextColor3, config.UI.hud.textColor)).toBe(true)
+		expect(near((front:FindFirstChild("Ink") :: UIStroke).Color, INK)).toBe(true)
+		expect((front:FindFirstChild("Ink") :: UIStroke).Thickness).toBe(1.5)
+		expect(near(edge.TextColor3, RED)).toBe(true)
+		expect(near((edge:FindFirstChild("Ink") :: UIStroke).Color, RED)).toBe(true)
+		expect((edge:FindFirstChild("Ink") :: UIStroke).Thickness).toBe(4.5)
+		expect(near(shadow.TextColor3, INK)).toBe(true)
+		expect((shadow:FindFirstChild("Ink") :: UIStroke).Thickness).toBe(4.5)
+		-- Back to front: the shadow, the ring, the white letters.
+		expect(shadow.ZIndex < edge.ZIndex and edge.ZIndex < front.ZIndex).toBe(true)
+	end)
+
+	it("letters a banner about nobody with no team ring, its shadow as wide as its ink", function()
+		local group = mount(Style.banner(config, {}, "60 SECONDS", 40, nil, 3, 6)):FindFirstChild("Box") :: CanvasGroup
+		expect(group:FindFirstChild("Edge")).toBeNil()
+		local shadow = group:FindFirstChild("Shadow") :: TextLabel
+		expect((shadow:FindFirstChild("Ink") :: UIStroke).Thickness).toBe(1.5)
+	end)
+
 	-- Rows and caps are sized from their texts (an auto-sized row round its box's ink would grow without end).
 	it("measures a key cap's width: its name's and padding, never narrower than tall; a glyph's square", function()
 		local font = config.UI.hud.look.font
 		local shift = TextService:GetTextSize("Shift", 15, font, Vector2.new(math.huge, math.huge))
 		expect(Style.textWidth(config, "Shift", 15)).toBe(math.ceil(shift.X))
 		expect(Style.textWidth(config, "", 15)).toBe(0)
+		-- In another font when asked (the banners' Luckiest Guy, #356).
+		local banner = config.UI.hud.look.bannerFont
+		local goal = TextService:GetTextSize("Shift", 15, banner, Vector2.new(math.huge, math.huge))
+		expect(Style.textWidth(config, "Shift", 15, banner)).toBe(math.ceil(goal.X))
 		expect(Style.capWidth(config, { text = "Shift" }, CAP)).toBe(math.ceil(shift.X) + 12)
 		expect(Style.capWidth(config, { text = "E" }, CAP)).toBe(30)
 		expect(Style.capWidth(config, { image = GLYPH }, CAP)).toBe(30)

@@ -9,7 +9,8 @@ local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
 
 -- Round sizes of this spec's own: S2 reaches (2 x 100 + 120 + 2 x 10) / 2 = 170 px either side of its centre; S5's
 -- row (2 x 50 + 80 + 2 x 10) / 2 = 100, and the worth chip 10 + 40 more beside either end: 150. Look C's boxes ink 2 px
--- round them and 3 more below (5 below a box), lettering 2; the worth chip at most 1.5 times its size.
+-- round them and 3 more below (5 below a box), lettering 2; the worth chip at most 1.5 times its size. A banner's
+-- ink reaches 2 + 3 = 5 px round its text on a desktop (2 + 2 = 4 on a phone), its shadow 3 px lower.
 local config = Fixtures.config({
 	UI = {
 		hud = {
@@ -44,6 +45,13 @@ local config = Fixtures.config({
 				countdown = {
 					sizes = { textSize = 60, ringSize = 120, ringThickness = 8 },
 					compactSizes = { textSize = 30, ringSize = 60, ringThickness = 4 },
+				},
+				banner = {
+					height = 0.2,
+					clearance = 3,
+					bottom = 20,
+					sizes = { headline = 40, goal = 60, lap = 30, message = 20, edge = 3 },
+					compactSizes = { headline = 24, goal = 36, lap = 18, message = 14, edge = 2 },
 				},
 			},
 		},
@@ -193,5 +201,49 @@ describe("HudScreen", function()
 		-- offset holds whole pixels); in regulation 44.3: no move.
 		expect(HudScreen.countDrop(config, true, 8, 100.3, true)).toBe(11)
 		expect(HudScreen.countDrop(config, true, 8, 100.3, false)).toBe(0)
+	end)
+
+	-- #356 (the owner, Q210): GOAL! big, a completed lap and the goal message smaller, the rest at the headline's.
+	it("gives each banner its text size on a phone's screen or a desktop's", function()
+		local banner = config.UI.hud.layout.banner
+		expect(HudScreen.banners(config, false)).toEqual(banner.sizes)
+		expect(HudScreen.banners(config, true)).toEqual(banner.compactSizes)
+		expect(HudScreen.bannerSize(config, false, "Goal")).toBe(60)
+		expect(HudScreen.bannerSize(config, false, "Lap")).toBe(30)
+		expect(HudScreen.bannerSize(config, false, "GoalOpen")).toBe(20)
+		for _, kind: any in { "Go", "Denied", "ClockWarning", "LastChance", "Overtime" } do
+			expect(HudScreen.bannerSize(config, false, kind)).toBe(40)
+		end
+		expect(HudScreen.bannerSize(config, true, "Goal")).toBe(36)
+		expect(HudScreen.bannerSize(config, true, "Go")).toBe(24)
+	end)
+
+	-- RC's GO a fifth of the way down (Video 31), lower where a banner's ink would come within 3 px of the board's
+	-- deepest ink in play (Q203's rule; Q210).
+	it("centres the banner line a share down the whole screen, lower just enough to clear the board", function()
+		-- 0.2 of 793; on the phone 0.2 of the whole 401 px, which starts 20 px above the safe area.
+		local desktop = Rect.new(0, -58, 1556, 735)
+		expect(HudScreen.bannerAt(config, desktop, desktop)).toBeCloseTo(158.6, 4)
+		expect(HudScreen.bannerAt(config, Rect.new(-62, -78, 812, 323), Rect.new(0, -58, 750, 323))).toBeCloseTo(
+			60.2,
+			4
+		)
+		-- At 158.6, rounded up; the board in play needs 8 + 117.5 + 3 + 5 + 40 / 2 = 153.5: no move.
+		expect(HudScreen.bannerLine(config, false, 158.6, 8, false, 40)).toBe(159)
+		-- GOAL!'s 60 px: 8 + 117.5 + 3 + 5 + 30 = 163.5, rounded up; with the period 8 + 132 + 3 + 5 + 20 = 168.
+		expect(HudScreen.bannerLine(config, false, 158.6, 8, false, 60)).toBe(164)
+		expect(HudScreen.bannerLine(config, false, 158.6, 8, true, 40)).toBe(168)
+		-- The phone at 60.2: S5 in play needs 8 + 50 + 3 + 4 + 12 = 77.
+		expect(HudScreen.bannerLine(config, true, 60.2, 8, false, 24)).toBe(77)
+	end)
+
+	-- The goal message where the feed was, the feed above it (the owner, Q211).
+	it("puts the goal message at the stage's bottom and the feed above it, a clearance apart", function()
+		-- Its text's bottom: 20 + the shadow's 3 + the ink's 5 = 28 up; the feed's: 28 + 20 + 5 + 3 = 56.
+		expect(HudScreen.messageBottom(config, false)).toBe(28)
+		expect(HudScreen.feedBottom(config, false)).toBe(56)
+		-- The phone's: 20 + 3 + 4 = 27, and 27 + 14 + 4 + 3 = 48.
+		expect(HudScreen.messageBottom(config, true)).toBe(27)
+		expect(HudScreen.feedBottom(config, true)).toBe(48)
 	end)
 end)
