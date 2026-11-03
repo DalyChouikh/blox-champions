@@ -25,17 +25,16 @@ function Motion.pop(motion: Config.MotionSettings, t: number): number
 	return peak - pop.overshoot * out(2 * p - 1)
 end
 
--- A bounce (a score that changes): its scale `t` seconds in, up to `scale`, back to `rebound`, then to 1, in three
--- equal parts (and 1 from then on).
-function Motion.bounce(motion: Config.MotionSettings, t: number): number
-	local bounce = motion.bounce
-	local p = 3 * t / bounce.seconds
+-- A bounce (motion.bounce: a score that changes; motion.press: a key pressed): its scale `t` seconds in, to
+-- `scale`, then to `rebound`, then to 1, in three equal parts (and 1 from then on).
+function Motion.bounce(shape: Config.BounceShape, t: number): number
+	local p = 3 * t / shape.seconds
 	if p < 1 then
-		return 1 + (bounce.scale - 1) * out(p)
+		return 1 + (shape.scale - 1) * out(p)
 	elseif p < 2 then
-		return bounce.scale + (bounce.rebound - bounce.scale) * out(p - 1)
+		return shape.scale + (shape.rebound - shape.scale) * out(p - 1)
 	end
-	return bounce.rebound + (1 - bounce.rebound) * out(p - 2)
+	return shape.rebound + (1 - shape.rebound) * out(p - 2)
 end
 
 -- How far an easing part (a meter filling or emptying, a part shrinking away) has come `t` seconds in, 0 to 1.

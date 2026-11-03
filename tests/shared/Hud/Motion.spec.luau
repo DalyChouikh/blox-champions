@@ -12,6 +12,7 @@ local Motion = require(ReplicatedStorage.Shared.Hud.Motion)
 local MOTION: Config.MotionSettings = {
 	pop = { seconds = 0.2, overshoot = 0.12 },
 	bounce = { seconds = 0.3, scale = 1.6, rebound = 0.9 },
+	press = { seconds = 0.3, scale = 0.8, rebound = 1.1 },
 	easeSeconds = 0.2,
 	lapHoldSeconds = 0.5,
 	glow = { seconds = 2, transparency = 0.8 },
@@ -32,17 +33,26 @@ describe("Motion", function()
 	end)
 
 	it("bounces up to its scale, back to the rebound, then settles, in three equal parts", function()
-		expect(Motion.bounce(MOTION, 0)).toBe(1)
+		expect(Motion.bounce(MOTION.bounce, 0)).toBe(1)
 		-- 1 + 0.6 x 0.875.
-		expect(Motion.bounce(MOTION, 0.05)).toBeCloseTo(1.525, 6)
-		expect(Motion.bounce(MOTION, 0.1)).toBeCloseTo(1.6, 6)
+		expect(Motion.bounce(MOTION.bounce, 0.05)).toBeCloseTo(1.525, 6)
+		expect(Motion.bounce(MOTION.bounce, 0.1)).toBeCloseTo(1.6, 6)
 		-- 1.6 - 0.7 x 0.875.
-		expect(Motion.bounce(MOTION, 0.15)).toBeCloseTo(0.9875, 6)
-		expect(Motion.bounce(MOTION, 0.2)).toBeCloseTo(0.9, 6)
+		expect(Motion.bounce(MOTION.bounce, 0.15)).toBeCloseTo(0.9875, 6)
+		expect(Motion.bounce(MOTION.bounce, 0.2)).toBeCloseTo(0.9, 6)
 		-- 0.9 + 0.1 x 0.875.
-		expect(Motion.bounce(MOTION, 0.25)).toBeCloseTo(0.9875, 6)
-		expect(Motion.bounce(MOTION, 0.3)).toBe(1)
-		expect(Motion.bounce(MOTION, 5)).toBe(1)
+		expect(Motion.bounce(MOTION.bounce, 0.25)).toBeCloseTo(0.9875, 6)
+		expect(Motion.bounce(MOTION.bounce, 0.3)).toBe(1)
+		expect(Motion.bounce(MOTION.bounce, 5)).toBe(1)
+	end)
+
+	-- A key pressed (#354): the same three parts, in to `scale`, out past its size to `rebound`, then settled.
+	it("presses a part in and springs it back past its size, in the bounce's three parts", function()
+		expect(Motion.bounce(MOTION.press, 0)).toBe(1)
+		expect(Motion.bounce(MOTION.press, 0.05)).toBeCloseTo(0.825, 6)
+		expect(Motion.bounce(MOTION.press, 0.1)).toBeCloseTo(0.8, 6)
+		expect(Motion.bounce(MOTION.press, 0.2)).toBeCloseTo(1.1, 6)
+		expect(Motion.bounce(MOTION.press, 0.3)).toBeCloseTo(1, 6)
 	end)
 
 	it("eases a part over its seconds, easing out", function()

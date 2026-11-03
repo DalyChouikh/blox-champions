@@ -1,7 +1,9 @@
 --!strict
 -- The props and layout pieces the HUD's parts share, all from Config.UI.hud, so each part spells out only its own.
 -- Look C (the owner, Q184; UI.hud.look) is drawn from Roblox's released UI objects only: a box's outline and drop
--- shadow are one ink shape under its fill (Style.box), its shade a gradient, its lettering outlined by a UIStroke.
+-- shadow are one ink shape under its fill (Style.box), its shade a gradient, its lettering outlined by a UIStroke;
+-- a key's cap (Style.keyCap) pops, and sweeps while its key cools down, through bindings only (#354); a mouse's
+-- button shows as a mouse with that button inked (Q207).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -9,20 +11,41 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Fit = require(ReplicatedStorage.Shared.Hud.Fit)
 local React = require(ReplicatedStorage.Packages.React)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
+local TextService = game:GetService("TextService")
 
 -- Keyed by property name, or by a React event (React.Event.Activated).
 export type Props = { [any]: any }
--- One key as the HUD shows it: the name the player's own keyboard gives it, or Roblox's glyph on a gamepad.
-export type KeyView = { text: string?, image: string? }
+-- One of a mouse's buttons: its key shows as a mouse with that button inked (#354, the owner's Q207).
+export type MouseButton = "Left" | "Right"
+-- One key as the HUD shows it: the name the player's own keyboard gives it, or Roblox's glyph on a gamepad; a
+-- mouse's button also says which (its key cap draws the mouse, the parts that letter keys keep the name).
+export type KeyView = { text: string?, image: string?, mouse: MouseButton? }
 -- How see-through a greyed part's text or glyph is: a number, or a binding that follows the play.
 export type Fade = number | React.Binding<number>
 -- A rounded part of a look C box, as wide as the box: its top and its height as shares of the box's height.
 export type Piece = { top: number, height: number, corner: UDim }
+-- What moves on a key's cap (#354): its pop (a UIScale), whether it shows pressed, the share of its cooldown still
+-- to run (0 while not cooling) and its seconds left ("" while not cooling).
+export type CapBindings = {
+	press: React.Binding<number>,
+	pressed: React.Binding<boolean>,
+	cooldown: React.Binding<number>,
+	seconds: React.Binding<string>,
+}
 type Children = { [string]: React.Node }
 
 -- A white fill shows its gradient's own colours (a UIGradient multiplies the colour it covers).
 local WHITE = Color3.new(1, 1, 1)
 local BLACK = Color3.new(0, 0, 0)
+-- Room enough for any one line of text (TextService).
+local UNBOUNDED = Vector2.new(math.huge, math.huge)
+-- Solid across the first half of a gradient, clear across the second: a hard step (two keypoints a hair apart).
+local STEP = NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 0),
+	NumberSequenceKeypoint.new(0.4999, 0),
+	NumberSequenceKeypoint.new(0.5, 1),
+	NumberSequenceKeypoint.new(1, 1),
+})
 
 local Style = {}
 
@@ -33,6 +56,23 @@ Style.CENTRE = Vector2.new(0.5, 0.5)
 Style.MIDDLE = UDim2.fromScale(0.5, 0.5)
 Style.FULL = UDim2.fromScale(1, 1)
 local CENTRE, MIDDLE, FULL = Style.CENTRE, Style.MIDDLE, Style.FULL
+
+-- A sweep's angle clockwise from 12 o'clock, where the share still to run starts: 0 for all of it, 360 for none.
+local function sweepAngle(share: number): number
+	return (1 - share) * 360
+end
+
+-- Each half's gradient turn for `share` (Style.sweep): the right half sweeps to 6 o'clock, the left from there.
+local function rightTurn(share: number): number
+	return math.min(sweepAngle(share), 180) + 180
+end
+
+local function leftTurn(share: number): number
+	return math.max(sweepAngle(share), 180) + 180
+end
+
+-- Text widths already measured, by font, text size and text: a width is read from TextService once.
+local widths: { [Enum.Font]: { [number]: { [string]: number } } } = {}
 
 -- `props` written over `base`, which the caller made fresh: React keeps each element's props.
 local function over(base: Props, props: Props?): Props
@@ -227,6 +267,230 @@ function Style.inkedRing(
 		parts.Content = holding(children)
 	end
 	return React.createElement("Frame", Style.holder(over({ Size = UDim2.fromOffset(reach, reach) }, props)), parts)
+end
+
+-- One side of a part, `left` or right, `height` down from its top, clipping to that side a shape (`shape`'s props,
+-- `children` in it) as big as the whole part: the shape keeps its own outline there (Style.sweep's halves, a
+-- mouse's button).
+local function sideClip(left: boolean, height: UDim, shape: Props, children: Props): React.ReactElement
+	return React.createElement(
+		"Frame",
+		Style.holder({
+			Position = UDim2.fromScale(if left then 0 else 0.5, 0),
+			Size = UDim2.new(UDim.new(0.5, 0), height),
+			ClipsDescendants = true,
+		}),
+		{
+			Ink = React.createElement(
+				"Frame",
+				over({ Position = UDim2.fromScale(if left then 0 else -1, 0), BorderSizePixel = 0 }, shape),
+				children
+			),
+		}
+	)
+end
+
+-- A cooling key's sweep (#354, the owner's Q186: "fills back clockwise"): look C's ink over a `size`-pixel square in
+-- its parent's middle, look.sweepTransparency see-through, lit where its cooldown has run: from 12 o'clock
+-- clockwise as `share` (a binding, the share still to run) goes from 1 to 0. Each half of the square is a clip
+-- holding the square's ink, `corner` rounded, whose gradient steps from solid to clear along the line through the
+-- middle at the sweep's angle (Rotation: the angle + 180, the right half to 6 o'clock, the left on from there), so
+-- only two numbers change as it sweeps.
+function Style.sweep(
+	config: Config.GameConfig,
+	size: number,
+	corner: UDim,
+	share: React.Binding<number>
+): React.ReactElement
+	local look = config.UI.hud.look
+	local function half(left: boolean, turn: (share: number) -> number): React.ReactElement
+		return sideClip(left, UDim.new(1, 0), {
+			Size = UDim2.fromScale(2, 1),
+			BackgroundColor3 = look.ink,
+			BackgroundTransparency = look.sweepTransparency,
+		}, {
+			Corner = React.createElement("UICorner", { CornerRadius = corner }),
+			Step = React.createElement("UIGradient", { Transparency = STEP, Rotation = share:map(turn) }),
+		})
+	end
+	return React.createElement(
+		"Frame",
+		Style.holder({ AnchorPoint = CENTRE, Position = MIDDLE, Size = UDim2.fromOffset(size, size) }),
+		{ Left = half(true, leftTurn), Right = half(false, rightTurn) }
+	)
+end
+
+-- How wide `text` is at `size` in look C's font, in whole pixels (TextService: a text label's own bounds).
+function Style.textWidth(config: Config.GameConfig, text: string, size: number): number
+	local font = config.UI.hud.look.font
+	local bySize = widths[font]
+	if bySize == nil then
+		bySize = {}
+		widths[font] = bySize
+	end
+	local byText = bySize[size]
+	if byText == nil then
+		byText = {}
+		bySize[size] = byText
+	end
+	local width = byText[text]
+	if width == nil then
+		width = math.ceil(TextService:GetTextSize(text, size, font, UNBOUNDED).X)
+		byText[text] = width
+	end
+	return width
+end
+
+-- How wide `view`'s key cap is (Style.keyCap): its name's width with sizes.padding each side, never narrower than
+-- tall; a glyph's or a mouse's square.
+function Style.capWidth(config: Config.GameConfig, view: KeyView, sizes: Config.CapSizes): number
+	local height = sizes.height
+	if view.image ~= nil or view.mouse ~= nil then
+		return height
+	end
+	return math.max(height, Style.textWidth(config, view.text or "", sizes.textSize) + 2 * sizes.padding)
+end
+
+-- A mouse on a mouse button's key cap (#354; the owner's Q207, A1 on the design page): a body sizes.mouse.width x
+-- height in the HUD's text colour inside look C's ink, `line` thick, rounded top and bottom; its buttons `buttons`
+-- deep, parted by ink lines; `button` inked: the body's own shape seen through a clip over that button, so it keeps
+-- the body's curve (clips and shapes, as Style.sweep).
+local function mouseShape(config: Config.GameConfig, sizes: Config.CapSizes, button: MouseButton): React.ReactElement
+	local hud = config.UI.hud
+	local mouse = sizes.mouse
+	local line, buttons = mouse.line, mouse.buttons
+	local body = UDim2.fromOffset(mouse.width, mouse.height)
+	local function round(): React.ReactElement
+		return React.createElement("UICorner", { CornerRadius = Style.ROUND })
+	end
+	local function inked(props: Props, children: Props?): React.ReactElement
+		return React.createElement(
+			"Frame",
+			over({ BackgroundColor3 = hud.look.ink, BorderSizePixel = 0 }, props),
+			children
+		)
+	end
+	return React.createElement(
+		"Frame",
+		Style.holder({
+			AnchorPoint = CENTRE,
+			Position = MIDDLE,
+			Size = UDim2.fromOffset(mouse.width + 2 * line, mouse.height + 2 * line),
+			ZIndex = 2,
+		}),
+		{
+			Ink = inked({ Size = FULL }, { Corner = round() }),
+			Body = React.createElement("Frame", {
+				AnchorPoint = CENTRE,
+				Position = MIDDLE,
+				Size = body,
+				BackgroundColor3 = hud.textColor,
+				BorderSizePixel = 0,
+				ZIndex = 2,
+			}, {
+				Corner = round(),
+				Button = sideClip(
+					button == "Left",
+					UDim.new(0, buttons),
+					{ Size = body, BackgroundColor3 = hud.look.ink },
+					{ Corner = round() }
+				),
+				Between = inked({
+					AnchorPoint = Vector2.new(0.5, 0),
+					Position = UDim2.fromScale(0.5, 0),
+					Size = UDim2.fromOffset(line, buttons),
+					ZIndex = 2,
+				}),
+				Under = inked({
+					AnchorPoint = Vector2.new(0, 0.5),
+					Position = UDim2.fromOffset(0, buttons),
+					Size = UDim2.new(1, 0, 0, line),
+					ZIndex = 2,
+				}),
+			}),
+		}
+	)
+end
+
+-- Look C's key cap (#354, the design page's): `view`'s name in ink on a look.key cap `sizes.height` pixels tall and
+-- as wide as the name with sizes.padding each side, never narrower than tall, outlined in ink look.textOutline
+-- thick; a mouse's button a mouse on a square cap, that button inked (Q207); for a gamepad Roblox's glyph instead,
+-- on no cap. `moving` pops it (its UIScale), turns the cap look.pressed, sweeps it (Style.sweep, a square as tall as
+-- the cap) and writes its seconds left in place of its name, lettered over a glyph or a mouse. Its slot keeps its
+-- size while it pops, so its row never shifts. At `order` in its row; returns what its row calls it ("Glyph" or
+-- "Key") and the cap.
+function Style.keyCap(
+	config: Config.GameConfig,
+	view: KeyView,
+	sizes: Config.CapSizes,
+	order: number,
+	moving: CapBindings
+): (string, React.ReactElement)
+	local hud = config.UI.hud
+	local look = hud.look
+	local height, image = sizes.height, view.image
+	local mouse: MouseButton? = view.mouse
+	local parts: Children = {
+		Scale = React.createElement("UIScale", { Scale = moving.press }),
+		Sweep = Style.sweep(config, height, if image ~= nil then Style.ROUND else sizes.corner, moving.cooldown),
+	}
+	if image ~= nil or mouse ~= nil then
+		-- The seconds lettered over a picture of the key.
+		parts.Legend = React.createElement(
+			"TextLabel",
+			Style.lettering(config, { Size = FULL, Text = moving.seconds, TextSize = sizes.textSize, ZIndex = 3 }),
+			{ Ink = Style.inked(config) }
+		)
+	end
+	if image ~= nil then
+		local face = Style.holder({ AnchorPoint = CENTRE, Position = MIDDLE, Size = FULL, Image = image })
+		return "Glyph",
+			React.createElement(
+				"Frame",
+				Style.holder({ LayoutOrder = order, Size = UDim2.fromOffset(height, height) }),
+				{
+					Face = React.createElement("ImageLabel", face, parts),
+				}
+			)
+	end
+	parts.Corner = React.createElement("UICorner", { CornerRadius = sizes.corner })
+	parts.Outline = React.createElement("UIStroke", { Color = look.ink, Thickness = look.textOutline })
+	if mouse ~= nil then
+		parts.Mouse = mouseShape(config, sizes, mouse)
+	else
+		local name = view.text or ""
+		parts.Legend = React.createElement(
+			"TextLabel",
+			Style.lettering(config, {
+				Size = FULL,
+				Text = moving.seconds:map(function(seconds: string): string
+					return if seconds ~= "" then seconds else name
+				end),
+				TextColor3 = look.ink,
+				TextSize = sizes.textSize,
+				ZIndex = 2,
+			})
+		)
+	end
+	return "Key",
+		React.createElement(
+			"Frame",
+			Style.holder({
+				LayoutOrder = order,
+				Size = UDim2.fromOffset(Style.capWidth(config, view, sizes), height),
+			}),
+			{
+				Face = React.createElement("Frame", {
+					AnchorPoint = CENTRE,
+					Position = MIDDLE,
+					Size = FULL,
+					BackgroundColor3 = moving.pressed:map(function(pressed: boolean): Color3
+						return if pressed then look.pressed else look.key
+					end),
+					BorderSizePixel = 0,
+				}, parts),
+			}
+		)
 end
 
 -- Shrinks a part to fit the HUD's area (a binding), screenMargin inside each edge (Fit). The part is `size`, or, for a

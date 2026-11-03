@@ -148,6 +148,48 @@ describe("ControlLabels", function()
 		expect(greyed("pass")).toBe(false)
 	end)
 
+	-- The HUD shows the key pressed (#354): the throw's row is worked by Ball Focus's keys while it starts no throw.
+	it("names the control whose keys work each row now", function()
+		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
+			expect(ControlLabels.worked(control, ActionController)).toBe(
+				if control == "throw" then "ballFocus" else control
+			)
+		end
+		BallCarrier:set(LOCAL_ID)
+		expect(ControlLabels.worked("throw", ActionController)).toBe("throw")
+	end)
+
+	-- A key cooling down (#354, Q186): the seconds left of the action its row names now, and their share of its
+	-- cooldown; none for a row that starts no action, or an action with no cooldown.
+	it("tells how long each row's action still cools down, and what share of its cooldown that is", function()
+		local runner = ActionController.runner
+		runner:start("CallPass", { hasBall = false, knockedDown = false })
+		runner:start("Uppercut", { hasBall = false, knockedDown = false })
+		runner:step(0.3)
+		local left, share = ControlLabels.cooldown("pass", config, ActionController)
+		expect(left).toBeCloseTo(config.Actions.CallPass.cooldown - 0.3, 6)
+		expect(share).toBeCloseTo(1 - 0.3 / config.Actions.CallPass.cooldown, 6)
+		left, share = ControlLabels.cooldown("uppercut", config, ActionController)
+		expect(left).toBeCloseTo(config.Actions.Uppercut.cooldown - 0.3, 6)
+		expect(share).toBeCloseTo(1 - 0.3 / config.Actions.Uppercut.cooldown, 6)
+		local idle: { Config.TouchControl } = { "jump", "pump", "brake", "attach", "tackle", "throw" }
+		for _, control: Config.TouchControl in idle do
+			left, share = ControlLabels.cooldown(control, config, ActionController)
+			expect(left).toBe(0)
+			expect(share).toBe(0)
+		end
+		runner:step(1)
+		left, share = ControlLabels.cooldown("pass", config, ActionController)
+		expect(left).toBe(0)
+		expect(share).toBe(0)
+		-- With the ball the throw and the pass start actions with no cooldown at all.
+		BallCarrier:set(LOCAL_ID)
+		expect(config.Actions.ChargeThrow.cooldown).toBe(0)
+		left, share = ControlLabels.cooldown("throw", config, ActionController)
+		expect(left).toBe(0)
+		expect(share).toBe(0)
+	end)
+
 	-- RC's Dodge row reads "Dive" for ~1 s after a dodge with the ball (#314, Video 32 at 4.6-5.6 s).
 	it("names the Dive on the tackle button in a dodge's follow-up window, with the ball", function()
 		BallCarrier:set(LOCAL_ID)

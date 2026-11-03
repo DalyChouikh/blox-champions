@@ -41,8 +41,8 @@ local Types = require(ReplicatedStorage.Shared.Rules.Types)
 export type HudBindings = {
 	clock: React.Binding<string>,
 	speed: React.Binding<string>,
-	labels: ControlHints.HintLabels,
-	fades: ControlHints.HintFades,
+	-- Each hint row's label, fade and key cap (#354).
+	hints: ControlHints.HintRows,
 	-- The HUD's stage in pixels, where the banner, the feed, the score tab and the end screen centre and fit; zero
 	-- until it is known.
 	stage: React.Binding<Vector2>,
@@ -135,8 +135,7 @@ local function App(props: AppProps): React.ReactElement
 				then React.createElement(ControlHints, {
 					config = config,
 					keys = keys,
-					labels = bindings.labels,
-					fades = bindings.fades,
+					rows = bindings.hints,
 				})
 				else nil,
 			Speedometer = React.createElement(Speedometer, {

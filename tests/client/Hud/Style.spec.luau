@@ -5,9 +5,11 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 local afterEach = JestGlobals.afterEach
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local React = require(ReplicatedStorage.Packages.React)
 local Style = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.Hud.Style)
+local TextService = game:GetService("TextService")
 
 -- Look C with round numbers of this spec's own: a 2 px outline, a 5 px shadow, 10 px corners, half as bright at the
 -- bottom, and team colours of its own.
@@ -22,6 +24,9 @@ local config = Fixtures.config({
 				corner = UDim.new(0, 10),
 				shade = 0.5,
 				teamColors = { Blue = Color3.fromRGB(0, 100, 250), Orange = Color3.fromRGB(250, 150, 0) },
+				key = Color3.fromRGB(240, 200, 60),
+				pressed = Color3.fromRGB(240, 120, 40),
+				sweepTransparency = 0.3,
 			},
 		},
 	},
@@ -48,6 +53,35 @@ end
 
 local function near(a: Color3, b: Color3): boolean
 	return math.abs(a.R - b.R) < 1e-3 and math.abs(a.G - b.G) < 1e-3 and math.abs(a.B - b.B) < 1e-3
+end
+
+-- A key cap's sizes and colours of this spec's own (#354): a 12 x 20 mouse in 2 px of ink, its buttons 8 px deep.
+local CAP: Config.CapSizes = {
+	height = 30,
+	padding = 6,
+	corner = UDim.new(0, 8),
+	textSize = 15,
+	mouse = { width = 12, height = 20, buttons = 8, line = 2 },
+}
+local INK = Color3.fromRGB(10, 20, 30)
+local KEY = Color3.fromRGB(240, 200, 60)
+local PRESSED = Color3.fromRGB(240, 120, 40)
+local GLYPH = "rbxasset://textures/ui/Controls/DefaultController/ButtonX@2x.png"
+
+-- What moves on a key cap, at rest, and their setters.
+local function capBindings(): any
+	local press, setPress = React.createBinding(1)
+	local pressed, setPressed = React.createBinding(false)
+	local cooldown, setCooldown = React.createBinding(0)
+	local seconds, setSeconds = React.createBinding("")
+	local bindings: Style.CapBindings = { press = press, pressed = pressed, cooldown = cooldown, seconds = seconds }
+	return {
+		bindings = bindings,
+		setPress = setPress,
+		setPressed = setPressed,
+		setCooldown = setCooldown,
+		setSeconds = setSeconds,
+	}
 end
 
 describe("Style (look C)", function()
@@ -150,5 +184,193 @@ describe("Style (look C)", function()
 		expect(Style.teamColor(config, "Blue") == Color3.fromRGB(0, 100, 250)).toBe(true)
 		expect(Style.teamColor(config, "Orange") == Color3.fromRGB(250, 150, 0)).toBe(true)
 		expect(Style.teamColor(config, nil) == config.UI.hud.textColor).toBe(true)
+	end)
+
+	-- Look C's key caps (#354, the design page's): this spec's own sizes, a key pressed, a key cooling down (Q186).
+	it("draws a key cap: its name in ink on a cap as wide as the name, never narrower than tall, inked", function()
+		local moving = capBindings()
+		local name, short = Style.keyCap(config, { text = "E" }, CAP, 2, moving.bindings)
+		expect(name).toBe("Key")
+		local _, long = Style.keyCap(config, { text = "Shift" }, CAP, 1, moving.bindings)
+		local mounted = mount(React.createElement(React.Fragment, nil, { Short = short, Long = long }))
+		local key = mounted:FindFirstChild("Short") :: Frame
+		expect(key.Size).toEqual(UDim2.fromOffset(30, 30))
+		expect(key.LayoutOrder).toBe(2)
+		local shift = TextService:GetTextSize("Shift", 15, config.UI.hud.look.font, Vector2.new(math.huge, math.huge))
+		expect((mounted:FindFirstChild("Long") :: Frame).Size).toEqual(UDim2.fromOffset(math.ceil(shift.X) + 12, 30))
+		local face = key:FindFirstChild("Face") :: Frame
+		expect(face.Size).toEqual(UDim2.fromScale(1, 1))
+		expect(face.AnchorPoint == Vector2.new(0.5, 0.5)).toBe(true)
+		expect(face.BackgroundColor3 == KEY).toBe(true)
+		expect((face:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(UDim.new(0, 8))
+		local stroke = face:FindFirstChildOfClass("UIStroke") :: UIStroke
+		expect(stroke.Color == INK).toBe(true)
+		expect(stroke.Thickness).toBe(1.5)
+		local label = face:FindFirstChild("Legend") :: TextLabel
+		expect(label.Text).toBe("E")
+		expect(label.TextColor3 == INK).toBe(true)
+		expect(label.TextSize).toBe(15)
+		expect(label.Font).toBe(config.UI.hud.look.font)
+	end)
+
+	-- Rows and caps are sized from their texts (an auto-sized row round its box's ink would grow without end).
+	it("measures a key cap's width: its name's and padding, never narrower than tall; a glyph's square", function()
+		local font = config.UI.hud.look.font
+		local shift = TextService:GetTextSize("Shift", 15, font, Vector2.new(math.huge, math.huge))
+		expect(Style.textWidth(config, "Shift", 15)).toBe(math.ceil(shift.X))
+		expect(Style.textWidth(config, "", 15)).toBe(0)
+		expect(Style.capWidth(config, { text = "Shift" }, CAP)).toBe(math.ceil(shift.X) + 12)
+		expect(Style.capWidth(config, { text = "E" }, CAP)).toBe(30)
+		expect(Style.capWidth(config, { image = GLYPH }, CAP)).toBe(30)
+		-- A mouse button's square, though its name alone would be wider.
+		expect(Style.capWidth(config, { text = "LMB" }, CAP) > 30).toBe(true)
+		expect(Style.capWidth(config, { text = "LMB", mouse = "Left" }, CAP)).toBe(30)
+	end)
+
+	it("pops a pressed key's cap in the pressed colour, and writes a cooling key's seconds on it", function()
+		local moving = capBindings()
+		local _, cap = Style.keyCap(config, { text = "E" }, CAP, 1, moving.bindings)
+		local face = (mount(cap):FindFirstChild("Box") :: Frame):FindFirstChild("Face") :: Frame
+		moving.setPressed(true)
+		expect(face.BackgroundColor3 == PRESSED).toBe(true)
+		moving.setPress(0.88)
+		expect((face:FindFirstChildOfClass("UIScale") :: UIScale).Scale).toBeCloseTo(0.88, 4)
+		moving.setPressed(false)
+		expect(face.BackgroundColor3 == KEY).toBe(true)
+		local label = face:FindFirstChild("Legend") :: TextLabel
+		moving.setSeconds("0.7")
+		expect(label.Text).toBe("0.7")
+		moving.setSeconds("")
+		expect(label.Text).toBe("E")
+	end)
+
+	-- Lit where the cooldown has run, growing clockwise from 12 o'clock (Q186: "fills back clockwise"): each half's ink
+	-- steps from solid to clear across its middle, turned so the step runs along the sweep's edge.
+	it("sweeps a cooling key's ink away clockwise from 12 o'clock as its cooldown runs out", function()
+		local moving = capBindings()
+		local _, cap = Style.keyCap(config, { text = "E" }, CAP, 1, moving.bindings)
+		local face = (mount(cap):FindFirstChild("Box") :: Frame):FindFirstChild("Face") :: Frame
+		local sweep = face:FindFirstChild("Sweep") :: Frame
+		expect(sweep.Size).toEqual(UDim2.fromOffset(30, 30))
+		expect(sweep.Position).toEqual(UDim2.fromScale(0.5, 0.5))
+		expect(sweep.ZIndex < (face:FindFirstChild("Legend") :: TextLabel).ZIndex).toBe(true)
+		local halves = { sweep:FindFirstChild("Left") :: Frame, sweep:FindFirstChild("Right") :: Frame }
+		local turns: { UIGradient } = {}
+		for index, half in halves do
+			expect(half.ClipsDescendants).toBe(true)
+			expect(half.Size).toEqual(UDim2.fromScale(0.5, 1))
+			local ink = half:FindFirstChild("Ink") :: Frame
+			expect(ink.Size).toEqual(UDim2.fromScale(2, 1))
+			expect(ink.Position).toEqual(UDim2.fromScale(1 - index, 0))
+			expect(ink.BackgroundColor3 == INK).toBe(true)
+			expect(ink.BackgroundTransparency).toBeCloseTo(0.3, 4)
+			expect((ink:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(UDim.new(0, 8))
+			local gradient = ink:FindFirstChildOfClass("UIGradient") :: UIGradient
+			local keys = gradient.Transparency.Keypoints
+			expect(keys[1].Value).toBe(0)
+			expect(keys[#keys].Value).toBe(1)
+			table.insert(turns, gradient)
+		end
+		expect(halves[2].Position).toEqual(UDim2.fromScale(0.5, 0))
+		-- All ink, a quarter run (lit 12 to 3), three quarters (lit 12 to 9), all run.
+		local cases = { { share = 1, left = 360, right = 180 }, { share = 0.75, left = 360, right = 270 } }
+		table.insert(cases, { share = 0.25, left = 450, right = 360 })
+		table.insert(cases, { share = 0, left = 540, right = 360 })
+		for _, case in cases do
+			moving.setCooldown(case.share)
+			expect(turns[1].Rotation).toBeCloseTo(case.left, 3)
+			expect(turns[2].Rotation).toBeCloseTo(case.right, 3)
+		end
+	end)
+
+	-- The mouse's buttons (Q207, A1 on the design page): a mouse in the HUD's text colour on the cap, its key's button
+	-- inked: the body's own rounded shape seen through a clip over that button, so it keeps the body's curve.
+	it("draws a mouse button's key as a mouse on its cap, that button inked", function()
+		local moving = capBindings()
+		local name, left = Style.keyCap(config, { text = "LMB", mouse = "Left" }, CAP, 1, moving.bindings)
+		expect(name).toBe("Key")
+		local _, right = Style.keyCap(config, { text = "RMB", mouse = "Right" }, CAP, 2, moving.bindings)
+		local mounted = mount(React.createElement(React.Fragment, nil, { Left = left, Right = right }))
+		local key = mounted:FindFirstChild("Left") :: Frame
+		expect(key.Size).toEqual(UDim2.fromOffset(30, 30))
+		local face = key:FindFirstChild("Face") :: Frame
+		expect(face.BackgroundColor3 == KEY).toBe(true)
+		expect(face:FindFirstChildOfClass("UIStroke") ~= nil).toBe(true)
+		-- The 12 x 20 body in its 2 px of ink, centred on the cap, above the sweep.
+		local mouse = face:FindFirstChild("Mouse") :: Frame
+		expect(mouse.Size).toEqual(UDim2.fromOffset(16, 24))
+		expect(mouse.Position).toEqual(UDim2.fromScale(0.5, 0.5))
+		expect(mouse.AnchorPoint == Vector2.new(0.5, 0.5)).toBe(true)
+		expect(mouse.ZIndex > (face:FindFirstChild("Sweep") :: Frame).ZIndex).toBe(true)
+		local ink = mouse:FindFirstChild("Ink") :: Frame
+		expect(ink.Size).toEqual(UDim2.fromScale(1, 1))
+		expect(ink.BackgroundColor3 == INK).toBe(true)
+		expect((ink:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(Style.ROUND)
+		local body = mouse:FindFirstChild("Body") :: Frame
+		expect(body.Size).toEqual(UDim2.fromOffset(12, 20))
+		expect(body.Position).toEqual(UDim2.fromScale(0.5, 0.5))
+		expect(body.AnchorPoint == Vector2.new(0.5, 0.5)).toBe(true)
+		expect(body.BackgroundColor3 == config.UI.hud.textColor).toBe(true)
+		expect((body:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(Style.ROUND)
+		expect(body.ZIndex > ink.ZIndex).toBe(true)
+		-- The left button inked, 8 px deep, rounded as the body is; ink lines between the buttons and under them.
+		local button = body:FindFirstChild("Button") :: Frame
+		expect(button.ClipsDescendants).toBe(true)
+		expect(button.Position).toEqual(UDim2.fromScale(0, 0))
+		expect(button.Size).toEqual(UDim2.new(0.5, 0, 0, 8))
+		local lit = button:FindFirstChild("Ink") :: Frame
+		expect(lit.Position).toEqual(UDim2.fromScale(0, 0))
+		expect(lit.Size).toEqual(UDim2.fromOffset(12, 20))
+		expect(lit.BackgroundColor3 == INK).toBe(true)
+		expect((lit:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(Style.ROUND)
+		local between = body:FindFirstChild("Between") :: Frame
+		expect(between.Size).toEqual(UDim2.fromOffset(2, 8))
+		expect(between.Position).toEqual(UDim2.fromScale(0.5, 0))
+		expect(between.AnchorPoint == Vector2.new(0.5, 0)).toBe(true)
+		local under = body:FindFirstChild("Under") :: Frame
+		expect(under.Size).toEqual(UDim2.new(1, 0, 0, 2))
+		expect(under.Position).toEqual(UDim2.fromOffset(0, 8))
+		expect(under.AnchorPoint == Vector2.new(0, 0.5)).toBe(true)
+		for _, line in { between, under } do
+			expect(line.BackgroundColor3 == INK).toBe(true)
+			expect(line.ZIndex > button.ZIndex).toBe(true)
+		end
+		-- The right button: the clip over the body's right half, the shape in it moved back by that half.
+		local rightFace = (mounted:FindFirstChild("Right") :: Frame):FindFirstChild("Face") :: Frame
+		local rightBody = (rightFace:FindFirstChild("Mouse") :: Frame):FindFirstChild("Body") :: Frame
+		local rightButton = rightBody:FindFirstChild("Button") :: Frame
+		expect(rightButton.Position).toEqual(UDim2.fromScale(0.5, 0))
+		expect((rightButton:FindFirstChild("Ink") :: Frame).Position).toEqual(UDim2.fromScale(-1, 0))
+		-- No name on it; cooling, its seconds lettered over the mouse in the text colour, inked.
+		local legend = face:FindFirstChild("Legend") :: TextLabel
+		expect(legend.Text).toBe("")
+		moving.setSeconds("0.7")
+		expect(legend.Text).toBe("0.7")
+		expect(legend.TextColor3 == config.UI.hud.textColor).toBe(true)
+		expect(legend:FindFirstChildOfClass("UIStroke") ~= nil).toBe(true)
+		expect(legend.ZIndex > mouse.ZIndex).toBe(true)
+		-- Pressed, the cap turns the pressed colour as every key's does.
+		moving.setPressed(true)
+		expect(face.BackgroundColor3 == PRESSED).toBe(true)
+	end)
+
+	it("shows a gamepad's glyph instead of a cap, its seconds lettered over it", function()
+		local moving = capBindings()
+		local name, cap = Style.keyCap(config, { image = GLYPH }, CAP, 1, moving.bindings)
+		expect(name).toBe("Glyph")
+		local glyph = mount(cap):FindFirstChild("Box") :: Frame
+		expect(glyph.Size).toEqual(UDim2.fromOffset(30, 30))
+		local face = glyph:FindFirstChild("Face") :: ImageLabel
+		expect(face.Image).toBe(GLYPH)
+		expect(face.BackgroundTransparency).toBe(1)
+		local label = face:FindFirstChild("Legend") :: TextLabel
+		expect(label.Text).toBe("")
+		moving.setSeconds("0.7")
+		expect(label.Text).toBe("0.7")
+		expect(label.TextColor3 == config.UI.hud.textColor).toBe(true)
+		expect(label:FindFirstChildOfClass("UIStroke") ~= nil).toBe(true)
+		-- Round, as Roblox's glyphs are.
+		local ink = ((face:FindFirstChild("Sweep") :: Frame):FindFirstChild("Left") :: Frame):FindFirstChild("Ink")
+		expect(((ink :: Frame):FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(Style.ROUND)
 	end)
 end)

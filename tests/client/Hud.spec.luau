@@ -70,11 +70,37 @@ local function endMatch()
 	HudStore:onEvents(Fixtures.ruleEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } }))
 end
 
--- The key a hint row shows: its key's text, or its glyph.
-local function hintKey(control: string): (string?, string?)
+-- A hint row's parts (#354, look C): the row, its fading group, its key's slot, cap face and legend, its label and
+-- its mark.
+local function hint(control: string): any
 	local row = part("ControlHints"):FindFirstChild(control)
-	local key, glyph = row:FindFirstChild("Key"), row:FindFirstChild("Glyph")
-	return if key ~= nil then key.Text else nil, if glyph ~= nil then glyph.Image else nil
+	local line = row.Group.Line
+	local slot = line:FindFirstChild("Key") or line:FindFirstChild("Glyph")
+	return {
+		row = row,
+		group = row.Group,
+		slot = slot,
+		face = slot.Face,
+		legend = slot.Face.Legend,
+		label = line.Label,
+		mark = row.Mark,
+	}
+end
+
+-- Which button a hint row's key cap inks on its mouse (#354, Q207): "Left" or "Right"; nil for a key with none.
+local function mouseButton(control: string): string?
+	local mouse: any = hint(control).face:FindFirstChild("Mouse")
+	if mouse == nil then
+		return nil
+	end
+	return if mouse.Body.Button.Position.X.Scale == 0 then "Left" else "Right"
+end
+
+-- The key a hint row shows: its cap's legend, or its glyph.
+local function hintKey(control: string): (string?, string?)
+	local parts = hint(control)
+	local keyboard = parts.slot.Name == "Key"
+	return if keyboard then parts.legend.Text else nil, if keyboard then nil else parts.face.Image
 end
 
 beforeEach(function()
@@ -290,13 +316,15 @@ describe("Hud", function()
 		expect((hintKey("pump"))).toBe("Shift")
 		expect((hintKey("jump"))).toBe("Space")
 		expect((hintKey("tackle"))).toBe("E")
-		expect(part("ControlHints").tackle.Label.Text).toBe(config.UI.controlLabels.Tackle)
+		expect(hint("tackle").label.Text).toBe(config.UI.controlLabels.Tackle)
 		expect(part("ControlHints").attach.Visible).toBe(false)
-		-- Without the ball the throw's row works Ball Focus, on its own key; with it, the throw's.
-		expect((hintKey("throw"))).toBe("RMB")
+		-- Without the ball the throw's row works Ball Focus, on its own key; with it, the throw's: the mouse's right
+		-- button, then its left, each drawn as a mouse with that button inked (Q207).
+		expect(mouseButton("throw")).toBe("Right")
+		expect(mouseButton("tackle")).toBeNil()
 		BallCarrier:set(LOCAL_ID)
 		Hud:step(0)
-		expect((hintKey("throw"))).toBe("LMB")
+		expect(mouseButton("throw")).toBe("Left")
 
 		preferred = Enum.PreferredInput.Gamepad
 		Hud:step(0)
@@ -314,34 +342,104 @@ describe("Hud", function()
 	end)
 
 	-- Magnetic Pass (#315, the owner: Q103): RC fades the whole row with nobody in the aim (Video 34 at 43.0 s); ours
-	-- by the HUD's dim, as the score tab's greyed Switch team (Q118).
+	-- by the HUD's dim, as the score tab's greyed Switch team (Q118), easing over easeSeconds (Q194).
 	it("greys the Magnetic Pass hint with nobody in the aim, and lights it with a teammate there", function()
 		local dim = config.UI.hud.dimTransparency
+		local ease = config.UI.hud.motion.easeSeconds
 		Fixtures.spawnSkater(folder, config)
 		BallCarrier:set(LOCAL_ID)
 		ActionController:step(DT)
 		Hud:step(0)
-		local hints = part("ControlHints")
-		expect(hints.pass.Visible).toBe(true)
-		expect(hints.pass.Label.Text).toBe(config.UI.controlLabels.Pass)
-		expect(hints.pass.Label.TextTransparency).toBeCloseTo(dim, 4)
-		expect(hints.pass.Key.TextTransparency).toBeCloseTo(dim, 4)
-		expect(hints.throw.Label.TextTransparency).toBe(0)
-		expect(hints.throw.Key.TextTransparency).toBe(0)
+		local pass = hint("pass")
+		expect(pass.row.Visible).toBe(true)
+		expect(pass.label.Text).toBe(config.UI.controlLabels.Pass)
+		expect(pass.group.GroupTransparency).toBe(0)
+		Hud:step(ease / 2)
+		expect(pass.group.GroupTransparency).toBeCloseTo(dim * 0.875, 4)
+		Hud:step(ease / 2)
+		expect(pass.group.GroupTransparency).toBeCloseTo(dim, 4)
+		expect(hint("throw").group.GroupTransparency).toBe(0)
 		table.insert(
 			skaters,
 			(Fixtures.otherSkater(folder, "2", Vector3.new(0, config.Movement.hoverHeight, -40), "Blue"))
 		)
 		ActionController:step(DT)
 		Hud:step(0)
-		expect(hints.pass.Label.TextTransparency).toBe(0)
-		expect(hints.pass.Key.TextTransparency).toBe(0)
-		-- A gamepad's glyph fades the same way.
+		Hud:step(ease)
+		expect(pass.group.GroupTransparency).toBe(0)
+		-- A gamepad's row fades the same way.
 		table.clear(skaters)
 		ActionController:step(DT)
 		preferred = Enum.PreferredInput.Gamepad
 		Hud:step(0)
-		expect(part("ControlHints").pass.Glyph.ImageTransparency).toBeCloseTo(dim, 4)
+		Hud:step(ease)
+		expect(hint("pass").group.GroupTransparency).toBeCloseTo(dim, 4)
+	end)
+
+	-- The owner (Q186): the key pressed pops with RC's >> beside it for the press's time (motion.press).
+	it("pops the key pressed for the press's time, with its mark, the throw's row on Ball Focus's keys", function()
+		local press = config.UI.hud.motion.press
+		local look = config.UI.hud.look
+		local context = InputController.context
+		Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		local pump = hint("pump")
+		local scale = pump.face:FindFirstChildOfClass("UIScale") :: UIScale
+		expect(pump.mark.Visible).toBe(false)
+		Fixtures.scriptedBinding(context, "Pump"):Fire(true)
+		task.wait() -- Pressed is deferred
+		Hud:step(0)
+		expect(pump.mark.Visible).toBe(true)
+		expect(pump.face.BackgroundColor3 == look.pressed).toBe(true)
+		Hud:step(press.seconds / 3)
+		expect(scale.Scale).toBeCloseTo(press.scale, 4)
+		Hud:step(press.seconds)
+		expect(pump.mark.Visible).toBe(false)
+		expect(scale.Scale).toBe(1)
+		expect(pump.face.BackgroundColor3 == look.key).toBe(true)
+		-- Without the ball the throw's row is Ball Focus's: its key pops it, the throw's own does not.
+		Fixtures.scriptedBinding(context, "Throw"):Fire(true)
+		task.wait()
+		Hud:step(0)
+		expect(hint("throw").mark.Visible).toBe(false)
+		Fixtures.scriptedBinding(context, "BallFocus"):Fire(true)
+		task.wait()
+		Hud:step(0)
+		expect(hint("throw").mark.Visible).toBe(true)
+		-- Catching the ball gives the row the throw's keys: their earlier presses pop nothing.
+		Hud:step(press.seconds)
+		local throw = Fixtures.scriptedBinding(context, "Throw")
+		throw:Fire(false)
+		throw:Fire(true)
+		task.wait()
+		Hud:step(0)
+		BallCarrier:set(LOCAL_ID)
+		Hud:step(0)
+		expect(hint("throw").mark.Visible).toBe(false)
+	end)
+
+	-- The owner (Q186): a key on cooldown fills back clockwise with the seconds left on it.
+	it("writes a cooling key's seconds left on its cap and sweeps it back clockwise", function()
+		Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		local pass = hint("pass")
+		local key = pass.legend.Text
+		local right = pass.face.Sweep.Right.Ink.Step :: UIGradient
+		expect(right.Rotation).toBeCloseTo(360, 3)
+		local runner = ActionController.runner
+		runner:start("CallPass", { hasBall = false, knockedDown = false })
+		Hud:step(0)
+		local whole = config.Actions.CallPass.cooldown
+		expect(pass.legend.Text).toBe(string.format(config.UI.text.cooldown, whole))
+		expect(right.Rotation).toBeCloseTo(180, 3)
+		runner:step(whole / 5)
+		Hud:step(0)
+		expect(pass.legend.Text).toBe(string.format(config.UI.text.cooldown, whole * 4 / 5))
+		expect(right.Rotation).toBeCloseTo(252, 3)
+		runner:step(whole)
+		Hud:step(0)
+		expect(pass.legend.Text).toBe(key)
+		expect(right.Rotation).toBeCloseTo(360, 3)
 	end)
 
 	-- The letter NameTags shows over a pass's target (#315; RC Video 34 at 41.6 s): the pass hint's own key, or on

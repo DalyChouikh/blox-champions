@@ -31,6 +31,17 @@ local function entry(
 end
 
 describe("HudText", function()
+	-- A key cooling down (#354, Q186): its seconds left to a tenth, rounded as the page's were, in this spec's own
+	-- template; one string per tenth.
+	it("writes a cooling key's seconds left to a tenth", function()
+		local cooling = HudText.new(Fixtures.config({ UI = { text = { cooldown = "%.1fs" } } }))
+		expect(cooling:cooldown(1.24)).toBe("1.2s")
+		expect(cooling:cooldown(1.16)).toBe("1.2s")
+		expect(cooling:cooldown(0.96)).toBe("1.0s")
+		expect(cooling:cooldown(0.04)).toBe("0.0s")
+		expect(cooling:cooldown(1.5)).toBe("1.5s")
+	end)
+
 	it("writes the clock as minutes and seconds", function()
 		expect(text:clock(300)).toBe("5:00")
 		expect(text:clock(65)).toBe("1:05")

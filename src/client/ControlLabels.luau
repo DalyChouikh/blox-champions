@@ -9,6 +9,7 @@
 -- carrier's throw, as RC's hints read through a carrier's dive and slide (#314, Video 33 at 17.6-19.0 s). The throw's
 -- control works Ball Focus while it would start no throw: without the ball. With the ball the pass's control reads
 -- Magnetic Pass; with nobody to pass to it shows greyed and does not work, as RC's does (#315, Video 34 at 43.0 s).
+-- An action key's row also tells how long its action still cools down (#354, the owner's Q186).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -33,6 +34,9 @@ ControlLabels.CONTROLS = table.freeze({
 -- The controls the skating takes, which do nothing while it is locked (Attach too, but a locked skater is never
 -- SkateController.attachable).
 local SKATING: { [string]: boolean } = table.freeze({ jump = true, pump = true, brake = true })
+
+-- The controls that start actions (Config.Input.actions).
+local ACTION_KEYS: { [string]: boolean } = table.freeze({ tackle = true, uppercut = true, pass = true, throw = true })
 
 -- A control never greyed: lit whenever it shows.
 local function lit(label: string?): (string?, boolean)
@@ -76,17 +80,43 @@ function ControlLabels.label(
 	return labels[action], not ready
 end
 
--- The keys that work `control` now (Config.Input): Ball Focus's for the throw's control while it would start no throw.
+-- The control whose keys work `control` now: Ball Focus for the throw's control while it would start no throw.
+function ControlLabels.worked(control: Config.TouchControl, actions: ActionController.ActionController): Config.Control
+	if control == "throw" and actions:keyAction("throw") == nil then
+		return "ballFocus"
+	end
+	return control
+end
+
+-- The keys that work `control` now (Config.Input): those of ControlLabels.worked's control.
 function ControlLabels.keys(
 	control: Config.TouchControl,
 	config: Config.GameConfig,
 	actions: ActionController.ActionController
 ): { Enum.KeyCode }
-	local input = config.Input
-	if control == "throw" and actions:keyAction("throw") == nil then
-		return input.ballFocus
+	return config.Input[ControlLabels.worked(control, actions)]
+end
+
+-- How long the action `control` would start now still cools down (ActionRunner), in seconds, and that as a share
+-- of its whole cooldown; 0 and 0 while it is not cooling, or the control starts no action.
+function ControlLabels.cooldown(
+	control: Config.TouchControl,
+	config: Config.GameConfig,
+	actions: ActionController.ActionController
+): (number, number)
+	if not ACTION_KEYS[control] then
+		return 0, 0
 	end
-	return input[control]
+	local action: Config.ActionName? = actions:keyAction(control :: Config.ActionKey)
+	if action == nil then
+		return 0, 0
+	end
+	-- Never more than the whole cooldown, which a cooling action has above 0.
+	local left = actions.runner:cooldownLeft(action)
+	if left <= 0 then
+		return 0, 0
+	end
+	return left, left / config.Actions[action].cooldown
 end
 
 return table.freeze(ControlLabels)

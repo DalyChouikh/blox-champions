@@ -561,6 +561,10 @@ describe("Config defaults", function()
 			touchPassTarget = "\u{25BC}",
 			touchMove = "Move",
 			switchTeam = "Switch team",
+			-- A key cooling down shows its seconds left (#354, Q186), to a tenth as the page wrote them.
+			cooldown = "%.1f",
+			-- RC's >> beside a pressed key (#354, Q186), as the page drew it.
+			pressMark = "\u{BB}",
 		})
 		expect(ui.hud).toEqual({
 			font = Enum.Font.BuilderSansBold,
@@ -593,11 +597,16 @@ describe("Config defaults", function()
 				shade = 0.4,
 				-- The page's brighter pair, the HUD's own (Q201); the world keeps UI.teamColors.
 				teamColors = { Blue = Color3.fromRGB(61, 139, 255), Orange = Color3.fromRGB(255, 154, 60) },
+				-- The page's key caps (#354): yellow, orange while pressed, a 62% black sweep while cooling.
+				key = Color3.fromRGB(255, 210, 63),
+				pressed = Color3.fromRGB(255, 138, 44),
+				sweepTransparency = 0.38,
 			},
 			-- Every change animates briefly (#352, Q194): the page's pop, bounce, fill and glow.
 			motion = {
 				pop = { seconds = 0.2, overshoot = 0.12 },
 				bounce = { seconds = 0.4, scale = 1.55, rebound = 0.9 },
+				press = { seconds = 0.3, scale = 0.88, rebound = 1.06 },
 				easeSeconds = 0.25,
 				lapHoldSeconds = 0.5,
 				glow = { seconds = 2.4, transparency = 0.8 },
@@ -630,7 +639,24 @@ describe("Config defaults", function()
 				},
 				banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(720, 110) },
 				feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
-				hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
+				-- Look C's rows (#354), at the page's sizes, the pressed key's mark outside them (Q195b).
+				hints = {
+					position = UDim2.new(1, -24, 0.5, 0),
+					rowHeight = 41,
+					clearance = 3,
+					inset = { left = 5, right = 12 },
+					gap = 11,
+					textSize = 22,
+					-- A mouse button's key drawn as a mouse (Q207: A1).
+					cap = {
+						height = 34,
+						padding = 8,
+						corner = UDim.new(0, 10),
+						textSize = 17,
+						mouse = { width = 16, height = 24, buttons = 10, line = 2 },
+					},
+					press = { textSize = 24, gap = 16 },
+				},
 				-- Bottom right on desktop, small top left on touch (#352, Q192).
 				speedometer = {
 					position = UDim2.new(1, -31, 1, -22),
@@ -2201,6 +2227,23 @@ describe("Config.forMode", function()
 				overrides = hud({ motion = { bounce = { rebound = 1.1 } } }),
 				message = "UI.hud.motion.bounce.rebound: must be <= 1 (got 1.1)",
 			},
+			-- A pressed key goes in no bigger than its size, then springs back to no smaller (#354).
+			{
+				overrides = hud({ motion = { press = { seconds = 0 } } }),
+				message = "UI.hud.motion.press.seconds: must be > 0 (got 0)",
+			},
+			{
+				overrides = hud({ motion = { press = { scale = 0 } } }),
+				message = "UI.hud.motion.press.scale: must be > 0 (got 0)",
+			},
+			{
+				overrides = hud({ motion = { press = { scale = 1.1 } } }),
+				message = "UI.hud.motion.press.scale: must be <= 1 (got 1.1)",
+			},
+			{
+				overrides = hud({ motion = { press = { rebound = 0.9 } } }),
+				message = "UI.hud.motion.press.rebound: must be >= 1 (got 0.9)",
+			},
 			{
 				overrides = hud({ motion = { easeSeconds = 0 } }),
 				message = "UI.hud.motion.easeSeconds: must be > 0 (got 0)",
@@ -2284,6 +2327,7 @@ describe("Config.forMode", function()
 					motion = {
 						pop = { seconds = 0.01, overshoot = 0 },
 						bounce = { seconds = 0.01, scale = 1, rebound = 0.01 },
+						press = { seconds = 0.01, scale = 0.01, rebound = 1 },
 						easeSeconds = 0.01,
 						lapHoldSeconds = 0,
 						glow = { seconds = 0.01, transparency = 0 },
@@ -2306,6 +2350,9 @@ describe("Config.forMode", function()
 		}).UI.hud
 		expect(hud.look.shade).toBe(0.99)
 		expect(hud.motion.bounce).toEqual({ seconds = 0.01, scale = 1, rebound = 0.01 })
+		expect(hud.motion.press).toEqual({ seconds = 0.01, scale = 0.01, rebound = 1 })
+		local still = Fixtures.config({ UI = { hud = { motion = { press = { scale = 1 } } } } }).UI.hud.motion
+		expect(still.press.scale).toBe(1)
 		expect(hud.motion.glow.transparency).toBe(0)
 		expect(hud.layout.scoreboard.textSizes).toEqual({ score = 89, clock = 56, worth = 26, period = 22 })
 		expect(hud.layout.compactScoreboard.textSizes).toEqual({ score = 44, clock = 44, worth = 34, period = 18 })
@@ -2314,6 +2361,164 @@ describe("Config.forMode", function()
 		expect(hud.look.bannerDigitRise).toBe(0)
 		local halfway = Fixtures.config({ UI = { hud = { look = { bannerDigitRise = 0.5 } } } }).UI.hud.look
 		expect(halfway.bannerDigitRise).toBe(0.5)
+	end)
+
+	-- The desktop hints in look C (#354): the page's key caps, its rows and the pressed key's mark (Q186, Q195b).
+	it("rejects the hints' look C settings outside their limits", function()
+		local function hud(values: { [string]: any }): { [string]: any }
+			return { UI = { hud = values } }
+		end
+		local function hints(values: { [string]: any }): { [string]: any }
+			return hud({ layout = { hints = values } })
+		end
+		local fit = "UI: a hint's key cap and label must fit its row (cap.height and textSize <= rowHeight, "
+			.. "cap.textSize <= cap.height)"
+		local mouseFit = "UI: a hint cap's mouse must fit its cap in its ink, the line under its buttons on its "
+			.. "straight sides (height + 2 × line <= cap.height, width / 2 + line / 2 <= buttons <= "
+			.. "height - width / 2 - line / 2)"
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{
+				overrides = hud({ look = { key = "yellow" } }),
+				message = "UI.hud.look.key: expected Color3, got string",
+			},
+			{
+				overrides = hud({ look = { pressed = 1 } }),
+				message = "UI.hud.look.pressed: expected Color3, got number",
+			},
+			-- A sweep as see-through as nothing would not show the cooldown.
+			{
+				overrides = hud({ look = { sweepTransparency = 1 } }),
+				message = "UI.hud.look.sweepTransparency: must be < 1 (got 1)",
+			},
+			{
+				overrides = hud({ look = { sweepTransparency = -0.1 } }),
+				message = "UI.hud.look.sweepTransparency: must be >= 0 (got -0.1)",
+			},
+			{ overrides = hints({ rowHeight = 0 }), message = "UI.hud.layout.hints.rowHeight: must be > 0 (got 0)" },
+			{ overrides = hints({ clearance = -1 }), message = "UI.hud.layout.hints.clearance: must be >= 0 (got -1)" },
+			{
+				overrides = hints({ inset = { left = -1 } }),
+				message = "UI.hud.layout.hints.inset.left: must be >= 0 (got -1)",
+			},
+			{
+				overrides = hints({ inset = { right = -1 } }),
+				message = "UI.hud.layout.hints.inset.right: must be >= 0 (got -1)",
+			},
+			{ overrides = hints({ gap = -1 }), message = "UI.hud.layout.hints.gap: must be >= 0 (got -1)" },
+			-- Roblox clamps text sizes to 1..100 (measured).
+			{ overrides = hints({ textSize = 0 }), message = "UI.hud.layout.hints.textSize: must be >= 1 (got 0)" },
+			{
+				overrides = hints({ cap = { height = 0 } }),
+				message = "UI.hud.layout.hints.cap.height: must be > 0 (got 0)",
+			},
+			{
+				overrides = hints({ cap = { padding = -1 } }),
+				message = "UI.hud.layout.hints.cap.padding: must be >= 0 (got -1)",
+			},
+			{
+				overrides = hints({ cap = { corner = 10 } }),
+				message = "UI.hud.layout.hints.cap.corner: expected UDim, got number",
+			},
+			{
+				overrides = hints({ cap = { textSize = 101 } }),
+				message = "UI.hud.layout.hints.cap.textSize: must be <= 100 (got 101)",
+			},
+			{
+				overrides = hints({ press = { textSize = 0 } }),
+				message = "UI.hud.layout.hints.press.textSize: must be >= 1 (got 0)",
+			},
+			{
+				overrides = hints({ press = { gap = -1 } }),
+				message = "UI.hud.layout.hints.press.gap: must be >= 0 (got -1)",
+			},
+			-- A 42 px cap or label in a 41 px row; an 35 px key name on a 34 px cap.
+			{ overrides = hints({ cap = { height = 42 } }), message = fit },
+			{ overrides = hints({ textSize = 42 }), message = fit },
+			{ overrides = hints({ cap = { textSize = 35 } }), message = fit },
+			-- A mouse's sizes in whole pixels (a UDim's offset drops a fraction).
+			{
+				overrides = hints({ cap = { mouse = { width = 0 } } }),
+				message = "UI.hud.layout.hints.cap.mouse.width: must be >= 1 (got 0)",
+			},
+			{
+				overrides = hints({ cap = { mouse = { height = 24.5 } } }),
+				message = "UI.hud.layout.hints.cap.mouse.height: must be an integer (got 24.5)",
+			},
+			{
+				overrides = hints({ cap = { mouse = { buttons = 0 } } }),
+				message = "UI.hud.layout.hints.cap.mouse.buttons: must be >= 1 (got 0)",
+			},
+			{
+				overrides = hints({ cap = { mouse = { line = 0 } } }),
+				message = "UI.hud.layout.hints.cap.mouse.line: must be >= 1 (got 0)",
+			},
+			-- A 31 px mouse in its 2 px ink on a 34 px cap; the line under its buttons on the 16 px body's round top
+			-- (8 - 1 < 8) or round bottom (16 + 1 > 24 - 8).
+			{ overrides = hints({ cap = { mouse = { height = 31 } } }), message = mouseFit },
+			{ overrides = hints({ cap = { mouse = { buttons = 8 } } }), message = mouseFit },
+			{ overrides = hints({ cap = { mouse = { buttons = 16 } } }), message = mouseFit },
+			-- The seconds left take one number, to a tenth by default; the mark shows.
+			{
+				overrides = { UI = { text = { cooldown = "%.1f of %.1f" } } },
+				message = "UI.text.cooldown: placeholder count must be 1",
+			},
+			{ overrides = { UI = { text = { pressMark = "" } } }, message = "UI.text.pressMark: must not be empty" },
+			-- The column's rows size themselves: the old fixed size has no reader.
+			{
+				overrides = hints({ size = UDim2.fromOffset(220, 300) }),
+				message = "UI.hud.layout.hints.size: unknown key",
+			},
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config(case.overrides)
+			end).toThrow(case.message)
+		end
+	end)
+
+	it("accepts the hints' look C settings just inside their limits", function()
+		local config = Fixtures.config({
+			UI = {
+				hud = {
+					look = { sweepTransparency = 0 },
+					layout = {
+						-- The cap, its name and the label exactly as tall as the row.
+						hints = {
+							rowHeight = 41,
+							clearance = 0,
+							inset = { left = 0, right = 0 },
+							gap = 0,
+							textSize = 41,
+							-- A mouse as tall as the cap leaves in its ink, its buttons' line just under its round top.
+							cap = {
+								height = 41,
+								padding = 0,
+								textSize = 41,
+								mouse = { width = 20, height = 37, buttons = 11, line = 2 },
+							},
+							press = { textSize = 1, gap = 0 },
+						},
+					},
+				},
+				text = { cooldown = "%5.2fs" },
+			},
+		})
+		local hints = config.UI.hud.layout.hints
+		expect(hints.cap).toEqual({
+			height = 41,
+			padding = 0,
+			corner = UDim.new(0, 10),
+			textSize = 41,
+			mouse = { width = 20, height = 37, buttons = 11, line = 2 },
+		})
+		-- The default 16 x 24 mouse with its buttons' line just over its round bottom (15 + 1 = 24 - 8).
+		local low = Fixtures.config({ UI = { hud = { layout = { hints = { cap = { mouse = { buttons = 15 } } } } } } })
+		expect(low.UI.hud.layout.hints.cap.mouse.buttons).toBe(15)
+		expect(hints.textSize).toBe(41)
+		expect(hints.clearance).toBe(0)
+		expect(hints.press).toEqual({ textSize = 1, gap = 0 })
+		expect(config.UI.hud.look.sweepTransparency).toBe(0)
+		expect(config.UI.text.cooldown).toBe("%5.2fs")
 	end)
 
 	it("rejects the old lap text, score pips and speedometer size as unknown", function()

@@ -2,8 +2,10 @@
 -- The controls (spec §8.3) on Roblox's Input Action System, built from Config.Input. One context sits above Roblox's
 -- own character controls and sinks the keys it binds, so their defaults never fire on ours. SkateController reads the
 -- skating keys once per physics step, ActionController the action keys, and CameraController the look and Ball Focus.
--- A press is counted when it happens, so one that starts and ends between two reads still counts; a hold is read as
--- it is now, and the look as the rate Roblox's own camera reads (turn = state × dt). Touch controls hook their stick
+-- A press is counted when it happens, so one that starts and ends between two reads still counts; every button's
+-- presses are counted, and each reader keeps the count it last saw, so the HUD can show the key pressed (#354)
+-- without taking the press from the game. A hold is read as it is now, and the look as the rate Roblox's own camera
+-- reads (turn = state × dt). Touch controls hook their stick
 -- pad and buttons in here. Every key stops while Roblox's menu or its Developer Console is open (also when the menu is
 -- open as this starts): the keys fire then too (measured), and a hold lets go. The menu has signals; the console has
 -- none, so watchOverlays reads it once a frame. `paused` tells the skating and the actions that a hold let go because
@@ -32,9 +34,20 @@ export type ActionKeys = { tackle: boolean, uppercut: boolean, pass: boolean, th
 -- One read of the camera keys: the look (radians per second), Ball Focus held now, and pressed since the last read.
 export type CameraKeys = { look: Vector2, ballFocus: boolean, ballFocusPressed: boolean }
 
--- The pressed (not held) buttons, each counted on its own.
-type Presses = { jump: number, tackle: number, uppercut: number, pass: number, ballFocus: number, switchTeam: number }
-type Pressed = "jump" | "tackle" | "uppercut" | "pass" | "ballFocus" | "switchTeam"
+-- Every button's presses, each counted on its own since the controls were built.
+type Pressed = Config.Control | "switchTeam"
+type Presses = {
+	jump: number,
+	pump: number,
+	brake: number,
+	attach: number,
+	tackle: number,
+	uppercut: number,
+	pass: number,
+	throw: number,
+	ballFocus: number,
+	switchTeam: number,
+}
 type LookBindings = { mouse: InputBinding, stick: InputBinding, touch: InputBinding }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
@@ -64,6 +77,9 @@ export type InputController = {
 	scoreTabHeld: (self: InputController) -> boolean,
 	-- Whether Switch team's key (T, or D-pad Up) was pressed since its last read.
 	switchTeamPressed: (self: InputController) -> boolean,
+	-- How many times `control`'s keys were pressed since the controls were built: the HUD compares it with the count
+	-- it last saw (#354), so it takes no press from the game's reads.
+	pressCount: (self: InputController, control: Config.Control) -> number,
 	-- Roblox's menu or Developer Console is open: every key is stopped.
 	paused: boolean,
 	destroy: (self: InputController) -> (),
@@ -80,6 +96,8 @@ export type InputController = {
 	_lookBindings: LookBindings,
 	_stick: InputBinding,
 	_presses: Presses,
+	-- The counts the game's reads last took.
+	_taken: Presses,
 	_connections: { RBXScriptConnection },
 	-- The Roblox look settings last applied, and where they are read.
 	_lookSettings: () -> (number, number, boolean),
@@ -95,7 +113,18 @@ export type InputController = {
 
 -- No presses counted yet.
 local function noPresses(): Presses
-	return { jump = 0, tackle = 0, uppercut = 0, pass = 0, ballFocus = 0, switchTeam = 0 }
+	return {
+		jump = 0,
+		pump = 0,
+		brake = 0,
+		attach = 0,
+		tackle = 0,
+		uppercut = 0,
+		pass = 0,
+		throw = 0,
+		ballFocus = 0,
+		switchTeam = 0,
+	}
 end
 
 local function getCore(key: string): any
@@ -158,7 +187,7 @@ local function newButton(context: InputContext, name: string, keys: { Enum.KeyCo
 	return action
 end
 
--- A button whose presses are counted under `pressed` until the next read.
+-- A button whose presses are counted under `pressed`.
 local function newPressButton(
 	self: InputController,
 	name: string,
@@ -175,11 +204,11 @@ local function newPressButton(
 	return action
 end
 
--- Whether `pressed` was pressed since its last read; the count starts over.
+-- Whether `pressed` was pressed since the game last read it.
 local function takePress(self: InputController, pressed: Pressed): boolean
-	local presses = self._presses
-	local any = presses[pressed] > 0
-	presses[pressed] = 0
+	local count = self._presses[pressed]
+	local any = count ~= self._taken[pressed]
+	self._taken[pressed] = count
 	return any
 end
 
@@ -222,6 +251,7 @@ local InputController: InputController = {
 	_lookBindings = nil :: any,
 	_stick = nil :: any,
 	_presses = noPresses(),
+	_taken = noPresses(),
 	_connections = {},
 	_lookSettings = function(): (number, number, boolean)
 		return 1, 1, false
@@ -244,6 +274,7 @@ local InputController: InputController = {
 		context.Sink = true
 		self.context = context
 		self._presses = noPresses()
+		self._taken = noPresses()
 		self._connections = {}
 		self._lookSettings = deps.LookSettings or lookSettingsOf(UserSettings():GetService("UserGameSettings"))
 
@@ -264,13 +295,13 @@ local InputController: InputController = {
 		self._move = move
 		self._stick = stick
 		self._jump = newPressButton(self, NAMES.jump, input.jump, "jump")
-		self._pump = newButton(context, NAMES.pump, input.pump)
-		self._brake = newButton(context, NAMES.brake, input.brake)
-		self._attach = newButton(context, NAMES.attach, input.attach)
+		self._pump = newPressButton(self, NAMES.pump, input.pump, "pump")
+		self._brake = newPressButton(self, NAMES.brake, input.brake, "brake")
+		self._attach = newPressButton(self, NAMES.attach, input.attach, "attach")
 		newPressButton(self, NAMES.tackle, input.tackle, "tackle")
 		newPressButton(self, NAMES.uppercut, input.uppercut, "uppercut")
 		newPressButton(self, NAMES.pass, input.pass, "pass")
-		self._throw = newButton(context, NAMES.throw, input.throw)
+		self._throw = newPressButton(self, NAMES.throw, input.throw, "throw")
 		self._ballFocus = newPressButton(self, NAMES.ballFocus, input.ballFocus, "ballFocus")
 		self._scoreTab = newButton(context, NAMES.scoreTab, input.scoreTab)
 		newPressButton(self, NAMES.switchTeam, input.switchTeam, "switchTeam")
@@ -381,6 +412,10 @@ local InputController: InputController = {
 
 	switchTeamPressed = function(self: InputController): boolean
 		return takePress(self, "switchTeam")
+	end,
+
+	pressCount = function(self: InputController, control: Config.Control): number
+		return self._presses[control]
 	end,
 
 	watchOverlays = function(self: InputController)
