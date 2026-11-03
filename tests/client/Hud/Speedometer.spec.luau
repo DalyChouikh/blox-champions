@@ -12,6 +12,8 @@ local Speedometer = require(game:GetService("StarterPlayer").StarterPlayerScript
 local config = Fixtures.config()
 local hud = config.UI.hud
 local place = hud.layout.speedometer
+-- The HUD's own Orange (look C, the owner: Q201).
+local ORANGE = config.UI.hud.look.teamColors.Orange
 
 local folder: Folder?
 
@@ -24,35 +26,52 @@ afterEach(function()
 end)
 
 describe("Speedometer", function()
-	it("shows the speed in km/h, and nothing for a spectator", function()
+	it("shows big digits in the team's colour over a small KM/H, bottom right, and nothing for a spectator", function()
 		local parent = Instance.new("Folder")
 		parent.Name = "SpeedometerTest"
 		parent.Parent = workspace
 		folder = parent
-		local speed, setSpeed = React.createBinding("120 km/h")
-		local function meter(device: Enum.PreferredInput, visible: boolean): React.ReactElement
+		local speed, setSpeed = React.createBinding("120")
+		local function meter(touch: boolean, compact: boolean, visible: boolean): React.ReactElement
 			return React.createElement(React.Fragment, nil, {
-				Speedometer = React.createElement(
-					Speedometer,
-					{ config = config, speed = speed, device = device, visible = visible }
-				),
+				Speedometer = React.createElement(Speedometer, {
+					config = config,
+					speed = speed,
+					color = ORANGE,
+					touch = touch,
+					compact = compact,
+					visible = visible,
+				}),
 			})
 		end
-		local mounted, rerender = Fixtures.mount(meter(Enum.PreferredInput.KeyboardAndMouse, true), parent)
-		local label = mounted:FindFirstChild("Speedometer") :: TextLabel
-		expect(label.Visible).toBe(true)
-		expect(label.Text).toBe("120 km/h")
-		expect(label.Position == place.position).toBe(true)
-		expect(label.AnchorPoint == Vector2.one and label.TextXAlignment == Enum.TextXAlignment.Right).toBe(true)
-		expect(label.TextSize).toBe(hud.titleSize)
-		setSpeed("96 km/h")
-		expect(label.Text).toBe("96 km/h")
-		-- On touch, small in the top-left corner: the right side holds the touch buttons and the score button.
-		rerender(meter(Enum.PreferredInput.Touch, true))
-		expect(label.Position == place.touchPosition).toBe(true)
-		expect(label.AnchorPoint == Vector2.zero and label.TextXAlignment == Enum.TextXAlignment.Left).toBe(true)
-		expect(label.TextSize).toBe(hud.textSize)
-		rerender(meter(Enum.PreferredInput.KeyboardAndMouse, false))
-		expect(label.Visible).toBe(false)
+		local mounted, rerender = Fixtures.mount(meter(false, false, true), parent)
+		local frame = mounted:FindFirstChild("Speedometer") :: Frame
+		local digits = frame:FindFirstChild("Speed") :: TextLabel
+		local unit = frame:FindFirstChild("Unit") :: TextLabel
+		expect(frame.Visible).toBe(true)
+		expect(frame.Position == place.position and frame.AnchorPoint == Vector2.one).toBe(true)
+		expect(digits.Text).toBe("120")
+		expect(digits.Font).toBe(hud.look.font)
+		expect(digits.TextColor3 == ORANGE).toBe(true)
+		expect(digits.TextSize).toBe(place.textSizes.speed)
+		expect(digits:FindFirstChildOfClass("UIStroke") ~= nil).toBe(true)
+		expect(unit.Text).toBe("KM/H")
+		expect(unit.TextSize).toBe(place.textSizes.unit)
+		expect(unit.TextColor3 == hud.textColor).toBe(true)
+		-- Digits over the unit, both against the right edge.
+		expect(digits.LayoutOrder < unit.LayoutOrder).toBe(true)
+		local layout = frame:FindFirstChildOfClass("UIListLayout") :: UIListLayout
+		expect(layout.HorizontalAlignment).toBe(Enum.HorizontalAlignment.Right)
+		setSpeed("96")
+		expect(digits.Text).toBe("96")
+		-- On touch, in the top-left corner: the right side holds the touch buttons and the score button; small on a
+		-- phone.
+		rerender(meter(true, true, true))
+		expect(frame.Position == place.touchPosition and frame.AnchorPoint == Vector2.zero).toBe(true)
+		expect(layout.HorizontalAlignment).toBe(Enum.HorizontalAlignment.Left)
+		expect(digits.TextSize).toBe(place.compactTextSizes.speed)
+		expect(unit.TextSize).toBe(place.compactTextSizes.unit)
+		rerender(meter(false, false, false))
+		expect(frame.Visible).toBe(false)
 	end)
 end)

@@ -55,9 +55,12 @@ local function keyImage(key: Enum.KeyCode): string
 	return if gamepadKey(name) then `rbxasset://textures/ui/Controls/DefaultController/{name}@2x.png` else ""
 end
 
--- The HUD's part called `name`, wherever it sits; nil while it is not drawn.
+-- The HUD's part called `name`, wherever it sits (the reticle in the full-screen gui, the scoreboard in the safe
+-- area's); nil while it is not drawn.
 local function part(name: string): any
 	return Hud.gui:FindFirstChild(name, true)
+		or Hud.centre:FindFirstChild(name, true)
+		or Hud.top:FindFirstChild(name, true)
 end
 
 -- Ends the match as the server's MatchEnded does: Blue wins, Ana the MVP.
@@ -101,12 +104,17 @@ beforeEach(function()
 		SendSwitchTeam = function()
 			switches += 1
 		end,
+		-- The HUD never measures the whole screen: a notched phone's reaches past its safe area, where Roblox's top bar
+		-- and our scoreboard are not (probed).
 		InsetArea = function(insets: Enum.ScreenInsets): Rect
 			if insets == Enum.ScreenInsets.CoreUISafeInsets then
 				return screen.hud
 			end
 			expect(insets).toBe(Enum.ScreenInsets.DeviceSafeInsets)
 			return screen.controls
+		end,
+		TopbarInset = function(): Rect
+			return screen.topbar
 		end,
 	})
 end)
@@ -132,8 +140,79 @@ describe("Hud", function()
 		expect(centre.Name).toBe("HudCentre")
 		expect(centre.ResetOnSpawn).toBe(false)
 		expect(centre.ScreenInsets).toBe(Enum.ScreenInsets.None)
+		expect(centre.ZIndexBehavior).toBe(Enum.ZIndexBehavior.Sibling)
 		expect(centre.Parent == folder).toBe(true)
 		expect(centre:FindFirstChild("Reticle") ~= nil).toBe(true)
+		-- The scoreboard is drawn from the top of the device's safe area, the frame GuiService.TopbarInset is measured
+		-- in, so it can sit in the top bar's band beside Roblox's buttons (#352).
+		local top = Hud.top
+		expect(top.Name).toBe("HudTop")
+		expect(top.ResetOnSpawn).toBe(false)
+		expect(top.ScreenInsets).toBe(Enum.ScreenInsets.DeviceSafeInsets)
+		expect(top.ZIndexBehavior).toBe(Enum.ZIndexBehavior.Sibling)
+		expect(top.Parent == folder).toBe(true)
+		expect(top:FindFirstChild("Scoreboard") ~= nil).toBe(true)
+		expect(centre:FindFirstChild("Scoreboard")).toBeNil()
+	end)
+
+	-- One rule for every part (#352): a phone's screen by size (HudScreen.compact), S5 there and S2 elsewhere.
+	it(
+		"draws the phone's scoreboard on a phone's screen and the desktop's on a big one, rendering on a change",
+		function()
+			Hud:step(0)
+			expect(part("BlueChip") ~= nil and part("BlueShield") == nil).toBe(true)
+			local renders = Hud.renders
+			screen = BIG
+			Hud:resize()
+			Hud:step(0)
+			expect(part("BlueShield") ~= nil and part("BlueChip") == nil).toBe(true)
+			expect(Hud.renders).toBe(renders + 1)
+			Hud:step(0)
+			expect(Hud.renders).toBe(renders + 1)
+		end
+	)
+
+	it("tells a phone by the device's safe area, Roblox's top bar included", function()
+		-- 900 x 520 with the bar, 900 x 462 under it: not a phone's (shorter side 500 or more).
+		screen = { hud = Rect.new(0, 0, 900, 462), controls = Rect.new(0, -58, 900, 462), topbar = BIG.topbar }
+		Hud:resize()
+		Hud:step(0)
+		expect(part("BlueShield") ~= nil).toBe(true)
+	end)
+
+	it("puts the scoreboard in the top bar's band, and under the bar where Roblox's buttons reach it", function()
+		screen = BIG
+		Hud:resize()
+		Hud:step(0)
+		local board = part("Scoreboard") :: Frame
+		expect(board.Position.Y.Offset).toBe(config.UI.hud.layout.scoreboard.position.Y.Offset)
+		-- Buttons reaching 700 px in: the desktop board (640 +- 166) would cover them.
+		screen = { hud = BIG.hud, controls = BIG.controls, topbar = Rect.new(700, 0, 1280, 58) }
+		Hud:resize()
+		Hud:step(0)
+		expect(board.Position.Y.Offset).toBe(58 + config.UI.hud.layout.scoreboard.position.Y.Offset)
+	end)
+
+	it("moves the scoreboard without rendering again: a score's bounce, a lap chip filling", function()
+		screen = BIG
+		Hud:resize()
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ possessingTeam = "Blue", lapProgress = 1 }, 1))
+		Hud:step(0)
+		local renders = Hud.renders
+		HudStore:onSnapshot(
+			Fixtures.matchSnapshot({ possessingTeam = "Blue", lapProgress = 2, scores = { Blue = 1, Orange = 0 } }, 2)
+		)
+		Hud:step(0)
+		expect(Hud.renders).toBe(renders + 1)
+		local bounce = part("BlueScore"):FindFirstChildOfClass("UIScale") :: UIScale
+		local chip = (part("LapChips"):FindFirstChild("2") :: Instance):FindFirstChild("Grow", true) :: UIScale
+		Hud:step(config.UI.hud.motion.bounce.seconds / 3)
+		expect(bounce.Scale).toBeCloseTo(config.UI.hud.motion.bounce.scale, 4)
+		expect(chip.Scale > 0).toBe(true)
+		Hud:step(1)
+		expect(bounce.Scale).toBe(1)
+		expect(chip.Scale).toBe(1)
+		expect(Hud.renders).toBe(renders + 1)
 	end)
 
 	it("renders again only when what it shows changes", function()
@@ -298,21 +377,39 @@ describe("Hud", function()
 		expect(part("GetUp")).toBeNil()
 	end)
 
-	it("shows the skater's speed in km/h as the speedometer reads it, and none without a character", function()
+	it("shows the skater's speed in km/h as the speedometer reads it, eased, and none without a character", function()
 		Hud:step(0)
-		local speedometer = part("Speedometer") :: TextLabel
+		local speedometer = part("Speedometer") :: Frame
+		local digits = speedometer:FindFirstChild("Speed") :: TextLabel
 		expect(speedometer.Visible).toBe(false)
-		Fixtures.spawnSkater(folder, config)
+		local rig = Fixtures.spawnSkater(folder, config)
 		local skater = SkateController.skater :: any
 		skater.velocity = Vector3.new(0, 0, -100)
+		-- A skater that appears reads its own speed at once, in the local player's team colour (Ana plays Blue).
 		Hud:step(0)
 		expect(speedometer.Visible).toBe(true)
-		expect(speedometer.Text).toBe("120 km/h")
-		-- Jumping at 50 studs/s: 50 × 1.2 across the ground, not the 78 km/h of |(0, 60, -50)| × 1.2 (#233).
+		expect(digits.Text).toBe("120")
+		expect(digits.TextColor3 == config.UI.hud.look.teamColors.Blue).toBe(true)
+		-- Gone, then back at 25 studs/s: read at once again, not eased from the last skater's speed.
+		rig:Destroy()
+		Hud:step(1 / 60)
+		Fixtures.spawnSkater(folder, config)
+		skater = SkateController.skater :: any
+		skater.velocity = Vector3.new(0, 0, -25)
+		Hud:step(1 / 60)
+		expect(digits.Text).toBe("30")
+		skater.velocity = Vector3.new(0, 0, -100)
+		Hud:step(10)
+		expect(digits.Text).toBe("120")
+		-- Jumping at 50 studs/s: 50 x 1.2 across the ground, not the 78 km/h of |(0, 60, -50)| x 1.2 (#233), eased
+		-- toward it at 6 a second: a sixth of a second on, 50 + 50 / e = 68.39 studs/s, read 82 km/h.
 		skater.mode = "Airborne"
 		skater.velocity = Vector3.new(0, 60, -50)
-		Hud:step(0)
-		expect(speedometer.Text).toBe("60 km/h")
+		expect(config.UI.hud.motion.speedRate).toBe(6)
+		Hud:step(1 / 6)
+		expect(digits.Text).toBe("82")
+		Hud:step(10)
+		expect(digits.Text).toBe("60")
 	end)
 
 	it("opens the score tab while its key is held, and toggles it with the touch button", function()

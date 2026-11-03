@@ -12,7 +12,8 @@ local ScoreTab = require(game:GetService("StarterPlayer").StarterPlayerScripts.C
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 local config = Fixtures.config()
-local colors = config.UI.teamColors
+-- The HUD's own team colours (look C, the owner: Q201).
+local colors = config.UI.hud.look.teamColors
 local text = HudText.new(config)
 local NAMES = { ["1"] = "Ana", ["2"] = "Rex", ["3"] = "Kai", ["9"] = "Gone" }
 

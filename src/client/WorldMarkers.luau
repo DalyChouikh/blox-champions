@@ -29,7 +29,6 @@ local HudStore = require(script.Parent.HudStore)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local RideSurfaces = require(script.Parent.RideSurfaces)
 local ScreenMarker = require(ReplicatedStorage.Shared.Hud.ScreenMarker)
-local Style = require(script.Parent.Hud.Style)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
@@ -130,9 +129,15 @@ local function paint(self: WorldMarkers, color: Color3)
 	self.line.Color = ColorSequence.new(color)
 end
 
+-- A marker's colour: `team`'s in the world (UI.teamColors; the HUD's brighter pair is for the screen only, the
+-- owner's choice, Q201), or the HUD's text colour with no team.
+local function worldColor(config: Config.GameConfig, team: Team?): Color3
+	return if team ~= nil then config.UI.teamColors[team] else config.UI.hud.textColor
+end
+
 -- The ball in `team`'s colour, or its skin's with no team, written when the ball or the colour changes.
 local function wear(self: WorldMarkers, ball: BasePart?, team: Team?)
-	local color = if team ~= nil then Style.teamColor(self._config, team) else self._neutral
+	local color = if team ~= nil then self._config.UI.teamColors[team] else self._neutral
 	if ball ~= nil and (ball ~= self._worn or color ~= self._wornColor) then
 		ball.Color = color
 		self._worn = ball
@@ -358,7 +363,7 @@ local WorldMarkers: WorldMarkers = {
 		local match = self._store.state.match
 		local team: Team? = if match ~= nil then match.possessingTeam else nil
 		local ball = self._ballPart:get()
-		paint(self, Style.teamColor(self._config, team))
+		paint(self, worldColor(self._config, team))
 		wear(self, ball, team)
 		placeBall(self, ball)
 		placeGate(self, if match ~= nil then match.nextGate else nil)

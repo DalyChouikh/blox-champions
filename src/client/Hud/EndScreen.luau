@@ -54,7 +54,7 @@ local function total(config: Config.GameConfig, team: Team.Team, scores: { [Team
 			Size = UDim2.fromOffset(0, size),
 			Text = tostring(scores[team]),
 			TextSize = size,
-			TextColor3 = config.UI.teamColors[team],
+			TextColor3 = Style.teamColor(config, team),
 		})
 	)
 end

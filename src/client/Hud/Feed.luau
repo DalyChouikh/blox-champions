@@ -43,7 +43,7 @@ local function Feed(props: FeedProps): React.ReactElement
 				LayoutOrder = entry.id,
 				Size = row,
 				Text = props.text:feed(entry, props.names),
-				TextColor3 = ui.teamColors[entry.team],
+				TextColor3 = Style.teamColor(config, entry.team),
 			})
 		)
 	end

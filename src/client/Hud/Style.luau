@@ -1,5 +1,7 @@
 --!strict
 -- The props and layout pieces the HUD's parts share, all from Config.UI.hud, so each part spells out only its own.
+-- Look C (the owner, Q184; UI.hud.look) is drawn from Roblox's released UI objects only: a box's outline and drop
+-- shadow are one ink shape under its fill (Style.box), its shade a gradient, its lettering outlined by a UIStroke.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -14,8 +16,18 @@ export type Props = { [any]: any }
 export type KeyView = { text: string?, image: string? }
 -- How see-through a greyed part's text or glyph is: a number, or a binding that follows the play.
 export type Fade = number | React.Binding<number>
+-- A rounded part of a look C box, as wide as the box: its top and its height as shares of the box's height.
+export type Piece = { top: number, height: number, corner: UDim }
+type Children = { [string]: React.Node }
+
+-- A white fill shows its gradient's own colours (a UIGradient multiplies the colour it covers).
+local WHITE = Color3.new(1, 1, 1)
+local BLACK = Color3.new(0, 0, 0)
 
 local Style = {}
+
+-- A corner that rounds a part's shorter side all the way.
+Style.ROUND = UDim.new(0.5, 0)
 
 -- `props` written over `base`, which the caller made fresh: React keeps each element's props.
 local function over(base: Props, props: Props?): Props
@@ -38,9 +50,11 @@ function Style.text(config: Config.GameConfig, props: Props?): Props
 	}, props)
 end
 
--- What the HUD draws in `team`'s colour, or in its own text colour for no team (a draw, overtime, a loose ball).
+-- What the HUD draws in `team`'s colour (the HUD's own, look.teamColors: brighter than the world's, the owner's
+-- choice, Q201), or in its own text colour for no team (a draw, overtime, a loose ball).
 function Style.teamColor(config: Config.GameConfig, team: Team.Team?): Color3
-	return if team ~= nil then config.UI.teamColors[team] else config.UI.hud.textColor
+	local hud = config.UI.hud
+	return if team ~= nil then hud.look.teamColors[team] else hud.textColor
 end
 
 -- How see-through something greyed is (a control, a hint or a button that would do nothing, an empty pip):
@@ -95,7 +109,76 @@ end
 
 -- Rounds a square frame all the way: a disc.
 function Style.round(): React.ReactElement
-	return React.createElement("UICorner", { CornerRadius = UDim.new(0.5, 0) })
+	return React.createElement("UICorner", { CornerRadius = Style.ROUND })
+end
+
+-- Look C's lettering: Style.text in UI.hud.look's font, with `props` on top.
+function Style.lettering(config: Config.GameConfig, props: Props?): Props
+	return Style.text(config, over({ Font = config.UI.hud.look.font }, props))
+end
+
+-- Look C's ink outline round a text label's letters (a UIStroke on a text label rings its text): look.textOutline
+-- pixels thick.
+function Style.inked(config: Config.GameConfig): React.ReactElement
+	local look = config.UI.hud.look
+	return React.createElement("UIStroke", { Color = look.ink, Thickness = look.textOutline })
+end
+
+-- Look C's shade down a part in `color`, from `top` to `bottom` (shares of its box's height): the colour at the
+-- box's top, darkening to look.shade of the way to black at its bottom. On a white frame (Style.box's fill).
+function Style.shading(config: Config.GameConfig, color: Color3, top: number, bottom: number): React.ReactElement
+	local shade = config.UI.hud.look.shade
+	return React.createElement("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(color:Lerp(BLACK, shade * top), color:Lerp(BLACK, shade * bottom)),
+	})
+end
+
+-- A look C box in `color`, its frame placed and sized by `props`: `pieces` (one piece with look.corner by default)
+-- filled and shaded (Style.shading) over one ink silhouette, each piece grown by look.outline on every side and by
+-- look.shadow more below it, so the outline and the drop shadow are one shape with no seam where pieces meet.
+-- `children` sit above it all, in its "Content" frame.
+function Style.box(
+	config: Config.GameConfig,
+	props: Props,
+	color: Color3,
+	children: Props?,
+	pieces: { Piece }?
+): React.ReactElement
+	local look = config.UI.hud.look
+	local grow, drop = look.outline, look.shadow
+	local shape: { Piece } = pieces or { { top = 0, height = 1, corner = look.corner } }
+	local parts: Children = {}
+	for index, piece in shape do
+		local corner = piece.corner
+		local grown = UDim.new(corner.Scale, corner.Offset + grow)
+		parts[`Ink{index}`] = React.createElement("Frame", {
+			Position = UDim2.new(0, -grow, piece.top, -grow),
+			Size = UDim2.new(1, 2 * grow, piece.height, 2 * grow + drop),
+			BackgroundColor3 = look.ink,
+			BorderSizePixel = 0,
+			ZIndex = 1,
+		}, { Corner = React.createElement("UICorner", { CornerRadius = grown }) })
+		parts[`Fill{index}`] = React.createElement("Frame", {
+			Position = UDim2.fromScale(0, piece.top),
+			Size = UDim2.fromScale(1, piece.height),
+			BackgroundColor3 = WHITE,
+			BorderSizePixel = 0,
+			ZIndex = 2,
+		}, {
+			Corner = React.createElement("UICorner", { CornerRadius = corner }),
+			Shade = Style.shading(config, color, piece.top, piece.top + piece.height),
+		})
+	end
+	parts.Content = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1), ZIndex = 3 }), children)
+	return React.createElement("Frame", Style.holder(props), parts)
+end
+
+-- How far below a look C box's bottom another starts so `clearance` pixels show between them: the upper box's ink
+-- reaches look.outline + look.shadow below it (Style.box), the lower one's look.outline above it.
+function Style.under(config: Config.GameConfig, clearance: number): number
+	local look = config.UI.hud.look
+	return look.outline + look.shadow + clearance + look.outline
 end
 
 -- A ring: a see-through disc frame (`props` place and size it) with an outline, a UIStroke (`outline` sets its Color,

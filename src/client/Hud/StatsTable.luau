@@ -92,7 +92,7 @@ function StatsTable.Table(props: StatsTableProps): React.ReactElement
 			tostring(stats.assists),
 			tostring(stats.saves),
 			tostring(stats.steals),
-		}, ui.teamColors[stats.team], stats.player == props.localId)
+		}, Style.teamColor(config, stats.team), stats.player == props.localId)
 	end
 	return React.createElement(
 		"Frame",

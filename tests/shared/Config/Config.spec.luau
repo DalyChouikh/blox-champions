@@ -527,14 +527,16 @@ describe("Config defaults", function()
 		})
 		expect(ui.text).toEqual({
 			clock = "%d:%02d",
-			lap = "Lap %d",
-			goalWorth = "Lap %d: goal +%d",
+			-- The scoreboard's chip (#352, Q188).
+			goalWorth = "+%d",
 			overtime = "OVERTIME",
 			goal = "GOAL!",
 			denied = "DENIED!",
 			clockWarning = "%d SECONDS",
 			lastChance = "LAST CHANCE",
-			speed = "%d km/h",
+			-- Big digits over a small unit (#352, Q192).
+			speed = "%d",
+			speedUnit = "KM/H",
 			possession = "%s has the ball",
 			lapCompleted = "Lap %d completed",
 			goalOpen = "%s goal is active",
@@ -577,17 +579,64 @@ describe("Config defaults", function()
 			feedMaxEntries = 5,
 			glowThickness = 3,
 			spacing = 6,
-			pipSize = 10,
 			screenMargin = 8,
+			-- Look C, Bold arcade (#352, Q184), as the design page drew it.
+			look = {
+				font = Enum.Font.FredokaOne,
+				bannerFont = Enum.Font.LuckiestGuy,
+				ink = Color3.fromRGB(11, 14, 24),
+				outline = 3,
+				shadow = 4,
+				textOutline = 2.5,
+				corner = UDim.new(0, 14),
+				box = Color3.fromRGB(42, 51, 80),
+				shade = 0.4,
+				-- The page's brighter pair, the HUD's own (Q201); the world keeps UI.teamColors.
+				teamColors = { Blue = Color3.fromRGB(61, 139, 255), Orange = Color3.fromRGB(255, 154, 60) },
+			},
+			-- Every change animates briefly (#352, Q194): the page's pop, bounce, fill and glow.
+			motion = {
+				pop = { seconds = 0.2, overshoot = 0.12 },
+				bounce = { seconds = 0.4, scale = 1.55, rebound = 0.9 },
+				easeSeconds = 0.25,
+				lapHoldSeconds = 0.5,
+				glow = { seconds = 2.4, transparency = 0.8 },
+				speedRate = 6,
+			},
 			layout = {
-				scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
+				-- Phones under it (#352): Roblox's own touch UI grows on screens whose shorter side passes 500 px.
+				compactBelow = 500,
+				-- S2 Shields on desktop, S5 Compact chips on phones (#352, Q196); the page's sizes.
+				scoreboard = {
+					position = UDim2.new(0.5, 0, 0, 8),
+					shield = UDim2.fromOffset(94, 89),
+					clock = UDim2.fromOffset(120, 56),
+					worth = UDim2.fromOffset(56, 38),
+					lapChip = 17,
+					chipCorner = UDim.new(0, 7),
+					gap = 12,
+					chipGap = 6,
+					-- The lap chips clear of the shield's drop shadow (the owner, Q200).
+					chipClearance = 3,
+					textSizes = { score = 55, clock = 41, worth = 26, period = 22 },
+				},
+				compactScoreboard = {
+					position = UDim2.new(0.5, 0, 0, 8),
+					score = UDim2.fromOffset(52, 44),
+					clock = UDim2.fromOffset(80, 44),
+					worth = UDim2.fromOffset(48, 34),
+					gap = 8,
+					textSizes = { score = 38, clock = 30, worth = 22, period = 18 },
+				},
 				banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(720, 110) },
 				feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
 				hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
+				-- Bottom right on desktop, small top left on touch (#352, Q192).
 				speedometer = {
-					position = UDim2.new(1, -24, 1, -24),
-					touchPosition = UDim2.fromOffset(16, 8),
-					size = UDim2.fromOffset(160, 40),
+					position = UDim2.new(1, -31, 1, -22),
+					touchPosition = UDim2.fromOffset(18, 4),
+					textSizes = { speed = 55, unit = 17 },
+					compactTextSizes = { speed = 30, unit = 12 },
 				},
 				-- RC's crosshair (#312): 31.5% down (Q123/Q127), its ring 130 px across at 1918 x 1078 (Video 32),
 				-- blinking every 0.4 s once closed (Q142).
@@ -1866,9 +1915,14 @@ describe("Config.forMode", function()
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			-- A text takes exactly as many values as the HUD gives it.
 			{
-				overrides = { UI = { text = { goalWorth = "goal +%d" } } },
-				message = "UI.text.goalWorth: placeholder count must be 2",
+				overrides = { UI = { text = { goalWorth = "Lap %d: +%d" } } },
+				message = "UI.text.goalWorth: placeholder count must be 1",
 			},
+			{
+				overrides = { UI = { text = { speed = "%d km/h at %d" } } },
+				message = "UI.text.speed: placeholder count must be 1",
+			},
+			{ overrides = { UI = { text = { speedUnit = "" } } }, message = "UI.text.speedUnit: must not be empty" },
 			{
 				overrides = { UI = { text = { possession = "has the ball" } } },
 				message = "UI.text.possession: placeholder count must be 1",
@@ -1879,7 +1933,6 @@ describe("Config.forMode", function()
 				message = "UI.text.clockWarning: placeholder count must be 1",
 			},
 			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
-			{ overrides = { UI = { hud = { pipSize = 0 } } }, message = "UI.hud.pipSize: must be > 0" },
 			{
 				overrides = { UI = { hud = { overlayTransparency = 2 } } },
 				message = "UI.hud.overlayTransparency: must be <= 1 (got 2)",
@@ -2005,6 +2058,174 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ UI = { text = { clockWarning = "%d%%s" } } })
 		end).never.toThrow()
+	end)
+
+	-- Look C, its motion and the S2/S5 scoreboards (#352).
+	it("rejects look C, motion and scoreboard settings outside their limits", function()
+		local function hud(values: { [string]: any }): { [string]: any }
+			return { UI = { hud = values } }
+		end
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{
+				overrides = hud({ look = { bannerFont = "LuckiestGuy" } }),
+				message = 'UI.hud.look.bannerFont: must be a Font (got "LuckiestGuy")',
+			},
+			{ overrides = hud({ look = { outline = -1 } }), message = "UI.hud.look.outline: must be >= 0 (got -1)" },
+			{ overrides = hud({ look = { shadow = -1 } }), message = "UI.hud.look.shadow: must be >= 0 (got -1)" },
+			{
+				overrides = hud({ look = { textOutline = -1 } }),
+				message = "UI.hud.look.textOutline: must be >= 0 (got -1)",
+			},
+			-- A box as dark at its bottom as the ink would lose its colour there.
+			{ overrides = hud({ look = { shade = 1 } }), message = "UI.hud.look.shade: must be < 1 (got 1)" },
+			{ overrides = hud({ look = { shade = -0.1 } }), message = "UI.hud.look.shade: must be >= 0 (got -0.1)" },
+			{
+				overrides = hud({ look = { teamColors = { Orange = "orange" } } }),
+				message = "UI.hud.look.teamColors.Orange: expected Color3, got string",
+			},
+			{
+				overrides = hud({ motion = { pop = { seconds = 0 } } }),
+				message = "UI.hud.motion.pop.seconds: must be > 0 (got 0)",
+			},
+			{
+				overrides = hud({ motion = { pop = { overshoot = -0.1 } } }),
+				message = "UI.hud.motion.pop.overshoot: must be >= 0 (got -0.1)",
+			},
+			-- A bounce grows, then comes back past its size to a smaller one that still shows.
+			{
+				overrides = hud({ motion = { bounce = { scale = 0.9 } } }),
+				message = "UI.hud.motion.bounce.scale: must be >= 1 (got 0.9)",
+			},
+			{
+				overrides = hud({ motion = { bounce = { rebound = 0 } } }),
+				message = "UI.hud.motion.bounce.rebound: must be > 0 (got 0)",
+			},
+			{
+				overrides = hud({ motion = { bounce = { rebound = 1.1 } } }),
+				message = "UI.hud.motion.bounce.rebound: must be <= 1 (got 1.1)",
+			},
+			{
+				overrides = hud({ motion = { easeSeconds = 0 } }),
+				message = "UI.hud.motion.easeSeconds: must be > 0 (got 0)",
+			},
+			{
+				overrides = hud({ motion = { lapHoldSeconds = -1 } }),
+				message = "UI.hud.motion.lapHoldSeconds: must be >= 0 (got -1)",
+			},
+			{
+				overrides = hud({ motion = { glow = { transparency = 2 } } }),
+				message = "UI.hud.motion.glow.transparency: must be <= 1 (got 2)",
+			},
+			{
+				overrides = hud({ motion = { speedRate = 0 } }),
+				message = "UI.hud.motion.speedRate: must be > 0 (got 0)",
+			},
+			{
+				overrides = hud({ layout = { compactBelow = 0 } }),
+				message = "UI.hud.layout.compactBelow: must be > 0 (got 0)",
+			},
+			{
+				overrides = hud({ layout = { scoreboard = { shield = UDim2.fromScale(0.1, 0.1) } } }),
+				message = "UI.hud.layout.scoreboard.shield: must be in pixels (scales 0, offsets > 0)",
+			},
+			{
+				overrides = hud({ layout = { scoreboard = { lapChip = 0 } } }),
+				message = "UI.hud.layout.scoreboard.lapChip: must be > 0 (got 0)",
+			},
+			{
+				overrides = hud({ layout = { scoreboard = { chipGap = -1 } } }),
+				message = "UI.hud.layout.scoreboard.chipGap: must be >= 0 (got -1)",
+			},
+			{
+				overrides = hud({ layout = { scoreboard = { chipClearance = -1 } } }),
+				message = "UI.hud.layout.scoreboard.chipClearance: must be >= 0 (got -1)",
+			},
+			-- Roblox clamps text sizes to 1..100 (measured).
+			{
+				overrides = hud({ layout = { scoreboard = { textSizes = { score = 101 } } } }),
+				message = "UI.hud.layout.scoreboard.textSizes.score: must be <= 100 (got 101)",
+			},
+			{
+				overrides = hud({ layout = { compactScoreboard = { gap = -1 } } }),
+				message = "UI.hud.layout.compactScoreboard.gap: must be >= 0 (got -1)",
+			},
+			{
+				overrides = hud({ layout = { compactScoreboard = { worth = UDim2.fromOffset(0, 34) } } }),
+				message = "UI.hud.layout.compactScoreboard.worth: must be in pixels (scales 0, offsets > 0)",
+			},
+			{
+				overrides = hud({ layout = { speedometer = { compactTextSizes = { unit = 0 } } } }),
+				message = "UI.hud.layout.speedometer.compactTextSizes.unit: must be >= 1 (got 0)",
+			},
+			-- A 57 px clock in the 56 px clock box, a 39 px worth in the 38 px chip; a 45 px score in the phone's
+			-- 44 px score chip.
+			{
+				overrides = hud({ layout = { scoreboard = { textSizes = { clock = 57 } } } }),
+				message = "UI: the desktop scoreboard's texts must fit their boxes (text size <= box height)",
+			},
+			{
+				overrides = hud({ layout = { scoreboard = { textSizes = { worth = 39 } } } }),
+				message = "UI: the desktop scoreboard's texts must fit their boxes (text size <= box height)",
+			},
+			{
+				overrides = hud({ layout = { compactScoreboard = { textSizes = { score = 45 } } } }),
+				message = "UI: the phone scoreboard's texts must fit their boxes (text size <= box height)",
+			},
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config(case.overrides)
+			end).toThrow(case.message)
+		end
+	end)
+
+	it("accepts look C, motion and the scoreboards just inside their limits", function()
+		local hud = Fixtures.config({
+			UI = {
+				hud = {
+					look = { outline = 0, shadow = 0, textOutline = 0, shade = 0.99 },
+					motion = {
+						pop = { seconds = 0.01, overshoot = 0 },
+						bounce = { seconds = 0.01, scale = 1, rebound = 0.01 },
+						easeSeconds = 0.01,
+						lapHoldSeconds = 0,
+						glow = { seconds = 0.01, transparency = 0 },
+						speedRate = 0.01,
+					},
+					layout = {
+						compactBelow = 0.01,
+						-- Each text exactly as tall as its box.
+						scoreboard = {
+							lapChip = 0.01,
+							gap = 0,
+							chipGap = 0,
+							chipClearance = 0,
+							textSizes = { score = 89, clock = 56 },
+						},
+						compactScoreboard = { gap = 0, textSizes = { score = 44, clock = 44, worth = 34 } },
+					},
+				},
+			},
+		}).UI.hud
+		expect(hud.look.shade).toBe(0.99)
+		expect(hud.motion.bounce).toEqual({ seconds = 0.01, scale = 1, rebound = 0.01 })
+		expect(hud.motion.glow.transparency).toBe(0)
+		expect(hud.layout.scoreboard.textSizes).toEqual({ score = 89, clock = 56, worth = 26, period = 22 })
+		expect(hud.layout.compactScoreboard.textSizes).toEqual({ score = 44, clock = 44, worth = 34, period = 18 })
+		expect(hud.layout.compactBelow).toBe(0.01)
+		expect(hud.layout.scoreboard.chipClearance).toBe(0)
+	end)
+
+	it("rejects the old lap text, score pips and speedometer size as unknown", function()
+		expect(function()
+			Fixtures.config({ UI = { text = { lap = "Lap %d" } } })
+		end).toThrow("UI.text.lap: unknown key")
+		expect(function()
+			Fixtures.config({ UI = { hud = { pipSize = 10 } } })
+		end).toThrow("UI.hud.pipSize: unknown key")
+		expect(function()
+			Fixtures.config({ UI = { hud = { layout = { speedometer = { size = UDim2.fromOffset(160, 40) } } } } })
+		end).toThrow("UI.hud.layout.speedometer.size: unknown key")
 	end)
 
 	it("rejects team spawns that would not fit on a straight", function()
