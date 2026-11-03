@@ -1,7 +1,7 @@
 --!strict
--- The banner across the screen (spec §11.1): the kickoff's 5-4-3-2-1 inside a ring, GO <team> TEAM!, GOAL!, DENIED!,
--- the clock warnings, LAST CHANCE and OVERTIME, in the colour of the team it is about, or the HUD's text colour.
--- Hidden without a banner.
+-- The banner across the screen (spec §11.1): GO <team> TEAM!, GOAL!, DENIED!, the clock warnings, LAST CHANCE and
+-- OVERTIME, in the colour of the team it is about, or the HUD's text colour. Hidden without a banner, and for the
+-- kickoff's count, which Hud/Countdown draws a third of the way down (#353).
 -- It centres in the HUD's stage (left of the touch buttons on touch) and shrinks to fit it. A plain function of its
 -- props.
 
@@ -25,31 +25,21 @@ export type BannerProps = {
 local function Banner(props: BannerProps): React.ReactElement
 	local config, banner = props.config, props.banner
 	local hud = config.UI.hud
-	local place, countdown = hud.layout.banner, hud.countdown
+	local place = hud.layout.banner
 	local team: Team.Team? = if banner ~= nil then banner.team else nil
-	local color = Style.teamColor(config, team)
-	local counting = banner ~= nil and banner.kind == "Countdown"
+	local shown = banner ~= nil and banner.kind ~= "Countdown"
 	return React.createElement(
 		"TextLabel",
 		Style.text(config, {
-			AnchorPoint = Vector2.new(0.5, 0.5),
+			AnchorPoint = Style.CENTRE,
 			Position = place.position,
 			Size = place.size,
-			TextSize = if counting then countdown.textSize else hud.bannerSize,
-			Text = if banner ~= nil then props.text:banner(banner) else "",
-			TextColor3 = color,
-			Visible = banner ~= nil,
+			TextSize = hud.bannerSize,
+			Text = if banner ~= nil and shown then props.text:banner(banner) else "",
+			TextColor3 = Style.teamColor(config, team),
+			Visible = shown,
 		}),
-		{
-			Fit = Style.fit(config, props.area, place.size),
-			-- The kickoff count's ring around its digit (the owner, Q108).
-			Ring = Style.ring({
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(countdown.ringSize, countdown.ringSize),
-				Visible = counting,
-			}, { Color = color, Thickness = countdown.ringThickness }),
-		}
+		{ Fit = Style.fit(config, props.area, place.size) }
 	)
 end
 

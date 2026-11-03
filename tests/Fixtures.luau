@@ -24,10 +24,11 @@ local Fixtures = {}
 -- and close Roblox's menu, which pauses the controls.
 export type Menu = { MenuOpened: Signal.Signal<>, MenuClosed: Signal.Signal<>, MenuIsOpen: boolean? }
 
--- A screen's areas: the HUD's (CoreUISafeInsets), the device's safe area (DeviceSafeInsets: the touch controls' and
+-- A screen's areas: the whole screen (ScreenInsets.None), the HUD's (CoreUISafeInsets), the device's safe area
+-- (DeviceSafeInsets: the touch controls' and
 -- the scoreboard's), which also spans Roblox's 58 px top bar, and the part of the top bar its buttons leave free
 -- (GuiService.TopbarInset, in pixels from the safe area's top-left).
-export type Screen = { hud: Rect, controls: Rect, topbar: Rect }
+export type Screen = { whole: Rect, hud: Rect, controls: Rect, topbar: Rect }
 
 -- A stand-in for the camera the controllers read: the skating steers by its CFrame, and throws and passes aim along
 -- the crosshair's line (CameraController:crosshair, #312, #315), which runs from the camera along `aim` (unit);
@@ -70,15 +71,18 @@ function Fixtures.outsideArena(config: Config.GameConfig): Vector3
 	return Centerline.at(arena, arena.straightLength / 2, arena.trackWidth + 10, 5).Position
 end
 
--- The emulated phone in landscape, its safe area 750 x 381 (probed in Play), and a big screen, whose touch area is
--- 1280 x 800 (the touch buttons grow 1.5 times there). Roblox's buttons take the top bar's first 164 px on both, as on
--- our desktop Play view (probed).
+-- The emulated phone in landscape, its safe area 750 x 381 in its whole 874 x 401 screen (a notch's strips round it,
+-- probed in Play), and a big screen, whose touch area is 1280 x 800 (the touch buttons grow 1.5 times there) and
+-- whose whole screen is its safe area, as on a desktop. Roblox's buttons take the top bar's first 164 px on both, as
+-- on our desktop Play view (probed).
 Fixtures.PHONE = table.freeze({
+	whole = Rect.new(-62, -78, 812, 323),
 	hud = Rect.new(0, 0, 750, 323),
 	controls = Rect.new(0, -58, 750, 323),
 	topbar = Rect.new(164, 0, 750, 58),
 }) :: Screen
 Fixtures.BIG_SCREEN = table.freeze({
+	whole = Rect.new(0, -58, 1280, 742),
 	hud = Rect.new(0, 0, 1280, 742),
 	controls = Rect.new(0, -58, 1280, 742),
 	topbar = Rect.new(164, 0, 1280, 58),

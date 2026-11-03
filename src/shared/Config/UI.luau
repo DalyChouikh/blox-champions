@@ -128,6 +128,14 @@ export type CompactScoreboardLayout = {
 	textSizes: BoardTextSizes,
 }
 
+-- A crosshair's two rings on one kind of screen (Hud/Reticle): the carrying ring and the charge ring, `carry` and
+-- `charge` pixels across at their strokes' outer edges, the strokes `thickness` pixels wide over look C's ink.
+export type RingSizes = { carry: number, charge: number, thickness: number }
+
+-- The kickoff count on one kind of screen (Hud/Countdown): its digit textSize pixels tall inside a ring ringSize pixels
+-- across at its stroke's outer edge, the stroke ringThickness pixels wide over look C's ink.
+export type CountSizes = { textSize: number, ringSize: number, ringThickness: number }
+
 -- Where each part of the HUD sits; sizes and row heights are pixels.
 export type HudLayout = {
 	-- A screen whose shorter side is under compactBelow pixels is a phone's: the compact scoreboard and the small
@@ -146,18 +154,24 @@ export type HudLayout = {
 		textSizes: { speed: number, unit: number },
 		compactTextSizes: { speed: number, unit: number },
 	},
-	-- The crosshair (#312): its dot `size` pixels across, centred across the screen and `height` of the way down it
-	-- (throws and passes aim through it); while a throw charges, a ring ringSize pixels across with a ringThickness
-	-- stroke, its halves ringGap pixels apart at the top and the bottom, blinking once every blinkSeconds while a full
-	-- charge is held.
+	-- The crosshair (#312, #353), shown while the viewer carries the ball: its dot `size` pixels across, centred
+	-- across the whole screen and `height` of the way down it (throws and passes aim through it), ringed by the
+	-- carrying ring; over the first growShare of a throw's charge that ring grows out into the charge ring and fades,
+	-- as the charge ring fills from its bottom up both sides, closing at a full charge; held full it blinks once every
+	-- blinkSeconds. `sizes` on a desktop's screen, compactSizes on a phone's (HudScreen.compact). Rings that would come
+	-- within `clearance` pixels of the scoreboard shrink round the dot (HudScreen.ringScale).
 	reticle: {
 		size: number,
 		height: number,
-		ringSize: number,
-		ringThickness: number,
-		ringGap: number,
 		blinkSeconds: number,
+		growShare: number,
+		clearance: number,
+		sizes: RingSizes,
+		compactSizes: RingSizes,
 	},
+	-- The kickoff count (#353) at the crosshair's place, lower where its ring would come within reticle.clearance
+	-- pixels of the scoreboard (HudScreen.countDrop): `sizes` on a desktop's screen, compactSizes on a phone's.
+	countdown: { sizes: CountSizes, compactSizes: CountSizes },
 	-- columnWidth: each number column; the name column takes the rest.
 	scoreTab: { position: UDim2, size: UDim2, rowHeight: number, columnWidth: number },
 	-- The touch button that opens the score tab.
@@ -171,10 +185,12 @@ export type HudLayout = {
 -- colour with an ink outline textOutline pixels thick. A box has `corner`s, an ink outline `outline` pixels wide and
 -- an ink shadow dropping `shadow` pixels below it; it is its colour at the top and that colour times (1 - shade) at the
 -- bottom. `box` colours a box that is no team's (the clock's, an empty lap chip); `teamColors` the HUD's team parts
--- (Style.teamColor), brighter than the world's UI.teamColors.
+-- (Style.teamColor), brighter than the world's UI.teamColors. bannerFont draws a digit's middle bannerDigitRise of
+-- its text size above its line's middle; a digit centred in a shape moves down by that (Hud/Countdown).
 export type LookSettings = {
 	font: Enum.Font,
 	bannerFont: Enum.Font,
+	bannerDigitRise: number,
 	ink: Color3,
 	outline: number,
 	shadow: number,
@@ -216,8 +232,6 @@ export type HudSettings = {
 	titleSize: number,
 	bannerSize: number,
 	bannerSeconds: number,
-	-- The kickoff count in the banner's place (pixels): its digit inside a ring of the player's team colour.
-	countdown: { textSize: number, ringSize: number, ringThickness: number },
 	feedSeconds: number,
 	feedMaxEntries: number,
 	glowThickness: number,
@@ -382,9 +396,6 @@ local defaults: UIConfig = {
 		titleSize = 32,
 		bannerSize = 96,
 		bannerSeconds = 2,
-		-- Roller Champions' count at 1918 x 1078 (Video 31 at 16.5 s): a 200 px ring with a 75 px digit (the owner,
-		-- Q108).
-		countdown = { textSize = 76, ringSize = 200, ringThickness = 8 },
 		feedSeconds = 6,
 		feedMaxEntries = 5,
 		glowThickness = 3,
@@ -397,6 +408,9 @@ local defaults: UIConfig = {
 		look = {
 			font = Enum.Font.FredokaOne,
 			bannerFont = Enum.Font.LuckiestGuy,
+			-- Luckiest Guy's 1 to 5, measured in Studio at a 100 px text size: their ink's middle 15.0 to 16.5 px
+			-- above the line's (the owner saw the count's digit sit high in its ring, Q204).
+			bannerDigitRise = 0.16,
 			ink = Color3.fromRGB(11, 14, 24),
 			outline = 3,
 			shadow = 4,
@@ -465,11 +479,29 @@ local defaults: UIConfig = {
 				compactTextSizes = { speed = 30, unit = 12 },
 			},
 			-- RC's crosshair (#312): above the skater, 31.5% down the screen (Video 32 at 2.0-4.4 s, Video 13 at 99.0
-			-- s; the owner kept it in trial #311, Q123/Q127); its ring, read at 1918 x 1078 (Video 32 at 3.2 s), 130 px
-			-- across with a ~4 px stroke, its halves ~29 px apart at the bottom; white, the HUD's text colour (Q141).
-			-- Closed and held, it blinks until the release (the owner, Q142): Video 32 at 30 fps lit at 3.67, 4.07 and
-			-- 4.47 s, nearly gone at 3.47, 3.87 and 4.27 s: once every 0.4 s.
-			reticle = { size = 6, height = 0.315, ringSize = 130, ringThickness = 4, ringGap = 29, blinkSeconds = 0.4 },
+			-- s; the owner kept it in trial #311, Q123/Q127); its charge ring, read at 1918 x 1078 (Video 32 at 3.2 s),
+			-- 130 px across with a ~4 px stroke. Closed and held, it blinks until the release (the owner, Q142): Video
+			-- 32 at 30 fps lit at 3.67, 4.07 and 4.47 s, nearly gone at 3.47, 3.87 and 4.27 s: once every 0.4 s. X1
+			-- (the owner, Q185/Q188b): RC's small carrying ring (~55-60 px, Video 32 at 2.4 s; Q143) at the design
+			-- page's share of the charge ring (61 px), growing into it and fading over the charge's first quarter as
+			-- the page drew it; on a phone the page's 46 and 24 px with a 3 px stroke (Q203). 3 px of the game kept
+			-- between the rings and the scoreboard, as between the lap chips and the shield (Q200).
+			reticle = {
+				size = 6,
+				height = 0.315,
+				blinkSeconds = 0.4,
+				growShare = 0.25,
+				clearance = 3,
+				sizes = { carry = 61, charge = 130, thickness = 4 },
+				compactSizes = { carry = 24, charge = 46, thickness = 3 },
+			},
+			-- The kickoff count a third down, where RC's sits (the owner, Q185): on desktop RC's at 1918 x 1078 (Video
+			-- 31 at 16.5 s), a 200 px ring with a 75 px digit (Q108); on a phone RC's share of the screen's height (a
+			-- 76 px ring) with a bigger digit, big and clear on phones (Q181), as the design page drew it (Q203).
+			countdown = {
+				sizes = { textSize = 76, ringSize = 200, ringThickness = 8 },
+				compactSizes = { textSize = 40, ringSize = 76, ringThickness = 4 },
+			},
 			scoreTab = {
 				position = UDim2.fromScale(0.5, 0.5),
 				size = UDim2.fromOffset(640, 360),
@@ -581,6 +613,8 @@ local nonNegative = Validate.number({ min = 0 })
 local boardTextSizes = Validate.record({ score = textSize, clock = textSize, worth = textSize, period = textSize })
 local teamColors = Validate.record({ Blue = Validate.datatype("Color3"), Orange = Validate.datatype("Color3") })
 local speedTextSizes = Validate.record({ speed = textSize, unit = textSize })
+local ringSizes = Validate.record({ carry = positive, charge = positive, thickness = positive })
+local countSizes = Validate.record({ textSize = textSize, ringSize = positive, ringThickness = positive })
 
 -- Each text of a scoreboard is drawn inside its box (Hud/Scoreboard): the scores in their shields or chips, the clock
 -- and the goal's worth, so none may be taller than its box.
@@ -601,6 +635,17 @@ local function namesFit(ui: UIConfig): boolean
 	-- Every column but the name's.
 	local taken = (count - 1) * (layout.scoreTab.columnWidth + hud.spacing) + 2 * hud.spacing
 	return taken < layout.scoreTab.size.X.Offset and taken < layout.endScreen.size.X.Offset
+end
+
+-- The reticle's dot, `ink` thick round it, inside a carrying ring's ink, which reaches `ink` either side of its
+-- stroke (Hud/Reticle).
+local function dotFits(rings: RingSizes, dot: number, ink: number): boolean
+	return dot < rings.carry - 2 * rings.thickness - 4 * ink
+end
+
+-- The count's digit inside its ring's ink (Hud/Countdown).
+local function digitFits(count: CountSizes, ink: number): boolean
+	return count.textSize < count.ringSize - 2 * (count.ringThickness + ink)
 end
 
 local fields = Validate.record({
@@ -686,7 +731,6 @@ local fields = Validate.record({
 		titleSize = textSize,
 		bannerSize = textSize,
 		bannerSeconds = positive,
-		countdown = Validate.record({ textSize = textSize, ringSize = positive, ringThickness = positive }),
 		feedSeconds = positive,
 		feedMaxEntries = Validate.number({ min = 1, integer = true }),
 		glowThickness = Validate.number({ min = 0 }),
@@ -695,6 +739,8 @@ local fields = Validate.record({
 		look = Validate.record({
 			font = Validate.enumItem(Enum.Font),
 			bannerFont = Validate.enumItem(Enum.Font),
+			-- Past half its size a digit's middle would sit above its whole line.
+			bannerDigitRise = Validate.number({ min = 0, max = 0.5 }),
 			ink = Validate.datatype("Color3"),
 			outline = nonNegative,
 			shadow = nonNegative,
@@ -753,11 +799,14 @@ local fields = Validate.record({
 				size = positive,
 				-- On the screen, never on its top or bottom edge.
 				height = Validate.number({ above = 0, below = 1 }),
-				ringSize = positive,
-				ringThickness = positive,
-				ringGap = Validate.number({ min = 0 }),
 				blinkSeconds = positive,
+				-- A share of the charge: the carrying ring has grown out and gone by the time it is spent.
+				growShare = Validate.number({ above = 0, max = 1 }),
+				clearance = nonNegative,
+				sizes = ringSizes,
+				compactSizes = ringSizes,
 			}),
+			countdown = Validate.record({ sizes = countSizes, compactSizes = countSizes }),
 			scoreTab = columns,
 			scoreButton = place,
 			endScreen = place,
@@ -799,10 +848,11 @@ local fields = Validate.record({
 
 local schema = Validate.checkAll(fields, {
 	{
-		message = "the count's digit must fit inside its ring (textSize < ringSize - 2 × ringThickness)",
+		message = "the count's digit must fit inside its ring's ink "
+			.. "(textSize < ringSize - 2 × (ringThickness + look.textOutline))",
 		holds = function(ui: UIConfig): boolean
-			local countdown = ui.hud.countdown
-			return countdown.textSize < countdown.ringSize - 2 * countdown.ringThickness
+			local countdown, ink = ui.hud.layout.countdown, ui.hud.look.textOutline
+			return digitFits(countdown.sizes, ink) and digitFits(countdown.compactSizes, ink)
 		end,
 	},
 	{
@@ -816,20 +866,22 @@ local schema = Validate.checkAll(fields, {
 			return ui.hud.layout.getUp.size.Y.Offset > 2 * ui.hud.spacing
 		end,
 	},
-	-- The crosshair's ring builds round its dot (#312).
+	-- The crosshair's rings build round its dot (#312, #353), on either kind of screen.
 	{
-		message = "the reticle's dot must fit inside its ring (size < ringSize - 2 × ringThickness)",
+		message = "the reticle's dot must fit inside each carrying ring's ink "
+			.. "(size < carry - 2 × thickness - 4 × look.textOutline)",
 		holds = function(ui: UIConfig): boolean
-			local reticle = ui.hud.layout.reticle
-			return reticle.size < reticle.ringSize - 2 * reticle.ringThickness
+			local reticle, ink = ui.hud.layout.reticle, ui.hud.look.textOutline
+			return dotFits(reticle.sizes, reticle.size, ink) and dotFits(reticle.compactSizes, reticle.size, ink)
 		end,
 	},
-	-- Each half is the ring clipped to its side of the gap (Hud/Reticle): a gap as wide as the ring leaves nothing.
+	-- The carrying ring grows out into the charge ring as a throw charges (X1, the owner's Q188b).
 	{
-		message = "the reticle ring's gap must leave its halves some arc (ringGap < ringSize)",
+		message = "the reticle's carrying ring must be smaller than its charge ring (carry < charge)",
 		holds = function(ui: UIConfig): boolean
 			local reticle = ui.hud.layout.reticle
-			return reticle.ringGap < reticle.ringSize
+			return reticle.sizes.carry < reticle.sizes.charge
+				and reticle.compactSizes.carry < reticle.compactSizes.charge
 		end,
 	},
 	{

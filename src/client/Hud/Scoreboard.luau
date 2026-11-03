@@ -36,9 +36,7 @@ export type ScoreboardProps = {
 	motion: BoardMotion.BoardMotion,
 }
 
-local CENTRE = Vector2.new(0.5, 0.5)
-local MIDDLE = UDim2.fromScale(0.5, 0.5)
-local FULL = UDim2.fromScale(1, 1)
+local CENTRE, MIDDLE, FULL = Style.CENTRE, Style.MIDDLE, Style.FULL
 local WHITE = Color3.new(1, 1, 1)
 
 -- Lettering filling its box, centred; `scale` grows it from its centre, `font` replaces the look's, `zIndex` orders
@@ -223,7 +221,7 @@ end
 local function shields(props: ScoreboardProps, place: Style.Props): React.ReactElement
 	local config = props.config
 	local board = config.UI.hud.layout.scoreboard
-	local drop = Style.under(config, board.chipClearance)
+	local drop = HudScreen.under(config, board.chipClearance)
 	local height = board.shield.Y.Offset + drop + board.lapChip
 	local function teamColumn(team: Team, order: number): React.ReactElement
 		local parts: Children = {

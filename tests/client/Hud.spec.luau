@@ -13,6 +13,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Hud = require(Client.Hud)
 local HudStore = require(Client.HudStore)
+local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
 local InputController = require(Client.InputController)
 local SkateController = require(Client.SkateController)
 
@@ -104,11 +105,13 @@ beforeEach(function()
 		SendSwitchTeam = function()
 			switches += 1
 		end,
-		-- The HUD never measures the whole screen: a notched phone's reaches past its safe area, where Roblox's top bar
-		-- and our scoreboard are not (probed).
+		-- The whole screen only for the crosshair's aim: a notched phone's reaches past its safe area, where Roblox's
+		-- top bar and our scoreboard are (probed).
 		InsetArea = function(insets: Enum.ScreenInsets): Rect
 			if insets == Enum.ScreenInsets.CoreUISafeInsets then
 				return screen.hud
+			elseif insets == Enum.ScreenInsets.None then
+				return screen.whole
 			end
 			expect(insets).toBe(Enum.ScreenInsets.DeviceSafeInsets)
 			return screen.controls
@@ -174,7 +177,8 @@ describe("Hud", function()
 
 	it("tells a phone by the device's safe area, Roblox's top bar included", function()
 		-- 900 x 520 with the bar, 900 x 462 under it: not a phone's (shorter side 500 or more).
-		screen = { hud = Rect.new(0, 0, 900, 462), controls = Rect.new(0, -58, 900, 462), topbar = BIG.topbar }
+		local safe = Rect.new(0, -58, 900, 462)
+		screen = { whole = safe, hud = Rect.new(0, 0, 900, 462), controls = safe, topbar = BIG.topbar }
 		Hud:resize()
 		Hud:step(0)
 		expect(part("BlueShield") ~= nil).toBe(true)
@@ -187,10 +191,32 @@ describe("Hud", function()
 		local board = part("Scoreboard") :: Frame
 		expect(board.Position.Y.Offset).toBe(config.UI.hud.layout.scoreboard.position.Y.Offset)
 		-- Buttons reaching 700 px in: the desktop board (640 +- 166) would cover them.
-		screen = { hud = BIG.hud, controls = BIG.controls, topbar = Rect.new(700, 0, 1280, 58) }
+		screen = { whole = BIG.whole, hud = BIG.hud, controls = BIG.controls, topbar = Rect.new(700, 0, 1280, 58) }
 		Hud:resize()
 		Hud:step(0)
 		expect(board.Position.Y.Offset).toBe(58 + config.UI.hud.layout.scoreboard.position.Y.Offset)
+	end)
+
+	-- A notched phone's whole screen reaches past its safe area, where Roblox's top bar and the touch controls are:
+	-- the screen's form and the scoreboard's place come from the safe area alone (#352).
+	it("decides a phone's screen and the scoreboard's place from the safe area, never the whole screen", function()
+		-- 480 px tall inside a whole screen 520 tall: a phone's.
+		local safe = Rect.new(0, -38, 1000, 442)
+		screen = {
+			whole = Rect.new(0, -58, 1000, 462),
+			hud = Rect.new(0, 0, 1000, 442),
+			controls = safe,
+			topbar = BIG.topbar,
+		}
+		Hud:resize()
+		Hud:step(0)
+		expect(part("BlueChip") ~= nil).toBe(true)
+		-- Roblox's buttons reaching 226 px into the phone's safe area: S5 centred on 375 reaches 156 either side, so it
+		-- goes under the bar (centred on the whole screen's 437 it would clear them).
+		screen = { whole = PHONE.whole, hud = PHONE.hud, controls = PHONE.controls, topbar = Rect.new(226, 0, 750, 58) }
+		Hud:resize()
+		Hud:step(0)
+		expect(part("Scoreboard").Position.Y.Offset).toBe(58 + config.UI.hud.layout.compactScoreboard.position.Y.Offset)
 	end)
 
 	it("moves the scoreboard without rendering again: a score's bounce, a lap chip filling", function()
@@ -605,11 +631,93 @@ describe("Hud", function()
 		expect(fit("EndScreen")).toBeCloseTo(488 / 720, 4)
 	end)
 
+	-- RC's way (the owner, Q185): nothing at the screen's centre without the ball.
+	it("shows the reticle only while the local player holds the ball", function()
+		local function reticle(): boolean
+			return (Hud.centre:FindFirstChild("Reticle") :: Frame).Visible
+		end
+		Hud:step(0)
+		expect(reticle()).toBe(false)
+		BallCarrier:set(LOCAL_ID)
+		Hud:step(0)
+		expect(reticle()).toBe(true)
+		-- In the local player's team colour (Ana plays Blue).
+		local dot = (Hud.centre:FindFirstChild("Reticle") :: any).Dot :: Frame
+		expect(dot.BackgroundColor3 == config.UI.hud.look.teamColors.Blue).toBe(true)
+		BallCarrier:set("2")
+		Hud:step(0)
+		expect(reticle()).toBe(false)
+		BallCarrier:set(nil)
+		Hud:step(0)
+		expect(reticle()).toBe(false)
+	end)
+
+	-- The phone emulator's frames (probed): the aim 0.315 of the whole 401 px screen down, 126.3 px, which is 106.3
+	-- below the safe area's top; S5 hangs from 8 px under it, OVERTIME under its row to 72.5 px below its top (44 + 8
+	-- + 18 + 2.5). That leaves 106.3 - 8 - 72.5 - 3 = 22.8 px for the 46 px charge ring's 25.5 px reach.
+	it(
+		"shrinks the rings on a phone while OVERTIME hangs under the scoreboard, measured on the whole screen",
+		function()
+			BallCarrier:set(LOCAL_ID)
+			Hud:step(0)
+			local fit = ((Hud.centre:FindFirstChild("Reticle") :: any).Rings :: Frame):FindFirstChildOfClass(
+					"UIScale"
+				) :: UIScale
+			expect(fit.Scale).toBe(1)
+			HudStore:onSnapshot(Fixtures.matchSnapshot({ period = "Overtime" }, 1))
+			Hud:step(0)
+			local aim = 0.315 * 401 - 20
+			expect(fit.Scale).toBeCloseTo((aim - 8 - 72.5 - 3) / 25.5, 4)
+			expect(fit.Scale).toBeCloseTo(HudScreen.ringScale(config, true, 8, aim, true), 6)
+		end
+	)
+
+	-- At overtime's kickoff (a Last Chance equaliser) the 76 px count's ring reaches 40.5 px round its centre, but only
+	-- 22.8 px clear the board: it sits 18 px lower (17.7, up to whole pixels; the owner, Q203); in regulation
+	-- 106.3 - 8 - 51 - 3 = 44.3 px are clear and it sits a third down.
+	it("draws the kickoff count a third down, moved down just enough where the scoreboard would touch it", function()
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }, 1))
+		Hud:step(0)
+		local count = Hud.centre:FindFirstChild("Countdown") :: Frame
+		expect(count.Visible).toBe(true)
+		expect((count:FindFirstChild("Digit", true) :: TextLabel).Text).toBe("3")
+		expect(count.Position).toEqual(UDim2.fromScale(0.5, config.UI.hud.layout.reticle.height))
+		expect((part("Banner") :: TextLabel).Visible).toBe(false)
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3, period = "Overtime" }, 2))
+		Hud:step(0)
+		expect(count.Position.Y.Scale).toBeCloseTo(config.UI.hud.layout.reticle.height, 6)
+		expect(count.Position.Y.Offset).toBe(math.ceil(40.5 - (0.315 * 401 - 20 - 8 - 72.5 - 3)))
+		-- Covered by the score tab: hidden, as the reticle is.
+		Fixtures.scriptedBinding(InputController.context, "ScoreTab"):Fire(true)
+		Hud:step(0)
+		expect(count.Visible).toBe(false)
+	end)
+
+	it("measures the crosshair's aim again when the screen changes, rendering again", function()
+		BallCarrier:set(LOCAL_ID)
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ period = "Overtime" }, 1))
+		Hud:step(0)
+		local renders = Hud.renders
+		-- A taller whole screen round the same safe area: the aim moves down, the rings fit.
+		screen =
+			{ whole = Rect.new(-62, -78, 812, 400), hud = PHONE.hud, controls = PHONE.controls, topbar = PHONE.topbar }
+		Hud:resize()
+		Hud:step(0)
+		expect(Hud.renders).toBe(renders + 1)
+		local fit = ((Hud.centre:FindFirstChild("Reticle") :: any).Rings :: Frame):FindFirstChildOfClass(
+				"UIScale"
+			) :: UIScale
+		expect(fit.Scale).toBe(1)
+		Hud:step(0)
+		expect(Hud.renders).toBe(renders + 1)
+	end)
+
 	it("hides the reticle while the score tab or the end screen shows", function()
 		local function reticle(): boolean
 			return (Hud.centre:FindFirstChild("Reticle") :: Frame).Visible
 		end
 		local held = Fixtures.scriptedBinding(InputController.context, "ScoreTab")
+		BallCarrier:set(LOCAL_ID)
 		Hud:step(0)
 		expect(reticle()).toBe(true)
 		held:Fire(true)
@@ -628,7 +736,7 @@ describe("Hud", function()
 		Fixtures.spawnSkater(folder, config)
 		BallCarrier:set(LOCAL_ID)
 		Hud:step(DT)
-		local ring = (Hud.centre:FindFirstChild("Reticle") :: any).Ring :: Frame
+		local ring = (Hud.centre:FindFirstChild("Reticle") :: any).Rings.Charge :: Frame
 		expect(ring.Visible).toBe(false)
 		local renders = Hud.renders
 		ActionController:step(DT) -- the throw key seen up while holding the ball
