@@ -9,6 +9,19 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.InputController)
 
+-- Every control with its keys' InputAction, by the name Config.Input's bindings sit under.
+local CONTROL_ACTIONS: { { control: Config.Control, action: string } } = {
+	{ control = "jump", action = "Jump" },
+	{ control = "pump", action = "Pump" },
+	{ control = "brake", action = "Brake" },
+	{ control = "attach", action = "Attach" },
+	{ control = "tackle", action = "Tackle" },
+	{ control = "uppercut", action = "Uppercut" },
+	{ control = "pass", action = "Pass" },
+	{ control = "throw", action = "Throw" },
+	{ control = "ballFocus", action = "BallFocus" },
+}
+
 -- The player's Roblox look settings as a player who never changed them has them.
 local function defaultLookSettings(): (number, number, boolean)
 	return 1, 1, false
@@ -166,24 +179,32 @@ describe("InputController", function()
 
 	it("counts a press of every control", function()
 		local context = InputController.context
-		local controls: { { control: Config.Control, action: string } } = {
-			{ control = "jump", action = "Jump" },
-			{ control = "pump", action = "Pump" },
-			{ control = "brake", action = "Brake" },
-			{ control = "attach", action = "Attach" },
-			{ control = "tackle", action = "Tackle" },
-			{ control = "uppercut", action = "Uppercut" },
-			{ control = "pass", action = "Pass" },
-			{ control = "throw", action = "Throw" },
-			{ control = "ballFocus", action = "BallFocus" },
-		}
-		for _, each in controls do
+		for _, each in CONTROL_ACTIONS do
 			Fixtures.scriptedBinding(context, each.action):Fire(true)
 		end
 		task.wait() -- Pressed is deferred
-		for _, each in controls do
+		for _, each in CONTROL_ACTIONS do
 			expect(InputController:pressCount(each.control)).toBe(1)
 		end
+	end)
+
+	-- The HUD shows a key pressed for as long as it is held (#367, the owner's Q219).
+	it("says whether each control's keys are held now", function()
+		local context = InputController.context
+		for _, each in CONTROL_ACTIONS do
+			expect(InputController:held(each.control)).toBe(false)
+		end
+		for _, each in CONTROL_ACTIONS do
+			Fixtures.scriptedBinding(context, each.action):Fire(true)
+		end
+		task.wait()
+		for _, each in CONTROL_ACTIONS do
+			expect(InputController:held(each.control)).toBe(true)
+		end
+		Fixtures.scriptedBinding(context, "Pump"):Fire(false)
+		task.wait()
+		expect(InputController:held("pump")).toBe(false)
+		expect(InputController:held("brake")).toBe(true)
 	end)
 
 	it("reads the score tab held on Tab or Select", function()

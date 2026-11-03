@@ -1762,6 +1762,23 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   cap on Uppercut's border; after one redraw 59/50/45, every cap 8 px in), four normal desktop Plays incl. the first
   after a Studio restart (the same widths from the first frame) and the phone): **"Yes, ship it"** as built. Next:
   #364's commit and PR, then Q216's three asks drawn on the page.
+- **Q219-Q222, Q216's asks as drawn** (session 76; page https://claude.ai/artifact/H6nXzFP8Q6MKyA6gWjux5y version 3,
+  'Held keys, rows that stay, and the Get Up prompt and feed in look C': one 16 s moment animated, today beside the
+  proposal, desktop 1556 x 745 and phone 874 x 401, with the game's timings). **Q219 held keys** (recommended):
+  **every key** shows pressed (the orange cap and the >>) for as long as it is held, and a quick tap still pops for
+  motion.press. Not chosen: only the hold actions. **Q220 rows stay** (recommended): **as drawn**: every row stays
+  while there is a skater; one that can do nothing now is greyed, sweeping its seconds while it cools (Uppercut, Pump
+  and Brake in the air; everything but the throw/Focus while diving or knocked down; Pump and the pass while a throw
+  charges), the touch buttons the same. Not chosen: only after their use. **Q221 the Get Up prompt and the feed**:
+  **Option 2, banner style** (not the recommended boxed Option 1): no box, bigger look C key caps and 'GET UP!' in
+  Luckiest Guy with look C's ink outline and drop shadow; the feed's lines as small look C chips with a team-colour
+  edge, the name in the team's colour. **Q222 details** (recommended): **keep both**: the Attach row shows only with a
+  teammate right ahead (an offer); a greyed row is named for the action it would start, else the one still running
+  from that key (the Dive through the dive), else its usual one (Tackle, Uppercut, Call). Not chosen: Attach always
+  shown, greyed.
+- **Q223 #367 shipped** (session 76, recommended; page https://claude.ai/artifact/H6nXzFP8Q6MKyA6gWjux5y version 4,
+  'A held key stays pressed': in a real Play Shift held for seconds kept Pump's cap orange with its >>, back to
+  yellow when let go): **"Yes, ship it"**. Next: #367's commit and PR, then #368 (rows stay).
 
 ## Roller Champions
 
