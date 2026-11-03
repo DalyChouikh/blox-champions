@@ -16,6 +16,7 @@ local HudStore = require(Client.HudStore)
 local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
 local InputController = require(Client.InputController)
 local SkateController = require(Client.SkateController)
+local Style = require(Client.Hud.Style)
 
 local config = Config.defaults()
 local LOCAL_ID = "1"
@@ -30,6 +31,9 @@ local preferred: Enum.PreferredInput
 local screen: Fixtures.Screen
 -- The Switch team requests the Hud sent.
 local switches = 0
+-- The fonts the Hud asked to load, and what it asked to be called once they have (deps.LoadFonts).
+local loadingFonts: { Font } = {}
+local fontsLoaded = function() end
 
 -- A gamepad's button, D-pad or stick: Roblox names each by its KeyCode and gives it a glyph (probed).
 local function gamepadKey(name: string): boolean
@@ -130,6 +134,9 @@ beforeEach(function()
 		KeyImage = keyImage,
 		SendSwitchTeam = function()
 			switches += 1
+		end,
+		LoadFonts = function(fonts: { Font }, loaded: () -> ())
+			loadingFonts, fontsLoaded = fonts, loaded
 		end,
 		-- The whole screen only for the crosshair's aim: a notched phone's reaches past its safe area, where Roblox's
 		-- top bar and our scoreboard are (probed).
@@ -285,6 +292,26 @@ describe("Hud", function()
 		expect(Hud.renders).toBe(5)
 		Hud:step(0)
 		expect(Hud.renders).toBe(5)
+	end)
+
+	-- A width measured before its font has loaded is the fallback font's, narrower (#364: Space's cap 52 px, not 59).
+	it("measures its text again once look C's fonts have loaded, rendering again then", function()
+		local look = config.UI.hud.look
+		expect(loadingFonts).toEqual({ Font.fromEnum(look.font), Font.fromEnum(look.bannerFont) })
+		Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		Hud:step(0)
+		expect(Hud.renders).toBe(1)
+		local measured = Style.widths.measures
+		fontsLoaded()
+		-- Every hint's label and key were measured again, with the fonts in.
+		Hud:step(0)
+		expect(Hud.renders).toBe(2)
+		expect(Style.widths.measures > measured).toBe(true)
+		measured = Style.widths.measures
+		Hud:step(0)
+		expect(Hud.renders).toBe(2)
+		expect(Style.widths.measures).toBe(measured)
 	end)
 
 	it("shows the banner and the feed from the HUD's state", function()
