@@ -77,7 +77,7 @@ export type AppProps = {
 	carrying: boolean,
 	-- Each hint's key on this device; nil where no hints show.
 	keys: ControlHints.HintKeys?,
-	-- The movement keys on this device while the local skater is knocked down; nil otherwise.
+	-- The movement keys on this device while the Get Up prompt shows (BannerMotion.promptShown); nil otherwise.
 	getUpKeys: { Style.KeyView }?,
 	-- Its key held, or its touch button toggled on.
 	scoreTabOpen: boolean,
@@ -190,7 +190,15 @@ local function App(props: AppProps): React.ReactElement
 					area = bindings.stage,
 				}),
 				GetUp = if props.getUpKeys ~= nil
-					then React.createElement(GetUp, { config = config, keys = props.getUpKeys })
+					then React.createElement(GetUp, {
+						config = config,
+						keys = props.getUpKeys,
+						compact = compact,
+						lines = #state.feed,
+						scale = banners.promptScale.binding,
+						leave = banners.promptLeave.binding,
+						area = bindings.stage,
+					})
 					else nil,
 				ScoreTab = if scoreTab and match ~= nil
 					then React.createElement(ScoreTab, {

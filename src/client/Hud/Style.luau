@@ -33,7 +33,7 @@ export type CapBindings = {
 	cooldown: React.Binding<number>,
 	seconds: React.Binding<string>,
 }
-type Children = { [string]: React.Node }
+export type Children = { [string]: React.Node }
 
 -- A white fill shows its gradient's own colours (a UIGradient multiplies the colour it covers).
 local WHITE = Color3.new(1, 1, 1)
@@ -50,6 +50,8 @@ local STEP = NumberSequence.new({
 
 local Style = {}
 
+-- A frame's fill under a shade (Style.shading).
+Style.WHITE = WHITE
 -- A corner that rounds a part's shorter side all the way.
 Style.ROUND = UDim.new(0.5, 0)
 -- A part centred on its place (its AnchorPoint), placed in the middle of its parent, or as big as its parent.
@@ -349,9 +351,44 @@ end
 
 -- Look C's banner lettering (#356, the owner's Q191, Q210): `words` in look.bannerFont `size` pixels tall, white
 -- over look C's ink outline, a ring of `color` `edge` pixels wide round that (none without a colour), and all of it
--- again in ink look.shadow lower, behind: three labels the text's measured size, `ink` pixels in from the edges of a
--- CanvasGroup (`props` place it; `children` act on it) that holds their ink and the shadow below, so nothing is
--- clipped. The group fades whole (GroupTransparency): see-through layers would darken where they overlap.
+-- again in ink look.shadow lower, behind: three labels the text's measured size, the front one's top-left at (x, y),
+-- for a group that holds their ink and the shadow below, so nothing is clipped (Style.banner, Hud/GetUp).
+function Style.letters(
+	config: Config.GameConfig,
+	words: string,
+	size: number,
+	color: Color3?,
+	edge: number,
+	x: number,
+	y: number
+): Children
+	local look = config.UI.hud.look
+	local width = Style.textWidth(config, words, size, look.bannerFont)
+	local ring = look.textOutline + (if color ~= nil then edge else 0)
+	local function layer(drop: number, letters: Color3?, outline: React.ReactElement, order: number): React.ReactElement
+		return React.createElement(
+			"TextLabel",
+			Style.lettering(config, {
+				Position = UDim2.fromOffset(x, y + drop),
+				Size = UDim2.fromOffset(width, size),
+				Font = look.bannerFont,
+				TextSize = size,
+				Text = words,
+				TextColor3 = letters,
+				ZIndex = order,
+			}),
+			{ Ink = outline }
+		)
+	end
+	return {
+		Shadow = layer(look.shadow, look.ink, stroke(look.ink, ring), 1),
+		Edge = if color ~= nil then layer(0, color, stroke(color, ring), 2) else nil,
+		Front = layer(0, nil, Style.inked(config), 3),
+	}
+end
+
+-- A banner: its letters (Style.letters) `ink` pixels in from the edges of a CanvasGroup (`props` place it; `children`
+-- act on it). The group fades whole (GroupTransparency): see-through layers would darken where they overlap.
 function Style.banner(
 	config: Config.GameConfig,
 	props: Props,
@@ -364,27 +401,7 @@ function Style.banner(
 ): React.ReactElement
 	local look = config.UI.hud.look
 	local width = Style.textWidth(config, words, size, look.bannerFont)
-	local ring = look.textOutline + (if color ~= nil then edge else 0)
-	local function layer(drop: number, letters: Color3?, outline: React.ReactElement, order: number): React.ReactElement
-		return React.createElement(
-			"TextLabel",
-			Style.lettering(config, {
-				Position = UDim2.fromOffset(ink, ink + drop),
-				Size = UDim2.fromOffset(width, size),
-				Font = look.bannerFont,
-				TextSize = size,
-				Text = words,
-				TextColor3 = letters,
-				ZIndex = order,
-			}),
-			{ Ink = outline }
-		)
-	end
-	local parts: Children = {
-		Shadow = layer(look.shadow, look.ink, stroke(look.ink, ring), 1),
-		Edge = if color ~= nil then layer(0, color, stroke(color, ring), 2) else nil,
-		Front = layer(0, nil, Style.inked(config), 3),
-	}
+	local parts = Style.letters(config, words, size, color, edge, ink, ink)
 	if children ~= nil then
 		for key, child in children do
 			parts[key] = child
@@ -417,7 +434,8 @@ end
 -- the body's curve (clips and shapes, as Style.sweep).
 local function mouseShape(config: Config.GameConfig, sizes: Config.CapSizes, button: MouseButton): React.ReactElement
 	local hud = config.UI.hud
-	local mouse = sizes.mouse
+	-- Only the hints show a mouse's button, and their caps have its sizes (their validator).
+	local mouse = sizes.mouse :: Config.MouseSizes
 	local line, buttons = mouse.line, mouse.buttons
 	local body = UDim2.fromOffset(mouse.width, mouse.height)
 	local function round(): React.ReactElement
@@ -476,9 +494,9 @@ end
 -- as wide as the name with sizes.padding each side, never narrower than tall, outlined in ink look.textOutline
 -- thick; a mouse's button a mouse on a square cap, that button inked (Q207); for a gamepad Roblox's glyph instead,
 -- on no cap. `moving` pops it (its UIScale), turns the cap look.pressed, sweeps it (Style.sweep, a square as tall as
--- the cap) and writes its seconds left in place of its name, lettered over a glyph or a mouse. Its slot keeps its
--- size while it pops, so its row never shifts. At `order` in its row; returns what its row calls it ("Glyph" or
--- "Key") and the cap.
+-- the cap) and writes its seconds left in place of its name, lettered over a glyph or a mouse. With sizes.dropShadow
+-- a cap drops look.shadow under its face, outlined as it is. Its slot keeps its size while it pops, so its row never
+-- shifts. At `order` in its row; returns what its row calls it ("Glyph" or "Key") and the cap.
 function Style.keyCap(
 	config: Config.GameConfig,
 	view: KeyView,
@@ -515,7 +533,7 @@ function Style.keyCap(
 			)
 	end
 	parts.Corner = React.createElement("UICorner", { CornerRadius = sizes.corner })
-	parts.Outline = React.createElement("UIStroke", { Color = look.ink, Thickness = look.textOutline })
+	parts.Outline = Style.inked(config)
 	if mouse ~= nil then
 		parts.Mouse = mouseShape(config, sizes, mouse)
 	else
@@ -533,6 +551,30 @@ function Style.keyCap(
 			})
 		)
 	end
+	local slot: Children = {
+		Face = React.createElement("Frame", {
+			AnchorPoint = CENTRE,
+			Position = MIDDLE,
+			Size = FULL,
+			BackgroundColor3 = moving.pressed:map(function(pressed: boolean): Color3
+				return if pressed then look.pressed else look.key
+			end),
+			BorderSizePixel = 0,
+			ZIndex = 2,
+		}, parts),
+	}
+	if sizes.dropShadow then
+		slot.Shadow = React.createElement("Frame", {
+			Position = UDim2.fromOffset(0, look.shadow),
+			Size = FULL,
+			BackgroundColor3 = look.ink,
+			BorderSizePixel = 0,
+			ZIndex = 1,
+		}, {
+			Corner = React.createElement("UICorner", { CornerRadius = sizes.corner }),
+			Outline = Style.inked(config),
+		})
+	end
 	return "Key",
 		React.createElement(
 			"Frame",
@@ -540,19 +582,18 @@ function Style.keyCap(
 				LayoutOrder = order,
 				Size = UDim2.fromOffset(width, height),
 			}),
-			{
-				Face = React.createElement("Frame", {
-					AnchorPoint = CENTRE,
-					Position = MIDDLE,
-					Size = FULL,
-					BackgroundColor3 = moving.pressed:map(function(pressed: boolean): Color3
-						return if pressed then look.pressed else look.key
-					end),
-					BorderSizePixel = 0,
-				}, parts),
-			}
+			slot
 		)
 end
+
+-- What moves on a cap that nothing moves (the Get Up prompt's keys, #369): at rest, never pressed, never cooling.
+local STILL_CAP: CapBindings = {
+	press = (React.createBinding(1)),
+	pressed = (React.createBinding(false)),
+	cooldown = (React.createBinding(0)),
+	seconds = (React.createBinding("")),
+}
+Style.stillCap = STILL_CAP
 
 -- Shrinks a part to fit the HUD's area (a binding), screenMargin inside each edge (Fit). The part is `size`, or, for a
 -- panel that grows to fit its parts (AutomaticSize Y), as tall as they need where that is taller: `content` pixels

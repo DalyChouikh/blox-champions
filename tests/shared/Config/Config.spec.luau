@@ -500,7 +500,7 @@ describe("Config defaults", function()
 			Pass = "Magnetic Pass",
 			CallPass = "Call",
 			BallFocus = "Focus",
-			GetUp = "Get Up",
+			GetUp = "GET UP!",
 		})
 		-- Roblox's own touch thumbstick colors.
 		expect(ui.touchStyle).toEqual({
@@ -645,7 +645,11 @@ describe("Config defaults", function()
 					sizes = { headline = 50, goal = 67, lap = 36, message = 29, edge = 3 },
 					compactSizes = { headline = 32, goal = 43, lap = 23, message = 18, edge = 2 },
 				},
-				feed = { size = UDim2.fromOffset(460, 140), rowHeight = 24 },
+				feed = {
+					clearance = 3,
+					sizes = { height = 30, corner = UDim.new(0, 10), inset = 10, textSize = 18 },
+					compactSizes = { height = 24, corner = UDim.new(0, 8), inset = 8, textSize = 15 },
+				},
 				-- Look C's rows (#354), at the page's sizes, the pressed key's mark outside them (Q195b).
 				hints = {
 					position = UDim2.new(1, -24, 0.5, 0),
@@ -697,7 +701,22 @@ describe("Config defaults", function()
 				},
 				scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
 				endScreen = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(720, 520) },
-				getUp = { position = UDim2.new(0.5, 0, 1, -172), size = UDim2.fromOffset(320, 40) },
+				getUp = {
+					sizes = {
+						bottom = 104,
+						gap = 9,
+						wordsGap = 15,
+						textSize = 40,
+						cap = { height = 46, padding = 11, corner = UDim.new(0, 13), textSize = 21, dropShadow = true },
+					},
+					compactSizes = {
+						bottom = 72,
+						gap = 6,
+						wordsGap = 10,
+						textSize = 28,
+						cap = { height = 34, padding = 8, corner = UDim.new(0, 10), textSize = 17, dropShadow = true },
+					},
+				},
 			},
 		})
 		expect(ui.markers).toEqual({
@@ -2078,19 +2097,47 @@ describe("Config.forMode", function()
 				message = "UI: the count's digit must fit inside its ring's ink "
 					.. "(textSize < ringSize - 2 × (ringThickness + look.textOutline))",
 			},
+			-- The Get Up prompt (#369): a place, text sizes Roblox draws, caps that show, a real drop-shadow switch.
 			{
-				overrides = { UI = { hud = { layout = { getUp = { size = UDim2.fromScale(0.5, 0.1) } } } } },
-				message = "UI.hud.layout.getUp.size: must be in pixels (scales 0, offsets > 0)",
+				overrides = { UI = { hud = { layout = { getUp = { sizes = { bottom = -1 } } } } } },
+				message = "UI.hud.layout.getUp.sizes.bottom: must be >= 0 (got -1)",
 			},
-			-- 12 px is all padding at the default spacing (6 px at the top and the bottom): no room for its keys.
 			{
-				overrides = { UI = { hud = { layout = { getUp = { size = UDim2.fromOffset(320, 12) } } } } },
-				message = "UI: the Get Up prompt must be taller than its padding (2 × hud.spacing)",
+				overrides = { UI = { hud = { layout = { getUp = { compactSizes = { textSize = 101 } } } } } },
+				message = "UI.hud.layout.getUp.compactSizes.textSize: must be <= 100 (got 101)",
 			},
-			-- The HUD fits its parts by their sizes in pixels.
 			{
-				overrides = { UI = { hud = { layout = { feed = { size = UDim2.fromScale(0.5, 0.2) } } } } },
-				message = "UI.hud.layout.feed.size: must be in pixels (scales 0, offsets > 0)",
+				overrides = { UI = { hud = { layout = { getUp = { sizes = { cap = { height = 0 } } } } } } },
+				message = "UI.hud.layout.getUp.sizes.cap.height: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { getUp = { sizes = { wordsGap = -1 } } } } } },
+				message = "UI.hud.layout.getUp.sizes.wordsGap: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { getUp = { compactSizes = { gap = -1 } } } } } },
+				message = "UI.hud.layout.getUp.compactSizes.gap: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { getUp = { size = UDim2.fromOffset(320, 40) } } } } },
+				message = "UI.hud.layout.getUp.size: unknown key",
+			},
+			-- The feed's chips (#369): sized in real numbers, and with no team edge (the owner, Q226).
+			{
+				overrides = { UI = { hud = { layout = { feed = { sizes = { edge = 8 } } } } } },
+				message = "UI.hud.layout.feed.sizes.edge: unknown key",
+			},
+			{
+				overrides = { UI = { hud = { layout = { feed = { compactSizes = { height = 0 } } } } } },
+				message = "UI.hud.layout.feed.compactSizes.height: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { feed = { clearance = -1 } } } } },
+				message = "UI.hud.layout.feed.clearance: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { feed = { size = UDim2.fromOffset(460, 140) } } } } },
+				message = "UI.hud.layout.feed.size: unknown key",
 			},
 			-- The banners (#356): a line on the screen, text sizes Roblox draws, an edge, a rise inside the
 			-- banner's own height, and each one shown for some time. The feed's place follows the goal message.
@@ -2580,7 +2627,7 @@ describe("Config.forMode", function()
 		})
 		-- The default 16 x 24 mouse with its buttons' line just over its round bottom (15 + 1 = 24 - 8).
 		local low = Fixtures.config({ UI = { hud = { layout = { hints = { cap = { mouse = { buttons = 15 } } } } } } })
-		expect(low.UI.hud.layout.hints.cap.mouse.buttons).toBe(15)
+		expect((low.UI.hud.layout.hints.cap.mouse :: Config.MouseSizes).buttons).toBe(15)
 		expect(hints.textSize).toBe(41)
 		expect(hints.clearance).toBe(0)
 		expect(hints.press).toEqual({ textSize = 1, gap = 0 })

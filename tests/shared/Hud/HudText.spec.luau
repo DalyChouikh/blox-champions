@@ -83,6 +83,27 @@ describe("HudText", function()
 		expect(text:result(nil)).toBe("DRAW")
 	end)
 
+	-- The feed's chips (#369, the owner's Q221): the name in a colour by Roblox's rich text, the rest as written, and
+	-- rich text's own characters shown as they are, in a name (a player's own) or a template (the config's).
+	it("marks the player's name in a colour for a rich-text line, escaping rich text's characters", function()
+		local blue = Color3.fromRGB(61, 139, 255)
+		local orange = Color3.fromRGB(255, 154, 60)
+		expect(text:feedMarked(entry("Possession", "Blue", "1"), NAMES, blue)).toBe(
+			'<font color="#3d8bff">Ana</font> has the ball'
+		)
+		expect(text:feedMarked(entry("Goal", "Orange", "2"), NAMES, orange)).toBe(
+			'<font color="#ff9a3c">Rex</font> scored!'
+		)
+		local marked = { ["3"] = `A<b>&'"` }
+		expect(text:feedMarked(entry("Possession", "Blue", "3"), marked, blue)).toBe(
+			'<font color="#3d8bff">A&lt;b&gt;&amp;&apos;&quot;</font> has the ball'
+		)
+		local own = HudText.new(Fixtures.config({ UI = { text = { scored = "%s & co scored!" } } }))
+		expect(own:feedMarked(entry("Goal", "Blue", "1"), NAMES, blue)).toBe(
+			'<font color="#3d8bff">Ana</font> &amp; co scored!'
+		)
+	end)
+
 	it("fails loudly on a banner or feed kind it has no text for", function()
 		expect(function()
 			text:banner({ kind = "Nope" } :: any)

@@ -3,7 +3,9 @@
 -- banner new to its slot (HudState makes a new table for each it shows) pops in from nothing, motion.pop's overshoot
 -- and back (`watch`, whenever the HUD's state changes); over its last motion.easeSeconds it leaves, 0 to 1 eased
 -- (Motion.ease), which Hud/Banner turns into its fade and its float up (`step`, each frame, writing only on a change).
--- Each slot's pop is an Animator track; its leave a binding.
+-- Each slot's pop is an Animator track; its leave a binding. The Get Up prompt, lettered as a banner (#369, the owner's
+-- Q221), has no time left to count: it pops in as it starts and fades out as it ends (`prompting`), and shows until it
+-- has gone (`promptShown`), on two more tracks.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -29,10 +31,14 @@ BannerMotion.__index = BannerMotion
 type Fields = {
 	line: Slot,
 	message: Slot,
+	-- The Get Up prompt's scale (1 at rest), and how far it has faded out, 0 to 1.
+	promptScale: Animator.Track,
+	promptLeave: Animator.Track,
 	-- How many times a leave was written (tests: nothing on a quiet step).
 	writes: number,
 	_motion: Config.MotionSettings,
 	_animator: Animator.Animator,
+	_prompting: boolean,
 }
 
 export type BannerMotion = typeof(setmetatable({} :: Fields, BannerMotion))
@@ -46,9 +52,12 @@ function BannerMotion.new(motion: Config.MotionSettings, animator: Animator.Anim
 	local fields: Fields = {
 		line = slot(animator),
 		message = slot(animator),
+		promptScale = animator:track(1),
+		promptLeave = animator:track(0),
 		writes = 0,
 		_motion = motion,
 		_animator = animator,
+		_prompting = false,
 	}
 	return setmetatable(fields, BannerMotion)
 end
@@ -71,6 +80,27 @@ local function leaving(self: BannerMotion, into: Slot, banner: HudState.Banner?,
 		into._setLeave(share)
 		self.writes += 1
 	end
+end
+
+-- Whether the Get Up prompt should show now: starting it pops it in from nothing, solid; ending it fades it out.
+function BannerMotion.prompting(self: BannerMotion, prompts: boolean)
+	if prompts == self._prompting then
+		return
+	end
+	self._prompting = prompts
+	local animator = self._animator
+	if prompts then
+		animator:rest(self.promptLeave, 0)
+		animator:rest(self.promptScale, 0)
+		animator:play(self.promptScale, "Pop", 1)
+	else
+		animator:play(self.promptLeave, "Ease", 1)
+	end
+end
+
+-- Whether the Get Up prompt is on the screen: from its start until it has faded out.
+function BannerMotion.promptShown(self: BannerMotion): boolean
+	return self._prompting or self.promptLeave.moving
 end
 
 -- Pops in each banner new to its slot.

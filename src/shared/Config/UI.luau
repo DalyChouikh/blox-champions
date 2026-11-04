@@ -27,7 +27,7 @@ export type ControlLabels = {
 	Pass: string,
 	CallPass: string,
 	BallFocus: string,
-	-- The Get Up prompt's label beside the movement keys while knocked down (#220): moving asks to get up, from
+	-- The Get Up prompt's words beside the movement keys while knocked down (#220): moving asks to get up, from
 	-- Actions.getUpAfter (the whole slide since #287); kept as RC shows it (the owner, #303, Q88).
 	GetUp: string,
 }
@@ -151,8 +151,24 @@ export type MouseSizes = { width: number, height: number, buttons: number, line:
 
 -- A look C key cap (Hud/Style.keyCap): `height` pixels tall and as wide as its key's name with `padding` each side,
 -- never narrower than tall, its corners `corner`, its name at textSize; a mouse button's cap square, with `mouse` on
--- it. Pixels.
-export type CapSizes = { height: number, padding: number, corner: UDim, textSize: number, mouse: MouseSizes }
+-- it (where a mouse's button can show: the hints). With dropShadow it drops look C's shadow. Pixels.
+export type CapSizes = {
+	height: number,
+	padding: number,
+	corner: UDim,
+	textSize: number,
+	mouse: MouseSizes?,
+	dropShadow: boolean?,
+}
+
+-- A line of the event feed (Hud/Feed, #369, the owner's Q221): a look C box `height` pixels tall with `corner`s, in
+-- look.box; in it, its words at textSize, `inset` pixels from each side. Pixels.
+export type FeedSizes = { height: number, corner: UDim, inset: number, textSize: number }
+
+-- The Get Up prompt (Hud/GetUp, #369, the owner's Q221): the movement keys' caps `gap` pixels apart, then wordsGap,
+-- then its words in the banners' lettering at textSize. Its ink's bottom sits `bottom` pixels above the stage's, higher
+-- when the feed reaches there (HudScreen.getUpBottom). Pixels.
+export type GetUpSizes = { bottom: number, cap: CapSizes, gap: number, wordsGap: number, textSize: number }
 
 -- The desktop hints in look C (Hud/ControlHints): position is the column's right middle's. A row per control is a
 -- look C box rowHeight pixels tall, with clearance pixels of the game between one row's drop shadow and the next
@@ -190,7 +206,9 @@ export type HudLayout = {
 		sizes: BannerSizes,
 		compactSizes: BannerSizes,
 	},
-	feed: { size: UDim2, rowHeight: number },
+	-- The event feed's chips: `clearance` pixels of the game between one's drop shadow and the next one's outline.
+	-- `sizes` on a desktop's screen, compactSizes on a phone's.
+	feed: { clearance: number, sizes: FeedSizes, compactSizes: FeedSizes },
 	hints: HintsLayout,
 	-- position is the bottom-right corner's; on touch, touchPosition is the top-left corner's, clear of the touch
 	-- buttons and the score button. The reading's digits over its unit, at textSizes, compactTextSizes on a phone.
@@ -223,8 +241,11 @@ export type HudLayout = {
 	-- The touch button that opens the score tab.
 	scoreButton: Place,
 	endScreen: Place,
-	-- The Get Up prompt: position is its bottom centre's; its keys are as tall as it is.
-	getUp: Place,
+	-- The Get Up prompt: `sizes` on a desktop's screen, compactSizes on a phone's.
+	getUp: {
+		sizes: GetUpSizes,
+		compactSizes: GetUpSizes,
+	},
 }
 
 -- Look C, Bold arcade (Hud/Style): text in `font`, banners and the goal's worth in `bannerFont`, in the HUD's text
@@ -376,7 +397,7 @@ local defaults: UIConfig = {
 		Pass = "Magnetic Pass",
 		CallPass = "Call",
 		BallFocus = "Focus",
-		GetUp = "Get Up",
+		GetUp = "GET UP!",
 	},
 	-- Roblox's GetStringForKeyCode gives these "" (or " " for Space).
 	keyNames = {
@@ -547,7 +568,14 @@ local defaults: UIConfig = {
 				sizes = { headline = 50, goal = 67, lap = 36, message = 29, edge = 3 },
 				compactSizes = { headline = 32, goal = 43, lap = 23, message = 18, edge = 2 },
 			},
-			feed = { size = UDim2.fromOffset(460, 140), rowHeight = 24 },
+			-- Look C chips (the owner, Q221) with no team edge (Q226), at the design page's sizes (a 34 px chip with
+			-- its 2.5 px outline, 18 px text); on a phone a little smaller, still big and clear (Q181). One chip's drop
+			-- shadow clear of the next one's outline by the hints' 3 px.
+			feed = {
+				clearance = 3,
+				sizes = { height = 30, corner = UDim.new(0, 10), inset = 10, textSize = 18 },
+				compactSizes = { height = 24, corner = UDim.new(0, 8), inset = 8, textSize = 15 },
+			},
 			-- Look C's hints (#354), at the page's sizes (1.2 px a unit: 34-unit rows 6 apart, a 28-unit cap, 18-unit
 			-- labels), in today's place at the right; RC's >> outside the row, over the game (the owner, Q195b),
 			-- where the page drew it: its left edge 30 px from the row's outline (a 14 px mark).
@@ -610,8 +638,25 @@ local defaults: UIConfig = {
 			},
 			scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
 			endScreen = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(720, 520) },
-			-- At the bottom centre like Roller Champions' prompt (Video 5 at 0:18), 8 px above the feed's 140 px.
-			getUp = { position = UDim2.new(0.5, 0, 1, -172), size = UDim2.fromOffset(320, 40) },
+			-- At the bottom centre like Roller Champions' prompt (Video 5 at 0:18), banner style (the owner, Q221), at
+			-- the design page's sizes: 46 px caps with their drop shadow, GET UP! in the banners' font at 40, 104 px
+			-- up. On a phone the hints' own cap size and a banner's share of the screen (Q191).
+			getUp = {
+				sizes = {
+					bottom = 104,
+					gap = 9,
+					wordsGap = 15,
+					textSize = 40,
+					cap = { height = 46, padding = 11, corner = UDim.new(0, 13), textSize = 21, dropShadow = true },
+				},
+				compactSizes = {
+					bottom = 72,
+					gap = 6,
+					wordsGap = 10,
+					textSize = 28,
+					cap = { height = 34, padding = 8, corner = UDim.new(0, 10), textSize = 17, dropShadow = true },
+				},
+			},
 		},
 	},
 	markers = {
@@ -709,7 +754,6 @@ local pixels = Validate.pixels()
 -- Whole pixels, where a UDim's offset would drop a fraction (probed).
 local wholePixels = Validate.number({ min = 1, integer = true })
 local place = Validate.record({ position = udim2, size = pixels })
-local list = Validate.record({ size = pixels, rowHeight = positive })
 local columns = Validate.record({ position = udim2, size = pixels, rowHeight = positive, columnWidth = positive })
 local nonNegative = Validate.number({ min = 0 })
 local boardTextSizes = Validate.record({ score = textSize, clock = textSize, worth = textSize, period = textSize })
@@ -723,6 +767,25 @@ local bannerSizes = Validate.record({
 	lap = textSize,
 	message = textSize,
 	edge = nonNegative,
+})
+local feedSizes = Validate.record({
+	height = positive,
+	corner = Validate.datatype("UDim"),
+	inset = nonNegative,
+	textSize = textSize,
+})
+local getUpSizes = Validate.record({
+	bottom = nonNegative,
+	gap = nonNegative,
+	wordsGap = nonNegative,
+	textSize = textSize,
+	cap = Validate.record({
+		height = positive,
+		padding = nonNegative,
+		corner = Validate.datatype("UDim"),
+		textSize = textSize,
+		dropShadow = Validate.boolean(),
+	}),
 })
 
 -- Each text of a scoreboard is drawn inside its box (Hud/Scoreboard): the scores in their shields or chips, the clock
@@ -916,7 +979,11 @@ local fields = Validate.record({
 				sizes = bannerSizes,
 				compactSizes = bannerSizes,
 			}),
-			feed = list,
+			feed = Validate.record({
+				clearance = nonNegative,
+				sizes = feedSizes,
+				compactSizes = feedSizes,
+			}),
 			hints = Validate.record({
 				position = udim2,
 				rowHeight = positive,
@@ -959,7 +1026,10 @@ local fields = Validate.record({
 			scoreTab = columns,
 			scoreButton = place,
 			endScreen = place,
-			getUp = place,
+			getUp = Validate.record({
+				sizes = getUpSizes,
+				compactSizes = getUpSizes,
+			}),
 		}),
 	}),
 	markers = Validate.record({
@@ -1022,7 +1092,8 @@ local schema = Validate.checkAll(fields, {
 			.. "height - width / 2 - line / 2)",
 		holds = function(ui: UIConfig): boolean
 			local cap = ui.hud.layout.hints.cap
-			local mouse = cap.mouse
+			-- A hint's cap always has one (its validator).
+			local mouse = cap.mouse :: MouseSizes
 			-- Where a round end meets the straight sides, with the line's half.
 			local edge = (mouse.width + mouse.line) / 2
 			return mouse.height + 2 * mouse.line <= cap.height
@@ -1033,13 +1104,6 @@ local schema = Validate.checkAll(fields, {
 	{
 		message = "the score tab's number columns must leave room for names, in the tab and the end screen",
 		holds = namesFit,
-	},
-	-- Its keys fill its height inside Style.padding (GetUp).
-	{
-		message = "the Get Up prompt must be taller than its padding (2 × hud.spacing)",
-		holds = function(ui: UIConfig): boolean
-			return ui.hud.layout.getUp.size.Y.Offset > 2 * ui.hud.spacing
-		end,
 	},
 	-- The crosshair's rings build round its dot (#312, #353), on either kind of screen.
 	{
