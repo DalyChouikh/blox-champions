@@ -155,7 +155,17 @@ function HudText.result(self: HudText, winner: Team.Team?): string
 	if winner == nil then
 		return self._config.UI.text.draw
 	end
-	return string.format(self._config.UI.text.wins, self:team(winner))
+	return string.format(self._config.UI.text.wins, self:teamBar(winner))
+end
+
+-- The MVP's numbers on the end screen's card (#358): their score, goals and steals.
+function HudText.mvpLine(self: HudText, score: number, goals: number, steals: number): string
+	return string.format(self._config.UI.text.mvpLine, score, goals, steals)
+end
+
+-- `team`'s total on the end screen's chip (#358): its name in capitals and `score`.
+function HudText.teamTotal(self: HudText, team: Team.Team, score: number): string
+	return string.format(self._config.UI.text.teamTotal, self:teamBar(team), score)
 end
 
 -- What a feed line says, with %s for its player.

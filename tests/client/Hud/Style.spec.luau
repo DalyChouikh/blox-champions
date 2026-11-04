@@ -322,6 +322,16 @@ describe("Style (look C)", function()
 		-- A mouse button's square, though its name alone would be wider.
 		expect(Style.capWidth(config, { text = "LMB" }, CAP) > 30).toBe(true)
 		expect(Style.capWidth(config, { text = "LMB", mouse = "Left" }, CAP)).toBe(30)
+		-- On a cap with no mouse's sizes it goes by its name.
+		local plain: Config.CapSizes = {
+			height = CAP.height,
+			padding = CAP.padding,
+			corner = CAP.corner,
+			textSize = CAP.textSize,
+		}
+		local named = Style.capWidth(config, { text = "LMB" }, plain)
+		expect(named > 30).toBe(true)
+		expect(Style.capWidth(config, { text = "LMB", mouse = "Left" }, plain)).toBe(named)
 	end)
 
 	it("pops a pressed key's cap in the pressed colour, and writes a cooling key's seconds on it", function()

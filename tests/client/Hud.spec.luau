@@ -201,6 +201,15 @@ describe("Hud", function()
 		for _, each in { gui, centre, top } do
 			expect(`{each.Name} {each.DisplayOrder}`).toBe(`{each.Name} {config.UI.hud.displayOrder}`)
 		end
+		-- The end screen's dim: the whole screen, under the HUD's own guis, over the touch controls' and the
+		-- markers' (0): level with them, which draws on top would be left to the engine.
+		local dim = Hud.dim
+		expect(dim.Name).toBe("HudDim")
+		expect(dim.ResetOnSpawn).toBe(false)
+		expect(dim.ScreenInsets).toBe(Enum.ScreenInsets.None)
+		expect(dim.Parent == folder).toBe(true)
+		expect(dim.DisplayOrder).toBe(config.UI.hud.displayOrder - 1)
+		expect(dim.DisplayOrder > 0).toBe(true)
 	end)
 
 	-- One rule for every part (#352): a phone's screen by size (HudScreen.compact), S5 there and S2 elsewhere.
@@ -209,11 +218,14 @@ describe("Hud", function()
 		function()
 			Hud:step(0)
 			expect(part("BlueChip") ~= nil and part("BlueShield") == nil).toBe(true)
+			-- Told to the name tags (#358), which draw at the screen's sizes too.
+			expect(Hud.compact).toBe(true)
 			local renders = Hud.renders
 			screen = BIG
 			Hud:resize()
 			Hud:step(0)
 			expect(part("BlueShield") ~= nil and part("BlueChip") == nil).toBe(true)
+			expect(Hud.compact).toBe(false)
 			expect(Hud.renders).toBe(renders + 1)
 			Hud:step(0)
 			expect(Hud.renders).toBe(renders + 1)
@@ -899,7 +911,7 @@ describe("Hud", function()
 
 	-- It never covers the scoreboard (Q203's rule): on this desktop S2 hangs into the HUD's area, 58 px under the safe
 	-- area's top, so the board's area starts under its deepest ink in play; on a big touch screen too, where that is
-	-- lower than the SCORES button, but not over the end screen, which has no scoreboard.
+	-- lower than the SCORES button, but not once the match is over, as the end screen has no scoreboard.
 	it("starts the score tab's area under the scoreboard's ink, where the scoreboard shows", function()
 		screen = BIG
 		Hud:resize()
@@ -918,7 +930,7 @@ describe("Hud", function()
 		Hud:toggleScoreTab()
 		Hud:step(0)
 		expect((part("ScoreTab") :: Frame).Position).toEqual(UDim2.fromOffset(0, under))
-		-- The match's end closes it; opened again over the end screen.
+		-- The match's end closes it; opened again in the end screen's place.
 		endMatch()
 		Hud:step(0)
 		fadeOut()
@@ -1061,7 +1073,7 @@ describe("Hud", function()
 		expect(part("Scoreboard") ~= nil).toBe(true)
 	end)
 
-	it("on touch, keeps the score button through the end screen and opens the full score tab over it", function()
+	it("on touch, keeps the score button through the end screen and opens the full score tab in its place", function()
 		preferred = Enum.PreferredInput.Touch
 		Hud:toggleScoreTab()
 		Hud:step(0)
@@ -1073,14 +1085,25 @@ describe("Hud", function()
 		expect(part("ScoreTab")).toBeNil()
 		expect(part("ScoreButton") ~= nil).toBe(true)
 		local endScreen = part("EndScreen") :: Frame
-		expect(endScreen:FindFirstChild("Table")).toBeNil()
-		-- A tap opens the full score tab over it, above the stage the end screen is on.
+		expect(endScreen:FindFirstChild("Table", true)).toBeNil()
+		-- A tap opens the full score tab above the stage; the end screen goes meanwhile, as the board would cut it,
+		-- the result's top sticking out above the board's (seen in Play on the phone).
+		local stage = endScreen.Parent :: Frame
 		Hud:toggleScoreTab()
 		Hud:step(0)
 		expect(part("ScoreTab") ~= nil).toBe(true)
-		expect((part("ScoreTab") :: Frame).ZIndex > (endScreen.Parent :: Frame).ZIndex).toBe(true)
-		expect(part("EndScreen") ~= nil).toBe(true)
-		-- The next match starts: the tab closes, so it never pops open then.
+		expect((part("ScoreTab") :: Frame).ZIndex > stage.ZIndex).toBe(true)
+		expect(part("EndScreen")).toBeNil()
+		-- Closed, it comes back once the board has faded, at rest: it does not pop a second time.
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect(part("EndScreen")).toBeNil()
+		fadeOut()
+		expect(part("ScoreTab")).toBeNil()
+		expect((part("EndScreen"):FindFirstChild("Pop", true) :: UIScale).Scale).toBe(1)
+		-- Open again when the next match starts: the tab closes, so it never pops open then.
+		Hud:toggleScoreTab()
+		Hud:step(0)
 		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
 		Hud:step(0)
 		fadeOut()
@@ -1111,11 +1134,92 @@ describe("Hud", function()
 		expect(part("Stage").Size).toEqual(UDim2.fromOffset(504, 323))
 		expect(fit("Banner")).toBe(1)
 		expect(fit("Feed")).toBe(1)
-		-- The compact end screen is as tall as its parts, so its width decides: (504 - 2 margins) / 720.
+		-- The end screen fits the stage too: on touch, without its table, the MVP's card is the widest part, wider
+		-- than the stage the buttons leave on a screen whose controls' area is 600 px wide.
+		screen = { whole = PHONE.whole, hud = PHONE.hud, controls = Rect.new(0, -58, 600, 323), topbar = PHONE.topbar }
+		Hud:resize()
 		endMatch()
 		Hud:step(0)
 		expect(part("EndScreen").Parent.Name).toBe("Stage")
-		expect(fit("EndScreen")).toBeCloseTo(488 / 720, 4)
+		local stack = part("Stack") :: Frame
+		local margin = 2 * config.UI.hud.screenMargin
+		local wide = (stage.Size.X.Offset - margin) / stack.Size.X.Offset
+		expect(wide < 1).toBe(true)
+		expect(fit("Stack")).toBeCloseTo(math.min(wide, (stage.Size.Y.Offset - margin) / stack.Size.Y.Offset), 4)
+	end)
+
+	-- As the page drew it (Q243): the game under a half-see-through ink over the whole screen, fading in with the
+	-- screen's pop; so the HUD's other parts go while it shows, or they would show through.
+	it("dims the whole screen under the end screen, the HUD's other parts gone, until the next match", function()
+		local function bright(): string
+			local shown: { string } = {}
+			for _, name in { "Banner", "Message", "Feed", "ControlHints" } do
+				if part(name) ~= nil then
+					table.insert(shown, name)
+				end
+			end
+			if part("Speedometer").Visible then
+				table.insert(shown, "Speedometer")
+			end
+			return table.concat(shown, " ")
+		end
+		Fixtures.spawnSkater(folder, config)
+		SkateController:step(DT)
+		Hud:step(0)
+		expect(Hud.dim:FindFirstChild("Dim")).toBeNil()
+		expect(bright()).toBe("Banner Message Feed ControlHints Speedometer")
+		endMatch()
+		Hud:step(0)
+		local dim = Hud.dim:FindFirstChild("Dim") :: Frame
+		expect(dim.Size).toEqual(UDim2.fromScale(1, 1))
+		expect(dim.BackgroundColor3 == config.UI.hud.look.ink).toBe(true)
+		expect(dim.BackgroundTransparency).toBeCloseTo(1, 4)
+		Hud:step(config.UI.hud.motion.pop.seconds)
+		expect(dim.BackgroundTransparency).toBeCloseTo(config.UI.hud.layout.endScreen.dim, 4)
+		expect(bright()).toBe("")
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
+		Hud:step(0)
+		expect(Hud.dim:FindFirstChild("Dim")).toBeNil()
+		expect(bright()).toBe("Banner Message Feed ControlHints Speedometer")
+	end)
+
+	-- They would show through the dim too (#358): the count of a kickoff the match ended in, a skater's Get Up.
+	it("hides the kickoff's count and the Get Up prompt under the end screen", function()
+		local rig = Fixtures.spawnSkater(folder, config)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
+		SkateController:step(DT)
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
+		Hud:step(0)
+		local count = Hud.centre:FindFirstChild("Countdown") :: Frame
+		expect(count.Visible).toBe(true)
+		expect(part("GetUp") ~= nil).toBe(true)
+		endMatch()
+		SkateController:step(DT)
+		Hud:step(0)
+		expect(count.Visible).toBe(false)
+		expect(part("GetUp")).toBeNil()
+	end)
+
+	-- The name tags read the form from their first step: a desktop's until the screen is measured.
+	it("has a desktop's form until the screen is measured", function()
+		expect(Hud.compact).toBe(false)
+		Hud:resize()
+		expect(Hud.compact).toBe(true)
+	end)
+
+	-- The owner's Q243 (#358): at the screen's own sizes (a phone's here, played with a keyboard), with the TAB
+	-- board's table off touch; it pops in whole as the match ends (Q194).
+	it("pops the end screen in at the screen's sizes, with the table off touch", function()
+		endMatch()
+		Hud:step(0)
+		local endScreen = part("EndScreen") :: Frame
+		local pop = endScreen:FindFirstChild("Pop", true) :: UIScale
+		expect(pop.Scale).toBeCloseTo(0, 4)
+		Hud:step(config.UI.hud.motion.pop.seconds)
+		expect(pop.Scale).toBe(1)
+		expect(endScreen:FindFirstChild("Table", true) ~= nil).toBe(true)
+		local result = endScreen:FindFirstChild("Result", true) :: CanvasGroup
+		expect((result:FindFirstChild("Front") :: TextLabel).TextSize).toBe(HudScreen.bannerSize(config, true, "Goal"))
 	end)
 
 	-- RC's way (the owner, Q185): nothing at the screen's centre without the ball.

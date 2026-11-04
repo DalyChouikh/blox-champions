@@ -39,7 +39,7 @@ local function Banner(props: BannerProps): React.ReactElement
 	local ink = HudScreen.bannerInk(config, compact)
 	local words = if banner ~= nil and shown then props.text:banner(banner) else ""
 	local color = if banner ~= nil and banner.team ~= nil then Style.teamColor(config, banner.team) else nil
-	local width = Style.textWidth(config, words, size, look.bannerFont) + 2 * ink
+	local width = Style.bannerWidth(config, words, size, ink)
 	local height = size + 2 * ink + look.shadow
 	local box = UDim2.fromOffset(width, height)
 	-- The text's centre and its bottom, shares of the holder's height: the line holds the centre, the stage's bottom

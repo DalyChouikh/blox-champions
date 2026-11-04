@@ -174,7 +174,7 @@ function HudState.switchOffer(self: HudState, carrier: PlayerId?): boolean?
 end
 
 -- Whether the TAB board shows (#357), `asked` (its key held, or its touch button toggled on): once there is a match,
--- and over the end screen on `touch` only, where the end screen leaves its own table out (the owner's choice).
+-- and once the match is over on `touch` only, where the end screen leaves its own table out (the owner's choice).
 function HudState.tabShows(self: HudState, asked: boolean, touch: boolean): boolean
 	return asked and self.match ~= nil and (self.ended == nil or touch)
 end

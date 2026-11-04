@@ -117,11 +117,6 @@ function Style.panel(config: Config.GameConfig, props: Props?): Props
 	)
 end
 
--- A panel drawn over the game (the score tab, the end screen): Style.panel, but overlayTransparency see-through.
-function Style.overlay(config: Config.GameConfig, props: Props?): Props
-	return Style.panel(config, over({ BackgroundTransparency = config.UI.hud.overlayTransparency }, props))
-end
-
 -- What a part holds, `children`, in a "Content" frame as big as it, above the part's own drawing.
 local function holding(children: Props?): React.ReactElement
 	return React.createElement("Frame", Style.holder({ Size = FULL, ZIndex = 3 }), children)
@@ -227,6 +222,23 @@ function Style.box(
 	end
 	parts.Content = holding(children)
 	return React.createElement("Frame", Style.holder(props), parts)
+end
+
+-- A player's avatar `size` pixels across (#357): `image` (HudText.avatar: their headshot) on a disc in the HUD's text
+-- colour, which shows alone for an id that is no Roblox user's or while the headshot loads, ringed in look C's ink.
+function Style.avatar(config: Config.GameConfig, size: number, image: string?): React.ReactElement
+	local hud = config.UI.hud
+	return React.createElement("ImageLabel", {
+		AnchorPoint = Style.CENTRE,
+		Position = Style.MIDDLE,
+		Size = UDim2.fromOffset(size, size),
+		BackgroundColor3 = hud.textColor,
+		BorderSizePixel = 0,
+		Image = image or "",
+	}, {
+		Corner = Style.round(),
+		Ink = React.createElement("UIStroke", { Color = hud.look.ink, Thickness = hud.look.textOutline }),
+	})
 end
 
 -- A ring: a see-through disc frame (`props` place and size it) with an outline, a UIStroke (`outline` sets its Color,
@@ -392,6 +404,12 @@ function Style.letters(
 	}
 end
 
+-- How wide a banner (Style.banner) of `words` `size` pixels tall stands: its letters, `ink` pixels in from each
+-- edge.
+function Style.bannerWidth(config: Config.GameConfig, words: string, size: number, ink: number): number
+	return Style.textWidth(config, words, size, config.UI.hud.look.bannerFont) + 2 * ink
+end
+
 -- A banner: its letters (Style.letters) `ink` pixels in from the edges of a CanvasGroup (`props` place it; `children`
 -- act on it). The group fades whole (GroupTransparency): see-through layers would darken where they overlap.
 function Style.banner(
@@ -405,7 +423,6 @@ function Style.banner(
 	children: Props?
 ): React.ReactElement
 	local look = config.UI.hud.look
-	local width = Style.textWidth(config, words, size, look.bannerFont)
 	local parts = Style.letters(config, words, size, color, edge, ink, ink)
 	if children ~= nil then
 		for key, child in children do
@@ -415,7 +432,7 @@ function Style.banner(
 	return React.createElement(
 		"CanvasGroup",
 		over({
-			Size = UDim2.fromOffset(width + 2 * ink, size + 2 * ink + look.shadow),
+			Size = UDim2.fromOffset(Style.bannerWidth(config, words, size, ink), size + 2 * ink + look.shadow),
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 		}, props),
@@ -423,11 +440,17 @@ function Style.banner(
 	)
 end
 
+-- The button `view` shows as a mouse on its cap: only a cap with a mouse's sizes can (the hints'); the others go by
+-- the button's name, as `view` names it too.
+local function drawnMouse(view: KeyView, sizes: Config.CapSizes): MouseButton?
+	return if sizes.mouse ~= nil then view.mouse else nil
+end
+
 -- How wide `view`'s key cap is (Style.keyCap): its name's width with sizes.padding each side, never narrower than
--- tall; a glyph's or a mouse's square.
+-- tall; a glyph's or a drawn mouse's square.
 function Style.capWidth(config: Config.GameConfig, view: KeyView, sizes: Config.CapSizes): number
 	local height = sizes.height
-	if view.image ~= nil or view.mouse ~= nil then
+	if view.image ~= nil or drawnMouse(view, sizes) ~= nil then
 		return height
 	end
 	return math.max(height, Style.textWidth(config, view.text or "", sizes.textSize) + 2 * sizes.padding)
@@ -439,7 +462,7 @@ end
 -- the body's curve (clips and shapes, as Style.sweep).
 local function mouseShape(config: Config.GameConfig, sizes: Config.CapSizes, button: MouseButton): React.ReactElement
 	local hud = config.UI.hud
-	-- Only the hints show a mouse's button, and their caps have its sizes (their validator).
+	-- Only a cap with its sizes comes here (drawnMouse).
 	local mouse = sizes.mouse :: Config.MouseSizes
 	local line, buttons = mouse.line, mouse.buttons
 	local body = UDim2.fromOffset(mouse.width, mouse.height)
@@ -513,7 +536,7 @@ function Style.keyCap(
 	local look = hud.look
 	local height, image = sizes.height, view.image
 	local width = Style.capWidth(config, view, sizes)
-	local mouse: MouseButton? = view.mouse
+	local mouse: MouseButton? = drawnMouse(view, sizes)
 	local parts: Children = {
 		Scale = React.createElement("UIScale", { Scale = moving.press }),
 		Sweep = Style.sweep(config, height, width, if image ~= nil then Style.ROUND else sizes.corner, moving.cooldown),

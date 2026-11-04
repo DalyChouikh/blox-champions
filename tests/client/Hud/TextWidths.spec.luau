@@ -45,7 +45,10 @@ describe("TextWidths", function()
 		expect(widths:width("Space", 17, LUCKIEST)).toBe(FALLBACK_SPACE)
 		loaded = true
 		expect(widths:width("Space", 17, FREDOKA)).toBe(FALLBACK_SPACE)
+		-- Each forget counted, for parts drawn outside the Hud's render (the name tags, #358).
+		expect(widths.generation).toBe(0)
 		widths:forget()
+		expect(widths.generation).toBe(1)
 		expect(widths:width("Space", 17, FREDOKA)).toBe(FREDOKA_SPACE)
 		expect(widths:width("Space", 17, LUCKIEST)).toBe(FREDOKA_SPACE)
 		expect(widths.measures).toBe(4)

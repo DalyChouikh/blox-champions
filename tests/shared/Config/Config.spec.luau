@@ -541,7 +541,9 @@ describe("Config defaults", function()
 			lapCompleted = "LAP %d COMPLETED",
 			goalOpen = "%s GOAL IS ACTIVE!",
 			scored = "%s scored!",
-			wins = "%s WINS",
+			wins = "%s WINS!",
+			mvpLine = "Score %d \u{B7} Goals %d \u{B7} Steals %d",
+			teamTotal = "%s %d",
 			go = "GO %s TEAM!",
 			draw = "DRAW",
 			mvp = "MVP",
@@ -556,9 +558,8 @@ describe("Config defaults", function()
 			},
 			unknownPlayer = "Player",
 			-- A raised hand.
-			callPass = "\u{270B}",
 			-- A down-pointing triangle: over a pass's target on touch, where no key letter fits (#315).
-			touchPassTarget = "\u{25BC}",
+			touchPassTarget = "PASS",
 			touchMove = "Move",
 			switchTeam = "Switch team",
 			-- A key cooling down shows its seconds left (#354, Q186), to a tenth as the page wrote them.
@@ -571,7 +572,6 @@ describe("Config defaults", function()
 			textColor = Color3.fromRGB(245, 245, 245),
 			panel = Color3.fromRGB(18, 18, 21),
 			panelTransparency = 0.35,
-			overlayTransparency = 0,
 			dimTransparency = 0.6,
 			corner = UDim.new(0, 8),
 			textSize = 20,
@@ -582,8 +582,9 @@ describe("Config defaults", function()
 			glowThickness = 3,
 			spacing = 6,
 			screenMargin = 8,
-			-- Over the touch controls, so the open TAB board covers their buttons on a phone (#357, Q236).
-			displayOrder = 1,
+			-- Over the touch controls, so the open TAB board covers their buttons on a phone (#357, Q236), with the end
+			-- screen's dim one under it and over them too (#358).
+			displayOrder = 2,
 			-- Each row's avatar on the TAB board (#357): Roblox's headshot of that user, 48 px square.
 			avatarImage = "rbxthumb://type=AvatarHeadShot&id=%s&w=48&h=48",
 			-- Look C, Bold arcade (#352, Q184), as the design page drew it.
@@ -735,10 +736,30 @@ describe("Config defaults", function()
 				},
 				scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
 				endScreen = {
-					position = UDim2.fromScale(0.5, 0.5),
-					size = UDim2.fromOffset(720, 520),
-					rowHeight = 28,
-					columnWidth = 80,
+					gap = 16,
+					dim = 0.5,
+					sizes = {
+						cardWidth = 400,
+						inset = 12,
+						avatar = 44,
+						nameSize = 21,
+						statSize = 15,
+						chipHeight = 24,
+						chipSize = 14,
+						totalHeight = 34,
+						totalSize = 22,
+					},
+					compactSizes = {
+						cardWidth = 350,
+						inset = 10,
+						avatar = 40,
+						nameSize = 19,
+						statSize = 14,
+						chipHeight = 22,
+						chipSize = 13,
+						totalHeight = 28,
+						totalSize = 17,
+					},
 				},
 				getUp = {
 					sizes = {
@@ -771,10 +792,59 @@ describe("Config defaults", function()
 			arrowImage = "rbxasset://textures/ui/MenuBar/arrow_up.png",
 		})
 		expect(ui.nameTag).toEqual({
-			size = UDim2.fromOffset(200, 48),
 			studsOffset = Vector3.new(0, 4, 0),
-			textSize = 20,
-			callSize = 28,
+			sizes = {
+				width = 240,
+				height = 184,
+				pillHeight = 26,
+				pillInset = 9,
+				textSize = 18,
+				cap = { height = 34, padding = 8, corner = UDim.new(0, 10), textSize = 17, dropShadow = false },
+				pointer = 9,
+				gap = 2,
+				badge = 24,
+				rim = 4,
+				ripple = 20,
+				rippleLine = 4,
+				badgeGap = 3,
+				glove = 1,
+				gloveDrop = 3,
+			},
+			compactSizes = {
+				width = 190,
+				height = 140,
+				pillHeight = 20,
+				pillInset = 7,
+				textSize = 14,
+				cap = { height = 24, padding = 6, corner = UDim.new(0, 8), textSize = 13, dropShadow = false },
+				pointer = 7,
+				gap = 2,
+				badge = 18,
+				rim = 3,
+				ripple = 15,
+				rippleLine = 3,
+				badgeGap = 2,
+				glove = 0.76,
+				gloveDrop = 2,
+			},
+			call = { rippleSeconds = 1, waveDegrees = 12, waveRate = 8, wavePivot = 10 },
+			glove = {
+				ink = 2.5,
+				parts = {
+					{ x = -9, y = -6, width = 18, height = 16, corner = 5, turn = 0 },
+					{ x = -9, y = -15, width = 4.5, height = 12, corner = 2.25, turn = 0 },
+					{ x = -4.5, y = -19, width = 4.5, height = 16, corner = 2.25, turn = 0 },
+					{ x = 0, y = -18, width = 4.5, height = 15, corner = 2.25, turn = 0 },
+					{ x = 4.5, y = -14, width = 4.5, height = 11, corner = 2.25, turn = 0 },
+					{ x = -9, y = -2, width = 7, height = 12, corner = 3.5, turn = -4 },
+					{ x = -9.6, y = -6, width = 5, height = 12, corner = 2.5, turn = -26 },
+				},
+				seams = {
+					{ x = -4.95, y = -13, width = 0.9, height = 9, corner = 0.45, turn = 0 },
+					{ x = -0.45, y = -16, width = 0.9, height = 12, corner = 0.45, turn = 0 },
+					{ x = 4.05, y = -12, width = 0.9, height = 8, corner = 0.45, turn = 0 },
+				},
+			},
 		})
 		expect(ui.arenaGlow).toEqual({
 			material = Enum.Material.Neon,
@@ -2037,6 +2107,15 @@ describe("Config.forMode", function()
 				overrides = { UI = { text = { speed = "%d km/h at %d" } } },
 				message = "UI.text.speed: placeholder count must be 1",
 			},
+			-- The end screen's: the MVP's score, goals and steals; a team's name and score (#358).
+			{
+				overrides = { UI = { text = { mvpLine = "Score %d \u{B7} Goals %d" } } },
+				message = "UI.text.mvpLine: placeholder count must be 3",
+			},
+			{
+				overrides = { UI = { text = { teamTotal = "%s" } } },
+				message = "UI.text.teamTotal: placeholder count must be 2",
+			},
 			{ overrides = { UI = { text = { speedUnit = "" } } }, message = "UI.text.speedUnit: must not be empty" },
 			{
 				overrides = { UI = { text = { possession = "has the ball" } } },
@@ -2049,16 +2128,49 @@ describe("Config.forMode", function()
 			},
 			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
 			{
-				overrides = { UI = { hud = { overlayTransparency = 2 } } },
-				message = "UI.hud.overlayTransparency: must be <= 1 (got 2)",
-			},
-			{
 				overrides = { UI = { markers = { arrowImage = "" } } },
 				message = "UI.markers.arrowImage: must not be empty",
 			},
 			{
-				overrides = { UI = { hud = { layout = { endScreen = { columnWidth = 0 } } } } },
-				message = "UI.hud.layout.endScreen.columnWidth: must be > 0",
+				overrides = { UI = { hud = { layout = { endScreen = { sizes = { cardWidth = 0 } } } } } },
+				message = "UI.hud.layout.endScreen.sizes.cardWidth: must be >= 1 (got 0)",
+			},
+			-- The end screen's sizes in whole pixels (its boxes on pixel edges), its text sizes as every text's.
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { gap = 16.5 } } } } },
+				message = "UI.hud.layout.endScreen.gap: must be an integer (got 16.5)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { dim = 1.5 } } } } },
+				message = "UI.hud.layout.endScreen.dim: must be <= 1 (got 1.5)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { sizes = { inset = 2.5 } } } } } },
+				message = "UI.hud.layout.endScreen.sizes.inset: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { sizes = { nameSize = 20.5 } } } } } },
+				message = "UI.hud.layout.endScreen.sizes.nameSize: must be an integer (got 20.5)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { sizes = { statSize = 101 } } } } } },
+				message = "UI.hud.layout.endScreen.sizes.statSize: must be <= 100 (got 101)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { compactSizes = { chipHeight = 0 } } } } } },
+				message = "UI.hud.layout.endScreen.compactSizes.chipHeight: must be >= 1 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { compactSizes = { chipSize = 0 } } } } } },
+				message = "UI.hud.layout.endScreen.compactSizes.chipSize: must be >= 1 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { sizes = { totalHeight = 33.5 } } } } } },
+				message = "UI.hud.layout.endScreen.sizes.totalHeight: must be an integer (got 33.5)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { compactSizes = { totalSize = 0 } } } } } },
+				message = "UI.hud.layout.endScreen.compactSizes.totalSize: must be >= 1 (got 0)",
 			},
 			{
 				overrides = { UI = { hud = { layout = { scoreTab = { sizes = { column = 0 } } } } } },
@@ -2091,8 +2203,12 @@ describe("Config.forMode", function()
 				overrides = { UI = { hud = { layout = { scoreTab = { scrollBar = 6.5 } } } } },
 				message = "UI.hud.layout.scoreTab.scrollBar: must be an integer (got 6.5)",
 			},
-			-- Under the touch controls, the open board would leave their buttons over it.
-			{ overrides = { UI = { hud = { displayOrder = 0 } } }, message = "UI.hud.displayOrder: must be >= 1" },
+			-- With the dim level with the touch controls, which draws on top would be left to the engine.
+			{ overrides = { UI = { hud = { displayOrder = 1 } } }, message = "UI.hud.displayOrder: must be >= 2" },
+			{
+				overrides = { UI = { hud = { displayOrder = 2.5 } } },
+				message = "UI.hud.displayOrder: must be an integer (got 2.5)",
+			},
 			{
 				overrides = { UI = { hud = { avatarImage = "rbxthumb://type=AvatarHeadShot&w=48&h=48" } } },
 				message = "UI.hud.avatarImage: placeholder count must be 1",
@@ -2266,8 +2382,8 @@ describe("Config.forMode", function()
 				message = "UI.hud.layout.feed.position: unknown key",
 			},
 			{
-				overrides = { UI = { hud = { layout = { endScreen = { size = UDim2.fromOffset(0, 520) } } } } },
-				message = "UI.hud.layout.endScreen.size: must be in pixels (scales 0, offsets > 0)",
+				overrides = { UI = { hud = { layout = { endScreen = { compactSizes = { avatar = 40.5 } } } } } },
+				message = "UI.hud.layout.endScreen.compactSizes.avatar: must be an integer (got 40.5)",
 			},
 			-- RC's crosshair (#312, #353): on the screen, rings that hold their dot, the carrying ring growing into the
 			-- charge ring, a blink that takes some time.
@@ -2347,10 +2463,186 @@ describe("Config.forMode", function()
 				overrides = { UI = { hud = { layout = { reticle = { compactSizes = { carry = 47 } } } } } },
 				message = "UI: the reticle's carrying ring must be smaller than its charge ring (carry < charge)",
 			},
-			-- Five number columns of 140 and their gaps, inside the padding: 742 px, wider than the 720 px end screen.
+			-- The end screen's words taller than their chips (#358): a 25 px MVP word on a 24 px chip; a 29 px total in
+			-- its 2 x 3 px of ink over a 34 px chip.
 			{
-				overrides = { UI = { hud = { layout = { endScreen = { columnWidth = 140 } } } } },
-				message = "UI: the end screen's number columns must leave room for names",
+				overrides = { UI = { hud = { layout = { endScreen = { sizes = { chipSize = 25 } } } } } },
+				message = "UI: the end screen's words must fit their chips (chipSize <= chipHeight, "
+					.. "totalSize + 2 \u{D7} textOutline <= totalHeight)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { sizes = { totalSize = 29 } } } } } },
+				message = "UI: the end screen's words must fit their chips (chipSize <= chipHeight, "
+					.. "totalSize + 2 \u{D7} textOutline <= totalHeight)",
+			},
+			-- On a phone: a 23 px MVP word on its 22 px chip; the MVP's 24 px name, its 3 px of ink and their 14 px
+			-- numbers, 41 px beside a 40 px avatar.
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { compactSizes = { chipSize = 23 } } } } } },
+				message = "UI: the end screen's words must fit their chips (chipSize <= chipHeight, "
+					.. "totalSize + 2 \u{D7} textOutline <= totalHeight)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { compactSizes = { nameSize = 24 } } } } } },
+				message = "UI: the end screen's card must hold its name over its numbers beside the avatar "
+					.. "(nameSize + textOutline + statSize <= avatar)",
+			},
+			-- The name tags (#358): whole pixels where their boxes meet, a glove of parts, a call that moves.
+			{
+				overrides = { UI = { nameTag = { sizes = { pillHeight = 25.5 } } } },
+				message = "UI.nameTag.sizes.pillHeight: must be an integer (got 25.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { compactSizes = { cap = { textSize = 0 } } } } },
+				message = "UI.nameTag.compactSizes.cap.textSize: must be >= 1 (got 0)",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { glove = 0 } } } },
+				message = "UI.nameTag.sizes.glove: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { nameTag = { compactSizes = { pointer = 6.5 } } } },
+				message = "UI.nameTag.compactSizes.pointer: must be an integer (got 6.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { call = { rippleSeconds = 0 } } } },
+				message = "UI.nameTag.call.rippleSeconds: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { nameTag = { glove = { parts = {} } } } },
+				message = "UI.nameTag.glove.parts: must not be empty",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { width = 2.5 } } } },
+				message = "UI.nameTag.sizes.width: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { height = 2.5 } } } },
+				message = "UI.nameTag.sizes.height: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { compactSizes = { pillInset = 2.5 } } } },
+				message = "UI.nameTag.compactSizes.pillInset: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { textSize = 2.5 } } } },
+				message = "UI.nameTag.sizes.textSize: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { gap = 2.5 } } } },
+				message = "UI.nameTag.sizes.gap: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { badge = 2.5 } } } },
+				message = "UI.nameTag.sizes.badge: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { compactSizes = { rim = 2.5 } } } },
+				message = "UI.nameTag.compactSizes.rim: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { ripple = 2.5 } } } },
+				message = "UI.nameTag.sizes.ripple: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { rippleLine = 0 } } } },
+				message = "UI.nameTag.sizes.rippleLine: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { nameTag = { compactSizes = { badgeGap = 2.5 } } } },
+				message = "UI.nameTag.compactSizes.badgeGap: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { gloveDrop = -1 } } } },
+				message = "UI.nameTag.sizes.gloveDrop: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { cap = { padding = -1 } } } } },
+				message = "UI.nameTag.sizes.cap.padding: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { nameTag = { call = { waveDegrees = -1 } } } },
+				message = "UI.nameTag.call.waveDegrees: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { nameTag = { call = { waveRate = -1 } } } },
+				message = "UI.nameTag.call.waveRate: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { nameTag = { glove = { ink = -1 } } } },
+				message = "UI.nameTag.glove.ink: must be >= 0 (got -1)",
+			},
+			{
+				overrides = {
+					UI = {
+						nameTag = {
+							glove = { parts = { { x = 0, y = 0, width = 0, height = 1, corner = 0, turn = 0 } } },
+						},
+					},
+				},
+				message = "UI.nameTag.glove.parts[1].width: must be > 0 (got 0)",
+			},
+			{
+				overrides = {
+					UI = {
+						nameTag = {
+							glove = { parts = { { x = 0, y = 0, width = 1, height = 0, corner = 0, turn = 0 } } },
+						},
+					},
+				},
+				message = "UI.nameTag.glove.parts[1].height: must be > 0 (got 0)",
+			},
+			{
+				overrides = {
+					UI = {
+						nameTag = {
+							glove = { parts = { { x = 0, y = 0, width = 1, height = 1, corner = -1, turn = 0 } } },
+						},
+					},
+				},
+				message = "UI.nameTag.glove.parts[1].corner: must be >= 0 (got -1)",
+			},
+			-- The name's 21 px and its 2 x 3 px of ink in a 26 px pill; on a phone 15 + 6 in 20.
+			{
+				overrides = { UI = { nameTag = { sizes = { textSize = 21 } } } },
+				message = "UI: a name tag's name must fit its pill (textSize + 2 \u{D7} textOutline <= pillHeight)",
+			},
+			{
+				overrides = { UI = { nameTag = { compactSizes = { textSize = 15 } } } },
+				message = "UI: a name tag's name must fit its pill (textSize + 2 \u{D7} textOutline <= pillHeight)",
+			},
+			-- The call's row reaching 92 px above the tag's middle (13 + 3 + 2 + 9 + 17, then the badge's 24 + 20 + 4)
+			-- in a 182 px tag; on a phone 70 (10 + 3 + 2 + 7 + 12, 18 + 15 + 3) in 138; and the ripple 2 x 48 across a
+			-- 95 px tag.
+			{
+				overrides = { UI = { nameTag = { sizes = { height = 182 } } } },
+				message = "UI: a name tag must hold its call's row (the pill, gap, pointer and key cap, "
+					.. "and the badge's widest ripple)",
+			},
+			{
+				overrides = { UI = { nameTag = { compactSizes = { height = 138 } } } },
+				message = "UI: a name tag must hold its call's row (the pill, gap, pointer and key cap, "
+					.. "and the badge's widest ripple)",
+			},
+			{
+				overrides = { UI = { nameTag = { sizes = { width = 95 } } } },
+				message = "UI: a name tag must hold its call's row (the pill, gap, pointer and key cap, "
+					.. "and the badge's widest ripple)",
+			},
+			-- A tall cap with a small badge: 13 + 3 + 2 + 9 + 50 = 77 px to the cap's middle and its 50 px top half,
+			-- 127 of the 92 px over the tag's middle, where the ring's 2 px would pass.
+			{
+				overrides = {
+					UI = { nameTag = { sizes = { cap = { height = 100 }, badge = 1, ripple = 0, rippleLine = 1 } } },
+				},
+				message = "UI: a name tag must hold its call's row (the pill, gap, pointer and key cap, "
+					.. "and the badge's widest ripple)",
+			},
+			-- The MVP's name (27 px) and its 3 px of ink over their numbers (15 px): 45 px beside a 44 px avatar.
+			{
+				overrides = { UI = { hud = { layout = { endScreen = { sizes = { nameSize = 27 } } } } } },
+				message = "UI: the end screen's card must hold its name over its numbers beside the avatar "
+					.. "(nameSize + textOutline + statSize <= avatar)",
 			},
 			-- The TAB board (#357), each leaving its names no room at all: on a phone 2 x 8 + (21 + 2 x 3) + 6 x 6 + 5
 			-- x 106 = 609 px of its 609; on desktop 2 x 12 + (27 + 2 x 3) + 6 x 6 + 5 x 76 = 473 of its 473.
@@ -2739,6 +3031,56 @@ describe("Config.forMode", function()
 		expect(hints.press).toEqual({ textSize = 1, gap = 0 })
 		expect(config.UI.hud.look.sweepTransparency).toBe(0)
 		expect(config.UI.text.cooldown).toBe("%5.2fs")
+	end)
+
+	-- The name tags (#358): their defaults already stand at the row's edge (92 px in a 184 px tag, 70 in 140);
+	-- the names at the pill's edge: 20 + 2 x 3 = 26, a phone's 14 + 6 = 20; the ripple 2 x 48 = 96 across 96.
+	it("accepts name tag sizes just inside their limits", function()
+		local config = Fixtures.config({
+			UI = { nameTag = { sizes = { textSize = 20, width = 96 }, compactSizes = { textSize = 14 } } },
+		})
+		local tag = config.UI.nameTag
+		expect(`{tag.sizes.textSize} {tag.sizes.width} {tag.compactSizes.textSize}`).toBe("20 96 14")
+		-- Nothing between its parts, a still call, one square glove part with no seams.
+		local bare = Fixtures.config({
+			UI = {
+				nameTag = {
+					sizes = {
+						pillInset = 0,
+						gap = 0,
+						rim = 0,
+						ripple = 0,
+						badgeGap = 0,
+						gloveDrop = 0,
+						cap = { padding = 0 },
+					},
+					call = { waveDegrees = 0, waveRate = 0 },
+					glove = {
+						ink = 0,
+						parts = { { x = 0, y = 0, width = 1, height = 1, corner = 0, turn = 0 } },
+						seams = {},
+					},
+				},
+			},
+		}).UI.nameTag
+		expect(bare.sizes.pillInset + bare.sizes.gap + bare.sizes.rim + bare.sizes.ripple).toBe(0)
+		expect(bare.sizes.badgeGap + bare.sizes.gloveDrop + bare.sizes.cap.padding).toBe(0)
+		expect(bare.call.waveDegrees + bare.call.waveRate + bare.glove.ink).toBe(0)
+		expect(#bare.glove.seams).toBe(0)
+	end)
+
+	-- The end screen (#358): a 24 px MVP word on its 24 px chip; a 28 px total in its 2 x 3 px of ink, 34; the
+	-- MVP's 26 px name, its 3 px of ink and their 15 px numbers beside the 44 px avatar.
+	it("accepts end screen sizes just inside their limits", function()
+		local sizes = { chipSize = 24, totalSize = 28, nameSize = 26, inset = 0 }
+		local config =
+			Fixtures.config({ UI = { hud = { layout = { endScreen = { gap = 0, dim = 1, sizes = sizes } } } } })
+		local endScreen = config.UI.hud.layout.endScreen
+		expect(endScreen.gap).toBe(0)
+		expect(endScreen.dim).toBe(1)
+		for key, value in sizes do
+			expect(`{key} = {(endScreen.sizes :: any)[key]}`).toBe(`{key} = {value}`)
+		end
 	end)
 
 	-- The TAB board (#357) at each room rule's edge: names one pixel wide, an avatar's and the text's ink as tall as a

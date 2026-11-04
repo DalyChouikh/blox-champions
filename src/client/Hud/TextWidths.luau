@@ -16,6 +16,9 @@ TextWidths.__index = TextWidths
 type Fields = {
 	-- How many texts were measured (tests: a render after `forget` measures again).
 	measures: number,
+	-- How many times every width was forgotten: a part drawn outside the Hud's render (the name tags, #358) measures
+	-- again when it changes.
+	generation: number,
 	_measure: Measure,
 	_widths: { [Enum.Font]: { [number]: { [string]: number } } },
 }
@@ -23,7 +26,7 @@ type Fields = {
 export type TextWidths = typeof(setmetatable({} :: Fields, TextWidths))
 
 function TextWidths.new(measure: Measure): TextWidths
-	return setmetatable({ measures = 0, _measure = measure, _widths = {} } :: Fields, TextWidths)
+	return setmetatable({ measures = 0, generation = 0, _measure = measure, _widths = {} } :: Fields, TextWidths)
 end
 
 -- How wide `text` is at `size` in `font`, in whole pixels rounded up so its letters fit: measured the first time, kept
@@ -51,6 +54,7 @@ end
 -- Forgets every width kept, so each is measured again when next asked.
 function TextWidths.forget(self: TextWidths)
 	table.clear(self._widths)
+	self.generation += 1
 end
 
 -- Waits while `font` loads: TextService's GetTextBoundsAsync yields until it has (a loaded font returns at once,
