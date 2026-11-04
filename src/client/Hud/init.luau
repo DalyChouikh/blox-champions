@@ -7,28 +7,30 @@
 -- draws both through portals). Before each frame is drawn (FrameController), after HudStore has counted the clocks, the
 -- Hud renders App again only when something App shows has changed: the HUD state's version, the device, the screen's
 -- form (a phone's or not, where the scoreboard sits under Roblox's top bar, and the crosshair's aim: HudScreen), the
--- carrier, whether the local player has a skater, whether it shows the Get Up prompt, or whether the score tab is open.
--- What changes every frame (the clock, the speed, what each control does now and whether it works, how far a throw has
--- charged) goes through bindings instead, each set only when it changes, and so does what moves (Animator's tracks,
--- stepped each frame; the scoreboard's from BoardMotion, which watches each new state): the texts come from caches and
--- the config, so a quiet frame allocates nothing. Each hint row (#354, look C) fades in and out over motion.easeSeconds
--- as its control greys and lights, pops its key for motion.press when the keys working it now are pressed
--- (InputController's counts, against the count the row saw last, so the game's own reads keep their presses), and shows
--- a cooling action's seconds and sweep. The speedometer's reading eases toward the skater's speed
--- (UI.hud.motion.speedRate), from the speed itself whenever a skater appears. Hints name each key as the device shows
--- it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout gives it, else
--- Config.UI.keyNames, else the KeyCode's name, and the mouse's buttons as a mouse with that button inked (Q207).
--- There are none on touch, where the buttons carry the labels; each render
--- names the pass key for the mark over a pass's target (passKey, #315). The Get Up prompt (a skater knocked down by a
--- strike or a fall: SkateController.promptsGetUp, #242) names the movement keys the same way: the first composite's
--- four keys, the gamepad's stick, or on touch Config.UI.text's name for the stick. The score tab shows while its key is
--- held; on touch a button toggles it, and the toggle clears once the device is not touch and whenever the end screen
--- appears or goes, so the tab never pops open unasked. While the tab shows its Switch team button
--- (HudState.switchOffer, #310), the button's key, or a tap on touch, asks the server for a switch when one works. The
--- banner, the feed, the score tab and the end screen centre and fit in the HUD's stage, a binding: on touch the part of
--- the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that GuiService gives), elsewhere the
--- whole of it. It is measured again, with the screen's form, when the screen's size or Roblox's top bar changes (from
--- start on) and when the device does.
+-- carrier, whether the local player has a skater, whether it shows the Get Up prompt, whether the score tab is open, or
+-- whether look C's fonts have loaded: the HUD loads them as it starts (TextWidths.load), since a text measured before
+-- its font is in comes out in the fallback font's width, narrower, and once they are in it forgets every width measured
+-- so far (Style.widths) and renders again with the real letters (#364). What changes every frame (the clock, the speed,
+-- what each control does now and whether it works, how far a throw has charged) goes through bindings instead, each set
+-- only when it changes, and so does what moves (Animator's tracks, stepped each frame; the scoreboard's from
+-- BoardMotion, which watches each new state): the texts come from caches and the config, so a quiet frame allocates
+-- nothing. Each hint row (#354, look C) fades in and out over motion.easeSeconds as its control greys and lights, pops
+-- its key for motion.press when the keys working it now are pressed (InputController's counts, against the count the
+-- row saw last, so the game's own reads keep their presses), and shows a cooling action's seconds and sweep. The
+-- speedometer's reading eases toward the skater's speed (UI.hud.motion.speedRate), from the speed itself whenever a
+-- skater appears. Hints name each key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the
+-- player's own keyboard layout gives it, else Config.UI.keyNames, else the KeyCode's name, and the mouse's buttons as a
+-- mouse with that button inked (Q207). There are none on touch, where the buttons carry the labels; each render names
+-- the pass key for the mark over a pass's target (passKey, #315). The Get Up prompt (a skater knocked down by a strike
+-- or a fall: SkateController.promptsGetUp, #242) names the movement keys the same way: the first composite's four keys,
+-- the gamepad's stick, or on touch Config.UI.text's name for the stick. The score tab shows while its key is held; on
+-- touch a button toggles it, and the toggle clears once the device is not touch and whenever the end screen appears or
+-- goes, so the tab never pops open unasked. While the tab shows its Switch team button (HudState.switchOffer, #310),
+-- the button's key, or a tap on touch, asks the server for a switch when one works. The banner, the feed, the score tab
+-- and the end screen centre and fit in the HUD's stage, a binding: on touch the part of the HUD's area left of the
+-- touch buttons (TouchArea, from the two guis' areas that GuiService gives), elsewhere the whole of it. It is measured
+-- again, with the screen's form, when the screen's size or Roblox's top bar changes (from start on) and when the device
+-- does.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -56,6 +58,7 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local ScoreTab = require(script.ScoreTab)
 local SkateController = require(script.Parent.SkateController)
 local Style = require(script.Style)
+local TextWidths = require(script.TextWidths)
 local TouchArea = require(ReplicatedStorage.Shared.Input.TouchArea)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
@@ -155,6 +158,8 @@ export type Hud = {
 	_touchToggled: boolean,
 	-- Whether the match was over at the last step.
 	_over: boolean,
+	-- Whether look C's fonts have loaded (TextWidths.load's callback sets it).
+	_fontsLoaded: boolean,
 	-- What App last rendered from; the version is nil before the first render.
 	_version: number?,
 	_device: Enum.PreferredInput?,
@@ -167,6 +172,7 @@ export type Hud = {
 	_hasSkater: boolean,
 	_promptsGetUp: boolean,
 	_scoreTabOpen: boolean,
+	_shownFontsLoaded: boolean,
 }
 
 local function newShown<T>(value: T): Shown<T>
@@ -355,6 +361,7 @@ local Hud: Hud = {
 	_sendSwitchTeam = function() end,
 	_touchToggled = false,
 	_over = false,
+	_fontsLoaded = false,
 	_version = nil,
 	_device = nil,
 	_shownCompact = false,
@@ -366,10 +373,11 @@ local Hud: Hud = {
 	_hasSkater = false,
 	_promptsGetUp = false,
 	_scoreTabOpen = false,
+	_shownFontsLoaded = false,
 
 	-- deps.Parent keeps the guis out of the local player's PlayerGui in tests; deps.PreferredInput, deps.LocalId,
-	-- deps.KeyString, deps.KeyImage, deps.InsetArea, deps.TopbarInset and deps.SendSwitchTeam replace the live game
-	-- there.
+	-- deps.KeyString, deps.KeyImage, deps.InsetArea, deps.TopbarInset, deps.SendSwitchTeam and deps.LoadFonts
+	-- replace the live game there.
 	init = function(self: Hud, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -423,6 +431,14 @@ local Hud: Hud = {
 		self._scoreTabOpen = false
 		self._touchToggled = false
 		self._over = false
+		self._fontsLoaded = false
+		self._shownFontsLoaded = false
+		local look = config.UI.hud.look
+		local loadFonts = deps.LoadFonts or TextWidths.load
+		loadFonts({ Font.fromEnum(look.font), Font.fromEnum(look.bannerFont) }, function()
+			Style.widths:forget()
+			self._fontsLoaded = true
+		end)
 		self._onScoreButton = function()
 			self:toggleScoreTab()
 		end
@@ -534,6 +550,7 @@ local Hud: Hud = {
 		end
 		local compact, boardTop, aim = self._compact, self._boardTop, self._aim
 		local bannerAt, stageTop = self._bannerAt, self._stageTop
+		local fontsLoaded = self._fontsLoaded
 		if state.version ~= self._version then
 			self._board:watch(state.match)
 			self._banners:watch(state)
@@ -550,6 +567,7 @@ local Hud: Hud = {
 			or hasSkater ~= self._hasSkater
 			or promptsGetUp ~= self._promptsGetUp
 			or scoreTabOpen ~= self._scoreTabOpen
+			or fontsLoaded ~= self._shownFontsLoaded
 		then
 			self._version = state.version
 			self._device = device
@@ -562,6 +580,7 @@ local Hud: Hud = {
 			self._hasSkater = hasSkater
 			self._promptsGetUp = promptsGetUp
 			self._scoreTabOpen = scoreTabOpen
+			self._shownFontsLoaded = fontsLoaded
 			self.renders += 1
 			local keys = hintKeys(self, device, hasSkater)
 			self.passKey = passKeyView(self, device, hasSkater, keys)

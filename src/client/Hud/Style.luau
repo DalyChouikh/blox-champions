@@ -12,6 +12,7 @@ local Fit = require(ReplicatedStorage.Shared.Hud.Fit)
 local React = require(ReplicatedStorage.Packages.React)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local TextService = game:GetService("TextService")
+local TextWidths = require(script.Parent.TextWidths)
 
 -- Keyed by property name, or by a React event (React.Event.Activated).
 export type Props = { [any]: any }
@@ -70,9 +71,6 @@ end
 local function leftTurn(share: number): number
 	return math.max(sweepAngle(share), 180) + 180
 end
-
--- Text widths already measured, by font, text size and text: a width is read from TextService once.
-local widths: { [Enum.Font]: { [number]: { [string]: number } } } = {}
 
 -- `props` written over `base`, which the caller made fresh: React keeps each element's props.
 local function over(base: Props, props: Props?): Props
@@ -333,26 +331,15 @@ function Style.sweep(
 	)
 end
 
--- How wide `text` is at `size` in look C's font (or `inFont`: the banners' look.bannerFont), in whole pixels
--- (TextService: a text label's own bounds).
+-- The HUD's text widths, each measured once by TextService (a text label's own bounds) until look C's fonts load
+-- (TextWidths, #364).
+Style.widths = TextWidths.new(function(text: string, size: number, font: Enum.Font): number
+	return TextService:GetTextSize(text, size, font, UNBOUNDED).X
+end)
+
+-- How wide `text` is at `size` in look C's font (or `inFont`: the banners' look.bannerFont), in whole pixels.
 function Style.textWidth(config: Config.GameConfig, text: string, size: number, inFont: Enum.Font?): number
-	local font = inFont or config.UI.hud.look.font
-	local bySize = widths[font]
-	if bySize == nil then
-		bySize = {}
-		widths[font] = bySize
-	end
-	local byText = bySize[size]
-	if byText == nil then
-		byText = {}
-		bySize[size] = byText
-	end
-	local width = byText[text]
-	if width == nil then
-		width = math.ceil(TextService:GetTextSize(text, size, font, UNBOUNDED).X)
-		byText[text] = width
-	end
-	return width
+	return Style.widths:width(text, size, inFont or config.UI.hud.look.font)
 end
 
 -- A UIStroke round a text label's letters in `color`, `thickness` pixels out.

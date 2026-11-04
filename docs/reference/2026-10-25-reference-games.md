@@ -1741,6 +1741,27 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   'Uppercut' is wider than its row and pushes the cap onto the border. That is #364 (filed the same session), not
   #363. **Q215** (recommended): **ship #363 as built, then fix #364** test-first and show the Uppercut row
   before/after. Not chosen: hold #363 until #364 is built.
+- **Q216 three asks after playing** (session 76, given with the cold-start restart for #364's last check; the
+  design page moved to https://claude.ai/artifact/H6nXzFP8Q6MKyA6gWjux5y, the earlier UaGHjfHfGuy2QeirmBNZyG being
+  the previous account's). The owner's words: "keep the hint controls when a user clicks something active, like when
+  user keeps clicking on the pump, we keep showing the arrowws hint and the pressed button, same for other actions
+  that can be holded, and second, don't disappear action when that action is clicked, for example uppercut, don't
+  disappear it, but just either show a coldown or gray it out, same for the dive, and finally, the get up hints and
+  the player has the ball text, update them also with out new HUD/UI, take a thorough look". So: (1) a key held down
+  keeps its cap pressed and its >> showing for as long as it is held (today the press pops for motion.press only);
+  (2) an action's row never vanishes after its use (the Uppercut in the air, the Dive): it stays, greyed or sweeping
+  its cooldown. RC does the same (this file: in the air RC greys Uppercut, Pump and Brake, Videos 10-11; through a
+  carrier's dive every hint is greyed but Charge Throw, Video 33; knocked down every action is greyed), and Q186
+  already chose 'an unusable one greyed'; ours hid rows by context since before #354; (3) the Get Up prompt and the
+  event feed (the possession line) in look C. Each its own issue, drawn on the page first.
+- **Q217 their order** (session 76, recommended): **right after #364**, before #357, #358 and #355 (they refine the
+  hint rows #354 built). Not chosen: after the HUD issues.
+- **Q218 #364 shipped** (session 76, recommended; shown on the page
+  https://claude.ai/artifact/H6nXzFP8Q6MKyA6gWjux5y version 2, 'Hint rows measured with the real font': session
+  75's two Plays, a Play with the fonts held back by a Studio-only patch (before: Space 52, Shift 45, Ctrl 38, the A
+  cap on Uppercut's border; after one redraw 59/50/45, every cap 8 px in), four normal desktop Plays incl. the first
+  after a Studio restart (the same widths from the first frame) and the phone): **"Yes, ship it"** as built. Next:
+  #364's commit and PR, then Q216's three asks drawn on the page.
 
 ## Roller Champions
 
