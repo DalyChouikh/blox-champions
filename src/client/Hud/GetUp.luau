@@ -3,7 +3,7 @@
 -- movement keys as the device shows them on look C's bigger caps (Style.keyCap), then its words in the banners'
 -- lettering (Style.letters), on no box, at the bottom centre like Roller Champions' prompt (the owner's recording,
 -- Video 5 at 0:18), over the feed's lines where they reach it (HudScreen.getUpBottom). It pops in and fades out whole,
--- in one CanvasGroup (BannerMotion). Moving asks the server to get the skater up, which it does from
+-- in one CanvasGroup (a Reveal's bindings). Moving asks the server to get the skater up, which it does from
 -- Actions.getUpAfter: since #287 the whole slide (Q62), and the prompt stays as RC's does (the owner, #303, Q88). It
 -- sits in the HUD's stage, so on touch it centres left of the buttons, and shrinks to fit it. A plain function of its
 -- props.

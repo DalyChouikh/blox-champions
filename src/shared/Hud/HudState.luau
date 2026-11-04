@@ -173,6 +173,12 @@ function HudState.switchOffer(self: HudState, carrier: PlayerId?): boolean?
 	return TeamSwitch.allowed(rules, seated, carrier == self._viewer)
 end
 
+-- Whether the TAB board shows (#357), `asked` (its key held, or its touch button toggled on): once there is a match,
+-- and over the end screen on `touch` only, where the end screen leaves its own table out (the owner's choice).
+function HudState.tabShows(self: HudState, asked: boolean, touch: boolean): boolean
+	return asked and self.match ~= nil and (self.ended == nil or touch)
+end
+
 -- The kickoff's count at `secondsLeft`, in the viewer's team's colour (the owner, Q110).
 local function countdown(self: HudState, secondsLeft: number): Banner
 	return { kind = "Countdown", team = viewerTeam(self), value = digit(secondsLeft) }

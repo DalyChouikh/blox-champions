@@ -10,10 +10,16 @@
 -- nothing, moves down (the owner, Q203). The banner line (#356) sits a share of the way down the whole screen too,
 -- lower where it would come near the board; the goal message sits at the stage's bottom, the feed above it (Q210,
 -- Q211), and the Get Up prompt above that where the feed reaches it (#369). All in pixels from the safe area's top, but
--- the message's, the feed's and the prompt's, from the stage's bottom.
+-- the message's, the feed's and the prompt's, from the stage's bottom. The TAB board (#357) fits the HUD's area under
+-- the scoreboard's ink, on touch under the SCORES button too, shrinking off touch and scrolling its rows on touch where
+-- they do not fit.
 
 local Config = require(script.Parent.Parent.Config)
+local Fit = require(script.Parent.Fit)
 local HudState = require(script.Parent.HudState)
+
+-- The Switch team row under the TAB board: its words alone (on touch, where it is tapped), or a key's cap beside them.
+export type SwitchRow = "Label" | "Key"
 
 local HudScreen = {}
 
@@ -60,6 +66,13 @@ end
 function HudScreen.under(config: Config.GameConfig, clearance: number): number
 	local look = config.UI.hud.look
 	return look.outline + look.shadow + clearance + look.outline
+end
+
+-- How far below the safe area's top the scoreboard (`top` its top) reaches at its deepest in play (the period under it
+-- while `period`): what the banner line and the TAB board keep clear of, the deepest at any moment of the period so
+-- neither moves within it.
+function HudScreen.boardBottom(config: Config.GameConfig, compact: boolean, top: number, period: boolean): number
+	return top + HudScreen.boardDepth(config, compact, period, true)
 end
 
 -- How far below the safe area's top (`safe`) a point `share` of the way down the whole screen (`whole`) lies; both
@@ -203,9 +216,9 @@ function HudScreen.bannerAt(config: Config.GameConfig, whole: Rect, safe: Rect):
 end
 
 -- The centre of a banner `size` pixels tall on the banner line: at `at` (HudScreen.bannerAt), lower where its ink would
--- come within layout.banner.clearance of the scoreboard's deepest ink in play (`top` its top; the period under it while
--- `period`): the deepest in play at any moment, so the line never moves within a period, GO at the kickoff's end
--- included. In whole pixels, rounded up: a UDim's offset holds whole pixels.
+-- come within layout.banner.clearance of the scoreboard's deepest ink in play (HudScreen.boardBottom: `top` its top,
+-- the period under it while `period`), so the line never moves within a period, GO at the kickoff's end included. In
+-- whole pixels, rounded up: a UDim's offset holds whole pixels.
 function HudScreen.bannerLine(
 	config: Config.GameConfig,
 	compact: boolean,
@@ -215,8 +228,8 @@ function HudScreen.bannerLine(
 	size: number
 ): number
 	local banner = config.UI.hud.layout.banner
-	local depth = HudScreen.boardDepth(config, compact, period, true)
-	local clear = top + depth + banner.clearance + HudScreen.bannerInk(config, compact) + size / 2
+	local board = HudScreen.boardBottom(config, compact, top, period)
+	local clear = board + banner.clearance + HudScreen.bannerInk(config, compact) + size / 2
 	return math.ceil(math.max(at, clear))
 end
 
@@ -262,6 +275,72 @@ end
 function HudScreen.getUpBottom(config: Config.GameConfig, compact: boolean, lines: number): number
 	local feedTop = HudScreen.feedBottom(config, compact) + HudScreen.feedHeight(config, compact, lines)
 	return math.max(HudScreen.getUpSizes(config, compact).bottom, feedTop + config.UI.hud.layout.feed.clearance)
+end
+
+-- The TAB board on a phone's screen or a desktop's (#357, the owner's Q237: one compact table on both).
+function HudScreen.tabSizes(config: Config.GameConfig, compact: boolean): Config.TabSizes
+	local tab = config.UI.hud.layout.scoreTab
+	return if compact then tab.compactSizes else tab.sizes
+end
+
+-- How far below the top of the HUD's area (`height` pixels tall) the TAB board's area starts: under the scoreboard's
+-- ink (`board` pixels below that top; none where it is above it), which the board's margin keeps it clear of (the
+-- owner's rule for the HUD's parts, Q203); on touch under the SCORES button too, which stays above it to close it
+-- (Q234, Q236). In whole pixels, rounded up: a UDim's offset holds whole pixels, and a share of the height reads back
+-- as a float32.
+function HudScreen.tabTop(config: Config.GameConfig, touch: boolean, height: number, board: number): number
+	local top = math.max(0, math.ceil(board))
+	if not touch then
+		return top
+	end
+	local button = config.UI.hud.layout.scoreButton
+	return math.max(top, math.round(height * button.position.Y.Scale) + button.position.Y.Offset + button.size.Y.Offset)
+end
+
+-- How tall the TAB board's teams stand: both teams' bars, however few play, and `players` rows.
+function HudScreen.tabBody(config: Config.GameConfig, compact: boolean, players: number): number
+	local sizes = HudScreen.tabSizes(config, compact)
+	return 2 * sizes.barHeight + players * sizes.rowHeight
+end
+
+-- How far the Switch team row (`row`) reaches under the TAB board's ink: switchGap, then its words in their ink, or a
+-- key's cap (UI.hud.layout.hints.cap) beside them where that is taller; nothing without the row.
+function HudScreen.tabSwitch(config: Config.GameConfig, compact: boolean, row: SwitchRow?): number
+	if row == nil then
+		return 0
+	end
+	local sizes = HudScreen.tabSizes(config, compact)
+	local words = sizes.switchSize + 2 * math.ceil(config.UI.hud.look.textOutline)
+	local height = if row == "Key" then math.max(config.UI.hud.layout.hints.cap.height, words) else words
+	return sizes.switchGap + height
+end
+
+-- How the TAB board fits its area (`area`, pixels): layout.scoreTab.margin in from each edge, shrunk only as much as it
+-- must. Off touch its key is held, so nothing could scroll it: it shrinks to fit whole. On touch, where a finger drags
+-- them, its teams scroll (the owner, Q190) behind its fixed parts (its ink, the header, Switch team), so it shrinks
+-- only for its width or those. Returns its scale and how tall its teams show, in whole pixels (every row while the area
+-- is not known yet; none where not even its margins fit).
+function HudScreen.tabFit(
+	config: Config.GameConfig,
+	compact: boolean,
+	touch: boolean,
+	area: Vector2,
+	players: number,
+	row: SwitchRow?
+): (number, number)
+	local look = config.UI.hud.look
+	local sizes = HudScreen.tabSizes(config, compact)
+	local margin = config.UI.hud.layout.scoreTab.margin
+	local body = HudScreen.tabBody(config, compact, players)
+	local fixed = 2 * look.outline + look.shadow + sizes.headHeight + HudScreen.tabSwitch(config, compact, row)
+	local width = sizes.width + 2 * look.outline
+	local scale = Fit.scale(area, UDim2.fromOffset(width, if touch then fixed else fixed + body), margin)
+	if not touch or area.X <= 0 or area.Y <= 0 then
+		return scale, body
+	elseif scale <= 0 then
+		return 0, 0
+	end
+	return scale, math.clamp(math.floor((area.Y - 2 * margin) / scale - fixed), 0, body)
 end
 
 return table.freeze(HudScreen)

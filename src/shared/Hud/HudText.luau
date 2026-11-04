@@ -135,6 +135,21 @@ function HudText.team(self: HudText, team: Team.Team): string
 	return self._config.UI.teamNames[team]
 end
 
+-- A team's bar on the TAB board names it in capitals, as the design page drew it (#357).
+function HudText.teamBar(self: HudText, team: Team.Team): string
+	return string.upper(self:team(team))
+end
+
+-- The avatar of `player` on the TAB board (#357): a Roblox user's headshot (UI.hud.avatarImage; a PlayerId is the
+-- decimal UserId, PlayerIds), nil for any other id (a Studio test player's is negative; a bot's), whose circle stays
+-- plain.
+function HudText.avatar(self: HudText, player: PlayerId): string?
+	if string.match(player, "^[1-9]%d*$") == nil then
+		return nil
+	end
+	return string.format(self._config.UI.hud.avatarImage, player)
+end
+
 -- The end screen's headline: the winning team, or a draw (nil) when overtime ran out.
 function HudText.result(self: HudText, winner: Team.Team?): string
 	if winner == nil then

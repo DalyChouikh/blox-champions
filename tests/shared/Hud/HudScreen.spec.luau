@@ -58,6 +58,43 @@ local config = Fixtures.config({
 					sizes = { height = 20, corner = UDim.new(0, 5), inset = 5, textSize = 12 },
 					compactSizes = { height = 16, corner = UDim.new(0, 4), inset = 4, textSize = 10 },
 				},
+				-- The TAB board: a desktop box 500 + 2 x 2 px wide with its ink, a phone's 400 + 4; under a SCORES
+				-- button 10 px down and 30 tall on touch; a key cap 30 px tall for Switch team.
+				scoreTab = {
+					margin = 4,
+					sizes = {
+						width = 500,
+						side = 10,
+						gap = 5,
+						avatar = 20,
+						column = 50,
+						rowHeight = 30,
+						textSize = 20,
+						headHeight = 20,
+						headSize = 12,
+						barHeight = 25,
+						barSize = 15,
+						switchGap = 10,
+						switchSize = 16,
+					},
+					compactSizes = {
+						width = 400,
+						side = 8,
+						gap = 4,
+						avatar = 16,
+						column = 40,
+						rowHeight = 20,
+						textSize = 16,
+						headHeight = 12,
+						headSize = 10,
+						barHeight = 22,
+						barSize = 14,
+						switchGap = 4,
+						switchSize = 12,
+					},
+				},
+				scoreButton = { position = UDim2.new(1, -10, 0, 10), size = UDim2.fromOffset(80, 30) },
+				hints = { cap = { height = 30 } },
 				getUp = {
 					sizes = {
 						bottom = 90,
@@ -194,6 +231,15 @@ describe("HudScreen", function()
 		expect(HudScreen.boardDepth(config, true, true, true)).toBe(68)
 	end)
 
+	-- What the banner line and the TAB board keep clear of: the board's deepest ink in play, from the safe area's top.
+	it("tells how far down the safe area the board's ink reaches in play, with the period or without", function()
+		-- S2 8 px down: 8 + 117.5, or 8 + 132 with the period; S5: 8 + 50, or 8 + 68.
+		expect(HudScreen.boardBottom(config, false, 8, false)).toBe(125.5)
+		expect(HudScreen.boardBottom(config, false, 8, true)).toBe(140)
+		expect(HudScreen.boardBottom(config, true, 8, false)).toBe(58)
+		expect(HudScreen.boardBottom(config, true, 8, true)).toBe(76)
+	end)
+
 	-- The charge ring's ink reaches 100 / 2 + 2 = 52 px round the dot here (the phone's 40 / 2 + 2 = 22); the room is
 	-- from the board's lowest ink in play to the aim, less a 3 px clearance.
 	it("shrinks the crosshair's rings just enough to clear the board in play, the dot staying put", function()
@@ -294,5 +340,121 @@ describe("HudScreen", function()
 		-- The phone: no line 48 + 4 = 52, under its 60; one: 48 + 23 + 4 = 75.
 		expect(HudScreen.getUpBottom(config, true, 0)).toBe(60)
 		expect(HudScreen.getUpBottom(config, true, 1)).toBe(75)
+	end)
+
+	-- One compact table on either kind of screen, at its own sizes (#357, the owner's Q237).
+	it("gives the TAB board's sizes for a phone's screen or a desktop's", function()
+		expect(HudScreen.tabSizes(config, false).width).toBe(500)
+		expect(HudScreen.tabSizes(config, true).width).toBe(400)
+	end)
+
+	-- Under the scoreboard, whose ink it never covers (Q203's rule; its margin keeps the clearance), and on a phone
+	-- under the SCORES button too, which stays above it (Q234, Q236).
+	it("puts the TAB board's area under the scoreboard's ink, and on touch under the SCORES button too", function()
+		-- The board's ink 12.5 px into the HUD's area: whole pixels, rounded up; above the area (or none), its top.
+		expect(HudScreen.tabTop(config, false, 300, 12.5)).toBe(13)
+		expect(HudScreen.tabTop(config, false, 300, -20)).toBe(0)
+		-- The SCORES button 10 px down and 30 tall, unless the board's ink reaches lower.
+		expect(HudScreen.tabTop(config, true, 300, 12.5)).toBe(40)
+		expect(HudScreen.tabTop(config, true, 300, 44.5)).toBe(45)
+		-- A button placed by a share of the HUD's height too: 0.1 x 300 + 5 + 30.
+		local scaled = Fixtures.config({
+			UI = {
+				hud = {
+					layout = {
+						scoreButton = { position = UDim2.new(1, -10, 0.1, 5), size = UDim2.fromOffset(80, 30) },
+					},
+				},
+			},
+		})
+		expect(HudScreen.tabTop(scaled, true, 300, 0)).toBe(65)
+	end)
+
+	it("knows how tall the TAB board's teams and its Switch team row stand", function()
+		-- Both bars always, then the rows: 2 x 25 + 6 x 30; on the phone 2 x 22 + 3 x 20.
+		expect(HudScreen.tabBody(config, false, 6)).toBe(230)
+		expect(HudScreen.tabBody(config, true, 3)).toBe(104)
+		expect(HudScreen.tabBody(config, false, 0)).toBe(50)
+		-- None; the label alone (touch) in its ink, 10 + 16 + 2 x 2; a key cap beside it, 10 + 30.
+		expect(HudScreen.tabSwitch(config, false, nil)).toBe(0)
+		expect(HudScreen.tabSwitch(config, false, "Label")).toBe(30)
+		expect(HudScreen.tabSwitch(config, false, "Key")).toBe(40)
+		-- The phone: 4 + 12 + 4; with a key 4 + 30.
+		expect(HudScreen.tabSwitch(config, true, "Label")).toBe(20)
+		expect(HudScreen.tabSwitch(config, true, "Key")).toBe(34)
+		-- Words taller than the key's cap: the row stands as tall as the words in their ink, 10 + 36 + 2 x 2.
+		local tall = Fixtures.config({
+			UI = {
+				hud = {
+					look = { textOutline = 2 },
+					layout = { hints = { cap = { height = 30 } }, scoreTab = { sizes = { switchSize = 36 } } },
+				},
+			},
+		})
+		expect(HudScreen.tabSwitch(tall, false, "Key")).toBe(50)
+	end)
+
+	-- The owner's Q190: on phones the board scrolls when its rows do not fit. Off touch its key is held, so nothing
+	-- could scroll it: it shrinks to fit, as the HUD's other panels do.
+	it("shrinks the TAB board only to fit off touch, and scrolls its rows on touch where they do not fit", function()
+		-- Desktop, six rows and the key: 7 px of ink + the 20 px header + 40 for Switch team, over 230 of teams, in a
+		-- 504 px box with its ink; 4 px kept clear of each edge.
+		local scale, rows = HudScreen.tabFit(config, false, false, Vector2.new(1000, 600), 6, "Key")
+		expect(scale).toBe(1)
+		expect(rows).toBe(230)
+		scale, rows = HudScreen.tabFit(config, false, false, Vector2.new(1000, 250), 6, "Key")
+		expect(scale).toBeCloseTo(242 / 297, 5)
+		expect(rows).toBe(230)
+		scale = HudScreen.tabFit(config, false, false, Vector2.new(400, 600), 6, "Key")
+		expect(scale).toBeCloseTo(392 / 504, 5)
+		-- A phone, six rows and the label: 7 + 12 + 20 fixed over 164 of teams. 200 px tall shows 192 - 39 of them.
+		scale, rows = HudScreen.tabFit(config, true, true, Vector2.new(750, 200), 6, "Label")
+		expect(scale).toBe(1)
+		expect(rows).toBe(153)
+		scale, rows = HudScreen.tabFit(config, true, true, Vector2.new(750, 300), 6, "Label")
+		expect(scale).toBe(1)
+		expect(rows).toBe(164)
+		-- Too narrow for its 404 px: it shrinks to (300 - 8) / 404, which leaves room for every row.
+		scale, rows = HudScreen.tabFit(config, true, true, Vector2.new(300, 200), 6, "Label")
+		expect(scale).toBeCloseTo(292 / 404, 5)
+		expect(rows).toBe(164)
+		-- Not even its fixed parts fit: it shrinks to them, and shows no rows.
+		scale, rows = HudScreen.tabFit(config, true, true, Vector2.new(750, 30), 6, "Label")
+		expect(scale).toBeCloseTo(22 / 39, 5)
+		expect(rows).toBeCloseTo(0, 5)
+		-- Not even its margins fit: nothing shows.
+		scale, rows = HudScreen.tabFit(config, true, true, Vector2.new(750, 8), 6, "Label")
+		expect(scale).toBe(0)
+		expect(rows).toBe(0)
+		-- Shrunk for its width, the room its teams get falls between pixels: whole pixels of it, (120 - 8) / (292 /
+		-- 404) - 39 = 115.96 -> 115.
+		scale, rows = HudScreen.tabFit(config, true, true, Vector2.new(300, 120), 6, "Label")
+		expect(scale).toBeCloseTo(292 / 404, 5)
+		expect(rows).toBe(115)
+		-- Before the area is known: its own size, every row.
+		scale, rows = HudScreen.tabFit(config, true, true, Vector2.zero, 6, "Label")
+		expect(scale).toBe(1)
+		expect(rows).toBe(164)
+	end)
+
+	-- The defaults the page drew (#357): a 3-a-side board fits a phone's screen under SCORES without scrolling, at its
+	-- full size; at 6 a side its rows scroll; on our desktop Play view 6 a side fits whole.
+	it("fits the default TAB board under a phone's SCORES at 3 a side, scrolling at 6, and whole on desktop", function()
+		local defaults = Fixtures.config()
+		-- The phone emulator's HUD area, 750 x 323, under the SCORES button.
+		local height = 323 - HudScreen.tabTop(defaults, true, 323, 0)
+		local area = Vector2.new(750, height)
+		local scale, rows = HudScreen.tabFit(defaults, true, true, area, 6, "Label")
+		expect(scale).toBe(1)
+		expect(rows).toBe(HudScreen.tabBody(defaults, true, 6))
+		scale, rows = HudScreen.tabFit(defaults, true, true, area, 12, "Label")
+		expect(scale).toBe(1)
+		expect(rows < HudScreen.tabBody(defaults, true, 12)).toBe(true)
+		-- Switch team's words in look C's 2.5 px ink, whole pixels each side: 4 + 15 + 2 x 3.
+		expect(HudScreen.tabSwitch(defaults, true, "Label")).toBe(25)
+		-- Our desktop Play view, 1556 x 793 under Roblox's 58 px top bar.
+		scale, rows = HudScreen.tabFit(defaults, false, false, Vector2.new(1556, 735), 12, "Key")
+		expect(scale).toBe(1)
+		expect(rows).toBe(HudScreen.tabBody(defaults, false, 12))
 	end)
 end)

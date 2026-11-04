@@ -3,12 +3,10 @@
 -- banner new to its slot (HudState makes a new table for each it shows) pops in from nothing, motion.pop's overshoot
 -- and back (`watch`, whenever the HUD's state changes); over its last motion.easeSeconds it leaves, 0 to 1 eased
 -- (Motion.ease), which Hud/Banner turns into its fade and its float up (`step`, each frame, writing only on a change).
--- Each slot's pop is an Animator track; its leave a binding. The Get Up prompt, lettered as a banner (#369, the owner's
--- Q221), has no time left to count: it pops in as it starts and fades out as it ends (`prompting`), and shows until it
--- has gone (`promptShown`), on two more tracks. The feed's chips move as banners do (#373, Q227), each line seated in a
--- slot of a fixed set as big as the feed's most lines, its time left the one the feed counts; a replaced ball line is
--- left only its fade (HudState), so it fades the same way. So the Animator's tracks stay few and nothing is made per
--- line.
+-- Each slot's pop is an Animator track; its leave a binding. The feed's chips move as banners do (#373, Q227), each
+-- line seated in a slot of a fixed set as big as the feed's most lines, its time left the one the feed counts; a
+-- replaced ball line is left only its fade (HudState), so it fades the same way. So the Animator's tracks stay few and
+-- nothing is made per line. The Get Up prompt, lettered as a banner but with no time of its own, moves by a Reveal.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -39,14 +37,10 @@ type Fields = {
 	message: Slot,
 	-- Each feed line's slot, by its id.
 	chips: { [number]: Slot },
-	-- The Get Up prompt's scale (1 at rest), and how far it has faded out, 0 to 1.
-	promptScale: Animator.Track,
-	promptLeave: Animator.Track,
 	-- How many times a leave was written (tests: nothing on a quiet step).
 	writes: number,
 	_motion: Config.MotionSettings,
 	_animator: Animator.Animator,
-	_prompting: boolean,
 	-- The feed's slots, each taken while it holds a line (its `_seen`).
 	_seats: { Slot },
 }
@@ -68,12 +62,9 @@ function BannerMotion.new(motion: Config.MotionSettings, animator: Animator.Anim
 		line = slot(animator),
 		message = slot(animator),
 		chips = {},
-		promptScale = animator:track(1),
-		promptLeave = animator:track(0),
 		writes = 0,
 		_motion = motion,
 		_animator = animator,
-		_prompting = false,
 		_seats = seats,
 	}
 	return setmetatable(fields, BannerMotion)
@@ -97,27 +88,6 @@ local function leaving(self: BannerMotion, into: Slot, banner: Shown?, left: num
 		into._setLeave(share)
 		self.writes += 1
 	end
-end
-
--- Whether the Get Up prompt should show now: starting it pops it in from nothing, solid; ending it fades it out.
-function BannerMotion.prompting(self: BannerMotion, prompts: boolean)
-	if prompts == self._prompting then
-		return
-	end
-	self._prompting = prompts
-	local animator = self._animator
-	if prompts then
-		animator:rest(self.promptLeave, 0)
-		animator:rest(self.promptScale, 0)
-		animator:play(self.promptScale, "Pop", 1)
-	else
-		animator:play(self.promptLeave, "Ease", 1)
-	end
-end
-
--- Whether the Get Up prompt is on the screen: from its start until it has faded out.
-function BannerMotion.promptShown(self: BannerMotion): boolean
-	return self._prompting or self.promptLeave.moving
 end
 
 -- Frees the slots of lines gone from the feed, first, so a line that pushed the oldest out has one; then seats each new

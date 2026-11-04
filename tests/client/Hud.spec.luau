@@ -14,6 +14,7 @@ local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Hud = require(Client.Hud)
 local HudStore = require(Client.HudStore)
 local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
+local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local InputController = require(Client.InputController)
 local SkateController = require(Client.SkateController)
 local Style = require(Client.Hud.Style)
@@ -107,6 +108,13 @@ local function hintKey(control: string): (string?, string?)
 	return if keyboard then parts.legend.Text else nil, if keyboard then nil else parts.face.Image
 end
 
+-- Lets what is closing (the Get Up prompt, the score tab) fade out and go: the fade's time, then a step that renders
+-- without it.
+local function fadeOut()
+	Hud:step(config.UI.hud.motion.easeSeconds)
+	Hud:step(0)
+end
+
 beforeEach(function()
 	folder = Instance.new("Folder")
 	folder.Name = "HudTest"
@@ -189,6 +197,10 @@ describe("Hud", function()
 		expect(top.Parent == folder).toBe(true)
 		expect(top:FindFirstChild("Scoreboard") ~= nil).toBe(true)
 		expect(centre:FindFirstChild("Scoreboard")).toBeNil()
+		-- Over the touch controls' gui (Roblox's default order, 0), so the open TAB board covers their buttons (#357).
+		for _, each in { gui, centre, top } do
+			expect(`{each.Name} {each.DisplayOrder}`).toBe(`{each.Name} {config.UI.hud.displayOrder}`)
+		end
 	end)
 
 	-- One rule for every part (#352): a phone's screen by size (HudScreen.compact), S5 there and S2 elsewhere.
@@ -555,11 +567,6 @@ describe("Hud", function()
 			SkateController:step(DT)
 			Hud:step(0)
 		end
-		-- Up, or the skater gone: it has faded and left once the fade's time has passed.
-		local function faded()
-			Hud:step(config.UI.hud.motion.easeSeconds)
-			Hud:step(0)
-		end
 		Hud:step(0)
 		expect(part("GetUp")).toBeNil()
 		knockedDown("Hit")
@@ -593,20 +600,20 @@ describe("Hud", function()
 		local fading = part("GetUp").Group.GroupTransparency
 		expect(fading > 0 and fading < 1).toBe(true)
 		expect(part("GetUp").Group.Keys.Key1.Face.Legend.Text).toBe(config.UI.text.touchMove)
-		faded()
+		fadeOut()
 		expect(part("GetUp")).toBeNil()
 		knockedDown("Hit")
 		expect(part("GetUp").Group.GroupTransparency).toBe(0)
 		-- A diver gets up when the slide stops, not by moving (#242): no prompt. A hard landing's knockdown has one.
 		knockedDown(nil)
-		faded()
+		fadeOut()
 		knockedDown("Dive")
 		expect(part("GetUp")).toBeNil()
 		knockedDown("Fall")
 		expect(part("GetUp") ~= nil).toBe(true)
 		rig:Destroy()
 		Hud:step(0)
-		faded()
+		fadeOut()
 		expect(part("GetUp")).toBeNil()
 	end)
 
@@ -744,6 +751,7 @@ describe("Hud", function()
 		expect(part("ScoreTab") ~= nil).toBe(true)
 		held:Fire(false)
 		Hud:step(0)
+		fadeOut()
 		expect(part("ScoreTab")).toBeNil()
 
 		-- On touch a button toggles it (the button's Activated calls toggleScoreTab; a test cannot fire it).
@@ -755,14 +763,198 @@ describe("Hud", function()
 		expect(part("ScoreTab") ~= nil).toBe(true)
 		Hud:toggleScoreTab()
 		Hud:step(0)
+		fadeOut()
 		expect(part("ScoreTab")).toBeNil()
 		-- A toggle left on closes once the device stops being touch.
 		Hud:toggleScoreTab()
 		Hud:step(0)
 		preferred = Enum.PreferredInput.KeyboardAndMouse
 		Hud:step(0)
+		fadeOut()
 		expect(part("ScoreTab")).toBeNil()
 		expect(part("ScoreButton")).toBeNil()
+	end)
+
+	-- Every HUD change animates (the owner, Q194): the board pops in as it opens and fades out whole as it closes.
+	it("pops the score tab in as it opens and fades it out whole as it closes, rendering only then", function()
+		local held = Fixtures.scriptedBinding(InputController.context, "ScoreTab")
+		Hud:step(0)
+		local renders = Hud.renders
+		held:Fire(true)
+		Hud:step(0)
+		expect(Hud.renders).toBe(renders + 1)
+		local group = part("ScoreTab"):FindFirstChild("Group", true) :: CanvasGroup
+		local pop = group:FindFirstChild("Pop") :: UIScale
+		-- A UIScale holds its smallest, 1e-7, for 0.
+		expect(pop.Scale).toBeCloseTo(0, 4)
+		Hud:step(config.UI.hud.motion.pop.seconds)
+		expect(pop.Scale).toBe(1)
+		expect(Hud.renders).toBe(renders + 1)
+		held:Fire(false)
+		Hud:step(0)
+		expect(group.GroupTransparency).toBe(0)
+		Hud:step(config.UI.hud.motion.easeSeconds / 2)
+		expect(group.GroupTransparency > 0 and group.GroupTransparency < 1).toBe(true)
+		fadeOut()
+		expect(part("ScoreTab")).toBeNil()
+		expect(Hud.renders).toBe(renders + 3)
+	end)
+
+	-- The owner's Q235: the open board would cut them in half (Q230); they come back once it has gone, the chips' time
+	-- counting on meanwhile, and moving still gets the skater up.
+	it("hides the Get Up prompt and the feed's chips while the score tab shows, and brings them back after", function()
+		local rig = Fixtures.spawnSkater(folder, config)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
+		SkateController:step(DT)
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "PossessionChanged", team = "Blue", player = "1" } }))
+		Hud:step(0)
+		expect(part("GetUp") ~= nil and part("Feed") ~= nil).toBe(true)
+		local held = Fixtures.scriptedBinding(InputController.context, "ScoreTab")
+		held:Fire(true)
+		Hud:step(0)
+		expect(part("ScoreTab") ~= nil).toBe(true)
+		expect(part("GetUp")).toBeNil()
+		expect(part("Feed")).toBeNil()
+		local left = HudStore.state.feed[1].timeLeft
+		HudStore:step(1)
+		expect(HudStore.state.feed[1].timeLeft).toBe(left - 1)
+		-- Closed, they stay hidden while the board fades over their place, then come back.
+		held:Fire(false)
+		Hud:step(0)
+		expect(part("GetUp")).toBeNil()
+		fadeOut()
+		expect(part("GetUp") ~= nil).toBe(true)
+		expect(part("Feed"):FindFirstChild(tostring(HudStore.state.feed[1].id)) ~= nil).toBe(true)
+	end)
+
+	-- The owner's Q238: the open board cut them too (a phone's goal message under its edge, a desktop's banner at 5 a
+	-- side); they hide while it shows and come back once it has gone, their time counting on meanwhile.
+	it("hides the banner line and the goal message while the score tab shows, and brings them back after", function()
+		HudStore:onEvents(Fixtures.ruleEvents({
+			{ name = "LapCompleted", team = "Blue", streak = 1, holder = "1" },
+			{ name = "GoalOpened", team = "Blue" },
+		}))
+		Hud:step(0)
+		expect(part("Banner") ~= nil and part("Message") ~= nil).toBe(true)
+		local held = Fixtures.scriptedBinding(InputController.context, "ScoreTab")
+		held:Fire(true)
+		Hud:step(0)
+		expect(part("Banner")).toBeNil()
+		expect(part("Message")).toBeNil()
+		local left = HudStore.state.bannerLeft
+		HudStore:step(1)
+		expect(HudStore.state.bannerLeft).toBe(left - 1)
+		held:Fire(false)
+		Hud:step(0)
+		expect(part("Message")).toBeNil()
+		fadeOut()
+		local words = HudText.new(config)
+		local state = HudStore.state
+		expect(part("Banner"):FindFirstChild("Front", true).Text).toBe(words:banner(state.banner :: any))
+		expect(part("Message"):FindFirstChild("Front", true).Text).toBe(words:banner(state.message :: any))
+	end)
+
+	-- Over all the HUD draws, its stage too, on the HUD's whole area under the scoreboard (#357); off touch, clicks
+	-- reach the game. On this phone's screen S5 sits in Roblox's bar, but its worth chip's pop reaches below it.
+	it("draws the score tab above the stage, over the HUD's whole area under the scoreboard", function()
+		Fixtures.scriptedBinding(InputController.context, "ScoreTab"):Fire(true)
+		Hud:step(0)
+		local tab = part("ScoreTab") :: Frame
+		expect((tab.Parent :: Instance).Name).toBe("Root")
+		expect(tab.ZIndex > (part("Stage") :: Frame).ZIndex).toBe(true)
+		local boardTop = HudScreen.boardTop(config, true, 750, PHONE.topbar)
+		local under = math.ceil(HudScreen.boardBottom(config, true, boardTop, false) - 58)
+		expect(under > 0).toBe(true)
+		expect(tab.Position).toEqual(UDim2.fromOffset(0, under))
+		expect(tab.Size).toEqual(UDim2.new(1, 0, 1, -under))
+		expect(tab.Active).toBe(false)
+		-- OVERTIME under S5's row reaches lower still.
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ period = "Overtime" }, 1))
+		Hud:step(0)
+		local overtime = math.ceil(HudScreen.boardBottom(config, true, boardTop, true) - 58)
+		expect(overtime > under).toBe(true)
+		expect(tab.Position).toEqual(UDim2.fromOffset(0, overtime))
+	end)
+
+	-- On a phone (Q234, Q236): the whole screen under the SCORES button, which stays above it, and over the touch
+	-- buttons, whose touches it takes while open.
+	it("on touch, puts the score tab under the SCORES button, taking the touches there while it is open", function()
+		preferred = Enum.PreferredInput.Touch
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		local tab = part("ScoreTab") :: Frame
+		expect((tab.Parent :: Instance).Name).toBe("Root")
+		expect(tab.Position.Y.Offset).toBe(HudScreen.tabTop(config, true, 323, 0))
+		expect(tab.Size).toEqual(UDim2.new(1, 0, 1, -HudScreen.tabTop(config, true, 323, 0)))
+		expect(tab.Active).toBe(true)
+		-- The SCORES button stays clear above it.
+		local button = part("ScoreButton") :: TextButton
+		local place = config.UI.hud.layout.scoreButton
+		expect(place.position.Y.Offset + place.size.Y.Offset <= tab.Position.Y.Offset).toBe(true)
+		expect(button.Parent == tab.Parent).toBe(true)
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect(tab.Active).toBe(false)
+	end)
+
+	-- It never covers the scoreboard (Q203's rule): on this desktop S2 hangs into the HUD's area, 58 px under the safe
+	-- area's top, so the board's area starts under its deepest ink in play; on a big touch screen too, where that is
+	-- lower than the SCORES button, but not over the end screen, which has no scoreboard.
+	it("starts the score tab's area under the scoreboard's ink, where the scoreboard shows", function()
+		screen = BIG
+		Hud:resize()
+		local held = Fixtures.scriptedBinding(InputController.context, "ScoreTab")
+		held:Fire(true)
+		Hud:step(0)
+		local boardTop = HudScreen.boardTop(config, false, 1280, BIG.topbar)
+		local under = math.ceil(HudScreen.boardBottom(config, false, boardTop, false) - 58)
+		local button = HudScreen.tabTop(config, true, 742, 0)
+		expect(under > button).toBe(true)
+		expect((part("ScoreTab") :: Frame).Position).toEqual(UDim2.fromOffset(0, under))
+		held:Fire(false)
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		fadeOut()
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect((part("ScoreTab") :: Frame).Position).toEqual(UDim2.fromOffset(0, under))
+		-- The match's end closes it; opened again over the end screen.
+		endMatch()
+		Hud:step(0)
+		fadeOut()
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		expect((part("ScoreTab") :: Frame).Position).toEqual(UDim2.fromOffset(0, button))
+	end)
+
+	-- The board fits the HUD's whole area, over the touch buttons (Q236), not the stage left of them, at the screen's
+	-- sizes; when the screen changes it fits the new one.
+	it("fits the score tab to the HUD's whole area at the screen's sizes, and again when the screen changes", function()
+		preferred = Enum.PreferredInput.Touch
+		local players = Fixtures.roster(12)
+		HudStore:onSnapshot(
+			Fixtures.matchSnapshot({ stats = { scores = { Blue = 0, Orange = 0 }, players = players } }, 1)
+		)
+		Hud:toggleScoreTab()
+		Hud:step(0)
+		local function board(): (Frame, UIScale, ScrollingFrame)
+			local tab = part("ScoreTab") :: Frame
+			local box = tab:FindFirstChild("Box", true) :: Frame
+			return box, tab:FindFirstChild("Fit", true) :: UIScale, tab:FindFirstChild("Teams", true) :: ScrollingFrame
+		end
+		-- The phone's 750 px hold its 610 px box at its size (the 504 px stage would not); 12 rows scroll.
+		local box, fit, teams = board()
+		expect(box.Size.X.Offset).toBe(config.UI.hud.layout.scoreTab.compactSizes.width)
+		expect(fit.Scale).toBe(1)
+		expect(teams.Size.Y.Offset < HudScreen.tabBody(config, true, 12)).toBe(true)
+		-- A big screen: the desktop's sizes, every row showing.
+		screen = BIG
+		Hud:resize()
+		Hud:step(0)
+		box, fit, teams = board()
+		expect(box.Size.X.Offset).toBe(config.UI.hud.layout.scoreTab.sizes.width)
+		expect(fit.Scale).toBe(1)
+		expect(teams.Size.Y.Offset).toBe(HudScreen.tabBody(config, false, 12))
 	end)
 
 	-- The owner (Q104, Q117, #310): the open score tab offers Switch team with the device's key; the key (or a tap on
@@ -784,20 +976,22 @@ describe("Hud", function()
 		Hud:step(0)
 		local button = part("SwitchTeam") :: TextButton
 		expect(button.Selectable).toBe(false)
-		expect((button:FindFirstChild("Key") :: TextLabel).Text).toBe("T")
-		expect((button:FindFirstChild("Label") :: TextLabel).Text).toBe(config.UI.text.switchTeam)
+		local row = button:FindFirstChild("Row") :: CanvasGroup
+		local key = row:FindFirstChild("Key") :: Frame
+		expect((key:FindFirstChild("Legend", true) :: TextLabel).Text).toBe("T")
+		expect((row:FindFirstChild("Label") :: TextLabel).Text).toBe(config.UI.text.switchTeam)
 		pressKey()
 		expect(switches).toBe(1)
 		preferred = Enum.PreferredInput.Gamepad
 		Hud:step(0)
-		local glyph = part("SwitchTeam"):FindFirstChild("Glyph") :: ImageLabel
-		expect(glyph.Image).toBe(keyImage(Enum.KeyCode.DPadUp))
+		local glyph = part("SwitchTeam"):FindFirstChild("Row"):FindFirstChild("Glyph"):FindFirstChild("Face")
+		expect((glyph :: ImageLabel).Image).toBe(keyImage(Enum.KeyCode.DPadUp))
 		-- On touch it is tapped (its Activated calls switchTeam; a test cannot fire it), with no key shown.
 		preferred = Enum.PreferredInput.Touch
 		held:Fire(false)
 		Hud:toggleScoreTab()
 		Hud:step(0)
-		expect(part("SwitchTeam"):FindFirstChild("Key")).toBeNil()
+		expect(part("SwitchTeam"):FindFirstChild("Row"):FindFirstChild("Key")).toBeNil()
 		Hud:switchTeam()
 		expect(switches).toBe(2)
 	end)
@@ -805,19 +999,18 @@ describe("Hud", function()
 	-- The owner (Q104, Q118): greyed while a switch can't happen, and then it asks nothing.
 	it("greys Switch team while the local player holds the ball or the other team is full", function()
 		local dim = config.UI.hud.dimTransparency
-		local function label(): TextLabel
-			return part("SwitchTeam"):FindFirstChild("Label") :: TextLabel
+		local function row(): CanvasGroup
+			return part("SwitchTeam"):FindFirstChild("Row") :: CanvasGroup
 		end
 		Fixtures.scriptedBinding(InputController.context, "ScoreTab"):Fire(true)
 		BallCarrier:set(LOCAL_ID)
 		Hud:step(0)
-		expect(label().TextTransparency).toBeCloseTo(dim, 5)
-		expect((part("SwitchTeam"):FindFirstChild("Key") :: TextLabel).TextTransparency).toBeCloseTo(dim, 5)
+		expect(row().GroupTransparency).toBeCloseTo(dim, 5)
 		Hud:switchTeam()
 		expect(switches).toBe(0)
 		BallCarrier:set(nil)
 		Hud:step(0)
-		expect(label().TextTransparency).toBe(0)
+		expect(row().GroupTransparency).toBe(0)
 		Hud:switchTeam()
 		expect(switches).toBe(1)
 		local players = { Fixtures.playerStats("1", "Blue") }
@@ -827,7 +1020,7 @@ describe("Hud", function()
 		local orangeFull = { scores = { Blue = 0, Orange = 0 }, players = players }
 		HudStore:onSnapshot(Fixtures.matchSnapshot({ stats = orangeFull }, 1))
 		Hud:step(0)
-		expect(label().TextTransparency).toBeCloseTo(dim, 5)
+		expect(row().GroupTransparency).toBeCloseTo(dim, 5)
 		Hud:switchTeam()
 		expect(switches).toBe(1)
 	end)
@@ -876,48 +1069,46 @@ describe("Hud", function()
 		-- The match ends: the tab toggled on before closes, the button stays, and the end screen has no full table.
 		endMatch()
 		Hud:step(0)
+		fadeOut()
 		expect(part("ScoreTab")).toBeNil()
 		expect(part("ScoreButton") ~= nil).toBe(true)
 		local endScreen = part("EndScreen") :: Frame
 		expect(endScreen:FindFirstChild("Table")).toBeNil()
-		-- A tap opens the full score tab over it.
+		-- A tap opens the full score tab over it, above the stage the end screen is on.
 		Hud:toggleScoreTab()
 		Hud:step(0)
 		expect(part("ScoreTab") ~= nil).toBe(true)
-		expect((part("ScoreTab") :: Frame).ZIndex > endScreen.ZIndex).toBe(true)
+		expect((part("ScoreTab") :: Frame).ZIndex > (endScreen.Parent :: Frame).ZIndex).toBe(true)
 		expect(part("EndScreen") ~= nil).toBe(true)
 		-- The next match starts: the tab closes, so it never pops open then.
 		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
 		Hud:step(0)
+		fadeOut()
 		expect(part("ScoreTab")).toBeNil()
 		expect(part("EndScreen")).toBeNil()
 		expect(part("ScoreButton") ~= nil).toBe(true)
 	end)
 
-	it("puts the big panels, the banner and the feed on a stage above the rest, left of the touch buttons", function()
+	it("puts the end screen, the banner and the feed on a stage above the rest, left of the touch buttons", function()
 		local function fit(panel: string): number
 			return (part(panel):FindFirstChild("Fit") :: UIScale).Scale
 		end
-		Fixtures.scriptedBinding(InputController.context, "ScoreTab"):Fire(true)
 		Hud:step(0)
-		for _, name in { "Banner", "Feed", "ScoreTab" } do
+		for _, name in { "Banner", "Feed" } do
 			expect(`{name} in {part(name).Parent.Name}`).toBe(`{name} in Stage`)
 		end
-		-- The solid score tab and end screen cover the scoreboard, the hints and the speedometer.
+		-- The solid end screen covers the scoreboard, the hints and the speedometer.
 		local stage = part("Stage") :: Frame
 		for _, other in part("Root"):GetChildren() do
 			if other ~= stage and other:IsA("GuiObject") then
 				expect(`{other.Name} below: {other.ZIndex < stage.ZIndex}`).toBe(`{other.Name} below: true`)
 			end
 		end
-		-- With a keyboard the stage is the whole HUD area: the tab's height decides, less a margin at each side.
+		-- With a keyboard the stage is the whole HUD area; on touch it ends where the buttons begin.
 		expect(part("Stage").Size).toEqual(UDim2.fromOffset(750, 323))
-		expect(fit("ScoreTab")).toBeCloseTo(307 / 360, 4)
-		-- On touch it ends where the buttons begin: (504 - 2 margins) / 640 for the tab; the banner fits as it is.
 		preferred = Enum.PreferredInput.Touch
 		Hud:step(0)
 		expect(part("Stage").Size).toEqual(UDim2.fromOffset(504, 323))
-		expect(fit("ScoreTab")).toBeCloseTo(488 / 640, 4)
 		expect(fit("Banner")).toBe(1)
 		expect(fit("Feed")).toBe(1)
 		-- The compact end screen is as tall as its parts, so its width decides: (504 - 2 margins) / 720.
@@ -1049,8 +1240,11 @@ describe("Hud", function()
 		held:Fire(true)
 		Hud:step(0)
 		expect(reticle()).toBe(false)
+		-- Back once the board has faded off it.
 		held:Fire(false)
 		Hud:step(0)
+		expect(reticle()).toBe(false)
+		fadeOut()
 		expect(reticle()).toBe(true)
 		endMatch()
 		Hud:step(0)

@@ -10,6 +10,7 @@ local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local React = require(ReplicatedStorage.Packages.React)
+local StatsTable = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.Hud.StatsTable)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 local config = Fixtures.config()
@@ -118,7 +119,7 @@ describe("EndScreen", function()
 		-- The winner, the totals, the MVP's title and card, and twelve rows under the header, spacing apart, inside the
 		-- padding: 630 px with the defaults, as Edit lays it out.
 		local hud = config.UI.hud
-		local row, gap = hud.layout.scoreTab.rowHeight, hud.spacing
+		local row, gap = hud.layout.endScreen.rowHeight, hud.spacing
 		local tall = 2 * gap + 3 * (hud.titleSize + gap) + (2 * row + gap) + gap + (13 * row + 12 * gap)
 		setArea(Vector2.new(750, 323))
 		local mounted = Fixtures.mount(screen("1", Fixtures.roster(12)), folder)
@@ -139,5 +140,30 @@ describe("EndScreen", function()
 		expect(frame.Size).toEqual(UDim2.fromOffset(width, 0))
 		local fit = frame:FindFirstChild("Fit") :: UIScale
 		expect(fit.Scale).toBeCloseTo((504 - 2 * hud.screenMargin) / width, 4)
+	end)
+
+	-- Its tables at the end screen's own row height and column width (UI.hud.layout.endScreen), not the TAB board's.
+	it("draws its tables at the end screen's row height and column width, and is as tall as their rows", function()
+		local own =
+			Fixtures.config({ UI = { hud = { layout = { endScreen = { rowHeight = 30, columnWidth = 90 } } } } })
+		local players = { Fixtures.playerStats("1", "Blue"), Fixtures.playerStats("2", "Orange") }
+		local mounted = Fixtures.mount(
+			React.createElement(React.Fragment, nil, {
+				Table = React.createElement(StatsTable.Table, {
+					config = own,
+					text = HudText.new(own),
+					players = players,
+					names = NAMES,
+					localId = "2",
+					order = 1,
+				}),
+			}),
+			folder
+		)
+		local ana = (mounted:FindFirstChild("Table") :: Frame):FindFirstChild("1") :: Frame
+		expect(ana.Size.Y.Offset).toBe(30)
+		expect((ana:FindFirstChild("Score") :: TextLabel).Size.X.Offset).toBe(90)
+		-- A row each and the header's, spacing apart.
+		expect(StatsTable.height(own, 2)).toBe(3 * 30 + 2 * own.UI.hud.spacing)
 	end)
 end)

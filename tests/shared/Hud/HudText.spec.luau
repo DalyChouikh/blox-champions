@@ -104,6 +104,26 @@ describe("HudText", function()
 		)
 	end)
 
+	-- Each row of the TAB board (#357): a Roblox user's headshot (a PlayerId is their decimal UserId); none for any
+	-- other id (a Studio test player's negative one, a bot's), whose circle stays plain.
+	it("gives a Roblox user's headshot for their avatar, and none for any other id", function()
+		expect(text:avatar("156")).toBe("rbxthumb://type=AvatarHeadShot&id=156&w=48&h=48")
+		for _, other in { "-1", "0", "07", "1.5", "bot", "" } do
+			expect(`{other}: {text:avatar(other)}`).toBe(`{other}: nil`)
+		end
+		local own = HudText.new(
+			Fixtures.config({ UI = { hud = { avatarImage = "rbxthumb://type=Avatar&id=%s&w=150&h=150" } } })
+		)
+		expect(own:avatar("7")).toBe("rbxthumb://type=Avatar&id=7&w=150&h=150")
+	end)
+
+	-- A team's bar on the TAB board names it in capitals, as the design page drew it (#357).
+	it("names a team in capitals for its bar on the TAB board", function()
+		expect(text:teamBar("Blue")).toBe("BLUE")
+		local own = HudText.new(Fixtures.config({ UI = { teamNames = { Orange = "Les Oranges" } } }))
+		expect(own:teamBar("Orange")).toBe("LES ORANGES")
+	end)
+
 	it("fails loudly on a banner or feed kind it has no text for", function()
 		expect(function()
 			text:banner({ kind = "Nope" } :: any)
