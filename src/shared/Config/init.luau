@@ -61,6 +61,7 @@ export type CompactScoreboardLayout = UI.CompactScoreboardLayout
 export type BoardTextSizes = UI.BoardTextSizes
 export type RingSizes = UI.RingSizes
 export type CountSizes = UI.CountSizes
+export type BannerSizes = UI.BannerSizes
 export type MarkerSettings = UI.MarkerSettings
 export type NameTagSettings = UI.NameTagSettings
 export type ArenaGlowSettings = UI.ArenaGlowSettings

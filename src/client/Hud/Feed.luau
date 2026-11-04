@@ -1,12 +1,13 @@
 --!strict
--- The event feed (spec §11.1), above the bottom of the screen: possession changes, laps, the goal opening and points,
--- the newest last, each line in its team's colour. Each line is keyed by its entry's id, so a line keeps its label
--- while older ones leave. It centres in the HUD's stage (left of the touch buttons on touch) and shrinks to fit it. A
--- plain function of its props.
+-- The event feed (spec §11.1), over the goal message at the bottom of the screen (HudScreen.feedBottom; #356, the
+-- owner's Q211): possession changes and points, the newest last, each line in its team's colour. Each line is keyed by
+-- its entry's id, so a line keeps its label while older ones leave. It centres in the HUD's stage (left of the touch
+-- buttons on touch) and shrinks to fit it. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local React = require(ReplicatedStorage.Packages.React)
@@ -19,6 +20,8 @@ export type FeedProps = {
 	-- Oldest first.
 	feed: { HudState.FeedEntry },
 	names: { [Types.PlayerId]: string },
+	-- A phone's screen (HudScreen.compact): the goal message under the feed is smaller there.
+	compact: boolean,
 	-- The HUD's stage, which the feed fits in.
 	area: React.Binding<Vector2>,
 }
@@ -49,7 +52,11 @@ local function Feed(props: FeedProps): React.ReactElement
 	end
 	return React.createElement(
 		"Frame",
-		Style.holder({ AnchorPoint = Vector2.new(0.5, 1), Position = place.position, Size = place.size }),
+		Style.holder({
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -HudScreen.feedBottom(config, props.compact)),
+			Size = place.size,
+		}),
 		lines
 	)
 end

@@ -39,6 +39,7 @@ local ActionController = require(script.Parent.ActionController)
 local Animator = require(script.Animator)
 local App = require(script.App)
 local BallCarrier = require(script.Parent.BallCarrier)
+local BannerMotion = require(script.BannerMotion)
 local BoardMotion = require(script.BoardMotion)
 local Config = require(ReplicatedStorage.Shared.Config)
 local ControlHints = require(script.ControlHints)
@@ -122,14 +123,18 @@ export type Hud = {
 	-- GuiService.TopbarInset, or a fake: the part of Roblox's top bar its buttons leave free, in pixels from the safe
 	-- area's top-left (probed on a notched phone).
 	_topbar: () -> Rect,
-	-- The HUD's moving values, and the scoreboard's motion.
+	-- The HUD's moving values, the scoreboard's motion and the banners'.
 	_animator: Animator.Animator,
 	_board: BoardMotion.BoardMotion,
+	_banners: BannerMotion.BannerMotion,
 	-- The screen's form, as last measured: a phone's, and the scoreboard's top and the crosshair's aim from the top of
 	-- the safe area.
 	_compact: boolean,
 	_boardTop: number,
 	_aim: number,
+	-- The banner line at its highest (HudScreen.bannerAt), and the stage's top, both from the safe area's top.
+	_bannerAt: number,
+	_stageTop: number,
 	-- The speed the speedometer reads, eased (studs per second); nil without a skater.
 	_shownSpeed: number?,
 	_root: ReactRoblox.RootType,
@@ -156,6 +161,8 @@ export type Hud = {
 	_shownCompact: boolean,
 	_shownBoardTop: number,
 	_shownAim: number,
+	_shownBannerAt: number,
+	_shownStageTop: number,
 	_shownCarrier: PlayerId?,
 	_hasSkater: boolean,
 	_promptsGetUp: boolean,
@@ -191,7 +198,10 @@ local function measure(self: Hud, device: Enum.PreferredInput)
 	local screen = safe.Max - safe.Min
 	self._compact = HudScreen.compact(self._config, screen)
 	self._boardTop = HudScreen.boardTop(self._config, self._compact, screen.X, self._topbar())
-	self._aim = HudScreen.aim(self._config, self._insetArea(Enum.ScreenInsets.None), safe)
+	local whole = self._insetArea(Enum.ScreenInsets.None)
+	self._aim = HudScreen.aim(self._config, whole, safe)
+	self._bannerAt = HudScreen.bannerAt(self._config, whole, safe)
+	self._stageTop = hud.Min.Y - safe.Min.Y
 end
 
 -- The mouse's buttons, whose keys the hints draw as a mouse with that button inked (#354, the owner's Q207).
@@ -325,9 +335,12 @@ local Hud: Hud = {
 	end,
 	_animator = nil :: any,
 	_board = nil :: any,
+	_banners = nil :: any,
 	_compact = false,
 	_boardTop = 0,
 	_aim = 0,
+	_bannerAt = 0,
+	_stageTop = 0,
 	_shownSpeed = nil,
 	_root = nil :: any,
 	_bindings = nil :: any,
@@ -347,6 +360,8 @@ local Hud: Hud = {
 	_shownCompact = false,
 	_shownBoardTop = 0,
 	_shownAim = 0,
+	_shownBannerAt = 0,
+	_shownStageTop = 0,
 	_shownCarrier = nil,
 	_hasSkater = false,
 	_promptsGetUp = false,
@@ -386,9 +401,12 @@ local Hud: Hud = {
 		end
 		self._animator = Animator.new(config.UI.hud.motion)
 		self._board = BoardMotion.new(self._text, self._animator)
+		self._banners = BannerMotion.new(config.UI.hud.motion, self._animator)
 		self._compact = false
 		self._boardTop = 0
 		self._aim = 0
+		self._bannerAt = 0
+		self._stageTop = 0
 		self._shownSpeed = nil
 		self.renders = 0
 		self.passKey = nil
@@ -397,6 +415,8 @@ local Hud: Hud = {
 		self._shownCompact = false
 		self._shownBoardTop = 0
 		self._shownAim = 0
+		self._shownBannerAt = 0
+		self._shownStageTop = 0
 		self._shownCarrier = nil
 		self._hasSkater = false
 		self._promptsGetUp = false
@@ -513,8 +533,10 @@ local Hud: Hud = {
 			self:switchTeam()
 		end
 		local compact, boardTop, aim = self._compact, self._boardTop, self._aim
+		local bannerAt, stageTop = self._bannerAt, self._stageTop
 		if state.version ~= self._version then
 			self._board:watch(state.match)
+			self._banners:watch(state)
 		end
 		if
 			state.version ~= self._version
@@ -522,6 +544,8 @@ local Hud: Hud = {
 			or compact ~= self._shownCompact
 			or boardTop ~= self._shownBoardTop
 			or aim ~= self._shownAim
+			or bannerAt ~= self._shownBannerAt
+			or stageTop ~= self._shownStageTop
 			or carrier ~= self._shownCarrier
 			or hasSkater ~= self._hasSkater
 			or promptsGetUp ~= self._promptsGetUp
@@ -532,6 +556,8 @@ local Hud: Hud = {
 			self._shownCompact = compact
 			self._shownBoardTop = boardTop
 			self._shownAim = aim
+			self._shownBannerAt = bannerAt
+			self._shownStageTop = stageTop
 			self._shownCarrier = carrier
 			self._hasSkater = hasSkater
 			self._promptsGetUp = promptsGetUp
@@ -548,7 +574,10 @@ local Hud: Hud = {
 				compact = compact,
 				boardTop = boardTop,
 				aim = aim,
+				bannerAt = bannerAt,
+				stageTop = stageTop,
 				board = self._board,
+				banners = self._banners,
 				hasSkater = hasSkater,
 				carrying = carrier == self._localId,
 				keys = keys,
@@ -575,6 +604,7 @@ local Hud: Hud = {
 		else
 			self._shownSpeed = nil
 		end
+		self._banners:step(state)
 		self._animator:step(dt)
 		local config, actions, input, text, animator =
 			self._config, self._actions, self._input, self._text, self._animator

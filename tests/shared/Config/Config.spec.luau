@@ -538,8 +538,8 @@ describe("Config defaults", function()
 			speed = "%d",
 			speedUnit = "KM/H",
 			possession = "%s has the ball",
-			lapCompleted = "Lap %d completed",
-			goalOpen = "%s goal is active",
+			lapCompleted = "LAP %d COMPLETED",
+			goalOpen = "%s GOAL IS ACTIVE!",
 			scored = "%s scored!",
 			wins = "%s WINS",
 			go = "GO %s TEAM!",
@@ -576,8 +576,7 @@ describe("Config defaults", function()
 			corner = UDim.new(0, 8),
 			textSize = 20,
 			titleSize = 32,
-			bannerSize = 96,
-			bannerSeconds = 2,
+			bannerSeconds = { headline = 2.5, lap = 3.6, message = 5 },
 			feedSeconds = 6,
 			feedMaxEntries = 5,
 			glowThickness = 3,
@@ -637,8 +636,16 @@ describe("Config defaults", function()
 					gap = 8,
 					textSizes = { score = 38, clock = 30, worth = 22, period = 18 },
 				},
-				banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(720, 110) },
-				feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
+				-- One banner line a fifth of the way down, the goal message at the bottom, the feed above it (#356).
+				banner = {
+					height = 0.22,
+					clearance = 3,
+					bottom = 24,
+					rise = 0.4,
+					sizes = { headline = 50, goal = 67, lap = 36, message = 29, edge = 3 },
+					compactSizes = { headline = 32, goal = 43, lap = 23, message = 18, edge = 2 },
+				},
+				feed = { size = UDim2.fromOffset(460, 140), rowHeight = 24 },
 				-- Look C's rows (#354), at the page's sizes, the pressed key's mark outside them (Q195b).
 				hints = {
 					position = UDim2.new(1, -24, 0.5, 0),
@@ -1942,6 +1949,16 @@ describe("Config.forMode", function()
 		expect(Fixtures.config({ UI = { text = { touchPassTarget = "v" } } }).UI.text.touchPassTarget).toBe("v")
 	end)
 
+	it("accepts banners at TextSize's cap with no team ring, on a line at the screen's top", function()
+		-- TextSize holds at most 100; a 0 edge draws no team colour, a 0 rise fades in place.
+		local sizes = { headline = 100, goal = 100, lap = 100, message = 100, edge = 0 }
+		local banner = { height = 0.01, clearance = 0, bottom = 0, rise = 0, sizes = sizes, compactSizes = sizes }
+		local seconds = { headline = 0.1, lap = 0.1, message = 0.1 }
+		local hud = Fixtures.config({ UI = { hud = { bannerSeconds = seconds, layout = { banner = banner } } } }).UI.hud
+		expect(hud.layout.banner).toEqual(banner)
+		expect(hud.bannerSeconds).toEqual(seconds)
+	end)
+
 	it("accepts a kickoff count whose digit just fits inside its ring's ink", function()
 		-- With a 2 px ink, 116 - 2 x (8 + 2) = 96: a 95 px digit fits, on either kind of screen.
 		local count = { textSize = 95, ringSize = 116, ringThickness = 8 }
@@ -2072,8 +2089,58 @@ describe("Config.forMode", function()
 			},
 			-- The HUD fits its parts by their sizes in pixels.
 			{
-				overrides = { UI = { hud = { layout = { banner = { size = UDim2.fromScale(0.5, 0.2) } } } } },
-				message = "UI.hud.layout.banner.size: must be in pixels (scales 0, offsets > 0)",
+				overrides = { UI = { hud = { layout = { feed = { size = UDim2.fromScale(0.5, 0.2) } } } } },
+				message = "UI.hud.layout.feed.size: must be in pixels (scales 0, offsets > 0)",
+			},
+			-- The banners (#356): a line on the screen, text sizes Roblox draws, an edge, a rise inside the
+			-- banner's own height, and each one shown for some time. The feed's place follows the goal message.
+			{
+				overrides = { UI = { hud = { layout = { banner = { height = 0 } } } } },
+				message = "UI.hud.layout.banner.height: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { banner = { height = 1 } } } } },
+				message = "UI.hud.layout.banner.height: must be < 1 (got 1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { banner = { clearance = -1 } } } } },
+				message = "UI.hud.layout.banner.clearance: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { banner = { bottom = -1 } } } } },
+				message = "UI.hud.layout.banner.bottom: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { banner = { rise = 1.5 } } } } },
+				message = "UI.hud.layout.banner.rise: must be <= 1 (got 1.5)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { banner = { rise = -0.1 } } } } },
+				message = "UI.hud.layout.banner.rise: must be >= 0 (got -0.1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { banner = { sizes = { goal = 101 } } } } } },
+				message = "UI.hud.layout.banner.sizes.goal: must be <= 100 (got 101)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { banner = { compactSizes = { message = 0 } } } } } },
+				message = "UI.hud.layout.banner.compactSizes.message: must be >= 1 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { banner = { compactSizes = { edge = -1 } } } } } },
+				message = "UI.hud.layout.banner.compactSizes.edge: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { bannerSeconds = { lap = 0 } } } },
+				message = "UI.hud.bannerSeconds.lap: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { bannerSeconds = { message = 0 } } } },
+				message = "UI.hud.bannerSeconds.message: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { feed = { position = UDim2.new(0.5, 0, 1, -24) } } } } },
+				message = "UI.hud.layout.feed.position: unknown key",
 			},
 			{
 				overrides = { UI = { hud = { layout = { scoreTab = { size = UDim2.fromOffset(0, 360) } } } } },

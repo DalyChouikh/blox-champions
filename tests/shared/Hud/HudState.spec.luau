@@ -81,7 +81,7 @@ describe("HudState", function()
 		expect(state.banner).toEqual({ kind = "Countdown", team = "Blue", value = 1 })
 		state:applyEvents({ { name = "KickoffEnded" } })
 		expect(state.banner).toEqual({ kind = "Go", team = "Blue" })
-		state:step(config.UI.hud.bannerSeconds - 0.01)
+		state:step(config.UI.hud.bannerSeconds.headline - 0.01)
 		expect(state.banner).toEqual({ kind = "Go", team = "Blue" })
 		state:step(0.02)
 		expect(state.banner).toBeNil()
@@ -105,7 +105,7 @@ describe("HudState", function()
 	end)
 
 	it("shows GOAL!, DENIED!, the clock warnings, LAST CHANCE and OVERTIME for bannerSeconds", function()
-		local seconds = config.UI.hud.bannerSeconds
+		local seconds = config.UI.hud.bannerSeconds.headline
 		local cases: { { event: Types.Event, banner: HudState.Banner } } = {
 			{
 				event = { name = "GoalScored", team = "Blue", scorer = "1", points = 1 },
@@ -138,7 +138,7 @@ describe("HudState", function()
 	end)
 
 	it("holds GOAL! through the celebration, until the kickoff's count replaces it", function()
-		local seconds = config.UI.hud.bannerSeconds
+		local seconds = config.UI.hud.bannerSeconds.headline
 		local state = liveState()
 		state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
 		state:applySnapshot(Fixtures.matchSnapshot({ state = "Celebration", phaseSecondsLeft = seconds + 1 }))
@@ -148,7 +148,8 @@ describe("HudState", function()
 		expect(state.banner).toEqual({ kind = "Countdown", team = "Blue", value = 5 })
 	end)
 
-	it("lists possession changes, laps, the goal opening and points in the feed, newest last", function()
+	-- A completed lap and the goal opening are banners now (the owner, Q211), so the feed lists the rest.
+	it("lists possession changes and points in the feed, newest last", function()
 		local state = liveState()
 		state:applyEvents({
 			{ name = "PossessionChanged", team = "Blue", player = "1" },
@@ -157,6 +158,8 @@ describe("HudState", function()
 			{ name = "GoalScored", team = "Blue", scorer = "1", points = 1 },
 			{ name = "GoalScored", team = "Orange", scorer = "2", points = 1 },
 			{ name = "PossessionChanged", team = "Orange", player = "2", previousTeam = "Blue" },
+			{ name = "GoalScored", team = "Orange", scorer = "2", points = 1 },
+			{ name = "PossessionChanged", team = "Blue", player = "1", previousTeam = "Orange" },
 		})
 		local kinds: { string } = {}
 		local ids: { number } = {}
@@ -165,19 +168,78 @@ describe("HudState", function()
 			table.insert(ids, entry.id)
 		end
 		-- feedMaxEntries is 5: the oldest of the six is gone.
-		expect(kinds).toEqual({ "Lap", "GoalOpen", "Goal", "Goal", "Possession" })
+		expect(kinds).toEqual({ "Goal", "Goal", "Possession", "Goal", "Possession" })
 		expect(ids).toEqual({ 2, 3, 4, 5, 6 })
-		expect(state.feed[1].value).toBe(1)
-		expect(state.feed[3].player).toBe("1")
+		expect(state.feed[1].player).toBe("1")
 		expect(state.feed[5]).toEqual({
 			id = 6,
 			kind = "Possession",
-			team = "Orange",
-			player = "2",
+			team = "Blue",
+			player = "1",
 			timeLeft = config.UI.hud.feedSeconds,
 		})
 		state:step(config.UI.hud.feedSeconds + 0.01)
 		expect(#state.feed).toBe(0)
+	end)
+
+	-- RC shows a completed lap under its scoreboard (Video 4 at 7:22.7), on our banner line (the owner, Q210).
+	it("shows a completed lap on the banner line for bannerSeconds.lap, until a newer banner replaces it", function()
+		local seconds = config.UI.hud.bannerSeconds.lap
+		local state = liveState()
+		local version = state.version
+		state:applyEvents({ { name = "LapCompleted", team = "Orange", streak = 2, holder = "2" } })
+		expect(state.banner).toEqual({ kind = "Lap", team = "Orange", value = 2 })
+		expect(state.bannerLeft).toBe(seconds)
+		expect(state.version).toBe(version + 1)
+		state:step(seconds - 0.01)
+		expect(state.banner).toEqual({ kind = "Lap", team = "Orange", value = 2 })
+		state:step(0.02)
+		expect(state.banner).toBeNil()
+		local replaced = liveState()
+		replaced:applyEvents({ { name = "LapCompleted", team = "Blue", streak = 1, holder = "1" } })
+		replaced:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
+		expect(replaced.banner).toEqual({ kind = "Goal", team = "Blue" })
+		expect(replaced.bannerLeft).toBe(config.UI.hud.bannerSeconds.headline)
+	end)
+
+	-- RC's "Orange goal is active!" at the bottom centre beside the lap's caption (Video 4 at 7:23; Q210).
+	it("shows the goal message on its own line for bannerSeconds.message, beside the banner", function()
+		local seconds = config.UI.hud.bannerSeconds.message
+		local state = liveState()
+		state:applyEvents({
+			{ name = "LapCompleted", team = "Blue", streak = 1, holder = "1" },
+			{ name = "GoalOpened", team = "Blue" },
+		})
+		expect(state.message).toEqual({ kind = "GoalOpen", team = "Blue" })
+		expect(state.banner).toEqual({ kind = "Lap", team = "Blue", value = 1 })
+		expect(state.messageLeft).toBe(seconds)
+		local version = state.version
+		state:step(seconds - 0.01)
+		expect(state.message).toEqual({ kind = "GoalOpen", team = "Blue" })
+		state:step(0.02)
+		expect(state.message).toBeNil()
+		expect(state.version).toBe(version + 2)
+	end)
+
+	it("drops the goal message as the goal closes: a goal, a snapshot of it closed or the match's end", function()
+		local opened = function(): HudState.HudState
+			local state = liveState({ goalOpenFor = "Blue" })
+			state:applyEvents({ { name = "GoalOpened", team = "Blue" } })
+			return state
+		end
+		local scored = opened()
+		scored:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
+		expect(scored.message).toBeNil()
+		local kept = opened()
+		kept:applySnapshot(Fixtures.matchSnapshot({ goalOpenFor = "Blue" }))
+		expect(kept.message).toEqual({ kind = "GoalOpen", team = "Blue" })
+		local closed = opened()
+		closed:applySnapshot(Fixtures.matchSnapshot())
+		expect(closed.message).toBeNil()
+		local ended = opened()
+		local stats = (match(ended) :: any).stats
+		ended:applyEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } })
+		expect(ended.message).toBeNil()
 	end)
 
 	it("shows the end of the match until the next match starts", function()

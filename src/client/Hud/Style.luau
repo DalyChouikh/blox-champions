@@ -320,9 +320,10 @@ function Style.sweep(
 	)
 end
 
--- How wide `text` is at `size` in look C's font, in whole pixels (TextService: a text label's own bounds).
-function Style.textWidth(config: Config.GameConfig, text: string, size: number): number
-	local font = config.UI.hud.look.font
+-- How wide `text` is at `size` in look C's font (or `inFont`: the banners' look.bannerFont), in whole pixels
+-- (TextService: a text label's own bounds).
+function Style.textWidth(config: Config.GameConfig, text: string, size: number, inFont: Enum.Font?): number
+	local font = inFont or config.UI.hud.look.font
 	local bySize = widths[font]
 	if bySize == nil then
 		bySize = {}
@@ -339,6 +340,65 @@ function Style.textWidth(config: Config.GameConfig, text: string, size: number):
 		byText[text] = width
 	end
 	return width
+end
+
+-- A UIStroke round a text label's letters in `color`, `thickness` pixels out.
+local function stroke(color: Color3, thickness: number): React.ReactElement
+	return React.createElement("UIStroke", { Color = color, Thickness = thickness })
+end
+
+-- Look C's banner lettering (#356, the owner's Q191, Q210): `words` in look.bannerFont `size` pixels tall, white
+-- over look C's ink outline, a ring of `color` `edge` pixels wide round that (none without a colour), and all of it
+-- again in ink look.shadow lower, behind: three labels the text's measured size, `ink` pixels in from the edges of a
+-- CanvasGroup (`props` place it; `children` act on it) that holds their ink and the shadow below, so nothing is
+-- clipped. The group fades whole (GroupTransparency): see-through layers would darken where they overlap.
+function Style.banner(
+	config: Config.GameConfig,
+	props: Props,
+	words: string,
+	size: number,
+	color: Color3?,
+	edge: number,
+	ink: number,
+	children: Props?
+): React.ReactElement
+	local look = config.UI.hud.look
+	local width = Style.textWidth(config, words, size, look.bannerFont)
+	local ring = look.textOutline + (if color ~= nil then edge else 0)
+	local function layer(drop: number, letters: Color3?, outline: React.ReactElement, order: number): React.ReactElement
+		return React.createElement(
+			"TextLabel",
+			Style.lettering(config, {
+				Position = UDim2.fromOffset(ink, ink + drop),
+				Size = UDim2.fromOffset(width, size),
+				Font = look.bannerFont,
+				TextSize = size,
+				Text = words,
+				TextColor3 = letters,
+				ZIndex = order,
+			}),
+			{ Ink = outline }
+		)
+	end
+	local parts: Children = {
+		Shadow = layer(look.shadow, look.ink, stroke(look.ink, ring), 1),
+		Edge = if color ~= nil then layer(0, color, stroke(color, ring), 2) else nil,
+		Front = layer(0, nil, Style.inked(config), 3),
+	}
+	if children ~= nil then
+		for key, child in children do
+			parts[key] = child
+		end
+	end
+	return React.createElement(
+		"CanvasGroup",
+		over({
+			Size = UDim2.fromOffset(width + 2 * ink, size + 2 * ink + look.shadow),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+		}, props),
+		parts
+	)
 end
 
 -- How wide `view`'s key cap is (Style.keyCap): its name's width with sizes.padding each side, never narrower than

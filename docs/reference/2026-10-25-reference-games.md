@@ -1704,6 +1704,35 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   https://claude.ai/artifact/Rsh5nQcGHQoRbhRrr3RNW1 version 3: the live game carrying, four frozen columns, 3x
   close-ups): **"Yes, ship it"** as built (A1), after the phone screenshot. The owner Connected Rojo and switched
   Studio's emulator to the phone. Next: the phone shot, #354's PR, then #356 the banners.
+- **RC banners measured** (session 74, for #356; 15-30 fps crops): Video 31 GO ORANGE TEAM! 22% down (centre ~234 of
+  1078), white with an orange edge and a dark shadow, ~35% of the screen wide; it grows in from tiny at 20.93 s to full
+  by 21.2 s (~0.27 s, ~2% overshoot) and is gone ~2.5 s after it appeared. Video 4 'Lap 1 Completed' (small, in the
+  team colour, ~16.7% down under the pill) fades in over ~0.13 s rising a few px (442.70-442.83 s), holds, fades out
+  over ~0.15 s (446.2-446.37): ~3.6 s; 'Orange goal is active!' at the bottom centre (~94% down) from 443.0 to ~447.9
+  (~5 s), both captions together.
+- **Q210 #356's banners as drawn** (session 74, recommended; the new page https://claude.ai/artifact/UaGHjfHfGuy2QeirmBNZyG,
+  the earlier Rsh5nQcGHQoRbhRrr3RNW1 being the previous account's; to scale on desktop 1556 x 793 and the phone 874 x
+  401, animated): **"Yes, as drawn"**: one banner line centred 22% down (RC's GO), moved down just enough to stay 3 px
+  clear of the scoreboard's lowest ink in play (Q203's rule); GO, GOAL!, DENIED!, 60/30 SECONDS, LAST CHANCE, OVERTIME
+  and LAP n COMPLETED on it, the newer replacing the older; '<TEAM> GOAL IS ACTIVE!' on its own line at the bottom
+  centre (94% down); white Luckiest Guy, look C's 2.5 px ink outline, a team-colour ring (3 px; 2 on phones; none for
+  a banner about nobody), a 4 px ink drop shadow; the board's pop in (0.2 s to 1.12), hold, float up 40% of its height
+  while fading over 0.25 s; GO/DENIED!/clock 2.5 s, the lap 3.6 s, the goal message 5 s, GOAL! until the next
+  kickoff; desktop 50 px (GOAL! 67, lap 36, goal message 29), phones 32 (43, 23, 18) centred in the stage left of the
+  touch buttons; the crosshair draws over them. Not chosen: today's 96 px. **Q211 the feed** (recommended): **banners
+  only**: the bottom feed keeps possession and points and sits above the goal message; its lap and goal-open lines go.
+- **Q212 the key caps' centre line** (session 75, while #356's desktop shots were taken; the owner's words: "also why
+  buttons on the right have a vertical line on the center? don't show that"): measured on the shots, a 1-px dark line
+  down the middle of the Space, Shift, A and R caps (not Ctrl, E or the mouse caps). Cause: #354's cooldown sweep is
+  two half-clips whose gradient steps from ink to clear exactly on the cap's middle even with no cooldown running, so
+  a cap whose middle falls between pixels shows a sliver of the ink (also in a cooldown's second half). **Its own
+  small bug fix right after #356** (recommended): each half drawn only while it holds ink, so a key with no cooldown
+  draws no sweep. Not chosen: folding it into #356. The mouse caps' line between their buttons is the mouse's drawing
+  (Q207's A1) and stays.
+- **Q213 #356 shipped** (session 75, recommended; the built banners shown on the page
+  https://claude.ai/artifact/UaGHjfHfGuy2QeirmBNZyG version 2, 'Built: #356': desktop and phone Play shots of GO, LAP 1
+  COMPLETED with ORANGE GOAL IS ACTIVE! while carrying, and GOAL!; Studio's copy of the banner times held at 30 s for
+  the captures only, then restored): **"Yes, ship it"** as built. Next: #356's commit and PR, then Q212's fix.
 
 ## Roller Champions
 

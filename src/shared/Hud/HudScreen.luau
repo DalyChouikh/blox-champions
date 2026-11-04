@@ -7,9 +7,12 @@
 -- just under the bar, so it never covers Roblox's own buttons. The crosshair's aim is a share of the way down the
 -- WHOLE screen, where the 3D view is centred; its rings and the kickoff count keep clear of the scoreboard (#353):
 -- from how deep the board reaches, the rings shrink round the dot, which throws aim through, and the count, which aims
--- nothing, moves down (the owner, Q203). All in pixels from the safe area's top.
+-- nothing, moves down (the owner, Q203). The banner line (#356) sits a share of the way down the whole screen too,
+-- lower where it would come near the board; the goal message sits at the stage's bottom, the feed above it (Q210,
+-- Q211). All in pixels from the safe area's top, but the message's and the feed's, from the stage's bottom.
 
 local Config = require(script.Parent.Parent.Config)
+local HudState = require(script.Parent.HudState)
 
 local HudScreen = {}
 
@@ -58,11 +61,17 @@ function HudScreen.under(config: Config.GameConfig, clearance: number): number
 	return look.outline + look.shadow + clearance + look.outline
 end
 
+-- How far below the safe area's top (`safe`) a point `share` of the way down the whole screen (`whole`) lies; both
+-- in one frame (GuiService:GetInsetArea gives them so).
+local function down(whole: Rect, safe: Rect, share: number): number
+	return whole.Min.Y + share * (whole.Max.Y - whole.Min.Y) - safe.Min.Y
+end
+
 -- How far below the safe area's top (`safe`) the crosshair's aim lies: UI.hud.layout.reticle.height of the way down
 -- the whole screen (`whole`; GuiService:GetInsetArea gives both in one frame), where the 3D view and the reticle's gui
 -- are centred (a notched phone's safe area starts 20 px below it, probed).
 function HudScreen.aim(config: Config.GameConfig, whole: Rect, safe: Rect): number
-	return whole.Min.Y + config.UI.hud.layout.reticle.height * (whole.Max.Y - whole.Min.Y) - safe.Min.Y
+	return down(whole, safe, config.UI.hud.layout.reticle.height)
 end
 
 -- The crosshair's rings on a phone's screen or a desktop's.
@@ -159,6 +168,69 @@ function HudScreen.countDrop(
 ): number
 	local radius = inkedRadius(config, HudScreen.count(config, compact).ringSize)
 	return math.max(0, math.ceil(radius - room(config, compact, top, aim, period, false)))
+end
+
+-- The banners on a phone's screen or a desktop's.
+function HudScreen.banners(config: Config.GameConfig, compact: boolean): Config.BannerSizes
+	local banner = config.UI.hud.layout.banner
+	return if compact then banner.compactSizes else banner.sizes
+end
+
+-- A banner's text size: GOAL!'s, a completed lap's, the goal message's, else the headline's.
+function HudScreen.bannerSize(config: Config.GameConfig, compact: boolean, kind: HudState.BannerKind): number
+	local sizes = HudScreen.banners(config, compact)
+	if kind == "Goal" then
+		return sizes.goal
+	elseif kind == "Lap" then
+		return sizes.lap
+	elseif kind == "GoalOpen" then
+		return sizes.message
+	end
+	return sizes.headline
+end
+
+-- How far a banner's ink reaches round its text (Hud/Style.banner): look C's outline and its team's ring, the ring
+-- counted even for a banner about nobody, so every banner on the line keeps the same clearance.
+function HudScreen.bannerInk(config: Config.GameConfig, compact: boolean): number
+	return config.UI.hud.look.textOutline + HudScreen.banners(config, compact).edge
+end
+
+-- How far below the safe area's top (`safe`) the banner line lies at its highest: UI.hud.layout.banner.height of the
+-- way down the whole screen (`whole`), where RC puts GO; measured with the screen, as the aim is.
+function HudScreen.bannerAt(config: Config.GameConfig, whole: Rect, safe: Rect): number
+	return down(whole, safe, config.UI.hud.layout.banner.height)
+end
+
+-- The centre of a banner `size` pixels tall on the banner line: at `at` (HudScreen.bannerAt), lower where its ink would
+-- come within layout.banner.clearance of the scoreboard's deepest ink in play (`top` its top; the period under it while
+-- `period`): the deepest in play at any moment, so the line never moves within a period, GO at the kickoff's end
+-- included. In whole pixels, rounded up: a UDim's offset holds whole pixels.
+function HudScreen.bannerLine(
+	config: Config.GameConfig,
+	compact: boolean,
+	at: number,
+	top: number,
+	period: boolean,
+	size: number
+): number
+	local banner = config.UI.hud.layout.banner
+	local depth = HudScreen.boardDepth(config, compact, period, true)
+	local clear = top + depth + banner.clearance + HudScreen.bannerInk(config, compact) + size / 2
+	return math.ceil(math.max(at, clear))
+end
+
+-- How far above the stage's bottom the goal message's text ends: its drop shadow's ink layout.banner.bottom above
+-- it, the shadow look.shadow lower than the text and inked as far round it as the text.
+function HudScreen.messageBottom(config: Config.GameConfig, compact: boolean): number
+	return config.UI.hud.layout.banner.bottom + config.UI.hud.look.shadow + HudScreen.bannerInk(config, compact)
+end
+
+-- How far above the stage's bottom the feed ends: over the goal message's text and ink, layout.banner.clearance
+-- apart (the owner, Q211).
+function HudScreen.feedBottom(config: Config.GameConfig, compact: boolean): number
+	local sizes = HudScreen.banners(config, compact)
+	local ink = HudScreen.bannerInk(config, compact)
+	return HudScreen.messageBottom(config, compact) + sizes.message + ink + config.UI.hud.layout.banner.clearance
 end
 
 return table.freeze(HudScreen)
