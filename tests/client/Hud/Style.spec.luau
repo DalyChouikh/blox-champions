@@ -288,14 +288,16 @@ describe("Style (look C)", function()
 	end)
 
 	-- Lit where the cooldown has run, growing clockwise from 12 o'clock (Q186: "fills back clockwise"): each half's ink
-	-- steps from solid to clear across its middle, turned so the step runs along the sweep's edge.
+	-- steps from solid to clear across its middle, turned so the step runs along the sweep's edge. Drawn only while the
+	-- key cools (#363: at rest its step lay on the halves' seam).
 	it("sweeps a cooling key's ink away clockwise from 12 o'clock as its cooldown runs out", function()
 		local moving = capBindings()
 		local _, cap = Style.keyCap(config, { text = "E" }, CAP, 1, moving.bindings)
 		local face = (mount(cap):FindFirstChild("Box") :: Frame):FindFirstChild("Face") :: Frame
 		local sweep = face:FindFirstChild("Sweep") :: Frame
 		expect(sweep.Size).toEqual(UDim2.fromOffset(30, 30))
-		expect(sweep.Position).toEqual(UDim2.fromScale(0.5, 0.5))
+		expect(sweep.Position).toEqual(UDim2.fromScale(0, 0.5))
+		expect(sweep.Visible).toBe(false)
 		expect(sweep.ZIndex < (face:FindFirstChild("Legend") :: TextLabel).ZIndex).toBe(true)
 		local halves = { sweep:FindFirstChild("Left") :: Frame, sweep:FindFirstChild("Right") :: Frame }
 		local turns: { UIGradient } = {}
@@ -323,7 +325,34 @@ describe("Style (look C)", function()
 			moving.setCooldown(case.share)
 			expect(turns[1].Rotation).toBeCloseTo(case.left, 3)
 			expect(turns[2].Rotation).toBeCloseTo(case.right, 3)
+			expect(sweep.Visible).toBe(case.share > 0)
 		end
+	end)
+
+	-- The halves meet on the sweep's middle: started on a half pixel, the seam split a pixel and showed a line down the
+	-- cap (#363, the owner's Q212). So the square starts on a whole pixel, within half a pixel of the cap's middle.
+	it("puts a cap's sweep on whole pixels however wide its name makes the cap", function()
+		local moving = capBindings()
+		local names = { "E", "Tab", "Ctrl", "Shift", "Space", "Enter" }
+		local caps: { [string]: React.Node } = {}
+		for _, name in names do
+			local _, cap = Style.keyCap(config, { text = name }, CAP, 1, moving.bindings)
+			caps[name] = cap
+		end
+		local mounted = mount(React.createElement(React.Fragment, nil, caps))
+		local odd = false
+		for _, name in names do
+			local width = Style.capWidth(config, { text = name }, CAP)
+			odd = odd or (width - 30) % 2 == 1
+			local face = (mounted:FindFirstChild(name) :: Frame):FindFirstChild("Face") :: Frame
+			local sweep = face:FindFirstChild("Sweep") :: Frame
+			-- From the cap's left edge by an offset alone (a UDim's offset holds whole pixels).
+			expect(sweep.AnchorPoint.X).toBe(0)
+			expect(sweep.Position.X.Scale).toBe(0)
+			expect(math.abs(sweep.Position.X.Offset - (width - 30) / 2) <= 0.5).toBe(true)
+		end
+		-- At least one of these names gives a cap whose middle falls between pixels.
+		expect(odd).toBe(true)
 	end)
 
 	-- The mouse's buttons (Q207, A1 on the design page): a mouse in the HUD's text colour on the cap, its key's button

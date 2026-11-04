@@ -290,15 +290,23 @@ local function sideClip(left: boolean, height: UDim, shape: Props, children: Pro
 	)
 end
 
+-- Whether a key's cooldown is still running: the share of it still to run.
+local function cooling(share: number): boolean
+	return share > 0
+end
+
 -- A cooling key's sweep (#354, the owner's Q186: "fills back clockwise"): look C's ink over a `size`-pixel square in
--- its parent's middle, look.sweepTransparency see-through, lit where its cooldown has run: from 12 o'clock
--- clockwise as `share` (a binding, the share still to run) goes from 1 to 0. Each half of the square is a clip
--- holding the square's ink, `corner` rounded, whose gradient steps from solid to clear along the line through the
--- middle at the sweep's angle (Rotation: the angle + 180, the right half to 6 o'clock, the left on from there), so
--- only two numbers change as it sweeps.
+-- the middle of a part `width` pixels wide and as tall, look.sweepTransparency see-through, lit where its cooldown has
+-- run: from 12 o'clock clockwise as `share` (a binding, the share still to run) goes from 1 to 0, and not drawn at all
+-- while nothing cools. Each half of the square is a clip holding the square's ink, `corner` rounded, whose gradient
+-- steps from solid to clear along the line through the middle at the sweep's angle (Rotation: the angle + 180, the
+-- right half to 6 o'clock, the left on from there), so only two numbers change as it sweeps. The square is placed
+-- from the part's left by an offset alone, which a UDim keeps in whole pixels (dropping a half), so the halves meet on
+-- a pixel's edge: a seam through a pixel showed a line down the cap (#363).
 function Style.sweep(
 	config: Config.GameConfig,
 	size: number,
+	width: number,
 	corner: UDim,
 	share: React.Binding<number>
 ): React.ReactElement
@@ -315,7 +323,12 @@ function Style.sweep(
 	end
 	return React.createElement(
 		"Frame",
-		Style.holder({ AnchorPoint = CENTRE, Position = MIDDLE, Size = UDim2.fromOffset(size, size) }),
+		Style.holder({
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, (width - size) / 2, 0.5, 0),
+			Size = UDim2.fromOffset(size, size),
+			Visible = share:map(cooling),
+		}),
 		{ Left = half(true, leftTurn), Right = half(false, rightTurn) }
 	)
 end
@@ -489,10 +502,11 @@ function Style.keyCap(
 	local hud = config.UI.hud
 	local look = hud.look
 	local height, image = sizes.height, view.image
+	local width = Style.capWidth(config, view, sizes)
 	local mouse: MouseButton? = view.mouse
 	local parts: Children = {
 		Scale = React.createElement("UIScale", { Scale = moving.press }),
-		Sweep = Style.sweep(config, height, if image ~= nil then Style.ROUND else sizes.corner, moving.cooldown),
+		Sweep = Style.sweep(config, height, width, if image ~= nil then Style.ROUND else sizes.corner, moving.cooldown),
 	}
 	if image ~= nil or mouse ~= nil then
 		-- The seconds lettered over a picture of the key.
@@ -507,7 +521,7 @@ function Style.keyCap(
 		return "Glyph",
 			React.createElement(
 				"Frame",
-				Style.holder({ LayoutOrder = order, Size = UDim2.fromOffset(height, height) }),
+				Style.holder({ LayoutOrder = order, Size = UDim2.fromOffset(width, height) }),
 				{
 					Face = React.createElement("ImageLabel", face, parts),
 				}
@@ -537,7 +551,7 @@ function Style.keyCap(
 			"Frame",
 			Style.holder({
 				LayoutOrder = order,
-				Size = UDim2.fromOffset(Style.capWidth(config, view, sizes), height),
+				Size = UDim2.fromOffset(width, height),
 			}),
 			{
 				Face = React.createElement("Frame", {

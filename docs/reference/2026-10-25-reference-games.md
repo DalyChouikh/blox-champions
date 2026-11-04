@@ -1733,6 +1733,14 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   https://claude.ai/artifact/UaGHjfHfGuy2QeirmBNZyG version 2, 'Built: #356': desktop and phone Play shots of GO, LAP 1
   COMPLETED with ORANGE GOAL IS ACTIVE! while carrying, and GOAL!; Studio's copy of the banner times held at 30 s for
   the captures only, then restored): **"Yes, ship it"** as built. Next: #356's commit and PR, then Q212's fix.
+- **Q214 the Uppercut cap touching its box** (session 75, answering whether to ship #363, shown on the page
+  https://claude.ai/artifact/UaGHjfHfGuy2QeirmBNZyG version 3; the owner's words: "why the uppercut button, is
+  touching the left border, the yellow box is touching the border"): measured on two Plays of the same build, the
+  Uppercut row with the font ready has ~8 px of its box between the border and the A cap; in a Play whose hint
+  widths were measured before Fredoka One loaded (Space's cap 52 px instead of 59) the row is too narrow, the real
+  'Uppercut' is wider than its row and pushes the cap onto the border. That is #364 (filed the same session), not
+  #363. **Q215** (recommended): **ship #363 as built, then fix #364** test-first and show the Uppercut row
+  before/after. Not chosen: hold #363 until #364 is built.
 
 ## Roller Champions
 
