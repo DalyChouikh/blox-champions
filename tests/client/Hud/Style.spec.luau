@@ -213,6 +213,60 @@ describe("Style (look C)", function()
 		expect(label.Font).toBe(config.UI.hud.look.font)
 	end)
 
+	-- The Get Up prompt's bigger caps (#369, the owner's Q221): a cap can drop look C's shadow, in one shape with its
+	-- outline, under its face, so a press never moves it; no other cap draws one.
+	it("drops a cap's shadow when its sizes ask for one", function()
+		local moving = capBindings()
+		local _, plain = Style.keyCap(config, { text = "E" }, CAP, 1, moving.bindings)
+		local dropped: Config.CapSizes = {
+			height = 30,
+			padding = 6,
+			corner = UDim.new(0, 8),
+			textSize = 15,
+			dropShadow = true,
+		}
+		local _, cap = Style.keyCap(config, { text = "W" }, dropped, 1, moving.bindings)
+		local parts = mount(React.createElement(React.Fragment, nil, { Plain = plain, Dropped = cap }))
+		expect((parts:FindFirstChild("Plain") :: Frame):FindFirstChild("Shadow")).toBeNil()
+		local key = parts:FindFirstChild("Dropped") :: Frame
+		local shadow = key:FindFirstChild("Shadow") :: Frame
+		-- This spec's look.shadow.
+		expect(shadow.Position).toEqual(UDim2.fromOffset(0, 5))
+		expect(shadow.Size).toEqual(UDim2.fromScale(1, 1))
+		expect(shadow.BackgroundColor3 == INK).toBe(true)
+		expect((shadow:FindFirstChild("Corner") :: UICorner).CornerRadius).toEqual(UDim.new(0, 8))
+		expect((shadow:FindFirstChild("Outline") :: UIStroke).Thickness).toBe(1.5)
+		expect(shadow.ZIndex < (key:FindFirstChild("Face") :: Frame).ZIndex).toBe(true)
+	end)
+
+	-- A cap that nothing moves (#369): at rest, its name in ink on the plain cap, unscaled, no sweep.
+	it("draws a still cap at rest", function()
+		local _, cap = Style.keyCap(config, { text = "W" }, CAP, 1, Style.stillCap)
+		local key = mount(cap):FindFirstChild("Box") :: Frame
+		local face = key:FindFirstChild("Face") :: Frame
+		expect((face:FindFirstChild("Legend") :: TextLabel).Text).toBe("W")
+		expect(face.BackgroundColor3 == KEY).toBe(true)
+		expect((face:FindFirstChild("Scale") :: UIScale).Scale).toBe(1)
+		expect((face:FindFirstChild("Sweep") :: Frame).Visible).toBe(false)
+	end)
+
+	-- The banners' lettering at any place (#369): what Style.banner holds, for a group that holds more than it.
+	it("letters words at a given place, in the banners' layers", function()
+		local look = config.UI.hud.look
+		local parts = Style.letters(config, "GET UP!", 40, nil, 0, 100, 10)
+		local mounted = mount(React.createElement(React.Fragment, nil, parts))
+		local front = mounted:FindFirstChild("Front") :: TextLabel
+		expect(front.Text).toBe("GET UP!")
+		expect(front.Font).toBe(look.bannerFont)
+		expect(front.TextSize).toBe(40)
+		expect(front.Position).toEqual(UDim2.fromOffset(100, 10))
+		local width = Style.textWidth(config, "GET UP!", 40, look.bannerFont)
+		expect(front.Size).toEqual(UDim2.fromOffset(width, 40))
+		-- Look.shadow lower; no team ring without a colour.
+		expect((mounted:FindFirstChild("Shadow") :: TextLabel).Position).toEqual(UDim2.fromOffset(100, 15))
+		expect(mounted:FindFirstChild("Edge")).toBeNil()
+	end)
+
 	-- Look C's banners (#356, the owner's Q191, Q210): white over ink, the team's ring round that, the shadow lower.
 	it("letters a banner in three layers inside a group that fades whole, nothing clipped", function()
 		local look = config.UI.hud.look

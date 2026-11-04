@@ -24,13 +24,14 @@
 -- (Q207). There are none on touch, where the buttons carry the labels; each render names the pass key for the mark over
 -- a pass's target (passKey, #315). The Get Up prompt (a skater knocked down by a strike or a fall:
 -- SkateController.promptsGetUp, #242) names the movement keys the same way: the first composite's four keys, the
--- gamepad's stick, or on touch Config.UI.text's name for the stick. The score tab shows while its key is held; on touch
--- a button toggles it, and the toggle clears once the device is not touch and whenever the end screen appears or goes,
--- so the tab never pops open unasked. While the tab shows its Switch team button (HudState.switchOffer, #310), the
--- button's key, or a tap on touch, asks the server for a switch when one works. The banner, the feed, the score tab and
--- the end screen centre and fit in the HUD's stage, a binding: on touch the part of the HUD's area left of the touch
--- buttons (TouchArea, from the two guis' areas that GuiService gives), elsewhere the whole of it. It is measured again,
--- with the screen's form, when the screen's size or Roblox's top bar changes (from start on) and when the device does.
+-- gamepad's stick, or on touch Config.UI.text's name for the stick; it stays until it has faded out (BannerMotion,
+-- #369). The score tab shows while its key is held; on touch a button toggles it, and the toggle clears once the device
+-- is not touch and whenever the end screen appears or goes, so the tab never pops open unasked. While the tab shows its
+-- Switch team button (HudState.switchOffer, #310), the button's key, or a tap on touch, asks the server for a switch
+-- when one works. The banner, the feed, the score tab and the end screen centre and fit in the HUD's stage, a binding:
+-- on touch the part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that GuiService
+-- gives), elsewhere the whole of it. It is measured again, with the screen's form, when the screen's size or Roblox's
+-- top bar changes (from start on) and when the device does.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -170,7 +171,7 @@ export type Hud = {
 	_shownStageTop: number,
 	_shownCarrier: PlayerId?,
 	_hasSkater: boolean,
-	_promptsGetUp: boolean,
+	_getUpShown: boolean,
 	_scoreTabOpen: boolean,
 	_shownFontsLoaded: boolean,
 }
@@ -371,7 +372,7 @@ local Hud: Hud = {
 	_shownStageTop = 0,
 	_shownCarrier = nil,
 	_hasSkater = false,
-	_promptsGetUp = false,
+	_getUpShown = false,
 	_scoreTabOpen = false,
 	_shownFontsLoaded = false,
 
@@ -427,7 +428,7 @@ local Hud: Hud = {
 		self._shownStageTop = 0
 		self._shownCarrier = nil
 		self._hasSkater = false
-		self._promptsGetUp = false
+		self._getUpShown = false
 		self._scoreTabOpen = false
 		self._touchToggled = false
 		self._over = false
@@ -534,7 +535,8 @@ local Hud: Hud = {
 		local skate = self._skate
 		local hasSkater = skate:hasSkater()
 		-- SkateController keeps its last reading once the skater is gone.
-		local promptsGetUp = hasSkater and skate.promptsGetUp
+		self._banners:prompting(hasSkater and skate.promptsGetUp)
+		local getUpShown = self._banners:promptShown()
 		if device ~= self._device then
 			measure(self, device)
 		end
@@ -565,7 +567,7 @@ local Hud: Hud = {
 			or stageTop ~= self._shownStageTop
 			or carrier ~= self._shownCarrier
 			or hasSkater ~= self._hasSkater
-			or promptsGetUp ~= self._promptsGetUp
+			or getUpShown ~= self._getUpShown
 			or scoreTabOpen ~= self._scoreTabOpen
 			or fontsLoaded ~= self._shownFontsLoaded
 		then
@@ -578,7 +580,7 @@ local Hud: Hud = {
 			self._shownStageTop = stageTop
 			self._shownCarrier = carrier
 			self._hasSkater = hasSkater
-			self._promptsGetUp = promptsGetUp
+			self._getUpShown = getUpShown
 			self._scoreTabOpen = scoreTabOpen
 			self._shownFontsLoaded = fontsLoaded
 			self.renders += 1
@@ -600,7 +602,7 @@ local Hud: Hud = {
 				hasSkater = hasSkater,
 				carrying = carrier == self._localId,
 				keys = keys,
-				getUpKeys = if promptsGetUp then moveKeys(self, device) else nil,
+				getUpKeys = if getUpShown then moveKeys(self, device) else nil,
 				scoreTabOpen = scoreTabOpen,
 				onScoreButton = self._onScoreButton,
 				switchTeam = switchTeamView(self, device, carrier),

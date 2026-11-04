@@ -1785,6 +1785,28 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   and the phone's buttons in the air and knocked down; asked with one ruling to check: while attached to a teammate,
   Jump, Pump and Brake grey too, because the skates do nothing there): **"Yes, ship it"**. Next: #368's commit and PR,
   then #369 (the Get Up prompt and the feed, banner style).
+- **Q225 the feed's edge and its box** (session 78, the owner's interruption while #369 was being finished; they had
+  seen Option 2's chips built): "for the player has ball feed remove the team color border on the left and can i see
+  version without the background banner". So the feed's team-colour edge goes (the name's colour stays, as Q221 chose),
+  and a version with no box behind the words is shown on the page beside the chip, over the real game, before it is
+  chosen.
+- **Q226 the feed's look** (session 78; the page https://claude.ai/artifact/XWrav5BHeWqVQ8eebfqrP9, section 'The "has the
+  ball" line', Play shots over the real game, desktop and the phone's text size; the recommended was C, no box at 22 px):
+  **A: the chip with no edge**: the look C box all in look.box, the name in its team's colour and the rest white, at the
+  chip's sizes (18 px, 15 on phones). Not chosen: B (no box, 18 px), C (no box, 22 px). This corrects Q221's team-colour
+  edge.
+- **Q227 the feed's motion, and one ball line at a time** (session 78; the page's 'Built #369' section drew today's instant
+  chip beside a pop in 0.2 s and fade out 0.25 s; recommended): **yes, as its own small issue right after #369**, and in
+  the owner's words: "make sure also we don't spam the player has ball feed, only one at once if carrier changes very
+  fast and the recent ball feed still there it fades and new one come". So at most one possession line shows: a new
+  carrier's line pops in while the previous one fades out.
+- **Q228 the owner's question about the prompt's keys** (session 78, with Q227): "is it showing key caps based on the user
+  controls or is it hardcoded zqsd because many players can also have wasd". Answered from the code: not hardcoded (see
+  the answer given that turn; Hud's moveKeys reads the binding's KeyCodes and names them by the player's own layout).
+- **Q229 #369 shipped** (session 78, recommended; the page's 'Built #369' section: desktop and phone Play shots, with two
+  feed lines and alone; asked with one thing to check: the prompt moves up to stay clear of the chips, where the earlier
+  drawing overlapped them): **"Yes, ship it"**. Next: #369's commit and PR, then the chips' pop and fade with one possession
+  line at a time (Q227), then #357, #358, #355.
 
 ## Roller Champions
 

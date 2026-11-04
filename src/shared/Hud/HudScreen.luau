@@ -9,7 +9,8 @@
 -- from how deep the board reaches, the rings shrink round the dot, which throws aim through, and the count, which aims
 -- nothing, moves down (the owner, Q203). The banner line (#356) sits a share of the way down the whole screen too,
 -- lower where it would come near the board; the goal message sits at the stage's bottom, the feed above it (Q210,
--- Q211). All in pixels from the safe area's top, but the message's and the feed's, from the stage's bottom.
+-- Q211), and the Get Up prompt above that where the feed reaches it (#369). All in pixels from the safe area's top, but
+-- the message's, the feed's and the prompt's, from the stage's bottom.
 
 local Config = require(script.Parent.Parent.Config)
 local HudState = require(script.Parent.HudState)
@@ -231,6 +232,36 @@ function HudScreen.feedBottom(config: Config.GameConfig, compact: boolean): numb
 	local sizes = HudScreen.banners(config, compact)
 	local ink = HudScreen.bannerInk(config, compact)
 	return HudScreen.messageBottom(config, compact) + sizes.message + ink + config.UI.hud.layout.banner.clearance
+end
+
+-- The feed's chips on this kind of screen.
+function HudScreen.feedSizes(config: Config.GameConfig, compact: boolean): Config.FeedSizes
+	local feed = config.UI.hud.layout.feed
+	return if compact then feed.compactSizes else feed.sizes
+end
+
+-- How tall `lines` of the feed stand: each chip's box and its ink (an outline each side, the shadow below),
+-- layout.feed.clearance apart.
+function HudScreen.feedHeight(config: Config.GameConfig, compact: boolean, lines: number): number
+	if lines == 0 then
+		return 0
+	end
+	local look = config.UI.hud.look
+	local chip = HudScreen.feedSizes(config, compact).height + 2 * look.outline + look.shadow
+	return lines * chip + (lines - 1) * config.UI.hud.layout.feed.clearance
+end
+
+-- The Get Up prompt on this kind of screen.
+function HudScreen.getUpSizes(config: Config.GameConfig, compact: boolean): Config.GetUpSizes
+	local getUp = config.UI.hud.layout.getUp
+	return if compact then getUp.compactSizes else getUp.sizes
+end
+
+-- How far above the stage's bottom the Get Up prompt's ink ends: at its place, or layout.feed.clearance over `lines` of
+-- the feed where they reach higher, so it never covers them.
+function HudScreen.getUpBottom(config: Config.GameConfig, compact: boolean, lines: number): number
+	local feedTop = HudScreen.feedBottom(config, compact) + HudScreen.feedHeight(config, compact, lines)
+	return math.max(HudScreen.getUpSizes(config, compact).bottom, feedTop + config.UI.hud.layout.feed.clearance)
 end
 
 return table.freeze(HudScreen)

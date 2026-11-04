@@ -12,6 +12,15 @@ local Types = require(script.Parent.Parent.Rules.Types)
 
 type PlayerId = Types.PlayerId
 
+-- Rich text's own characters, as its markup writes them.
+local ESCAPES: { [string]: string } = table.freeze({
+	["&"] = "&amp;",
+	["<"] = "&lt;",
+	[">"] = "&gt;",
+	['"'] = "&quot;",
+	["'"] = "&apos;",
+})
+
 local HudText = {}
 HudText.__index = HudText
 
@@ -134,17 +143,35 @@ function HudText.result(self: HudText, winner: Team.Team?): string
 	return string.format(self._config.UI.text.wins, self:team(winner))
 end
 
-function HudText.feed(self: HudText, entry: HudState.FeedEntry, names: { [PlayerId]: string }): string
+-- What a feed line says, with %s for its player.
+local function feedTemplate(self: HudText, kind: HudState.FeedKind): string
 	local text = self._config.UI.text
-	local kind = entry.kind
-	local name = self:name(entry.player, names)
 	if kind == "Possession" then
-		return string.format(text.possession, name)
+		return text.possession
 	elseif kind == "Goal" then
-		return string.format(text.scored, name)
+		return text.scored
 	end
 	-- HudState.FeedKind has only the kinds above: any other is a wiring bug.
 	error(`HudText: no feed text for kind "{kind}"`, 0)
+end
+
+function HudText.feed(self: HudText, entry: HudState.FeedEntry, names: { [PlayerId]: string }): string
+	return string.format(feedTemplate(self, entry.kind), self:name(entry.player, names))
+end
+
+-- The same line for a rich-text label (Hud/Feed, #369): the player's name in `color`, and rich text's own characters
+-- written so that they show as they are.
+function HudText.feedMarked(
+	self: HudText,
+	entry: HudState.FeedEntry,
+	names: { [PlayerId]: string },
+	color: Color3
+): string
+	local function escaped(words: string): string
+		return (string.gsub(words, "[&<>\"']", ESCAPES))
+	end
+	local name = escaped(self:name(entry.player, names))
+	return string.format(escaped(feedTemplate(self, entry.kind)), `<font color="#{color:ToHex()}">{name}</font>`)
 end
 
 return HudText

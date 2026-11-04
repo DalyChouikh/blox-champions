@@ -37,7 +37,7 @@ export type ScoreboardProps = {
 }
 
 local CENTRE, MIDDLE, FULL = Style.CENTRE, Style.MIDDLE, Style.FULL
-local WHITE = Color3.new(1, 1, 1)
+local WHITE = Style.WHITE
 
 -- Lettering filling its box, centred; `scale` grows it from its centre, `font` replaces the look's, `zIndex` orders
 -- it over a sibling.

@@ -321,7 +321,8 @@ describe("Hud", function()
 		expect(banner.Visible).toBe(true)
 		expect((banner:FindFirstChild("Front", true) :: TextLabel).Text).toBe("GOAL!")
 		local feed = part("Feed") :: Frame
-		expect((feed:FindFirstChild("1") :: TextLabel).Text).toBe("Ana scored!")
+		local line = feed:FindFirstChild("Label", true) :: TextLabel
+		expect(string.find(line.Text, "Ana</font> scored!", 1, true) ~= nil).toBe(true)
 	end)
 
 	-- One banner line under the scoreboard, the goal message at the stage's bottom (#356, the owner's Q210, Q211):
@@ -554,34 +555,87 @@ describe("Hud", function()
 			SkateController:step(DT)
 			Hud:step(0)
 		end
+		-- Up, or the skater gone: it has faded and left once the fade's time has passed.
+		local function faded()
+			Hud:step(config.UI.hud.motion.easeSeconds)
+			Hud:step(0)
+		end
 		Hud:step(0)
 		expect(part("GetUp")).toBeNil()
 		knockedDown("Hit")
 		local prompt = part("GetUp")
-		expect(prompt.Label.Text).toBe(config.UI.controlLabels.GetUp)
+		expect(prompt.Parent.Name).toBe("Stage")
+		expect(prompt.Group.Front.Text).toBe(config.UI.controlLabels.GetUp)
+		-- It pops in from nothing (the owner, Q221; a UIScale holds its smallest, 1e-7, for 0).
+		expect(prompt.Group.Pop.Scale).toBeCloseTo(0, 4)
+		Hud:step(config.UI.hud.motion.pop.seconds)
+		expect(prompt.Group.Pop.Scale).toBe(1)
 		-- The default WASD composite, up, left, down, right, as the player's keyboard names them.
-		local keys = { prompt.Key1.Text, prompt.Key2.Text, prompt.Key3.Text, prompt.Key4.Text }
+		local caps = prompt.Group.Keys
+		local keys = {
+			caps.Key1.Face.Legend.Text,
+			caps.Key2.Face.Legend.Text,
+			caps.Key3.Face.Legend.Text,
+			caps.Key4.Face.Legend.Text,
+		}
 		expect(keys).toEqual({ "W", "A", "S", "D" })
 		preferred = Enum.PreferredInput.Gamepad
 		Hud:step(0)
-		expect(part("GetUp").Glyph1.Image).toBe(keyImage(Enum.KeyCode.Thumbstick1))
+		expect(part("GetUp").Group.Keys.Glyph1.Face.Image).toBe(keyImage(Enum.KeyCode.Thumbstick1))
 		preferred = Enum.PreferredInput.Touch
 		Hud:step(0)
-		expect(part("GetUp").Key1.Text).toBe(config.UI.text.touchMove)
+		expect(part("GetUp").Group.Keys.Key1.Face.Legend.Text).toBe(config.UI.text.touchMove)
 
+		-- Up: it fades out whole, keeps the keys while it does, then goes.
 		knockedDown(nil)
+		expect(part("GetUp").Group.GroupTransparency).toBe(0)
+		Hud:step(config.UI.hud.motion.easeSeconds / 2)
+		local fading = part("GetUp").Group.GroupTransparency
+		expect(fading > 0 and fading < 1).toBe(true)
+		expect(part("GetUp").Group.Keys.Key1.Face.Legend.Text).toBe(config.UI.text.touchMove)
+		faded()
 		expect(part("GetUp")).toBeNil()
 		knockedDown("Hit")
-		expect(part("GetUp") ~= nil).toBe(true)
+		expect(part("GetUp").Group.GroupTransparency).toBe(0)
 		-- A diver gets up when the slide stops, not by moving (#242): no prompt. A hard landing's knockdown has one.
 		knockedDown(nil)
+		faded()
 		knockedDown("Dive")
 		expect(part("GetUp")).toBeNil()
 		knockedDown("Fall")
 		expect(part("GetUp") ~= nil).toBe(true)
 		rig:Destroy()
 		Hud:step(0)
+		faded()
 		expect(part("GetUp")).toBeNil()
+	end)
+
+	-- The prompt stands clear of the feed's lines, on this phone (#369): one line reaches past its place.
+	it("raises the Get Up prompt over the feed's lines", function()
+		local rig = Fixtures.spawnSkater(folder, config)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
+		SkateController:step(DT)
+		Hud:step(0)
+		expect(part("GetUp").Position.Y.Offset).toBe(-HudScreen.getUpBottom(config, true, 0))
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } }))
+		Hud:step(0)
+		expect(HudStore.state.feed[1] ~= nil).toBe(true)
+		expect(part("GetUp").Position.Y.Offset).toBe(-HudScreen.getUpBottom(config, true, 1))
+		expect(HudScreen.getUpBottom(config, true, 1) > HudScreen.getUpBottom(config, true, 0)).toBe(true)
+	end)
+
+	-- The prompt's own spec holds the rule; this holds its wire to the stage the Hud measures.
+	it("shrinks the Get Up prompt to fit a stage too narrow for it", function()
+		local rig = Fixtures.spawnSkater(folder, config)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
+		SkateController:step(DT)
+		Hud:step(0)
+		local fit = part("GetUp"):FindFirstChild("Fit") :: UIScale
+		expect(fit.Scale).toBe(1)
+		screen =
+			{ whole = PHONE.whole, hud = Rect.new(0, 0, 200, 323), controls = PHONE.controls, topbar = PHONE.topbar }
+		Hud:resize()
+		expect(fit.Scale < 1).toBe(true)
 	end)
 
 	it("shows the skater's speed in km/h as the speedometer reads it, eased, and none without a character", function()

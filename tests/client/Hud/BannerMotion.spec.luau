@@ -54,6 +54,43 @@ describe("BannerMotion", function()
 	end)
 
 	-- ... holds, then floats up as it fades (Q191, Q194): over its last easeSeconds.
+	-- The Get Up prompt (#369, the owner's Q221): it has no time left to count, it ends when the skater is up.
+	it("pops the prompt in as it starts, fades it out as it ends, and shows it until it has gone", function()
+		local animator = Animator.new(config.UI.hud.motion)
+		local motion = BannerMotion.new(config.UI.hud.motion, animator)
+		expect(motion:promptShown()).toBe(false)
+		motion:prompting(false)
+		expect(motion:promptShown()).toBe(false)
+
+		motion:prompting(true)
+		expect(motion:promptShown()).toBe(true)
+		expect(motion.promptScale.value).toBe(0)
+		animator:step(0.1)
+		expect(motion.promptScale.value > 0).toBe(true)
+		animator:step(0.1)
+		expect(motion.promptScale.value).toBe(1)
+		expect(motion.promptLeave.value).toBe(0)
+		-- Still prompting: nothing starts again.
+		motion:prompting(true)
+		expect(motion.promptScale.value).toBe(1)
+		expect(motion.promptScale.moving).toBe(false)
+
+		motion:prompting(false)
+		expect(motion:promptShown()).toBe(true)
+		animator:step(0.2)
+		expect(motion.promptLeave.value > 0 and motion.promptLeave.value < 1).toBe(true)
+		-- Down again before it has gone: it pops in afresh, solid.
+		motion:prompting(true)
+		expect(motion.promptLeave.value).toBe(0)
+		expect(motion.promptLeave.moving).toBe(false)
+		expect(motion.promptScale.value).toBe(0)
+
+		motion:prompting(false)
+		animator:step(0.4)
+		expect(motion.promptLeave.value).toBe(1)
+		expect(motion:promptShown()).toBe(false)
+	end)
+
 	it("leaves each line over its banner's last easeSeconds, writing only when that changes", function()
 		local animator = Animator.new(config.UI.hud.motion)
 		local motion = BannerMotion.new(config.UI.hud.motion, animator)

@@ -53,6 +53,27 @@ local config = Fixtures.config({
 					sizes = { headline = 40, goal = 60, lap = 30, message = 20, edge = 3 },
 					compactSizes = { headline = 24, goal = 36, lap = 18, message = 14, edge = 2 },
 				},
+				feed = {
+					clearance = 4,
+					sizes = { height = 20, corner = UDim.new(0, 5), inset = 5, textSize = 12 },
+					compactSizes = { height = 16, corner = UDim.new(0, 4), inset = 4, textSize = 10 },
+				},
+				getUp = {
+					sizes = {
+						bottom = 90,
+						gap = 5,
+						wordsGap = 10,
+						textSize = 30,
+						cap = { height = 40, padding = 5, corner = UDim.new(0, 8), textSize = 20, dropShadow = true },
+					},
+					compactSizes = {
+						bottom = 60,
+						gap = 4,
+						wordsGap = 8,
+						textSize = 20,
+						cap = { height = 30, padding = 4, corner = UDim.new(0, 6), textSize = 14, dropShadow = true },
+					},
+				},
 			},
 		},
 	},
@@ -245,5 +266,33 @@ describe("HudScreen", function()
 		-- The phone's: 20 + 3 + 4 = 27, and 27 + 14 + 4 + 3 = 48.
 		expect(HudScreen.messageBottom(config, true)).toBe(27)
 		expect(HudScreen.feedBottom(config, true)).toBe(48)
+	end)
+
+	-- The feed's chips (#369, the owner's Q221): each a box and its ink (outline each side, shadow below), `clearance`
+	-- apart. Over no lines the feed takes no room.
+	it("tells how tall the feed's chips stand, on each kind of screen", function()
+		expect(HudScreen.feedSizes(config, false).height).toBe(20)
+		expect(HudScreen.feedSizes(config, true).height).toBe(16)
+		expect(HudScreen.feedHeight(config, false, 0)).toBe(0)
+		-- 20 + 2 × 2 + 3 = 27 a chip.
+		expect(HudScreen.feedHeight(config, false, 1)).toBe(27)
+		-- 3 × 27 + 2 × 4.
+		expect(HudScreen.feedHeight(config, false, 3)).toBe(89)
+		-- 16 + 2 × 2 + 3 = 23 a chip: 2 × 23 + 4.
+		expect(HudScreen.feedHeight(config, true, 2)).toBe(50)
+	end)
+
+	-- The prompt stays where it is drawn until the feed's chips reach it, then stands clear above them: it never covers
+	-- them (a plain place would, with a line or two).
+	it("puts the Get Up prompt at its place, or just over the feed where that reaches higher", function()
+		expect(HudScreen.getUpSizes(config, false).textSize).toBe(30)
+		expect(HudScreen.getUpSizes(config, true).textSize).toBe(20)
+		-- No line: 56 + 0 + 4 = 60, under the prompt's 90. One: 56 + 27 + 4 = 87, still under it. Two: 56 + 58 + 4.
+		expect(HudScreen.getUpBottom(config, false, 0)).toBe(90)
+		expect(HudScreen.getUpBottom(config, false, 1)).toBe(90)
+		expect(HudScreen.getUpBottom(config, false, 2)).toBe(118)
+		-- The phone: no line 48 + 4 = 52, under its 60; one: 48 + 23 + 4 = 75.
+		expect(HudScreen.getUpBottom(config, true, 0)).toBe(60)
+		expect(HudScreen.getUpBottom(config, true, 1)).toBe(75)
 	end)
 end)
