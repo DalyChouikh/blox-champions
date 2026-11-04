@@ -179,7 +179,7 @@ describe("ControlHints", function()
 		expect(tackle.group.GroupTransparency).toBe(0)
 	end)
 
-	it("hides a hint whose control does nothing now", function()
+	it("hides a hint with an empty label", function()
 		local mounted = Fixtures.mount(hints({}), folder)
 		local attach = partsOf(mounted, "attach")
 		expect(attach.row.Visible).toBe(true)

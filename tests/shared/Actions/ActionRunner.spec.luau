@@ -312,4 +312,23 @@ describe("ActionRunner", function()
 		expect(runner:cooldownLeft("Tackle")).toBe(0)
 		expect(runner:cooldownLeft("Uppercut")).toBe(0)
 	end)
+
+	-- A key's usual action (#368) starts on its own (never the Dive, only after a Tackle or a Dodge) and fits the ball.
+	it("tells a key's usual actions with and without the ball", function()
+		local runner = ActionRunner.new(actions)
+		local usual: { [string]: { without: boolean, with: boolean } } = {
+			Dive = { without = false, with = false },
+			Tackle = { without = true, with = false },
+			Dodge = { without = false, with = true },
+			Uppercut = { without = true, with = false },
+			RollBall = { without = false, with = true },
+			Pass = { without = false, with = true },
+			CallPass = { without = true, with = false },
+			ChargeThrow = { without = false, with = true },
+		}
+		for name, expected in usual do
+			expect(runner:usual(name :: Config.ActionName, false)).toBe(expected.without)
+			expect(runner:usual(name :: Config.ActionName, true)).toBe(expected.with)
+		end
+	end)
 end)

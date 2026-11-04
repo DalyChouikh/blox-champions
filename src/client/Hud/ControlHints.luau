@@ -1,15 +1,14 @@
 --!strict
 -- The control hints (spec §11.1) in look C (#354; the owner's Q186, Q195b), at the right of the screen: a row per
--- control, in ControlLabels' order, a look C box round the key's cap (Style.keyCap) and what the control does now.
--- The key is the name the player's own keyboard gives it, or Roblox's glyph on a gamepad. What follows the play is a
--- binding, so a row changes without a render: it hides while its control would do nothing (an empty label), and fades
--- whole (box, cap and label: a CanvasGroup) while it shows but does not work (Magnetic Pass with nobody to pass to,
--- #315: RC fades the whole row, Video 34 at 43.0 s). A key just pressed pops in the pressed colour, with RC's >>
--- outside its row, over the game (Q195b: the box keeps no room for it); a key cooling down shows its seconds left and
--- an ink sweep clearing clockwise. Each row is as wide as its parts, measured (Style.textWidth, Style.capWidth): an
--- auto-sized row would grow without end round its box's ink, which reaches past the box. The rows stack
--- right-aligned, clearance pixels of the game between one row's drop shadow and the next one's outline. A plain
--- function of its props.
+-- control, in ControlLabels' order, a look C box round the key's cap (Style.keyCap) and what the control does now. The
+-- key is the name the player's own keyboard gives it, or Roblox's glyph on a gamepad. What follows the play is a
+-- binding, so a row changes without a render: it hides while it has no label (an empty one: Attach with no teammate
+-- ahead), and fades whole (box, cap and label: a CanvasGroup) while it shows but does nothing now (#315, #368: RC fades
+-- the whole row, Video 34 at 43.0 s). A key just pressed pops in the pressed colour, with RC's >> outside its row, over
+-- the game (Q195b: the box keeps no room for it); a key cooling down shows its seconds left and an ink sweep clearing
+-- clockwise. Each row is as wide as its parts, measured (Style.textWidth, Style.capWidth): an auto-sized row would grow
+-- without end round its box's ink, which reaches past the box. The rows stack right-aligned, clearance pixels of the
+-- game between one row's drop shadow and the next one's outline. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -19,7 +18,7 @@ local React = require(ReplicatedStorage.Packages.React)
 local Style = require(script.Parent.Style)
 
 export type HintKeys = { [Config.TouchControl]: Style.KeyView }
--- One row's bindings: what its control does now ("" while it would do nothing), how see-through the whole row is (0
+-- One row's bindings: what its control does now ("" while it has no label), how see-through the whole row is (0
 -- while its control works, UI.hud.dimTransparency while it is greyed), and what moves on its key's cap.
 export type HintRow = {
 	label: React.Binding<string>,

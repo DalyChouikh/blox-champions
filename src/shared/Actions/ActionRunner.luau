@@ -225,6 +225,12 @@ function ActionRunner.striking(self: Runner): Actions.ActionName?
 	return if self.phase == "Recovery" then nil else self.action
 end
 
+-- Whether `name` may be a key's usual action with the ball held (`hasBall`) or not: it starts on its own, not only as
+-- another's follow-up (the Dive), and its ball requirement fits (ActionController:keyShown, #368).
+function ActionRunner.usual(self: Runner, name: Actions.ActionName, hasBall: boolean): boolean
+	return not self._followUps[name] and fits(self._actions[name].requires.ball, "with", hasBall)
+end
+
 function ActionRunner.cooldownLeft(self: Runner, name: Actions.ActionName): number
 	return self._cooldowns[name]
 end

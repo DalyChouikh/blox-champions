@@ -5,10 +5,10 @@
 -- corner (Config.Input.touch), each working its control through InputController as its keys do; the throw button also
 -- works Ball Focus. On a big screen the stick and the buttons grow, as Roblox's own do (TouchArea), and they follow the
 -- screen's size. Before each frame is drawn (FrameController), every button reads what its control does now
--- (ControlLabels), hiding while it would do nothing and greyed (its text faded by UI.hud.dimTransparency) while it
--- shows but does not work (Magnetic Pass with nobody to pass to, #315), and the throw button rings while Ball Focus is
--- on (CameraController.focusing). A property is written only when it changes. Hiding the controls under a thumb ends
--- that touch.
+-- (ControlLabels), hiding only while it has no label (no skater; Attach with no teammate ahead) and greyed (its text
+-- faded by UI.hud.dimTransparency) while it shows but does nothing now (#315, #368), and the throw button rings while
+-- Ball Focus is on (CameraController.focusing). A property is written only when it changes. Hiding the controls under
+-- a thumb ends that touch.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
