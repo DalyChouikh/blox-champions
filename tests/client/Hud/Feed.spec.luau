@@ -12,7 +12,8 @@ local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local React = require(ReplicatedStorage.Packages.React)
 
 local config = Fixtures.config()
-local colors = config.UI.teamColors
+-- The HUD's own team colours (look C, the owner: Q201).
+local colors = config.UI.hud.look.teamColors
 local text = HudText.new(config)
 local NAMES = { ["1"] = "Ana", ["2"] = "Rex" }
 

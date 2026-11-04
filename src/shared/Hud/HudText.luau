@@ -1,6 +1,7 @@
 --!strict
 -- Every string the HUD shows (spec §11.1), written from Config.UI.text. The clock and the speedometer change every
--- frame, so their strings are cached per whole second and per km/h: once seen, a value costs no allocation.
+-- frame, so their strings are cached per whole second and per km/h, and the goal's worth per value: once seen, a value
+-- costs no allocation.
 
 local Config = require(script.Parent.Parent.Config)
 local GoalJudge = require(script.Parent.Parent.Rules.GoalJudge)
@@ -18,12 +19,13 @@ type Fields = {
 	_config: Config.GameConfig,
 	_clocks: { [number]: string },
 	_speeds: { [number]: string },
+	_worths: { [number]: string },
 }
 
 export type HudText = typeof(setmetatable({} :: Fields, HudText))
 
 function HudText.new(config: Config.GameConfig): HudText
-	return setmetatable({ _config = config, _clocks = {}, _speeds = {} } :: Fields, HudText)
+	return setmetatable({ _config = config, _clocks = {}, _speeds = {}, _worths = {} } :: Fields, HudText)
 end
 
 -- Whole seconds as minutes and seconds.
@@ -37,7 +39,7 @@ function HudText.clock(self: HudText, seconds: number): string
 	return cached
 end
 
--- A speed in studs per second as the speedometer reads it (spec §7.2: × Movement.speedometerScale, in km/h).
+-- A speed in studs per second as the speedometer's digits read it (spec §7.2: × Movement.speedometerScale, in km/h).
 function HudText.speed(self: HudText, studsPerSecond: number): string
 	local shown = math.floor(studsPerSecond * self._config.Movement.speedometerScale + 0.5)
 	local cached = self._speeds[shown]
@@ -48,19 +50,19 @@ function HudText.speed(self: HudText, studsPerSecond: number): string
 	return cached
 end
 
--- The possessing team's laps, and once the goal is open for them what a goal is worth (GoalJudge.worth); nil while
--- neutral. A point closes the goal, but the streak that opened it stays until the kickoff (or the match's end), so
--- it is still shown then.
-function HudText.lap(self: HudText, match: MatchEngine.Snapshot): string?
-	if match.possessingTeam == nil then
+-- What a goal is worth while the goal is open (GoalJudge.worth of the streak that opened it), for the scoreboard's
+-- chip; nil while it is closed.
+function HudText.worth(self: HudText, match: MatchEngine.Snapshot): string?
+	if match.goalOpenFor == nil then
 		return nil
 	end
-	local text = self._config.UI.text
 	local worth = GoalJudge.worth(self._config.Match.goalPointsByLap, match.streak)
-	if worth > 0 then
-		return string.format(text.goalWorth, match.streak, worth)
+	local cached = self._worths[worth]
+	if cached == nil then
+		cached = string.format(self._config.UI.text.goalWorth, worth)
+		self._worths[worth] = cached
 	end
-	return string.format(text.lap, match.streak)
+	return cached
 end
 
 -- The period named under the clock for as long as it lasts: OVERTIME or LAST CHANCE; nil in regulation.

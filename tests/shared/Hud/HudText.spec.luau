@@ -11,9 +11,9 @@ local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local text = HudText.new(Fixtures.config())
 local NAMES = { ["1"] = "Ana", ["2"] = "Rex" }
 
--- Only the fields HudText:lap reads.
-local function lapOf(team: string?, streak: number): any
-	return { possessingTeam = team, streak = streak }
+-- Only the fields HudText:worth reads.
+local function worthOf(openFor: string?, streak: number): any
+	return { goalOpenFor = openFor, streak = streak }
 end
 
 -- Only the field HudText:period reads.
@@ -38,18 +38,20 @@ describe("HudText", function()
 		expect(text:clock(0)).toBe("0:00")
 	end)
 
-	it("writes the speed in km/h", function()
-		expect(text:speed(100)).toBe("120 km/h")
-		expect(text:speed(0)).toBe("0 km/h")
+	-- Digits over the speedometer's own KM/H (#352, Q192).
+	it("writes the speed in km/h, as the speedometer's digits", function()
+		expect(text:speed(100)).toBe("120")
+		expect(text:speed(0)).toBe("0")
 	end)
 
-	-- The owner (#305): the goal opens after a lap and is worth +1, +3, then +5; the streak stays until the kickoff.
-	it("names the laps of the team with the ball and, once the goal is open, what a goal is worth", function()
-		expect(text:lap(lapOf(nil, 0))).toBeNil()
-		expect(text:lap(lapOf("Blue", 0))).toBe("Lap 0")
-		expect(text:lap(lapOf("Blue", 1))).toBe("Lap 1: goal +1")
-		expect(text:lap(lapOf("Blue", 2))).toBe("Lap 2: goal +3")
-		expect(text:lap(lapOf("Blue", 5))).toBe("Lap 5: goal +5")
+	-- The owner (#305): the goal opens after a lap and is worth +1, +3, then +5; the scoreboard's chip says so while
+	-- the goal is open (#352, Q188).
+	it("writes what a goal is worth while the goal is open, and nothing while it is closed", function()
+		expect(text:worth(worthOf(nil, 0))).toBeNil()
+		expect(text:worth(worthOf(nil, 3))).toBeNil()
+		expect(text:worth(worthOf("Blue", 1))).toBe("+1")
+		expect(text:worth(worthOf("Orange", 2))).toBe("+3")
+		expect(text:worth(worthOf("Blue", 5))).toBe("+5")
 	end)
 
 	it("names overtime and Last Chance under the clock, and nothing in regulation", function()

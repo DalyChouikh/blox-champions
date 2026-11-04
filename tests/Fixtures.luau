@@ -24,9 +24,10 @@ local Fixtures = {}
 -- and close Roblox's menu, which pauses the controls.
 export type Menu = { MenuOpened: Signal.Signal<>, MenuClosed: Signal.Signal<>, MenuIsOpen: boolean? }
 
--- A screen's two areas: the HUD's (CoreUISafeInsets) and the touch controls' (DeviceSafeInsets), which also spans
--- Roblox's 58 px top bar.
-export type Screen = { hud: Rect, controls: Rect }
+-- A screen's areas: the HUD's (CoreUISafeInsets), the device's safe area (DeviceSafeInsets: the touch controls' and
+-- the scoreboard's), which also spans Roblox's 58 px top bar, and the part of the top bar its buttons leave free
+-- (GuiService.TopbarInset, in pixels from the safe area's top-left).
+export type Screen = { hud: Rect, controls: Rect, topbar: Rect }
 
 -- A stand-in for the camera the controllers read: the skating steers by its CFrame, and throws and passes aim along
 -- the crosshair's line (CameraController:crosshair, #312, #315), which runs from the camera along `aim` (unit);
@@ -69,11 +70,19 @@ function Fixtures.outsideArena(config: Config.GameConfig): Vector3
 	return Centerline.at(arena, arena.straightLength / 2, arena.trackWidth + 10, 5).Position
 end
 
--- The emulated iPhone 17 Pro in landscape (probed in Play), and a big screen, whose touch area is 1280 x 800 (the
--- touch buttons grow 1.5 times there).
-Fixtures.PHONE = table.freeze({ hud = Rect.new(0, 0, 750, 323), controls = Rect.new(0, -58, 750, 323) }) :: Screen
-Fixtures.BIG_SCREEN =
-	table.freeze({ hud = Rect.new(0, 0, 1280, 742), controls = Rect.new(0, -58, 1280, 742) }) :: Screen
+-- The emulated phone in landscape, its safe area 750 x 381 (probed in Play), and a big screen, whose touch area is
+-- 1280 x 800 (the touch buttons grow 1.5 times there). Roblox's buttons take the top bar's first 164 px on both, as on
+-- our desktop Play view (probed).
+Fixtures.PHONE = table.freeze({
+	hud = Rect.new(0, 0, 750, 323),
+	controls = Rect.new(0, -58, 750, 323),
+	topbar = Rect.new(164, 0, 750, 58),
+}) :: Screen
+Fixtures.BIG_SCREEN = table.freeze({
+	hud = Rect.new(0, 0, 1280, 742),
+	controls = Rect.new(0, -58, 1280, 742),
+	topbar = Rect.new(164, 0, 1280, 58),
+}) :: Screen
 
 -- Roblox's menu, closed unless `isOpen`.
 function Fixtures.menu(isOpen: boolean?): Menu

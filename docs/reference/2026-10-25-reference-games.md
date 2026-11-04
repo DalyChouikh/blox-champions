@@ -1560,6 +1560,112 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   outer / 6 inner) and fell a steady 40 studs/s (not ~102 and 42), first touch 2.0 s (outer foot) / 2.3 s (inner bank);
   the build matches it (#321's Play check: 2.13 / 2.45 s); since #311's 2-stud ball it starts at 106 (the lip less the
   ball's width).
+- **The Presentation part's grilling, round 1; Q181-Q183** (session 67, AskUserQuestion, after the Ball & rules
+  stack's merge OK). **Q181 scope** (my list of 7: the HUD redesign on desktop and phones with #333, Q55, Q143, the
+  kickoff count's place; the lap and goal captions incl. the goal's worth on its housing and a fiery streak per lap;
+  the goal sequence GOAL! -> replay -> celebration -> kickoff; the intro flyover with the skaters' names and the
+  kickoff camera; the end-of-match podium; the drop-in's look; the default camera pitch so a level throw flies
+  flat): **all 7**, in the owner's words: "I want the HUD and everything to be modern, animated, and most importantly
+  clear and big text specially on mobiles, because largest users in roblox are in mobiles, and it needs to be clear
+  and modern, just like RC and illegal soccer in roblox, and also control hints, coldown, hints on what the user
+  pressed, and it needs to be well adjusted in mobiles". So the HUD is mobile-first (big, clear text), animated, and
+  its control hints also show cooldowns and which key was just pressed. Sound, music, art, stadium/crowd stay in the
+  later milestone. **Q182 order** (recommended): **the HUD first**, then the captions, the goal sequence, the
+  intro/kickoff cameras and the podium, the drop-in and the camera pitch last; each piece RC's (and IS's) frames
+  beside ours on a private page first, a playable Studio trial where it is about feel, then built test-first.
+  **Q183 the look**: not RC's layout alone: "it should be a combination of all, mix between RC and IS, and our arts
+  specially": each piece picks from RC and Illegal Soccer, drawn in our own art (our name, logo, fonts, colours;
+  never Ubisoft's or IS's art).
+- **HUD round 2; Q184-Q187** (session 67, AskUserQuestion beside the private page
+  https://claude.ai/artifact/AzDJLnLXcTPeyuaZ4pvi7a: RC Videos 4/31-34 frames, IS 0:11/0:40, ours, and three looks
+  drawn over our game at desktop and the 750 x 381 phone emulator). **Q184 the look**: **C Bold arcade** (chunky
+  rounded shapes, thick dark outlines and drop shadows, Fredoka with Luckiest Guy banners; not the recommended A
+  Broadcast glass). **Q185 the crosshair**: **RC's way** (nothing at the centre without the ball, a small ring with
+  the dot while carrying, the charge ring while charging; the kickoff count a third down where RC's sits, never
+  touching the scoreboard: #333), and in the owner's words: "can you give me more crosshair iterations? also I think
+  the crosshair follow the team color, and indicator of the score the team can score like +1, +3, +5, depending on
+  the laps, so keep that c mockup and have more iterations on the top scoreboard, more designs, and also what about
+  the TAB scoreboard, give me designs about it". So next: crosshair iterations in the team colour (this replaces
+  Q141's white) with the goal's current worth (+1/+3/+5) shown by it; more top-scoreboard designs in look C; TAB
+  scoreboard designs in look C. **Q186 feedback** (recommended): **as drawn**: the pressed key pops with RC's orange
+  >> beside it, a key on cooldown fills back clockwise with the seconds left on it, an unusable one greyed; the same
+  on phone buttons. **Q187 phones** (recommended): **no hint column on phones** (the buttons with big labels are the
+  hints), Jump big bottom right with the actions in an arc round it, Roblox's stick bottom left, the scoreboard
+  compact at the top, the speed small top left; placement tuned in a playable Studio trial on the phone emulator.
+- **HUD round 3; Q188-Q190** (session 67, page version 2: five crosshairs, five top scoreboards, three TAB
+  boards, all in look C). **Q188 the crosshair**: not chosen yet; the owner's words: "I didn't mean the goal worth
+  hint next to the crosshair, I meant it in the top scoreboard, and if you can show me the transition form the
+  crosshair to charging crosshair". So the goal's worth (+1/+3/+5) lives in the TOP SCOREBOARD only; the crosshair
+  is in the team colour with no worth; next: animated crosshair designs showing carrying -> charging (0.5 s) ->
+  full (blinks) -> release. **Q189 the top scoreboard** (recommended): **S4 Two tiers on desktop** (scores round
+  the clock on top; under it a four-gate lap meter filled by the possessing team with the goal's worth chip at its
+  end) **and S5 Compact chips on phones** (score chips round the clock in one short row, the worth chip glowing
+  beside the possessing team). **Q190 the TAB board** (recommended): **T1 side by side** (an Orange and a Blue
+  panel, the team score in each header; rows: avatar, name, score, goals, assists, saves, steals; the viewer's row
+  outlined; the Switch team row under the table; on phones from the score button, scrolling if needed).
+- **Q188b the crosshair** (session 67, page version 3: five designs animated carrying -> 0.5 s charge -> full,
+  blinking -> thrown, in both team colours, no worth beside it): **X1 Classic ring** (the recommended): RC's small
+  carrying ring with the dot, in the team colour (replaces Q141's white), growing into the charge ring; in the
+  owner's words: "jsut try to connect the two halves at the bottom when they start connection, currently one is
+  overlapping with the other and it shows that they are not in continuation and one circle". So the charge grows
+  both ways from the bottom as ONE continuous stroke, no seam and no bottom gap (today's game keeps #312's 29-px
+  gap at the bottom and the top: the top gap closes last); page version 4 shows it.
+- **HUD round 4; Q191-Q194** (session 67, asked in words; all recommended). **Q191 banners**: **yes**: GO <TEAM>
+  TEAM!, LAP n COMPLETED, GOAL!, DENIED!, 60/30 SECONDS, LAST CHANCE, OVERTIME and "<Team> goal is active!" in look C
+  (Luckiest Guy, white with a thick dark outline and a team-colour edge) at RC's places (GO and GOAL ~22% down, the
+  lap caption just under the scoreboard, "goal is active" at the bottom centre), popping in with a quick overshoot,
+  holding, floating up as they fade; on phones ~1.3x their share of the screen. **Q192 the speedometer**: **yes**:
+  big outlined digits in the team colour with a small KM/H, bottom right on desktop, small top left on phones, the
+  number easing. **Q193 phone buttons**: **big text labels now, icons with the art milestone** (icons need image
+  assets the owner uploads). **Q194 motion**: **yes**: every HUD change animates briefly (0.15-0.25 s: pop/slide
+  in, a score change bounces, the lap meter fills smoothly, greyed keys fade, cooldowns sweep), from settings, no
+  per-frame redraw of what does not change. With each: the owner's standing rule, "always show me in the artificat
+  page, so I can visualize" ("Yes, show me" on Q192 and Q194): every look or motion is drawn, animated, on the
+  private page before it is asked or built (memory feedback-show-on-artifact-page.md).
+- **Q195 the whole HUD, animated** (session 67, page version 5: the picks so far on one 10-second loop, desktop
+  and phone): not yet; the owner's words: "the desktop top scoreboard, is not what I have chosen, I chose S2
+  Shields, let me see it also in phone, but I think we can keep that S5 Compact Chips on phone too, but want to see
+  shields on phone first". So **Q189 is corrected: S2 Shields on desktop** (each team a big shield with its score,
+  the clock between them with the goal's worth chip under it, lap dots under the possessing team's shield); the
+  phone is S2 or S5, to be chosen from page version 6 (desktop S2, phone S2 and phone S5 side by side).
+- **Q196 and Q195b, the HUD settled** (session 67, page version 6). **Q196**: **S2 Shields on desktop, S5 Compact
+  chips on phones** (not the recommended S2 on both), with the owner's note for the build: "for desktop, make sure the
+  lap chips are equal height and width, and that the fourth chip gets filled then reset to 0 for the next lap". So
+  the four lap chips under the possessing team's shield are squares of one size; the fourth fills at the lap's last
+  gate, then all four empty for the next lap. **Q195b** (recommended): **yes, write the HUD's issues** (then the phone
+  button trial, then the test-first build), with: "just about the hints with press pop arrows, don't leave a
+  predefined space in the controls boxes, make the arrows outside the box, like with the game background and no the
+  box". So RC's orange >> of a pressed key is drawn outside the hint's box, over the game, and the box keeps no room
+  for it.
+- **Q197 the marks over a teammate** (session 67, the owner's question before #352: "what about the pass hint
+  on the player request and the hand gesture request, show me visual"; page version 7: M1 Stacked, M2 Bubble, M3
+  Ring marker, animated, desktop key F and phone PASS chip): **M1 Stacked** (the name tag, the pass key's cap with a
+  small pointer over it, the hand popping in to the key's left while they call), with: "but I don't like the hand,
+  do you have better iteration". Page version 8 shows H1 Glove, H2 Badge, H3 Wave and H4 Badge + ripple, each drawn
+  as one merged silhouette with one outline (the first hand's parts each had their own outline). Goes into #358.
+- **Q198 the call's hand** (session 67, page version 8): **H4 Badge + ripple** (not the recommended H3 Wave): a round
+  team-colour badge with a dark rim, a white cartoon glove waving inside, a ring rippling out every second; with:
+  "but the hand fingers are not correctly placed". Page version 9 fixes the glove: four fingers evenly across the
+  palm's top and rooted inside it (the middle longest, a short little finger), the thumb from the palm's left side
+  leaning out, all one silhouette with one outline. It sits left of the pass key's cap in M1 (#358).
+- **Q199 the hand stays open** (session 67, after page version 9): the owner, "I still don't like the hand, but we
+  will come to it later": H4's place (left of the key in M1) and badge + ripple idea stand; the glove's drawing is
+  redone later (with #358 or the art milestone). Next: #352, look C.
+- **Q200 the lap chips clear of the shield** (session 69, #352's Play screenshots; the owner interrupted the shots):
+  "Just one thing, the lap chips under the shield score are touching the shield, bring them down a bit, just a
+  little". The shield's ink (outline + drop shadow, 7 px below its box) overlapped the chips' 3 px outline across the
+  6 px gap; now `UI.hud.layout.scoreboard.chipClearance` 3 leaves 3 px of the game between the shield's shadow and the
+  chips (the row starts 13 px under the shield's box). The gap between the chips themselves is unchanged.
+- **Q201 the HUD's team colours** (session 69, beside page version 10's "Built in the game" section): asked
+  whether to ship #352 and which colours the HUD uses (today's #0d69ac / #da8541, the world's, vs the page's
+  #3d8bff / #ff9a3c); the owner: "Is it possible to do the lighter color or we cant in roblox? I want the lighter
+  one if possible", and picked **Brighter, HUD only** (recommended). So the screen HUD gets the page's brighter pair
+  as its own setting (`UI.hud.look.teamColors`, read through Style.teamColor); the arena glow, spawn pads, carrier
+  beam, ball, world markers and name tags keep `UI.teamColors`. The brighter shot on the page was the real game code
+  with only that colour changed (Roblox shows it fine). #352 ships after this change is shown.
+- **Q202 #352 shipped** (session 69, after the brighter pair was built and shown on the new page
+  https://claude.ai/artifact/EQmcWw9Ywe8n1GeeUMPBD8, the old AzDJLnLXcTPeyuaZ4pvi7a being the previous account's):
+  **"Yes, ship it"** (recommended). Next: #353 the crosshair.
 
 ## Roller Champions
 

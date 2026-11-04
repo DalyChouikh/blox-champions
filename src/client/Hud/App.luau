@@ -6,13 +6,16 @@
 -- first snapshot on; the hints and the Get Up prompt wherever the Hud gives their keys; the score tab while it is open.
 -- Once the match is over the end screen shows until the next match in place of the scoreboard, holding the final
 -- score. Off touch it holds its own score tab too, so an open one shows no other; on touch it is compact (the owner's
--- choice) and the score tab opens over it, from its button, shown on touch throughout, or a held key. The reticle,
--- drawn in the full-screen gui the Hud gives (a portal), hides while the score tab or the end screen shows. A plain
+-- choice) and the score tab opens over it, from its button, shown on touch throughout, or a held key. The reticle and
+-- the scoreboard are drawn in guis the Hud gives (portals): the reticle in the full-screen one, where throws aim, the
+-- scoreboard in the safe area's, from its top (in Roblox's top bar's free band where it fits, HudScreen); the reticle
+-- hides while the score tab or the end screen shows. The speedometer reads in the viewer's team colour. A plain
 -- function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Banner = require(script.Parent.Banner)
+local BoardMotion = require(script.Parent.BoardMotion)
 local Config = require(ReplicatedStorage.Shared.Config)
 local ControlHints = require(script.Parent.ControlHints)
 local EndScreen = require(script.Parent.EndScreen)
@@ -50,8 +53,12 @@ export type AppProps = {
 	state: HudState.HudState,
 	device: Enum.PreferredInput,
 	localId: Types.PlayerId,
-	-- Who carries the ball (BallCarrier), nil while it is loose.
-	carrier: Types.PlayerId?,
+	-- A phone's screen (HudScreen.compact), and the scoreboard's top in pixels from the top of the safe area
+	-- (HudScreen.boardTop).
+	compact: boolean,
+	boardTop: number,
+	-- How the scoreboard moves, having watched the state's match.
+	board: BoardMotion.BoardMotion,
 	-- Whether the local player has a skater: a spectator has no speed and no hints.
 	hasSkater: boolean,
 	-- Each hint's key on this device; nil where no hints show.
@@ -64,8 +71,10 @@ export type AppProps = {
 	-- The score tab's Switch team button; nil where it has none (#310).
 	switchTeam: ScoreTab.SwitchTeam?,
 	bindings: HudBindings,
-	-- The full-screen gui the reticle is drawn in (a portal): the HUD's own sits below Roblox's top bar.
+	-- The full-screen gui the reticle is drawn in, and the safe area's the scoreboard is (portals): the HUD's own sits
+	-- below Roblox's top bar.
 	centre: ScreenGui,
+	top: ScreenGui,
 }
 
 -- The Stage frame's size: the stage, or the whole Root while the stage is not known.
@@ -79,23 +88,26 @@ local function App(props: AppProps): React.ReactElement
 	local touch = props.device == Enum.PreferredInput.Touch
 	local scoreTab = props.scoreTabOpen and match ~= nil and (ended == nil or touch)
 	return React.createElement(React.Fragment, nil, {
-		Reticle = ReactRoblox.createPortal({
+		Centre = ReactRoblox.createPortal({
 			Reticle = React.createElement(
 				Reticle,
 				{ config = config, visible = not scoreTab and ended == nil, charge = bindings.charge }
 			),
 		}, props.centre),
-		Root = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1) }), {
+		Top = ReactRoblox.createPortal({
 			Scoreboard = if match ~= nil and ended == nil
 				then React.createElement(Scoreboard, {
 					config = config,
 					text = text,
 					match = match,
-					names = state.names,
-					carrier = props.carrier,
+					compact = props.compact,
+					top = props.boardTop,
 					clock = bindings.clock,
+					motion = props.board,
 				})
 				else nil,
+		}, props.top),
+		Root = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1) }), {
 			ControlHints = if keys ~= nil
 				then React.createElement(ControlHints, {
 					config = config,
@@ -107,7 +119,9 @@ local function App(props: AppProps): React.ReactElement
 			Speedometer = React.createElement(Speedometer, {
 				config = config,
 				speed = bindings.speed,
-				device = props.device,
+				color = Style.teamColor(config, HudState.teamOf(match, props.localId)),
+				touch = touch,
+				compact = props.compact,
 				visible = props.hasSkater,
 			}),
 			ScoreButton = if touch

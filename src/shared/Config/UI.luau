@@ -51,9 +51,7 @@ export type TouchStyle = {
 export type UIText = {
 	-- The clock's minutes and seconds (two values).
 	clock: string,
-	-- The possessing team's completed laps (one value).
-	lap: string,
-	-- Their laps and what a goal is worth once the goal is open for them (two values).
+	-- What a goal is worth while the goal is open (one value).
 	goalWorth: string,
 	overtime: string,
 	goal: string,
@@ -61,8 +59,9 @@ export type UIText = {
 	-- The seconds left (one value).
 	clockWarning: string,
 	lastChance: string,
-	-- The speedometer's reading (one value).
+	-- The speedometer's reading (one value), over its unit.
 	speed: string,
+	speedUnit: string,
 	-- The new holder's name (one value).
 	possession: string,
 	-- The streak (one value).
@@ -94,15 +93,59 @@ export type UIText = {
 
 export type Place = { position: UDim2, size: UDim2 }
 
+-- A colour for each team.
+export type TeamColors = { Blue: Color3, Orange: Color3 }
+
+-- A scoreboard's text sizes (pixels): the scores, the clock, the goal's worth and the period (OVERTIME, LAST CHANCE).
+export type BoardTextSizes = { score: number, clock: number, worth: number, period: number }
+
+-- The desktop scoreboard, S2 Shields (Hud/Scoreboard): position is its top centre's, from the top of the device's safe
+-- area (in the top bar's free band, or under the bar where Roblox's buttons reach it: HudScreen); a team shield each
+-- side of the clock's box, the goal's worth chip under the clock, and under the possessing team's shield a row of
+-- square lap chips lapChip pixels across with chipCorner corners, chipGap apart, with chipClearance pixels of the game
+-- showing between the shield's drop shadow and their outlines; gap between the other parts. Sizes are pixels.
+export type ScoreboardLayout = {
+	position: UDim2,
+	shield: UDim2,
+	clock: UDim2,
+	worth: UDim2,
+	lapChip: number,
+	chipCorner: UDim,
+	gap: number,
+	chipGap: number,
+	chipClearance: number,
+	textSizes: BoardTextSizes,
+}
+
+-- The phone scoreboard, S5 Compact chips: one row, a score chip each side of the clock's box, the worth chip outside
+-- the row beside the score of the team the goal is open for; placed as ScoreboardLayout is.
+export type CompactScoreboardLayout = {
+	position: UDim2,
+	score: UDim2,
+	clock: UDim2,
+	worth: UDim2,
+	gap: number,
+	textSizes: BoardTextSizes,
+}
+
 -- Where each part of the HUD sits; sizes and row heights are pixels.
 export type HudLayout = {
-	scoreboard: Place,
+	-- A screen whose shorter side is under compactBelow pixels is a phone's: the compact scoreboard and the small
+	-- speedometer (HudScreen.compact).
+	compactBelow: number,
+	scoreboard: ScoreboardLayout,
+	compactScoreboard: CompactScoreboardLayout,
 	banner: Place,
 	feed: { position: UDim2, size: UDim2, rowHeight: number },
 	hints: { position: UDim2, size: UDim2, rowHeight: number },
 	-- position is the bottom-right corner's; on touch, touchPosition is the top-left corner's, clear of the touch
-	-- buttons and the score button.
-	speedometer: { position: UDim2, touchPosition: UDim2, size: UDim2 },
+	-- buttons and the score button. The reading's digits over its unit, at textSizes, compactTextSizes on a phone.
+	speedometer: {
+		position: UDim2,
+		touchPosition: UDim2,
+		textSizes: { speed: number, unit: number },
+		compactTextSizes: { speed: number, unit: number },
+	},
 	-- The crosshair (#312): its dot `size` pixels across, centred across the screen and `height` of the way down it
 	-- (throws and passes aim through it); while a throw charges, a ring ringSize pixels across with a ringThickness
 	-- stroke, its halves ringGap pixels apart at the top and the bottom, blinking once every blinkSeconds while a full
@@ -124,9 +167,42 @@ export type HudLayout = {
 	getUp: Place,
 }
 
+-- Look C, Bold arcade (Hud/Style): text in `font`, banners and the goal's worth in `bannerFont`, in the HUD's text
+-- colour with an ink outline textOutline pixels thick. A box has `corner`s, an ink outline `outline` pixels wide and
+-- an ink shadow dropping `shadow` pixels below it; it is its colour at the top and that colour times (1 - shade) at the
+-- bottom. `box` colours a box that is no team's (the clock's, an empty lap chip); `teamColors` the HUD's team parts
+-- (Style.teamColor), brighter than the world's UI.teamColors.
+export type LookSettings = {
+	font: Enum.Font,
+	bannerFont: Enum.Font,
+	ink: Color3,
+	outline: number,
+	shadow: number,
+	textOutline: number,
+	corner: UDim,
+	box: Color3,
+	shade: number,
+	teamColors: TeamColors,
+}
+
+-- How the HUD's parts move (Hud/Motion), in seconds. A part popping in grows from nothing past its size by
+-- `overshoot` of it, then settles; a bounce grows to `scale` times its size, comes back to `rebound` times it, then
+-- settles, in three equal parts; a meter's part fills or empties, and a part shrinks away, easing out over
+-- easeSeconds. The last lap chip stays full lapHoldSeconds before the row empties for the next lap. A glow brightens
+-- (a white veil down to `transparency`) and dims once every glow.seconds. The speedometer's reading eases toward the
+-- speed, closing speedRate of the gap a second.
+export type MotionSettings = {
+	pop: { seconds: number, overshoot: number },
+	bounce: { seconds: number, scale: number, rebound: number },
+	easeSeconds: number,
+	lapHoldSeconds: number,
+	glow: { seconds: number, transparency: number },
+	speedRate: number,
+}
+
 -- How the HUD looks and how long its messages last. dimTransparency greys what would do nothing (a control, a hint,
--- the Switch team button) and fades an empty pip (Style.dim); glowThickness (pixels) outlines the lap bar while the
--- goal is open, and the touch throw button while Ball Focus is on.
+-- the Switch team button: Style.dim); glowThickness (pixels) outlines the touch throw button while Ball Focus is on
+-- and the viewer's row on the score tab. `look` and `motion` are look C's: the parts it restyles read them.
 export type HudSettings = {
 	font: Enum.Font,
 	textColor: Color3,
@@ -147,10 +223,10 @@ export type HudSettings = {
 	glowThickness: number,
 	-- Pixels between the parts of a panel, and inside its edge.
 	spacing: number,
-	-- A score pip's side and the lap bar's height, in pixels.
-	pipSize: number,
 	-- Pixels kept clear at each edge of the HUD's area by a panel shrunk to fit it (the score tab, the end screen).
 	screenMargin: number,
+	look: LookSettings,
+	motion: MotionSettings,
 	layout: HudLayout,
 }
 
@@ -193,7 +269,8 @@ export type BallTrailSettings = { lifetime: number, width: number, color: Color3
 
 export type UIConfig = {
 	clockWarnings: { number },
-	teamColors: { Blue: Color3, Orange: Color3 },
+	-- The world's team colours: the arena's glow and pads, the carrier's beam, the ball, the markers and name tags.
+	teamColors: TeamColors,
 	teamNames: { Blue: string, Orange: string },
 	controlLabels: ControlLabels,
 	-- What a hint calls a key Roblox gives no name to, by its Enum.KeyCode name.
@@ -255,14 +332,16 @@ local defaults: UIConfig = {
 	},
 	text = {
 		clock = "%d:%02d",
-		lap = "Lap %d",
-		goalWorth = "Lap %d: goal +%d",
+		-- The scoreboard's worth chip (#352): +1, +3 or +5 (the owner, Q188: the worth lives in the scoreboard).
+		goalWorth = "+%d",
 		overtime = "OVERTIME",
 		goal = "GOAL!",
 		denied = "DENIED!",
 		clockWarning = "%d SECONDS",
 		lastChance = "LAST CHANCE",
-		speed = "%d km/h",
+		-- Big digits over a small KM/H, as Roller Champions reads it (the owner, Q192).
+		speed = "%d",
+		speedUnit = "KM/H",
 		possession = "%s has the ball",
 		lapCompleted = "Lap %d completed",
 		goalOpen = "%s goal is active",
@@ -289,7 +368,7 @@ local defaults: UIConfig = {
 		touchMove = "Move",
 		switchTeam = "Switch team",
 	},
-	-- The HUD's graybox look; the art pass restyles it.
+	-- The HUD's graybox look, which the Presentation part's issues replace part by part with look C (`look`).
 	hud = {
 		font = Enum.Font.BuilderSansBold,
 		textColor = Color3.fromRGB(245, 245, 245),
@@ -310,19 +389,80 @@ local defaults: UIConfig = {
 		feedMaxEntries = 5,
 		glowThickness = 3,
 		spacing = 6,
-		pipSize = 10,
 		screenMargin = 8,
+		-- Look C, Bold arcade (the owner, Q184: chunky rounded shapes, thick dark outlines and drop shadows, Fredoka
+		-- with Luckiest Guy banners), as the private design page drew it: ink #0b0e18, 3 px outlines, a 4 px shadow,
+		-- 14 px corners, the clock's box #2a3350, darker toward the bottom (the page's #2a3350 -> #161c30; its team
+		-- boxes about 0.6 as bright at the bottom). Both fonts are Roblox's own.
+		look = {
+			font = Enum.Font.FredokaOne,
+			bannerFont = Enum.Font.LuckiestGuy,
+			ink = Color3.fromRGB(11, 14, 24),
+			outline = 3,
+			shadow = 4,
+			textOutline = 2.5,
+			corner = UDim.new(0, 14),
+			box = Color3.fromRGB(42, 51, 80),
+			shade = 0.4,
+			-- The page's brighter pair (#3d8bff, #ff9a3c), for the HUD only (the owner, Q201: "I want the lighter
+			-- one"): the world's darker teamColors made a lit lap chip hard to tell from an empty one.
+			teamColors = { Blue = Color3.fromRGB(61, 139, 255), Orange = Color3.fromRGB(255, 154, 60) },
+		},
+		-- Every HUD change animates briefly, from settings (the owner, Q194), at the page's timings: a pop to 1.12 then
+		-- 1 (its banners), a score's bounce to 1.55, back to 0.9, then 1 in 0.4 s, its lap chips filling in 0.25 s
+		-- easing out, the worth chip glowing brighter and back over 2.4 s, the speed easing at 6 a second. The last
+		-- lap chip shows full for half a second before the row empties (the owner, Q196).
+		motion = {
+			pop = { seconds = 0.2, overshoot = 0.12 },
+			bounce = { seconds = 0.4, scale = 1.55, rebound = 0.9 },
+			easeSeconds = 0.25,
+			lapHoldSeconds = 0.5,
+			glow = { seconds = 2.4, transparency = 0.8 },
+			speedRate = 6,
+		},
 		layout = {
-			scoreboard = { position = UDim2.new(0.5, 0, 0, 8), size = UDim2.fromOffset(440, 84) },
+			-- Roblox's own touch controls grow on a screen whose shorter side passes 500 px (its DynamicThumbstick,
+			-- read from its PlayerModule): below that, a phone. The phone emulator is 750 x 381.
+			compactBelow = 500,
+			-- S2 Shields on desktop (the owner, Q195/Q196), at the page's sizes: it drew the desktop 1280 wide over our
+			-- 1556 x 793 Play view, so 1.2 px a unit (a 78 x 74 shield, a 46 px score, a 34 px clock, 6-unit lap chip
+			-- corners); the lap chips square and of one size (Q196).
+			scoreboard = {
+				position = UDim2.new(0.5, 0, 0, 8),
+				shield = UDim2.fromOffset(94, 89),
+				clock = UDim2.fromOffset(120, 56),
+				worth = UDim2.fromOffset(56, 38),
+				lapChip = 17,
+				chipCorner = UDim.new(0, 7),
+				gap = 12,
+				chipGap = 6,
+				-- The owner, on #352's screenshots (Q200): the chips touched the shield; "bring them down a bit, just a
+				-- little".
+				chipClearance = 3,
+				textSizes = { score = 55, clock = 41, worth = 26, period = 22 },
+			},
+			-- S5 Compact chips on phones (Q196), at the page's phone sizes, drawn 750 wide: one point a unit.
+			compactScoreboard = {
+				position = UDim2.new(0.5, 0, 0, 8),
+				score = UDim2.fromOffset(52, 44),
+				clock = UDim2.fromOffset(80, 44),
+				worth = UDim2.fromOffset(48, 34),
+				gap = 8,
+				textSizes = { score = 38, clock = 30, worth = 22, period = 18 },
+			},
 			-- Its centre 200 px from the top: clear of the scoreboard on a phone too (the owner's choice); 720 px wide
 			-- for its longest line, GO ORANGE TEAM! (691 px at bannerSize).
 			banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(720, 110) },
 			feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
 			hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
+			-- Big digits in the viewer's team colour over a small KM/H, bottom right on desktop and small top left on
+			-- phones, where the touch buttons take the right side (the owner, Q192), at the page's sizes (46 and 14
+			-- units on desktop; 30 and 12 on the phone, 4 px under Roblox's top bar).
 			speedometer = {
-				position = UDim2.new(1, -24, 1, -24),
-				touchPosition = UDim2.fromOffset(16, 8),
-				size = UDim2.fromOffset(160, 40),
+				position = UDim2.new(1, -31, 1, -22),
+				touchPosition = UDim2.fromOffset(18, 4),
+				textSizes = { speed = 55, unit = 17 },
+				compactTextSizes = { speed = 30, unit = 12 },
 			},
 			-- RC's crosshair (#312): above the skater, 31.5% down the screen (Video 32 at 2.0-4.4 s, Video 13 at 99.0
 			-- s; the owner kept it in trial #311, Q123/Q127); its ring, read at 1918 x 1078 (Video 32 at 3.2 s), 130 px
@@ -437,6 +577,16 @@ local pixels = Validate.pixels()
 local place = Validate.record({ position = udim2, size = pixels })
 local list = Validate.record({ position = udim2, size = pixels, rowHeight = positive })
 local columns = Validate.record({ position = udim2, size = pixels, rowHeight = positive, columnWidth = positive })
+local nonNegative = Validate.number({ min = 0 })
+local boardTextSizes = Validate.record({ score = textSize, clock = textSize, worth = textSize, period = textSize })
+local teamColors = Validate.record({ Blue = Validate.datatype("Color3"), Orange = Validate.datatype("Color3") })
+local speedTextSizes = Validate.record({ speed = textSize, unit = textSize })
+
+-- Each text of a scoreboard is drawn inside its box (Hud/Scoreboard): the scores in their shields or chips, the clock
+-- and the goal's worth, so none may be taller than its box.
+local function textsFit(sizes: BoardTextSizes, score: UDim2, clock: UDim2, worth: UDim2): boolean
+	return sizes.score <= score.Y.Offset and sizes.clock <= clock.Y.Offset and sizes.worth <= worth.Y.Offset
+end
 
 -- The score tab's table (StatsTable) gives each number column columnWidth and a spacing gap, inside its panel's
 -- padding (spacing at each side), and the name column what is left: the score tab and the end screen draw it, and
@@ -459,7 +609,7 @@ local fields = Validate.record({
 		noDuplicates,
 		"must not contain duplicates"
 	),
-	teamColors = Validate.record({ Blue = Validate.datatype("Color3"), Orange = Validate.datatype("Color3") }),
+	teamColors = teamColors,
 	teamNames = Validate.record({ Blue = label, Orange = label }),
 	controlLabels = Validate.record({
 		Jump = label,
@@ -493,14 +643,14 @@ local fields = Validate.record({
 	}),
 	text = Validate.record({
 		clock = template(2),
-		lap = template(1),
-		goalWorth = template(2),
+		goalWorth = template(1),
 		overtime = label,
 		goal = label,
 		denied = label,
 		clockWarning = template(1),
 		lastChance = label,
 		speed = template(1),
+		speedUnit = label,
 		possession = template(1),
 		lapCompleted = template(1),
 		goalOpen = template(1),
@@ -541,14 +691,64 @@ local fields = Validate.record({
 		feedMaxEntries = Validate.number({ min = 1, integer = true }),
 		glowThickness = Validate.number({ min = 0 }),
 		spacing = Validate.number({ min = 0 }),
-		pipSize = positive,
 		screenMargin = Validate.number({ min = 0 }),
+		look = Validate.record({
+			font = Validate.enumItem(Enum.Font),
+			bannerFont = Validate.enumItem(Enum.Font),
+			ink = Validate.datatype("Color3"),
+			outline = nonNegative,
+			shadow = nonNegative,
+			textOutline = nonNegative,
+			corner = Validate.datatype("UDim"),
+			box = Validate.datatype("Color3"),
+			-- A bottom as dark as black would lose the box's colour there.
+			shade = seen,
+			teamColors = teamColors,
+		}),
+		motion = Validate.record({
+			pop = Validate.record({ seconds = positive, overshoot = nonNegative }),
+			-- A bounce grows (or keeps its size, with no bounce), then comes back to a size that still shows.
+			bounce = Validate.record({
+				seconds = positive,
+				scale = Validate.number({ min = 1 }),
+				rebound = Validate.number({ above = 0, max = 1 }),
+			}),
+			easeSeconds = positive,
+			lapHoldSeconds = nonNegative,
+			glow = Validate.record({ seconds = positive, transparency = transparency }),
+			speedRate = positive,
+		}),
 		layout = Validate.record({
-			scoreboard = place,
+			compactBelow = positive,
+			scoreboard = Validate.record({
+				position = udim2,
+				shield = pixels,
+				clock = pixels,
+				worth = pixels,
+				lapChip = positive,
+				chipCorner = Validate.datatype("UDim"),
+				gap = nonNegative,
+				chipGap = nonNegative,
+				chipClearance = nonNegative,
+				textSizes = boardTextSizes,
+			}),
+			compactScoreboard = Validate.record({
+				position = udim2,
+				score = pixels,
+				clock = pixels,
+				worth = pixels,
+				gap = nonNegative,
+				textSizes = boardTextSizes,
+			}),
 			banner = place,
 			feed = list,
 			hints = list,
-			speedometer = Validate.record({ position = udim2, touchPosition = udim2, size = pixels }),
+			speedometer = Validate.record({
+				position = udim2,
+				touchPosition = udim2,
+				textSizes = speedTextSizes,
+				compactTextSizes = speedTextSizes,
+			}),
 			reticle = Validate.record({
 				size = positive,
 				-- On the screen, never on its top or bottom edge.
@@ -630,6 +830,20 @@ local schema = Validate.checkAll(fields, {
 		holds = function(ui: UIConfig): boolean
 			local reticle = ui.hud.layout.reticle
 			return reticle.ringGap < reticle.ringSize
+		end,
+	},
+	{
+		message = "the desktop scoreboard's texts must fit their boxes (text size <= box height)",
+		holds = function(ui: UIConfig): boolean
+			local board = ui.hud.layout.scoreboard
+			return textsFit(board.textSizes, board.shield, board.clock, board.worth)
+		end,
+	},
+	{
+		message = "the phone scoreboard's texts must fit their boxes (text size <= box height)",
+		holds = function(ui: UIConfig): boolean
+			local board = ui.hud.layout.compactScoreboard
+			return textsFit(board.textSizes, board.score, board.clock, board.worth)
 		end,
 	},
 })
