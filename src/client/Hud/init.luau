@@ -33,7 +33,8 @@
 -- binding: on touch the part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that
 -- GuiService gives), elsewhere the whole of it; the board fits the HUD's whole area, another binding. Both are measured
 -- again, with the screen's form, when the screen's size or Roblox's top bar changes (from start on) and when the device
--- does. The HUD's guis draw over the touch controls' (UI.hud.displayOrder), so the open board covers their buttons.
+-- does. The HUD's guis draw over the touch controls' (UI.hud.displayOrder), so the open board covers their buttons; the
+-- end screen's dim draws one under the HUD's and over the touch controls'.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -106,6 +107,8 @@ export type Hud = {
 	gui: ScreenGui,
 	-- Spans the whole screen: the reticle's.
 	centre: ScreenGui,
+	-- Spans the whole screen under the HUD's other guis: the end screen's dim (#358).
+	dim: ScreenGui,
 	-- Spans the device's safe area, Roblox's top bar included: the scoreboard's.
 	top: ScreenGui,
 	-- How many times App has rendered.
@@ -113,6 +116,8 @@ export type Hud = {
 	-- The pass key as the hints show it on this device, or on touch, where no key shows, UI.text.touchPassTarget: what
 	-- NameTags floats over the teammate a pass would go to (#315; RC Video 34 at 41.6 s). Nil without a skater.
 	passKey: Style.KeyView?,
+	-- The screen's form, as last measured: a phone's (HudScreen.compact); the name tags draw at its sizes (#358).
+	compact: boolean,
 	_config: Config.GameConfig,
 	_text: HudText.HudText,
 	_store: HudStore.HudStore,
@@ -130,15 +135,16 @@ export type Hud = {
 	-- GuiService.TopbarInset, or a fake: the part of Roblox's top bar its buttons leave free, in pixels from the safe
 	-- area's top-left (probed on a notched phone).
 	_topbar: () -> Rect,
-	-- The HUD's moving values, the scoreboard's motion and the banners', the Get Up prompt's and the TAB board's.
+	-- The HUD's moving values, the scoreboard's motion and the banners', the Get Up prompt's, the TAB board's and the
+	-- end screen's.
 	_animator: Animator.Animator,
 	_board: BoardMotion.BoardMotion,
 	_banners: BannerMotion.BannerMotion,
 	_prompt: Reveal.Reveal,
 	_tab: Reveal.Reveal,
-	-- The screen's form, as last measured: a phone's, and the scoreboard's top and the crosshair's aim from the top of
-	-- the safe area.
-	_compact: boolean,
+	_ending: Reveal.Reveal,
+	-- The rest of the screen's form, as last measured: the scoreboard's top and the crosshair's aim from the top of the
+	-- safe area.
 	_boardTop: number,
 	_aim: number,
 	-- The banner line at its highest (HudScreen.bannerAt), and the stage's top, both from the safe area's top.
@@ -216,8 +222,8 @@ local function measure(self: Hud, device: Enum.PreferredInput)
 		self._setArea(area)
 	end
 	local screen = safe.Max - safe.Min
-	self._compact = HudScreen.compact(self._config, screen)
-	self._boardTop = HudScreen.boardTop(self._config, self._compact, screen.X, self._topbar())
+	self.compact = HudScreen.compact(self._config, screen)
+	self._boardTop = HudScreen.boardTop(self._config, self.compact, screen.X, self._topbar())
 	local whole = self._insetArea(Enum.ScreenInsets.None)
 	self._aim = HudScreen.aim(self._config, whole, safe)
 	self._bannerAt = HudScreen.bannerAt(self._config, whole, safe)
@@ -328,6 +334,7 @@ local Hud: Hud = {
 	dependencies = { "Config", "HudStore", "InputController", "SkateController", "ActionController", "BallCarrier" },
 	gui = nil :: any,
 	centre = nil :: any,
+	dim = nil :: any,
 	top = nil :: any,
 	renders = 0,
 	passKey = nil,
@@ -359,7 +366,8 @@ local Hud: Hud = {
 	_banners = nil :: any,
 	_prompt = nil :: any,
 	_tab = nil :: any,
-	_compact = false,
+	_ending = nil :: any,
+	compact = false,
 	_boardTop = 0,
 	_aim = 0,
 	_bannerAt = 0,
@@ -432,7 +440,8 @@ local Hud: Hud = {
 		self._banners = BannerMotion.new(config.UI.hud.motion, self._animator, config.UI.hud.feedMaxEntries)
 		self._prompt = Reveal.new(self._animator)
 		self._tab = Reveal.new(self._animator)
-		self._compact = false
+		self._ending = Reveal.new(self._animator)
+		self.compact = false
 		self._boardTop = 0
 		self._aim = 0
 		self._bannerAt = 0
@@ -524,6 +533,7 @@ local Hud: Hud = {
 		self._root = ReactRoblox.createLegacyRoot(self.gui)
 		self.centre = screenGui("HudCentre", Enum.ScreenInsets.None, order, parent)
 		self.top = screenGui("HudTop", Enum.ScreenInsets.DeviceSafeInsets, order, parent)
+		self.dim = screenGui("HudDim", Enum.ScreenInsets.None, order - 1, parent)
 	end,
 
 	-- The screen's size changes when the window is resized or the device turned; Roblox's top bar when its buttons do.
@@ -568,6 +578,7 @@ local Hud: Hud = {
 			measure(self, device)
 		end
 		local over = state.ended ~= nil
+		self._ending:set(over)
 		if device ~= Enum.PreferredInput.Touch or over ~= self._over then
 			self._touchToggled = false
 			self._over = over
@@ -580,7 +591,7 @@ local Hud: Hud = {
 		if self._input:switchTeamPressed() and tabOpen then
 			self:switchTeam()
 		end
-		local compact, boardTop, aim = self._compact, self._boardTop, self._aim
+		local compact, boardTop, aim = self.compact, self._boardTop, self._aim
 		local bannerAt, stageTop = self._bannerAt, self._stageTop
 		local fontsLoaded = self._fontsLoaded
 		if state.version ~= self._version then
@@ -633,6 +644,7 @@ local Hud: Hud = {
 				banners = self._banners,
 				prompt = self._prompt,
 				tab = self._tab,
+				ending = self._ending,
 				hasSkater = hasSkater,
 				carrying = carrier == self._localId,
 				keys = keys,
@@ -643,6 +655,7 @@ local Hud: Hud = {
 				switchTeam = switchTeamView(self, device, carrier),
 				bindings = self._bindings,
 				centre = self.centre,
+				dim = self.dim,
 				top = self.top,
 			}))
 		end

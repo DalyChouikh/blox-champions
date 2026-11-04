@@ -79,8 +79,15 @@ describe("HudText", function()
 		expect(text:feed(entry("Possession", "Blue", "1"), NAMES)).toBe("Ana has the ball")
 		expect(text:feed(entry("Goal", "Orange", "2"), NAMES)).toBe("Rex scored!")
 		expect(text:feed(entry("Possession", "Blue", "77"), NAMES)).toBe("Player has the ball")
-		expect(text:result("Orange")).toBe("Orange WINS")
+		-- In the banners' capitals (#358, Q243).
+		expect(text:result("Orange")).toBe("ORANGE WINS!")
 		expect(text:result(nil)).toBe("DRAW")
+	end)
+
+	-- The end screen's MVP card and team totals (#358, the owner's Q243).
+	it("writes the MVP's numbers and a team's total for the end screen", function()
+		expect(text:mvpLine(320, 2, 3)).toBe("Score 320 \u{B7} Goals 2 \u{B7} Steals 3")
+		expect(text:teamTotal("Blue", 5)).toBe("BLUE 5")
 	end)
 
 	-- The feed's chips (#369, the owner's Q221): the name in a colour by Roblox's rich text, the rest as written, and

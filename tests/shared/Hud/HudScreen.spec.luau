@@ -342,6 +342,31 @@ describe("HudScreen", function()
 		expect(HudScreen.getUpBottom(config, true, 1)).toBe(75)
 	end)
 
+	-- The end screen (#358, the owner's Q243): the result in GOAL!'s lettering, the MVP's card, the totals, then the
+	-- TAB board's table, a gap apart.
+	it("knows the end screen's sizes and how tall its parts stand, a gap apart", function()
+		expect(HudScreen.endSizes(config, false)).toEqual(config.UI.hud.layout.endScreen.sizes)
+		expect(HudScreen.endSizes(config, true)).toEqual(config.UI.hud.layout.endScreen.compactSizes)
+		-- GOAL!'s 60 in its 5 px ink and 3 px shadow: 73; the card 44 + 2 x 12 in its 7 px of ink: 75; the totals
+		-- 34 + 7: 41; the table's header 20 and six rows' 230, + 7: 257; three 16 px gaps.
+		expect(HudScreen.endHeight(config, false, 6, true, true)).toBe(494)
+		-- No MVP and no table: 73 + 16 + 41.
+		expect(HudScreen.endHeight(config, false, 6, false, false)).toBe(130)
+		-- A phone's: 36 + 2 x 4 + 3, then 40 + 2 x 10 + 7 and 28 + 7, two gaps.
+		expect(HudScreen.endHeight(config, true, 2, true, false)).toBe(181)
+		-- With a keyboard there, the table too at the desktop's sizes: 181 + 16 + 20 + 110 + 7.
+		expect(HudScreen.endHeight(config, true, 2, true, true)).toBe(334)
+	end)
+
+	-- The end screen's dim (the page's half-see-through ink) fades in with its pop, staying put through the overshoot.
+	it("fades the end screen's dim in with its pop", function()
+		local dim = config.UI.hud.layout.endScreen.dim
+		expect(HudScreen.endDim(config, 0)).toBe(1)
+		expect(HudScreen.endDim(config, 0.5)).toBeCloseTo(1 - (1 - dim) / 2, 6)
+		expect(HudScreen.endDim(config, 1)).toBeCloseTo(dim, 6)
+		expect(HudScreen.endDim(config, 1.08)).toBeCloseTo(dim, 6)
+	end)
+
 	-- One compact table on either kind of screen, at its own sizes (#357, the owner's Q237).
 	it("gives the TAB board's sizes for a phone's screen or a desktop's", function()
 		expect(HudScreen.tabSizes(config, false).width).toBe(500)

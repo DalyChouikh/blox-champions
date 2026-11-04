@@ -277,6 +277,47 @@ function HudScreen.getUpBottom(config: Config.GameConfig, compact: boolean, line
 	return math.max(HudScreen.getUpSizes(config, compact).bottom, feedTop + config.UI.hud.layout.feed.clearance)
 end
 
+-- The end screen's sizes on a phone's screen or a desktop's (#358, the owner's Q243).
+function HudScreen.endSizes(config: Config.GameConfig, compact: boolean): Config.EndSizes
+	local endScreen = config.UI.hud.layout.endScreen
+	return if compact then endScreen.compactSizes else endScreen.sizes
+end
+
+-- How tall the end screen's parts stand, layout.endScreen.gap apart: the result in GOAL!'s lettering (Style.banner:
+-- its ink and the shadow), the MVP's card while there is one (`mvp`), the team totals' chips, and while `withTable` the
+-- TAB board's table of `players` (desktop sizes: it shows off touch only), each box in its ink (look.outline round
+-- it, look.shadow under it).
+function HudScreen.endHeight(
+	config: Config.GameConfig,
+	compact: boolean,
+	players: number,
+	mvp: boolean,
+	withTable: boolean
+): number
+	local hud = config.UI.hud
+	local look, gap = hud.look, hud.layout.endScreen.gap
+	local sizes = HudScreen.endSizes(config, compact)
+	local ink = 2 * look.outline + look.shadow
+	local result = HudScreen.bannerSize(config, compact, "Goal")
+		+ 2 * HudScreen.bannerInk(config, compact)
+		+ look.shadow
+	local height = result + gap + sizes.totalHeight + ink
+	if mvp then
+		height += gap + sizes.avatar + 2 * sizes.inset + ink
+	end
+	if withTable then
+		local tab = HudScreen.tabSizes(config, false)
+		height += gap + tab.headHeight + HudScreen.tabBody(config, false, players) + ink
+	end
+	return height
+end
+
+-- How see-through the end screen's dim is at its pop's `scale`: it fades in with the pop, and stays put through the
+-- pop's overshoot.
+function HudScreen.endDim(config: Config.GameConfig, scale: number): number
+	return 1 - (1 - config.UI.hud.layout.endScreen.dim) * math.min(scale, 1)
+end
+
 -- The TAB board on a phone's screen or a desktop's (#357, the owner's Q237: one compact table on both).
 function HudScreen.tabSizes(config: Config.GameConfig, compact: boolean): Config.TabSizes
 	local tab = config.UI.hud.layout.scoreTab

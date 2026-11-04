@@ -1854,6 +1854,39 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   the rulings to check: the pop 0.2 s and fade 0.25 s (Q194); scroll on touch, shrink to fit off touch; the area under SCORES
   takes taps only while open; plain white circles for ids that are no Roblox user. **"Yes, ship it"**. Next: #357's commit and
   PR, then #358, #355.
+- **Q240 the call's glove** (session 80, #358; the design page version 3, section 'A better glove for the call': three new gloves
+  beside H4's, each waving in H4's badge with its ripple, in M1's stack on desktop (F) and phone (PASS) and close up; all built from
+  rounded bars the game can draw now, each drawn twice so the glove has one outline): **G3 Bold icon** (recommended: four straight
+  fingers side by side with lines between them, a short thumb, a thick outline), with the owner's words: "but just the hand is not
+  quite good, I don't like that curve between the thumb and the rest of the hand, try to make it more human and continuous". So the
+  thumb rises from the palm's side in one curve (a pad under the thumb fills the notch where it met the palm), drawn again before
+  it is built. Not chosen: G1 Mitten, G2 Cartoon glove.
+- **Q241 the thumb joined** (session 80, recommended; the design page version 4, section 'G3 with a more human thumb': G3 as shown,
+  E2 and E3, waving in the badge on desktop, phone and close up): **E2 Joined, thumb out**: G3's four straight fingers with seams, a
+  palm [-9, -6, 18, 16, r5], a pad under the thumb [-9, -2, 7, 12, r3.5, turned -4] that carries the outline from the wrist up into
+  the thumb [-9.6, -6, 5, 12, r2.5, turned -26] in one curve, a gentle web before the index finger (units of the page's glove; each
+  part turns round the middle of its bottom edge). Not chosen: E3 (the thumb more upright). This closes Q199.
+- **Q242 four findings get issues** (session 80, recommended): **all four**: the off-screen ball arrow over the hint column (and its
+  stray chevrons), the lap chips lit through the goal celebration, hint rows on half pixels, and no error boundary (one part's broken
+  render took the whole HUD down, session 78). Each its own issue, after #358 and #355, before M1 closes. Not chosen: only the error
+  boundary; none for now.
+- **Q243 the end screen's layout** (session 80, #358; the design page version 5, section 'The end screen, on the TAB board's table',
+  to scale on desktop 1556 x 793 and the phone 750 x 381, popping in): **B, today's parts in look C** (not the recommended A, the
+  result over the table with an MVP chip on the MVP's row): the result ("BLUE WINS!" / DRAW) in GOAL!'s lettering and size (67 px,
+  43 on phones) with the team ring, the MVP's card (a look C box: avatar, the name with a key-yellow MVP chip, score, goals and
+  steals), the two team totals as team-colour look C chips, then the TAB board's compact table (desktop). On phones the result, the
+  MVP's card and the totals, no table (SCORES opens the board over it, as before).
+- **Q244 #358 shipped** (session 82, recommended; the design page moved to https://claude.ai/artifact/2yuQnxDna9x8W2nHcocSUf after the
+  owner's /login, section 'The end screen and the name tags, built': Play shots on desktop 1556 x 793 and the phone 750 x 381, and a
+  real 2-player test on the phone). Asked with the rulings to check: the pill and badge in the HUD's brighter team colours although
+  Q201 kept the world's old tags in UI.teamColors; the tags' phone sizes; the end screen popping in whole with the dim fading in, not
+  the page's two steps; the hints, speedometer, banners, goal message, feed and Get Up prompt going under the dim; PASS on the tag while
+  the touch button still reads Magnetic Pass; long names truncating; the tag resting just over the head at any distance, tall ears
+  poking under it and hats possibly covered. Said plainly: my first build was an opaque panel on the stage only, not the page's
+  see-through ink over the whole screen. Found on the phone this round and fixed: the result's top stuck out above the open board (the
+  end screen now goes while the board shows, so the board opens in its place, not over it as Q243 said); the dim and the touch buttons
+  shared one draw order (the dim now covers them, SCORES stays bright); a pass key on a mouse's button would have broken its tag (it
+  now goes by its name). **"Yes, ship it"**. Next: #358's commit and PR, then #355, #376-#379.
 
 ## Roller Champions
 

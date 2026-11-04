@@ -72,6 +72,10 @@ export type UIText = {
 	scored: string,
 	-- The winning team's name (one value).
 	wins: string,
+	-- The end screen's MVP card: their score, goals and steals (three values); a team's total: its name in
+	-- capitals and its score (#358).
+	mvpLine: string,
+	teamTotal: string,
 	-- The end screen's headline when overtime runs out (the owner, Q95).
 	draw: string,
 	-- At GO, the player's own team's name in capitals (one value): Roller Champions' line (the owner, Q109).
@@ -81,8 +85,6 @@ export type UIText = {
 	columns: { player: string, score: string, goals: string, assists: string, saves: string, steals: string },
 	-- A player the HUD has no name for.
 	unknownPlayer: string,
-	-- Over a teammate calling for the ball.
-	callPass: string,
 	-- Over the teammate a pass would go to, on touch, where no key letter shows (#315).
 	touchPassTarget: string,
 	-- The Get Up prompt's key on touch, where the stick has none.
@@ -150,8 +152,8 @@ export type BannerSizes = { headline: number, goal: number, lap: number, message
 export type MouseSizes = { width: number, height: number, buttons: number, line: number }
 
 -- A look C key cap (Hud/Style.keyCap): `height` pixels tall and as wide as its key's name with `padding` each side,
--- never narrower than tall, its corners `corner`, its name at textSize; a mouse button's cap square, with `mouse` on
--- it (where a mouse's button can show: the hints). With dropShadow it drops look C's shadow. Pixels.
+-- never narrower than tall, its corners `corner`, its name at textSize; with `mouse` (the hints') a mouse button's cap
+-- square with a mouse on it, without it the button's name. With dropShadow it drops look C's shadow. Pixels.
 export type CapSizes = {
 	height: number,
 	padding: number,
@@ -169,6 +171,22 @@ export type FeedSizes = { height: number, corner: UDim, inset: number, textSize:
 -- then its words in the banners' lettering at textSize. Its ink's bottom sits `bottom` pixels above the stage's, higher
 -- when the feed reaches there (HudScreen.getUpBottom). Pixels.
 export type GetUpSizes = { bottom: number, cap: CapSizes, gap: number, wordsGap: number, textSize: number }
+
+-- The end screen's parts on a desktop's screen or a phone's (Hud/EndScreen, #358, the owner's Q243): the MVP's card
+-- cardWidth wide, `inset` in from its box's edges, their avatar `avatar` across beside the name (nameSize) with the
+-- MVP chip (chipHeight tall, its word at chipSize) and a line of their numbers (statSize); each team's total on a
+-- chip totalHeight tall at totalSize. Pixels.
+export type EndSizes = {
+	cardWidth: number,
+	inset: number,
+	avatar: number,
+	nameSize: number,
+	statSize: number,
+	chipHeight: number,
+	chipSize: number,
+	totalHeight: number,
+	totalSize: number,
+}
 
 -- The TAB board on one kind of screen (Hud/ScoreTab, #357, the owner's Q236, Q237): a look C box `width` pixels wide.
 -- In it a header headHeight tall with the column names at headSize; then each team's bar, barHeight tall with its ink
@@ -263,9 +281,9 @@ export type HudLayout = {
 	scoreTab: { margin: number, scrollBar: number, sizes: TabSizes, compactSizes: TabSizes },
 	-- The touch button that opens the score tab.
 	scoreButton: Place,
-	-- The end screen and its table (Hud/StatsTable): rowHeight tall rows, each number column columnWidth wide, the
-	-- name's column the rest.
-	endScreen: { position: UDim2, size: UDim2, rowHeight: number, columnWidth: number },
+	-- The end screen (Hud/EndScreen): its parts `gap` apart, at `sizes` on a desktop's screen and compactSizes on a
+	-- phone's, over the whole screen dimmed in look.ink, `dim` see-through.
+	endScreen: { gap: number, dim: number, sizes: EndSizes, compactSizes: EndSizes },
 	-- The Get Up prompt: `sizes` on a desktop's screen, compactSizes on a phone's.
 	getUp: {
 		sizes: GetUpSizes,
@@ -326,8 +344,6 @@ export type HudSettings = {
 	textColor: Color3,
 	panel: Color3,
 	panelTransparency: number,
-	-- The score tab and the end screen, drawn over the game: solid, so nothing shows through them.
-	overlayTransparency: number,
 	dimTransparency: number,
 	corner: UDim,
 	textSize: number,
@@ -341,7 +357,8 @@ export type HudSettings = {
 	spacing: number,
 	-- Pixels kept clear at each edge of the HUD's area by a part shrunk to fit it (Style.fit).
 	screenMargin: number,
-	-- The HUD's guis draw over the touch controls' (Roblox's default order, 0) while this is higher (#357).
+	-- The HUD's guis draw at this order, over the touch controls' (Roblox's default, 0; #357); the end screen's dim one
+	-- under it, over them too (#358).
 	displayOrder: number,
 	-- A Roblox user's avatar on the TAB board (HudText.avatar): a content id with %s for their UserId.
 	avatarImage: string,
@@ -370,8 +387,49 @@ export type MarkerSettings = {
 	arrowImage: string,
 }
 
--- A name tag's size, how far above a player's root it sits (studs), and its text sizes.
-export type NameTagSettings = { size: UDim2, studsOffset: Vector3, textSize: number, callSize: number }
+-- One part of the call's glove (#358, the owner's Q240 G3, Q241 E2), in the glove's own units from its middle: a bar
+-- `width` x `height` with its top-left corner at (x, y) before it turns, its corners `corner` round, turned `turn`
+-- degrees (clockwise) round the middle of its bottom edge, as a finger turns at its root.
+export type GlovePart = { x: number, y: number, width: number, height: number, corner: number, turn: number }
+
+-- A name tag on one kind of screen (NameTags, #358, the owner's Q197 M1 Stacked, Q198 H4): its gui `width` x
+-- `height`, the name's pill on its middle (pillHeight tall, the name at textSize with pillInset each side). Above
+-- the pill's ink, `gap` and a pointer `pointer` pixels tall (a square turned 45 degrees, half under the cap), the
+-- pass key on look C's cap (`cap`); the call's badge (`badge` across its middle, a `rim` of ink) badgeGap beside
+-- the cap, its glove `glove` pixels a glove unit, gloveDrop below the badge's middle, and its ring growing `ripple`
+-- pixels out, rippleLine thick. Pixels.
+export type TagSizes = {
+	width: number,
+	height: number,
+	pillHeight: number,
+	pillInset: number,
+	textSize: number,
+	cap: CapSizes,
+	pointer: number,
+	gap: number,
+	badge: number,
+	rim: number,
+	ripple: number,
+	rippleLine: number,
+	badgeGap: number,
+	glove: number,
+	gloveDrop: number,
+}
+
+-- The call's motion (#358, the owner's Q198 H4): its badge's ring ripples out every rippleSeconds and its glove
+-- waves waveDegrees each way, waveRate radians a second, round a point wavePivot glove units below its middle.
+export type CallMotion = { rippleSeconds: number, waveDegrees: number, waveRate: number, wavePivot: number }
+
+-- The name tags (#358): the pill's ink resting studsOffset studs above a player's root, at `sizes` on a desktop's
+-- screen and compactSizes on a phone's; how the call moves while a teammate calls; its glove: `parts` in white over
+-- their ink, each grown `ink` glove units all round, `seams` in ink on top.
+export type NameTagSettings = {
+	studsOffset: Vector3,
+	sizes: TagSizes,
+	compactSizes: TagSizes,
+	call: CallMotion,
+	glove: { ink: number, parts: { GlovePart }, seams: { GlovePart } },
+}
 
 -- The goal ring, the next gate's panel and the carrier's beam glow in `material`; the goal panel slides panelSlide
 -- studs up out of the ring over panelSlideSeconds. The beam (Arena spec §5.4) is `width` studs along the track and
@@ -467,7 +525,10 @@ local defaults: UIConfig = {
 		lapCompleted = "LAP %d COMPLETED",
 		goalOpen = "%s GOAL IS ACTIVE!",
 		scored = "%s scored!",
-		wins = "%s WINS",
+		-- In the banners' capitals (#358, the owner's Q243: the result in GOAL!'s lettering).
+		wins = "%s WINS!",
+		mvpLine = "Score %d \u{B7} Goals %d \u{B7} Steals %d",
+		teamTotal = "%s %d",
 		draw = "DRAW",
 		go = "GO %s TEAM!",
 		mvp = "MVP",
@@ -481,11 +542,9 @@ local defaults: UIConfig = {
 			steals = "Steals",
 		},
 		unknownPlayer = "Player",
-		-- A raised hand.
-		callPass = "\u{270B}",
-		-- A down-pointing triangle: RC floats the pass key's letter there (Video 34 at 41.6 s); a touch screen has
-		-- none.
-		touchPassTarget = "\u{25BC}",
+		-- On the pass key's cap over its target on touch, which has no key: RC floats the pass key's letter there
+		-- (Video 34 at 41.6 s); M1 drew a PASS chip on phones (#358, the owner's Q197).
+		touchPassTarget = "PASS",
 		touchMove = "Move",
 		switchTeam = "Switch team",
 		-- A cooling key's seconds left, to a tenth, as the page wrote them (#354, Q186); RC's >> beside a key
@@ -500,7 +559,6 @@ local defaults: UIConfig = {
 		panel = Color3.fromRGB(18, 18, 21),
 		panelTransparency = 0.35,
 		-- The owner's choice (2026-10-24).
-		overlayTransparency = 0,
 		dimTransparency = 0.6,
 		corner = UDim.new(0, 8),
 		textSize = 20,
@@ -516,7 +574,8 @@ local defaults: UIConfig = {
 		spacing = 6,
 		screenMargin = 8,
 		-- On a phone the open TAB board covers the touch buttons (the owner, Q236), so the HUD draws over their gui.
-		displayOrder = 1,
+		-- The end screen's dim covers them too, as they do nothing then, while SCORES, in the HUD, stays bright.
+		displayOrder = 2,
 		-- Roblox's headshot of a user, which loads without yielding; 48 px is its smallest size (probed in Studio: a
 		-- real user's loads in ~0.6 s, an unknown id fails and prints nothing).
 		avatarImage = "rbxthumb://type=AvatarHeadShot&id=%s&w=48&h=48",
@@ -705,11 +764,34 @@ local defaults: UIConfig = {
 				},
 			},
 			scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
+			-- Today's parts in look C (#358, the owner's Q243), at the design page's sizes: the result in GOAL!'s
+			-- lettering, the MVP's card, the team totals on chips, then the TAB board's table (not on touch), the game
+			-- half-dimmed behind them.
 			endScreen = {
-				position = UDim2.fromScale(0.5, 0.5),
-				size = UDim2.fromOffset(720, 520),
-				rowHeight = 28,
-				columnWidth = 80,
+				gap = 16,
+				dim = 0.5,
+				sizes = {
+					cardWidth = 400,
+					inset = 12,
+					avatar = 44,
+					nameSize = 21,
+					statSize = 15,
+					chipHeight = 24,
+					chipSize = 14,
+					totalHeight = 34,
+					totalSize = 22,
+				},
+				compactSizes = {
+					cardWidth = 350,
+					inset = 10,
+					avatar = 40,
+					nameSize = 19,
+					statSize = 14,
+					chipHeight = 22,
+					chipSize = 13,
+					totalHeight = 28,
+					totalSize = 17,
+				},
 			},
 			-- At the bottom centre like Roller Champions' prompt (Video 5 at 0:18), banner style (the owner, Q221), at
 			-- the design page's sizes: 46 px caps with their drop shadow, GET UP! in the banners' font at 40, 104 px
@@ -744,11 +826,66 @@ local defaults: UIConfig = {
 		arrowSize = 28,
 		arrowImage = "rbxasset://textures/ui/MenuBar/arrow_up.png",
 	},
+	-- M1 Stacked with H4's badge and the E2 glove (#358, the owner's Q197, Q198, Q240, Q241), over the head of a body
+	-- 4 studs up to its head's top (measured in Play), at the design page's
+	-- proportions: its key cap 24 units, the hints' 34 px cap on desktop (1.42 px a unit), about 1.05 on a phone.
 	nameTag = {
-		size = UDim2.fromOffset(200, 48),
 		studsOffset = Vector3.new(0, 4, 0),
-		textSize = 20,
-		callSize = 28,
+		sizes = {
+			width = 240,
+			height = 184,
+			pillHeight = 26,
+			pillInset = 9,
+			textSize = 18,
+			cap = { height = 34, padding = 8, corner = UDim.new(0, 10), textSize = 17, dropShadow = false },
+			pointer = 9,
+			gap = 2,
+			badge = 24,
+			rim = 4,
+			ripple = 20,
+			rippleLine = 4,
+			badgeGap = 3,
+			glove = 1,
+			gloveDrop = 3,
+		},
+		compactSizes = {
+			width = 190,
+			height = 140,
+			pillHeight = 20,
+			pillInset = 7,
+			textSize = 14,
+			cap = { height = 24, padding = 6, corner = UDim.new(0, 8), textSize = 13, dropShadow = false },
+			pointer = 7,
+			gap = 2,
+			badge = 18,
+			rim = 3,
+			ripple = 15,
+			rippleLine = 3,
+			badgeGap = 2,
+			glove = 0.76,
+			gloveDrop = 2,
+		},
+		-- H4: a ring every second, the glove waving 12 degrees each way (the page's 12 sin 8t).
+		call = { rippleSeconds = 1, waveDegrees = 12, waveRate = 8, wavePivot = 10 },
+		-- E2 (Q241): G3's four straight fingers with seams, the palm, a pad under the thumb that carries the outline
+		-- from the wrist up into the thumb in one curve.
+		glove = {
+			ink = 2.5,
+			parts = {
+				{ x = -9, y = -6, width = 18, height = 16, corner = 5, turn = 0 },
+				{ x = -9, y = -15, width = 4.5, height = 12, corner = 2.25, turn = 0 },
+				{ x = -4.5, y = -19, width = 4.5, height = 16, corner = 2.25, turn = 0 },
+				{ x = 0, y = -18, width = 4.5, height = 15, corner = 2.25, turn = 0 },
+				{ x = 4.5, y = -14, width = 4.5, height = 11, corner = 2.25, turn = 0 },
+				{ x = -9, y = -2, width = 7, height = 12, corner = 3.5, turn = -4 },
+				{ x = -9.6, y = -6, width = 5, height = 12, corner = 2.5, turn = -26 },
+			},
+			seams = {
+				{ x = -4.95, y = -13, width = 0.9, height = 9, corner = 0.45, turn = 0 },
+				{ x = -0.45, y = -16, width = 0.9, height = 12, corner = 0.45, turn = 0 },
+				{ x = 4.05, y = -12, width = 0.9, height = 8, corner = 0.45, turn = 0 },
+			},
+		},
 	},
 	arenaGlow = {
 		material = Enum.Material.Neon,
@@ -827,7 +964,6 @@ local pixels = Validate.pixels()
 -- Whole pixels, where a UDim's offset would drop a fraction (probed).
 local wholePixels = Validate.number({ min = 1, integer = true })
 local place = Validate.record({ position = udim2, size = pixels })
-local columns = Validate.record({ position = udim2, size = pixels, rowHeight = positive, columnWidth = positive })
 local nonNegative = Validate.number({ min = 0 })
 -- Whole pixels or none.
 local wholeOrNone = Validate.number({ min = 0, integer = true })
@@ -865,24 +1001,92 @@ local feedSizes = Validate.record({
 	inset = nonNegative,
 	textSize = textSize,
 })
+-- A key cap drawn alone (the Get Up prompt's, a name tag's pass key), with or without look C's drop shadow.
+local capSizes = Validate.record({
+	height = positive,
+	padding = nonNegative,
+	corner = Validate.datatype("UDim"),
+	textSize = textSize,
+	dropShadow = Validate.boolean(),
+})
 local getUpSizes = Validate.record({
 	bottom = nonNegative,
 	gap = nonNegative,
 	wordsGap = nonNegative,
 	textSize = textSize,
-	cap = Validate.record({
-		height = positive,
-		padding = nonNegative,
-		corner = Validate.datatype("UDim"),
-		textSize = textSize,
-		dropShadow = Validate.boolean(),
-	}),
+	cap = capSizes,
 })
+-- A name tag's sizes (NameTags) in whole pixels where its boxes meet; the glove's scale and drop may be fractions.
+local tagSizes = Validate.record({
+	width = wholePixels,
+	height = wholePixels,
+	pillHeight = wholePixels,
+	pillInset = wholeOrNone,
+	textSize = textSize,
+	cap = capSizes,
+	pointer = wholePixels,
+	gap = wholeOrNone,
+	badge = wholePixels,
+	rim = wholeOrNone,
+	ripple = wholeOrNone,
+	rippleLine = positive,
+	badgeGap = wholeOrNone,
+	glove = positive,
+	gloveDrop = nonNegative,
+})
+local glovePart = Validate.record({
+	x = Validate.number(),
+	y = Validate.number(),
+	width = positive,
+	height = positive,
+	corner = nonNegative,
+	turn = Validate.number(),
+})
+local gloveParts = Validate.check(Validate.list(glovePart), function(parts: { GlovePart }): boolean
+	return #parts > 0
+end, "must not be empty")
 
 -- Each text of a scoreboard is drawn inside its box (Hud/Scoreboard): the scores in their shields or chips, the clock
 -- and the goal's worth, so none may be taller than its box.
 local function textsFit(sizes: BoardTextSizes, score: UDim2, clock: UDim2, worth: UDim2): boolean
 	return sizes.score <= score.Y.Offset and sizes.clock <= clock.Y.Offset and sizes.worth <= worth.Y.Offset
+end
+
+-- The end screen's sizes (Hud/EndScreen) in whole pixels, so its boxes sit on pixel edges.
+local endSizes = Validate.record({
+	cardWidth = wholePixels,
+	inset = wholeOrNone,
+	avatar = wholePixels,
+	nameSize = textSize,
+	statSize = textSize,
+	chipHeight = wholePixels,
+	chipSize = textSize,
+	totalHeight = wholePixels,
+	totalSize = textSize,
+})
+
+-- The end screen's words inside their chips: the MVP's word on its chip (no ink), a total in look C's ink.
+local function chipsHold(sizes: EndSizes, look: LookSettings): boolean
+	return sizes.chipSize <= sizes.chipHeight and sizes.totalSize + 2 * math.ceil(look.textOutline) <= sizes.totalHeight
+end
+
+-- The MVP's card (Hud/EndScreen) as tall as their avatar inside its inset: beside it their name, in look C's ink,
+-- over their numbers.
+local function cardHolds(sizes: EndSizes, look: LookSettings): boolean
+	return sizes.nameSize + math.ceil(look.textOutline) + sizes.statSize <= sizes.avatar
+end
+
+-- A name tag's name (NameTags) in look C's ink inside its pill.
+local function pillHolds(sizes: TagSizes, look: LookSettings): boolean
+	return sizes.textSize + 2 * math.ceil(look.textOutline) <= sizes.pillHeight
+end
+
+-- A name tag's call row inside its gui: above the gui's middle (the pill's), the pill's top half and ink, the gap,
+-- the pointer and the key cap, with the badge round the cap's middle at its widest ripple; and that ring across it.
+local function rowFits(sizes: TagSizes, look: LookSettings): boolean
+	local capMiddle = sizes.pillHeight / 2 + look.outline + sizes.gap + sizes.pointer + sizes.cap.height / 2
+	local ring = sizes.badge + sizes.ripple + sizes.rippleLine
+	return capMiddle + math.max(sizes.cap.height / 2, ring) <= sizes.height / 2 and 2 * ring <= sizes.width
 end
 
 -- How many number columns a table of players' stats has: every column but the name's (UI.text.columns).
@@ -892,15 +1096,6 @@ local function numberColumns(ui: UIConfig): number
 		count += 1
 	end
 	return count - 1
-end
-
--- The end screen's table (StatsTable) gives each number column columnWidth and a spacing gap, inside its panel's
--- padding (spacing at each side), and the name column what is left, which must leave the names some room.
-local function namesFit(ui: UIConfig): boolean
-	local hud = ui.hud
-	local endScreen = hud.layout.endScreen
-	local taken = numberColumns(ui) * (endScreen.columnWidth + hud.spacing) + 2 * hud.spacing
-	return taken < endScreen.size.X.Offset
 end
 
 -- How wide a TAB board row's avatar slot is (Hud/ScoreTab): its circle and `ink` round it, in whole pixels.
@@ -994,6 +1189,8 @@ local fields = Validate.record({
 		goalOpen = template(1),
 		scored = template(1),
 		wins = template(1),
+		mvpLine = template(3),
+		teamTotal = template(2),
 		draw = label,
 		go = template(1),
 		mvp = label,
@@ -1007,7 +1204,6 @@ local fields = Validate.record({
 			steals = label,
 		}),
 		unknownPlayer = label,
-		callPass = label,
 		touchPassTarget = label,
 		touchMove = label,
 		switchTeam = label,
@@ -1019,7 +1215,6 @@ local fields = Validate.record({
 		textColor = Validate.datatype("Color3"),
 		panel = Validate.datatype("Color3"),
 		panelTransparency = transparency,
-		overlayTransparency = transparency,
 		dimTransparency = transparency,
 		corner = Validate.datatype("UDim"),
 		textSize = textSize,
@@ -1030,8 +1225,9 @@ local fields = Validate.record({
 		glowThickness = Validate.number({ min = 0 }),
 		spacing = Validate.number({ min = 0 }),
 		screenMargin = Validate.number({ min = 0 }),
-		-- Level with the touch controls' gui (Roblox's default, 0), the open board could draw under their buttons.
-		displayOrder = Validate.number({ min = 1, integer = true }),
+		-- The dim goes one under it: level with the touch controls' gui (Roblox's default, 0), which of them draws on
+		-- top would be left to the engine.
+		displayOrder = Validate.number({ min = 2, integer = true }),
 		avatarImage = template(1),
 		look = Validate.record({
 			font = Validate.enumItem(Enum.Font),
@@ -1154,7 +1350,12 @@ local fields = Validate.record({
 				compactSizes = tabSizes,
 			}),
 			scoreButton = place,
-			endScreen = columns,
+			endScreen = Validate.record({
+				gap = wholeOrNone,
+				dim = transparency,
+				sizes = endSizes,
+				compactSizes = endSizes,
+			}),
 			getUp = Validate.record({
 				sizes = getUpSizes,
 				compactSizes = getUpSizes,
@@ -1174,10 +1375,16 @@ local fields = Validate.record({
 		arrowImage = label,
 	}),
 	nameTag = Validate.record({
-		size = udim2,
 		studsOffset = Validate.datatype("Vector3"),
-		textSize = textSize,
-		callSize = textSize,
+		sizes = tagSizes,
+		compactSizes = tagSizes,
+		call = Validate.record({
+			rippleSeconds = positive,
+			waveDegrees = nonNegative,
+			waveRate = nonNegative,
+			wavePivot = Validate.number(),
+		}),
+		glove = Validate.record({ ink = nonNegative, parts = gloveParts, seams = Validate.list(glovePart) }),
 	}),
 	arenaGlow = Validate.record({
 		material = Validate.enumItem(Enum.Material),
@@ -1231,8 +1438,36 @@ local schema = Validate.checkAll(fields, {
 		end,
 	},
 	{
-		message = "the end screen's number columns must leave room for names",
-		holds = namesFit,
+		message = "the end screen's words must fit their chips (chipSize <= chipHeight, "
+			.. "totalSize + 2 \u{D7} textOutline <= totalHeight)",
+		holds = function(ui: UIConfig): boolean
+			local endScreen, look = ui.hud.layout.endScreen, ui.hud.look
+			return chipsHold(endScreen.sizes, look) and chipsHold(endScreen.compactSizes, look)
+		end,
+	},
+	{
+		message = "the end screen's card must hold its name over its numbers beside the avatar "
+			.. "(nameSize + textOutline + statSize <= avatar)",
+		holds = function(ui: UIConfig): boolean
+			local endScreen, look = ui.hud.layout.endScreen, ui.hud.look
+			return cardHolds(endScreen.sizes, look) and cardHolds(endScreen.compactSizes, look)
+		end,
+	},
+	-- The name tags (#358) on either kind of screen.
+	{
+		message = "a name tag's name must fit its pill (textSize + 2 \u{D7} textOutline <= pillHeight)",
+		holds = function(ui: UIConfig): boolean
+			local tag, look = ui.nameTag, ui.hud.look
+			return pillHolds(tag.sizes, look) and pillHolds(tag.compactSizes, look)
+		end,
+	},
+	{
+		message = "a name tag must hold its call's row (the pill, gap, pointer and key cap, "
+			.. "and the badge's widest ripple)",
+		holds = function(ui: UIConfig): boolean
+			local tag, look = ui.nameTag, ui.hud.look
+			return rowFits(tag.sizes, look) and rowFits(tag.compactSizes, look)
+		end,
 	},
 	-- One compact table on desktop and phones (#357, the owner's Q237), each at its own sizes.
 	{
