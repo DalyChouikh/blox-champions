@@ -1,8 +1,9 @@
 --!strict
 -- A table of players' stats (spec §6.4): a header from Config.UI.text.columns, then a row per player in the order
--- given (the score tab's: by team, then score), keyed by their id: name, score, goals, assists, saves and steals, in
--- their team's colour, the local player's row outlined. The score tab and the end screen draw it (StatsTable.Table, a
--- plain function of its props) and fit it to the screen by its height (StatsTable.height).
+-- given (by team, then score), keyed by their id: name, score, goals, assists, saves and steals, in their team's
+-- colour, the local player's row outlined, at UI.hud.layout.endScreen's row height and column width. The end screen
+-- draws it (StatsTable.Table, a plain function of its props) and fits it to the screen by its height
+-- (StatsTable.height); the TAB board draws its own compact table (Hud/ScoreTab, #357).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -34,7 +35,7 @@ local function row(
 	marked: boolean
 ): React.ReactElement
 	local hud = config.UI.hud
-	local place = hud.layout.scoreTab
+	local place = hud.layout.endScreen
 	local others = #COLUMNS - 1
 	local children: { [string]: React.Node } = { Layout = Style.list(config, Enum.FillDirection.Horizontal) }
 	for index, column in COLUMNS do
@@ -67,7 +68,7 @@ local StatsTable = {}
 -- How tall the table is with `players` rows: a row each, and the header's, spacing apart (Style.list).
 function StatsTable.height(config: Config.GameConfig, players: number): number
 	local hud = config.UI.hud
-	return (players + 1) * hud.layout.scoreTab.rowHeight + players * hud.spacing
+	return (players + 1) * hud.layout.endScreen.rowHeight + players * hud.spacing
 end
 
 function StatsTable.Table(props: StatsTableProps): React.ReactElement

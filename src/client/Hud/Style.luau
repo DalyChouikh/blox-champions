@@ -133,6 +133,11 @@ function Style.above(props: Props?): Props
 	return over({ ZIndex = 2 }, props)
 end
 
+-- Drawn above what Style.above lifts (the HUD's stage): the TAB board, over all the HUD draws (#357).
+function Style.topmost(props: Props?): Props
+	return over({ ZIndex = 3 }, props)
+end
+
 -- A frame that only holds others.
 function Style.holder(props: Props?): Props
 	return over({ BackgroundTransparency = 1, BorderSizePixel = 0 }, props)

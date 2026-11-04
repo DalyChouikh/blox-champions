@@ -1,19 +1,21 @@
 --!strict
 -- The whole HUD as one React element: a full-screen frame, "Root", that holds every part of the HUD. The banner line
--- (its place from HudScreen.bannerLine, measured from the safe area's top, less the stage's top), the goal message,
--- the feed, the Get Up prompt, the score tab and the end screen sit in its frame "Stage", the HUD's stage (the Hud's
--- binding): on touch the part of the HUD's area left of the touch buttons, so they centre there, clear of the buttons,
--- and all but the small prompt shrink to fit it. The stage draws over the other parts. The scoreboard shows from the
--- first snapshot on; the hints and the Get Up prompt wherever the Hud gives their keys; the score tab while it is open.
--- Once the match is over the end screen shows until the next match in place of the scoreboard, holding the final
--- score. Off touch it holds its own score tab too, so an open one shows no other; on touch it is compact (the owner's
--- choice) and the score tab opens over it, from its button, shown on touch throughout, or a held key. The reticle,
--- the kickoff count and the scoreboard are drawn in guis the Hud gives (portals): the reticle and the count in the
--- full-screen one, where throws aim, the scoreboard in the safe area's, from its top (in Roblox's top bar's free band
--- where it fits, HudScreen). The reticle shows only while the local player holds the ball (RC's way, the owner's
--- Q185); its rings shrink, and the count moves down, where they would touch the scoreboard (HudScreen); both hide
--- while the score tab or the end screen shows. The reticle and the speedometer read in the viewer's team colour. A
--- plain function of its props.
+-- (its place from HudScreen.bannerLine, measured from the safe area's top, less the stage's top), the goal message, the
+-- feed, the Get Up prompt and the end screen sit in its frame "Stage", the HUD's stage (the Hud's binding): on touch
+-- the part of the HUD's area left of the touch buttons, so they centre there, clear of the buttons, and all but the
+-- small prompt shrink to fit it. The stage draws over the other parts, and the TAB board over everything (#357): it
+-- fits the HUD's whole area under the scoreboard's ink, on touch under the score button too, over the touch buttons
+-- (the owner, Q234, Q236). The scoreboard shows from the first snapshot on; the hints and the Get Up prompt wherever
+-- the Hud gives their keys; the board while it shows (HudState.tabShows, then its fade), and while it does no part of
+-- the stage but the end screen, which it would cut (the owner, Q235, Q238): they come back once it has gone, their time
+-- counting on. Once the match is over the end screen shows until the next match in place of the scoreboard, holding the
+-- final score; on touch it is compact (the owner's choice) and the board opens over it, from its button, shown on touch
+-- throughout. The reticle, the kickoff count and the scoreboard are drawn in guis the Hud gives (portals): the reticle
+-- and the count in the full-screen one, where throws aim, the scoreboard in the safe area's, from its top (in Roblox's
+-- top bar's free band where it fits, HudScreen). The reticle shows only while the local player holds the ball (RC's
+-- way, the owner's Q185); its rings shrink, and the count moves down, where they would touch the scoreboard
+-- (HudScreen); both hide while the board or the end screen shows. The reticle and the speedometer read in the viewer's
+-- team colour. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -32,6 +34,7 @@ local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local React = require(ReplicatedStorage.Packages.React)
 local ReactRoblox = require(ReplicatedStorage.Packages.ReactRoblox)
 local Reticle = require(script.Parent.Reticle)
+local Reveal = require(script.Parent.Reveal)
 local ScoreButton = require(script.Parent.ScoreButton)
 local ScoreTab = require(script.Parent.ScoreTab)
 local Scoreboard = require(script.Parent.Scoreboard)
@@ -45,9 +48,10 @@ export type HudBindings = {
 	speed: React.Binding<string>,
 	-- Each hint row's label, fade and key cap (#354).
 	hints: ControlHints.HintRows,
-	-- The HUD's stage in pixels, where the banner, the feed, the score tab and the end screen centre and fit; zero
-	-- until it is known.
+	-- The HUD's stage in pixels, where the banner, the feed and the end screen centre and fit; zero until it is known.
 	stage: React.Binding<Vector2>,
+	-- The HUD's whole area in pixels, which the TAB board fits; zero until it is known.
+	area: React.Binding<Vector2>,
 	-- How long the throw key has been held while a throw charges, 0 otherwise: the reticle's ring (#312).
 	charge: React.Binding<number>,
 }
@@ -69,18 +73,21 @@ export type AppProps = {
 	stageTop: number,
 	-- How the scoreboard moves, having watched the state's match.
 	board: BoardMotion.BoardMotion,
-	-- How the banner line and the goal message move.
+	-- How the banner line and the goal message move, and the Get Up prompt and the TAB board (#357).
 	banners: BannerMotion.BannerMotion,
+	prompt: Reveal.Reveal,
+	tab: Reveal.Reveal,
 	-- Whether the local player has a skater: a spectator has no speed and no hints.
 	hasSkater: boolean,
 	-- Whether the local player holds the ball: the reticle shows only then.
 	carrying: boolean,
 	-- Each hint's key on this device; nil where no hints show.
 	keys: ControlHints.HintKeys?,
-	-- The movement keys on this device while the Get Up prompt shows (BannerMotion.promptShown); nil otherwise.
+	-- The movement keys on this device while the Get Up prompt shows (Reveal.shown); nil otherwise.
 	getUpKeys: { Style.KeyView }?,
-	-- Its key held, or its touch button toggled on.
-	scoreTabOpen: boolean,
+	-- The TAB board open (HudState.tabShows), and on the screen: open, or fading out after (Reveal.shown).
+	tabOpen: boolean,
+	tabShown: boolean,
 	onScoreButton: () -> (),
 	-- The score tab's Switch team button; nil where it has none (#310).
 	switchTeam: ScoreTab.SwitchTeam?,
@@ -100,10 +107,12 @@ local function App(props: AppProps): React.ReactElement
 	local config, text, state, bindings = props.config, props.text, props.state, props.bindings
 	local match, keys, ended = state.match, props.keys, state.ended
 	local touch = props.device == Enum.PreferredInput.Touch
-	local scoreTab = props.scoreTabOpen and match ~= nil and (ended == nil or touch)
-	local uncovered = not scoreTab and ended == nil
+	local tabShown = props.tabShown
+	local uncovered = not tabShown and ended == nil
 	local compact, top, aim = props.compact, props.boardTop, props.aim
 	local period = match ~= nil and text:period(match) ~= nil
+	-- The match the scoreboard shows: none once it is over, when the end screen holds the final score.
+	local scoreboard = if ended == nil then match else nil
 	local banners = props.banners
 	local feedLines = state:feedLines()
 	local shownBanner = state.banner
@@ -129,11 +138,11 @@ local function App(props: AppProps): React.ReactElement
 			}),
 		}, props.centre),
 		Top = ReactRoblox.createPortal({
-			Scoreboard = if match ~= nil and ended == nil
+			Scoreboard = if scoreboard ~= nil
 				then React.createElement(Scoreboard, {
 					config = config,
 					text = text,
-					match = match,
+					match = scoreboard,
 					compact = compact,
 					top = top,
 					clock = bindings.clock,
@@ -160,58 +169,53 @@ local function App(props: AppProps): React.ReactElement
 			ScoreButton = if touch
 				then React.createElement(ScoreButton, { config = config, onActivated = props.onScoreButton })
 				else nil,
-			-- Above the other parts, so the solid score tab and end screen cover them.
+			-- Above the other parts, so the solid end screen covers them.
 			Stage = React.createElement("Frame", Style.holder(Style.above({ Size = bindings.stage:map(stageSize) })), {
-				Banner = React.createElement(Banner, {
-					config = config,
-					text = text,
-					banner = state.banner,
-					compact = compact,
-					line = HudScreen.bannerLine(config, compact, props.bannerAt, top, period, lineSize)
-						- props.stageTop,
-					scale = banners.line.scale.binding,
-					leave = banners.line.leave,
-					area = bindings.stage,
-				}),
-				Message = React.createElement(Banner, {
-					config = config,
-					text = text,
-					banner = state.message,
-					compact = compact,
-					scale = banners.message.scale.binding,
-					leave = banners.message.leave,
-					area = bindings.stage,
-				}),
-				Feed = React.createElement(Feed, {
-					config = config,
-					text = text,
-					feed = state.feed,
-					lines = feedLines,
-					chips = banners.chips,
-					names = state.names,
-					compact = compact,
-					area = bindings.stage,
-				}),
-				GetUp = if props.getUpKeys ~= nil
+				Banner = if not tabShown
+					then React.createElement(Banner, {
+						config = config,
+						text = text,
+						banner = state.banner,
+						compact = compact,
+						line = HudScreen.bannerLine(config, compact, props.bannerAt, top, period, lineSize)
+							- props.stageTop,
+						scale = banners.line.scale.binding,
+						leave = banners.line.leave,
+						area = bindings.stage,
+					})
+					else nil,
+				Message = if not tabShown
+					then React.createElement(Banner, {
+						config = config,
+						text = text,
+						banner = state.message,
+						compact = compact,
+						scale = banners.message.scale.binding,
+						leave = banners.message.leave,
+						area = bindings.stage,
+					})
+					else nil,
+				Feed = if not tabShown
+					then React.createElement(Feed, {
+						config = config,
+						text = text,
+						feed = state.feed,
+						lines = feedLines,
+						chips = banners.chips,
+						names = state.names,
+						compact = compact,
+						area = bindings.stage,
+					})
+					else nil,
+				GetUp = if props.getUpKeys ~= nil and not tabShown
 					then React.createElement(GetUp, {
 						config = config,
 						keys = props.getUpKeys,
 						compact = compact,
 						lines = feedLines,
-						scale = banners.promptScale.binding,
-						leave = banners.promptLeave.binding,
+						scale = props.prompt.scale.binding,
+						leave = props.prompt.leave.binding,
 						area = bindings.stage,
-					})
-					else nil,
-				ScoreTab = if scoreTab and match ~= nil
-					then React.createElement(ScoreTab, {
-						config = config,
-						text = text,
-						stats = if ended ~= nil then ended.stats else match.stats,
-						names = state.names,
-						localId = props.localId,
-						area = bindings.stage,
-						switchTeam = props.switchTeam,
 					})
 					else nil,
 				EndScreen = if ended ~= nil
@@ -226,6 +230,25 @@ local function App(props: AppProps): React.ReactElement
 					})
 					else nil,
 			}),
+			ScoreTab = if tabShown and match ~= nil
+				then React.createElement(ScoreTab, {
+					config = config,
+					text = text,
+					stats = if ended ~= nil then ended.stats else match.stats,
+					names = state.names,
+					localId = props.localId,
+					compact = compact,
+					touch = touch,
+					open = props.tabOpen,
+					scale = props.tab.scale.binding,
+					leave = props.tab.leave.binding,
+					area = bindings.area,
+					boardBottom = if scoreboard ~= nil
+						then HudScreen.boardBottom(config, compact, top, period) - props.stageTop
+						else 0,
+					switchTeam = props.switchTeam,
+				})
+				else nil,
 		}),
 	})
 end

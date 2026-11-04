@@ -582,6 +582,10 @@ describe("Config defaults", function()
 			glowThickness = 3,
 			spacing = 6,
 			screenMargin = 8,
+			-- Over the touch controls, so the open TAB board covers their buttons on a phone (#357, Q236).
+			displayOrder = 1,
+			-- Each row's avatar on the TAB board (#357): Roblox's headshot of that user, 48 px square.
+			avatarImage = "rbxthumb://type=AvatarHeadShot&id=%s&w=48&h=48",
 			-- Look C, Bold arcade (#352, Q184), as the design page drew it.
 			look = {
 				font = Enum.Font.FredokaOne,
@@ -693,14 +697,49 @@ describe("Config defaults", function()
 					sizes = { textSize = 76, ringSize = 200, ringThickness = 8 },
 					compactSizes = { textSize = 40, ringSize = 76, ringThickness = 4 },
 				},
+				-- One compact table on desktop and phones (#357, Q236, Q237) at the design page's sizes, a 3-a-side
+				-- board fitting under a phone's SCORES button.
 				scoreTab = {
+					margin = 3,
+					scrollBar = 6,
+					sizes = {
+						width = 800,
+						side = 12,
+						gap = 6,
+						avatar = 27,
+						column = 76,
+						rowHeight = 38,
+						textSize = 19,
+						headHeight = 23,
+						headSize = 14,
+						barHeight = 31,
+						barSize = 20,
+						switchGap = 10,
+						switchSize = 18,
+					},
+					compactSizes = {
+						width = 610,
+						side = 8,
+						gap = 6,
+						avatar = 21,
+						column = 58,
+						rowHeight = 27,
+						textSize = 17,
+						headHeight = 15,
+						headSize = 11,
+						barHeight = 25,
+						barSize = 17,
+						switchGap = 4,
+						switchSize = 15,
+					},
+				},
+				scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
+				endScreen = {
 					position = UDim2.fromScale(0.5, 0.5),
-					size = UDim2.fromOffset(640, 360),
+					size = UDim2.fromOffset(720, 520),
 					rowHeight = 28,
 					columnWidth = 80,
 				},
-				scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
-				endScreen = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(720, 520) },
 				getUp = {
 					sizes = {
 						bottom = 104,
@@ -2018,8 +2057,45 @@ describe("Config.forMode", function()
 				message = "UI.markers.arrowImage: must not be empty",
 			},
 			{
-				overrides = { UI = { hud = { layout = { scoreTab = { columnWidth = 0 } } } } },
-				message = "UI.hud.layout.scoreTab.columnWidth: must be > 0",
+				overrides = { UI = { hud = { layout = { endScreen = { columnWidth = 0 } } } } },
+				message = "UI.hud.layout.endScreen.columnWidth: must be > 0",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { sizes = { column = 0 } } } } } },
+				message = "UI.hud.layout.scoreTab.sizes.column: must be >= 1 (got 0)",
+			},
+			-- The old graybox tab's place and table (#357 rebuilt it).
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { rowHeight = 28 } } } } },
+				message = "UI.hud.layout.scoreTab.rowHeight: unknown key",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { compactSizes = { textSize = 101 } } } } } },
+				message = "UI.hud.layout.scoreTab.compactSizes.textSize: must be <= 100",
+			},
+			-- Whole pixels: a UDim's offset drops a fraction, which would open seams between rows.
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { compactSizes = { rowHeight = 27.5 } } } } } },
+				message = "UI.hud.layout.scoreTab.compactSizes.rowHeight: must be an integer (got 27.5)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { margin = -1 } } } } },
+				message = "UI.hud.layout.scoreTab.margin: must be >= 0",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { scrollBar = -1 } } } } },
+				message = "UI.hud.layout.scoreTab.scrollBar: must be >= 0",
+			},
+			-- ScrollBarThickness holds whole pixels.
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { scrollBar = 6.5 } } } } },
+				message = "UI.hud.layout.scoreTab.scrollBar: must be an integer (got 6.5)",
+			},
+			-- Under the touch controls, the open board would leave their buttons over it.
+			{ overrides = { UI = { hud = { displayOrder = 0 } } }, message = "UI.hud.displayOrder: must be >= 1" },
+			{
+				overrides = { UI = { hud = { avatarImage = "rbxthumb://type=AvatarHeadShot&w=48&h=48" } } },
+				message = "UI.hud.avatarImage: placeholder count must be 1",
 			},
 			{ overrides = { UI = { hud = { spacing = -1 } } }, message = "UI.hud.spacing: must be >= 0" },
 			-- The carrier's beam is one part, which Roblox would clamp to its size limits.
@@ -2190,8 +2266,8 @@ describe("Config.forMode", function()
 				message = "UI.hud.layout.feed.position: unknown key",
 			},
 			{
-				overrides = { UI = { hud = { layout = { scoreTab = { size = UDim2.fromOffset(0, 360) } } } } },
-				message = "UI.hud.layout.scoreTab.size: must be in pixels (scales 0, offsets > 0)",
+				overrides = { UI = { hud = { layout = { endScreen = { size = UDim2.fromOffset(0, 520) } } } } },
+				message = "UI.hud.layout.endScreen.size: must be in pixels (scales 0, offsets > 0)",
 			},
 			-- RC's crosshair (#312, #353): on the screen, rings that hold their dot, the carrying ring growing into the
 			-- charge ring, a blink that takes some time.
@@ -2271,10 +2347,40 @@ describe("Config.forMode", function()
 				overrides = { UI = { hud = { layout = { reticle = { compactSizes = { carry = 47 } } } } } },
 				message = "UI: the reticle's carrying ring must be smaller than its charge ring (carry < charge)",
 			},
-			-- Five number columns of 120 and their gaps, inside the padding: 642 px, wider than the 640 px tab.
+			-- Five number columns of 140 and their gaps, inside the padding: 742 px, wider than the 720 px end screen.
 			{
-				overrides = { UI = { hud = { layout = { scoreTab = { columnWidth = 120 } } } } },
-				message = "UI: the score tab's number columns must leave room for names, in the tab and the end screen",
+				overrides = { UI = { hud = { layout = { endScreen = { columnWidth = 140 } } } } },
+				message = "UI: the end screen's number columns must leave room for names",
+			},
+			-- The TAB board (#357), each leaving its names no room at all: on a phone 2 x 8 + (21 + 2 x 3) + 6 x 6 + 5
+			-- x 106 = 609 px of its 609; on desktop 2 x 12 + (27 + 2 x 3) + 6 x 6 + 5 x 76 = 473 of its 473.
+			{
+				overrides = {
+					UI = { hud = { layout = { scoreTab = { compactSizes = { column = 106, width = 609 } } } } },
+				},
+				message = "UI: the TAB board's number columns must leave room for names, on either kind of screen",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { sizes = { width = 473 } } } } } },
+				message = "UI: the TAB board's number columns must leave room for names, on either kind of screen",
+			},
+			-- An avatar ringed in look C's 2.5 px ink is 27 + 5 = 32 px, a row 31; a phone's bar text 17 + 5 = 22 over
+			-- the bar's ink line, 24 - 3 = 21 left; a 14 px header in 13.
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { sizes = { rowHeight = 31 } } } } } },
+				message = "UI: a TAB board's rows, header and bars must hold what they show",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { compactSizes = { textSize = 23 } } } } } },
+				message = "UI: a TAB board's rows, header and bars must hold what they show",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { compactSizes = { barHeight = 24 } } } } } },
+				message = "UI: a TAB board's rows, header and bars must hold what they show",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreTab = { sizes = { headHeight = 13 } } } } } },
+				message = "UI: a TAB board's rows, header and bars must hold what they show",
 			},
 		}
 		for _, case in cases do
@@ -2633,6 +2739,27 @@ describe("Config.forMode", function()
 		expect(hints.press).toEqual({ textSize = 1, gap = 0 })
 		expect(config.UI.hud.look.sweepTransparency).toBe(0)
 		expect(config.UI.text.cooldown).toBe("%5.2fs")
+	end)
+
+	-- The TAB board (#357) at each room rule's edge: names one pixel wide, an avatar's and the text's ink as tall as a
+	-- row, the header's text as tall as it, a bar's text and ink just above its ink line.
+	it("accepts TAB board sizes just inside their limits", function()
+		-- Desktop: 2 x 12 + (27 + 2 x 3) + 6 x 6 + 5 x 76 = 473, one pixel short of 474. A 27 px avatar or text and
+		-- their 2.5 px ink in a 32 px row; 20 + 5 = 25 px over a 28 + 3 px bar's ink line.
+		local sizes = { width = 474, rowHeight = 32, textSize = 27, headHeight = 14, barHeight = 28, switchGap = 0 }
+		-- The phone: 2 x 8 + (21 + 2 x 3) + 6 x 6 + 5 x 106 = 609, one short of 610; 21 + 5 = 26 and 17 + 5 = 22 + 3.
+		local compactSizes = { column = 106, rowHeight = 26, textSize = 21, headHeight = 11, barHeight = 25 }
+		local overrides = { margin = 0, scrollBar = 0, sizes = sizes, compactSizes = compactSizes }
+		local config = Fixtures.config({ UI = { hud = { layout = { scoreTab = overrides } } } })
+		local tab = config.UI.hud.layout.scoreTab
+		expect(tab.margin).toBe(0)
+		expect(tab.scrollBar).toBe(0)
+		for key, value in sizes do
+			expect(`{key} = {(tab.sizes :: any)[key]}`).toBe(`{key} = {value}`)
+		end
+		for key, value in compactSizes do
+			expect(`{key} = {(tab.compactSizes :: any)[key]}`).toBe(`{key} = {value}`)
+		end
 	end)
 
 	it("rejects the old lap text, score pips and speedometer size as unknown", function()

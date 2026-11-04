@@ -1,9 +1,9 @@
 --!strict
 -- The end of the match (spec §6.5, §11.1), in the middle of the HUD's stage until the next match starts, solid: the
--- winner in their team's colour, both teams' totals, the MVP's card (their row of the score tab; hidden without an
--- MVP), and the whole score tab, one under another. Compact (on touch, the owner's choice) it leaves the score tab out,
--- which the touch score button opens over it, and is only as tall as the rest. It shrinks to fit a small screen, as
--- tall as its parts make it. A plain function of its props.
+-- winner in their team's colour, both teams' totals, the MVP's card (their row of the stats table, StatsTable; hidden
+-- without an MVP), and the whole table, one under another. Compact (on touch, the owner's choice) it leaves the table
+-- out, as the touch score button opens the TAB board over it, and is only as tall as the rest. It shrinks to fit a
+-- small screen, as tall as its parts make it. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -24,7 +24,7 @@ export type EndScreenProps = {
 	localId: Types.PlayerId,
 	-- The HUD's stage, which the screen fits in.
 	area: React.Binding<Vector2>,
-	-- Without the whole score tab.
+	-- Without the whole table.
 	compact: boolean,
 }
 

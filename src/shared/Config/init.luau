@@ -56,6 +56,7 @@ export type CapSizes = UI.CapSizes
 export type MouseSizes = UI.MouseSizes
 export type FeedSizes = UI.FeedSizes
 export type GetUpSizes = UI.GetUpSizes
+export type TabSizes = UI.TabSizes
 export type LookSettings = UI.LookSettings
 export type MotionSettings = UI.MotionSettings
 export type BounceShape = UI.BounceShape

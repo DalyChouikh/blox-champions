@@ -170,6 +170,27 @@ export type FeedSizes = { height: number, corner: UDim, inset: number, textSize:
 -- when the feed reaches there (HudScreen.getUpBottom). Pixels.
 export type GetUpSizes = { bottom: number, cap: CapSizes, gap: number, wordsGap: number, textSize: number }
 
+-- The TAB board on one kind of screen (Hud/ScoreTab, #357, the owner's Q236, Q237): a look C box `width` pixels wide.
+-- In it a header headHeight tall with the column names at headSize; then each team's bar, barHeight tall with its ink
+-- line, its name and score at barSize; then its rows, rowHeight tall: an avatar circle `avatar` pixels across in its
+-- ink, the name, then the five number columns, each `column` wide, all `gap` apart and `side` in from the box's edges,
+-- at textSize. Switch team sits switchGap under the box's ink, its words at switchSize. Pixels.
+export type TabSizes = {
+	width: number,
+	side: number,
+	gap: number,
+	avatar: number,
+	column: number,
+	rowHeight: number,
+	textSize: number,
+	headHeight: number,
+	headSize: number,
+	barHeight: number,
+	barSize: number,
+	switchGap: number,
+	switchSize: number,
+}
+
 -- The desktop hints in look C (Hud/ControlHints): position is the column's right middle's. A row per control is a
 -- look C box rowHeight pixels tall, with clearance pixels of the game between one row's drop shadow and the next
 -- row's outline; in it, inset pixels from its left and right, the key's cap, then `gap`, then its label at
@@ -236,11 +257,15 @@ export type HudLayout = {
 	-- The kickoff count (#353) at the crosshair's place, lower where its ring would come within reticle.clearance
 	-- pixels of the scoreboard (HudScreen.countDrop): `sizes` on a desktop's screen, compactSizes on a phone's.
 	countdown: { sizes: CountSizes, compactSizes: CountSizes },
-	-- columnWidth: each number column; the name column takes the rest.
-	scoreTab: { position: UDim2, size: UDim2, rowHeight: number, columnWidth: number },
+	-- The TAB board (#357): `sizes` on a desktop's screen, compactSizes on a phone's (HudScreen.compact), kept `margin`
+	-- pixels in from its area's edges (HudScreen.tabFit); its rows scroll on touch behind a bar scrollBar pixels wide,
+	-- in the rows' right side.
+	scoreTab: { margin: number, scrollBar: number, sizes: TabSizes, compactSizes: TabSizes },
 	-- The touch button that opens the score tab.
 	scoreButton: Place,
-	endScreen: Place,
+	-- The end screen and its table (Hud/StatsTable): rowHeight tall rows, each number column columnWidth wide, the
+	-- name's column the rest.
+	endScreen: { position: UDim2, size: UDim2, rowHeight: number, columnWidth: number },
 	-- The Get Up prompt: `sizes` on a desktop's screen, compactSizes on a phone's.
 	getUp: {
 		sizes: GetUpSizes,
@@ -295,7 +320,7 @@ export type MotionSettings = {
 
 -- How the HUD looks and how long its messages last. dimTransparency greys what would do nothing (a control, a hint,
 -- the Switch team button: Style.dim); glowThickness (pixels) outlines the touch throw button while Ball Focus is on
--- and the viewer's row on the score tab. `look` and `motion` are look C's: the parts it restyles read them.
+-- and the viewer's row on the end screen. `look` and `motion` are look C's: the parts it restyles read them.
 export type HudSettings = {
 	font: Enum.Font,
 	textColor: Color3,
@@ -314,8 +339,12 @@ export type HudSettings = {
 	glowThickness: number,
 	-- Pixels between the parts of a panel, and inside its edge.
 	spacing: number,
-	-- Pixels kept clear at each edge of the HUD's area by a panel shrunk to fit it (the score tab, the end screen).
+	-- Pixels kept clear at each edge of the HUD's area by a part shrunk to fit it (Style.fit).
 	screenMargin: number,
+	-- The HUD's guis draw over the touch controls' (Roblox's default order, 0) while this is higher (#357).
+	displayOrder: number,
+	-- A Roblox user's avatar on the TAB board (HudText.avatar): a content id with %s for their UserId.
+	avatarImage: string,
 	look: LookSettings,
 	motion: MotionSettings,
 	layout: HudLayout,
@@ -486,6 +515,11 @@ local defaults: UIConfig = {
 		glowThickness = 3,
 		spacing = 6,
 		screenMargin = 8,
+		-- On a phone the open TAB board covers the touch buttons (the owner, Q236), so the HUD draws over their gui.
+		displayOrder = 1,
+		-- Roblox's headshot of a user, which loads without yielding; 48 px is its smallest size (probed in Studio: a
+		-- real user's loads in ~0.6 s, an unknown id fails and prints nothing).
+		avatarImage = "rbxthumb://type=AvatarHeadShot&id=%s&w=48&h=48",
 		-- Look C, Bold arcade (the owner, Q184: chunky rounded shapes, thick dark outlines and drop shadows, Fredoka
 		-- with Luckiest Guy banners), as the private design page drew it: ink #0b0e18, 3 px outlines, a 4 px shadow,
 		-- 14 px corners, the clock's box #2a3350, darker toward the bottom (the page's #2a3350 -> #161c30; its team
@@ -632,14 +666,51 @@ local defaults: UIConfig = {
 				sizes = { textSize = 76, ringSize = 200, ringThickness = 8 },
 				compactSizes = { textSize = 40, ringSize = 76, ringThickness = 4 },
 			},
+			-- One compact table on desktop and phones (the owner, Q236, Q237), at the design page's sizes: 19 px rows
+			-- 800 wide on desktop, 17 px rows 610 wide on a phone, each avatar 32 or 26 px across with its ink as the
+			-- page drew it, rows one pixel shorter than the page's on a phone so that a 3-a-side board fits under the
+			-- SCORES button with margin pixels to spare. Rows scroll on touch behind a thin bar in their side.
 			scoreTab = {
+				margin = 3,
+				scrollBar = 6,
+				sizes = {
+					width = 800,
+					side = 12,
+					gap = 6,
+					avatar = 27,
+					column = 76,
+					rowHeight = 38,
+					textSize = 19,
+					headHeight = 23,
+					headSize = 14,
+					barHeight = 31,
+					barSize = 20,
+					switchGap = 10,
+					switchSize = 18,
+				},
+				compactSizes = {
+					width = 610,
+					side = 8,
+					gap = 6,
+					avatar = 21,
+					column = 58,
+					rowHeight = 27,
+					textSize = 17,
+					headHeight = 15,
+					headSize = 11,
+					barHeight = 25,
+					barSize = 17,
+					switchGap = 4,
+					switchSize = 15,
+				},
+			},
+			scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
+			endScreen = {
 				position = UDim2.fromScale(0.5, 0.5),
-				size = UDim2.fromOffset(640, 360),
+				size = UDim2.fromOffset(720, 520),
 				rowHeight = 28,
 				columnWidth = 80,
 			},
-			scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
-			endScreen = { position = UDim2.fromScale(0.5, 0.5), size = UDim2.fromOffset(720, 520) },
 			-- At the bottom centre like Roller Champions' prompt (Video 5 at 0:18), banner style (the owner, Q221), at
 			-- the design page's sizes: 46 px caps with their drop shadow, GET UP! in the banners' font at 40, 104 px
 			-- up. On a phone the hints' own cap size and a banner's share of the screen (Q191).
@@ -758,6 +829,24 @@ local wholePixels = Validate.number({ min = 1, integer = true })
 local place = Validate.record({ position = udim2, size = pixels })
 local columns = Validate.record({ position = udim2, size = pixels, rowHeight = positive, columnWidth = positive })
 local nonNegative = Validate.number({ min = 0 })
+-- Whole pixels or none.
+local wholeOrNone = Validate.number({ min = 0, integer = true })
+-- The TAB board's offsets (Hud/ScoreTab) in whole pixels, so its rows and bars meet on pixel edges.
+local tabSizes = Validate.record({
+	width = wholePixels,
+	side = wholeOrNone,
+	gap = wholeOrNone,
+	avatar = wholePixels,
+	column = wholePixels,
+	rowHeight = wholePixels,
+	textSize = textSize,
+	headHeight = wholePixels,
+	headSize = textSize,
+	barHeight = wholePixels,
+	barSize = textSize,
+	switchGap = wholeOrNone,
+	switchSize = textSize,
+})
 local boardTextSizes = Validate.record({ score = textSize, clock = textSize, worth = textSize, period = textSize })
 local teamColors = Validate.record({ Blue = Validate.datatype("Color3"), Orange = Validate.datatype("Color3") })
 local speedTextSizes = Validate.record({ speed = textSize, unit = textSize })
@@ -796,19 +885,49 @@ local function textsFit(sizes: BoardTextSizes, score: UDim2, clock: UDim2, worth
 	return sizes.score <= score.Y.Offset and sizes.clock <= clock.Y.Offset and sizes.worth <= worth.Y.Offset
 end
 
--- The score tab's table (StatsTable) gives each number column columnWidth and a spacing gap, inside its panel's
--- padding (spacing at each side), and the name column what is left: the score tab and the end screen draw it, and
--- both must leave the names some room.
-local function namesFit(ui: UIConfig): boolean
-	local hud = ui.hud
-	local layout = hud.layout
+-- How many number columns a table of players' stats has: every column but the name's (UI.text.columns).
+local function numberColumns(ui: UIConfig): number
 	local count = 0
 	for _ in ui.text.columns do
 		count += 1
 	end
-	-- Every column but the name's.
-	local taken = (count - 1) * (layout.scoreTab.columnWidth + hud.spacing) + 2 * hud.spacing
-	return taken < layout.scoreTab.size.X.Offset and taken < layout.endScreen.size.X.Offset
+	return count - 1
+end
+
+-- The end screen's table (StatsTable) gives each number column columnWidth and a spacing gap, inside its panel's
+-- padding (spacing at each side), and the name column what is left, which must leave the names some room.
+local function namesFit(ui: UIConfig): boolean
+	local hud = ui.hud
+	local endScreen = hud.layout.endScreen
+	local taken = numberColumns(ui) * (endScreen.columnWidth + hud.spacing) + 2 * hud.spacing
+	return taken < endScreen.size.X.Offset
+end
+
+-- How wide a TAB board row's avatar slot is (Hud/ScoreTab): its circle and `ink` round it, in whole pixels.
+local function tabAvatarSlot(sizes: TabSizes, ink: number): number
+	return sizes.avatar + 2 * math.ceil(ink)
+end
+
+-- How wide a TAB board row's cells but its name stand (Hud/ScoreTab): the avatar's slot, `numbers` number columns,
+-- and a gap between each two of the row's cells. The name takes what they leave of the box's width inside `side` at
+-- each edge.
+local function tabCellsWidth(sizes: TabSizes, ink: number, numbers: number): number
+	return tabAvatarSlot(sizes, ink) + (numbers + 1) * sizes.gap + numbers * sizes.column
+end
+
+-- Whether a TAB board's row leaves its name some room.
+local function tabNamesFit(sizes: TabSizes, ink: number, numbers: number): boolean
+	return sizes.width - 2 * sizes.side - tabCellsWidth(sizes, ink, numbers) > 0
+end
+
+-- What a TAB board's rows, header and bars show fits in them (Hud/ScoreTab): an avatar's circle and a row's text with
+-- look C's ink round them, the header's names (not inked), a bar's text with its ink above the bar's ink line.
+local function tabHolds(sizes: TabSizes, look: LookSettings): boolean
+	local ink = 2 * look.textOutline
+	return sizes.avatar + ink <= sizes.rowHeight
+		and sizes.textSize + ink <= sizes.rowHeight
+		and sizes.headSize <= sizes.headHeight
+		and sizes.barSize + ink <= sizes.barHeight - look.outline
 end
 
 -- The reticle's dot, `ink` thick round it, inside a carrying ring's ink, which reaches `ink` either side of its
@@ -911,6 +1030,9 @@ local fields = Validate.record({
 		glowThickness = Validate.number({ min = 0 }),
 		spacing = Validate.number({ min = 0 }),
 		screenMargin = Validate.number({ min = 0 }),
+		-- Level with the touch controls' gui (Roblox's default, 0), the open board could draw under their buttons.
+		displayOrder = Validate.number({ min = 1, integer = true }),
+		avatarImage = template(1),
 		look = Validate.record({
 			font = Validate.enumItem(Enum.Font),
 			bannerFont = Validate.enumItem(Enum.Font),
@@ -1025,9 +1147,14 @@ local fields = Validate.record({
 				compactSizes = ringSizes,
 			}),
 			countdown = Validate.record({ sizes = countSizes, compactSizes = countSizes }),
-			scoreTab = columns,
+			scoreTab = Validate.record({
+				margin = nonNegative,
+				scrollBar = wholeOrNone,
+				sizes = tabSizes,
+				compactSizes = tabSizes,
+			}),
 			scoreButton = place,
-			endScreen = place,
+			endScreen = columns,
 			getUp = Validate.record({
 				sizes = getUpSizes,
 				compactSizes = getUpSizes,
@@ -1104,8 +1231,24 @@ local schema = Validate.checkAll(fields, {
 		end,
 	},
 	{
-		message = "the score tab's number columns must leave room for names, in the tab and the end screen",
+		message = "the end screen's number columns must leave room for names",
 		holds = namesFit,
+	},
+	-- One compact table on desktop and phones (#357, the owner's Q237), each at its own sizes.
+	{
+		message = "the TAB board's number columns must leave room for names, on either kind of screen",
+		holds = function(ui: UIConfig): boolean
+			local tab, ink, numbers = ui.hud.layout.scoreTab, ui.hud.look.textOutline, numberColumns(ui)
+			return tabNamesFit(tab.sizes, ink, numbers) and tabNamesFit(tab.compactSizes, ink, numbers)
+		end,
+	},
+	{
+		message = "a TAB board's rows, header and bars must hold what they show (avatar and textSize with look C's "
+			.. "ink round them <= rowHeight, headSize <= headHeight, barSize with its ink <= barHeight - look.outline)",
+		holds = function(ui: UIConfig): boolean
+			local tab, look = ui.hud.layout.scoreTab, ui.hud.look
+			return tabHolds(tab.sizes, look) and tabHolds(tab.compactSizes, look)
+		end,
 	},
 	-- The crosshair's rings build round its dot (#312, #353), on either kind of screen.
 	{
@@ -1144,4 +1287,6 @@ local schema = Validate.checkAll(fields, {
 return {
 	defaults = defaults,
 	schema = schema,
+	tabAvatarSlot = tabAvatarSlot,
+	tabCellsWidth = tabCellsWidth,
 }

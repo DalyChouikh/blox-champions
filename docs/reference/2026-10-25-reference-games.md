@@ -1823,6 +1823,37 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   rulings to check: at most 3 lines (a fourth pushes the oldest out), and a wider old chip showing past a narrower new one for
   the 0.25 s swap): **"Yes, ship it"**. Next: #373's commit and PR, then #357 (the TAB board, also not cutting the prompt in
   half, Q231), #358, #355.
+- **Q234 the TAB board on a phone** (session 78, #357; the page's section 'The TAB board on desktop and phone', to scale at 750 x
+  381: P1 two panels left of the buttons at 13 px, P2 two panels on the whole screen at 15 px): "The whole screen, but didn't
+  chose a compact scoreboard instead each scoreboard for a team?". So the whole screen, and a question. From this file: S5
+  Compact chips (Q196) is the TOP scoreboard on phones; the TAB board was T1 side by side (Q190), and no compact TAB board was
+  ever drawn or chosen. Next: draw P3, one compact table for both teams on the whole screen, beside P2, and ask.
+- **Q235** (recommended): **the Get Up prompt and the feed's chips hide while the board is open** and come back when it closes
+  (a chip's 6 s keep counting; moving still gets a knocked-down skater up). Not chosen: the board drawing over them.
+- **Q236 the phone's TAB board** (session 78, recommended; the page, to scale at 750 x 381): **P3 one compact table** on the whole
+  screen: both teams in one table with a coloured bar per team, the viewer's first, 17 px text, full column names, under the
+  SCORES button and over the touch buttons while it is open. Desktop keeps T1's two panels. Not chosen: P2 (two panels, 15 px).
+- **Q237 desktop's TAB board too** (session 78, the owner's words: "No even desktop should be compact"): **one compact table on
+  desktop as well as phones**, a coloured bar per team, the viewer's first. This replaces T1's two panels (Q190) everywhere, and
+  Q236's "Desktop keeps T1's two panels". Sizes differ by screen, the layout does not.
+- **Q238 the banners under the open board** (session 79, #357 built; the design page moved to
+  https://claude.ai/artifact/VPCRWP4Y399pP2cFJ8vQqP, the earlier XWrav5BHeWqVQ8eebfqrP9 being the previous account's; section
+  'The TAB board, built': Play shots, desktop 1556 x 793 and the phone 750 x 381). Measured with the other messages (Q230's
+  lesson): on a phone at 3 a side the bottom 6 px of ORANGE GOAL IS ACTIVE! show as a dark strip under the board's ink; on desktop
+  at 5 a side the board's top crosses LAP 2 COMPLETED, only the top 13 px of its letters showing (at 3-4 a side it clears the
+  banner, at 6 the banner is wholly behind the board). **Hide them too** (recommended): while the board shows, the banner line and
+  the goal message hide like the prompt and the chips (Q235), and come back when it has faded, their time counting on. Not chosen:
+  hiding the goal message only; leaving them. Also shown there, a correction of the plan: the rows do not fit a phone from 4 a side;
+  they scroll on touch (Q190's "scrolling if needed"), and off touch the board shrinks to fit (TAB is held).
+- **Q239 #357 shipped** (session 80, recommended; the design page https://claude.ai/artifact/VPCRWP4Y399pP2cFJ8vQqP version 2,
+  section 'The open board hides the banners, and keeps clear of the scoreboard': Play shots of Q238 built, desktop 1556 x 793
+  and the phone 750 x 381, a LAP banner and the goal message fired before each capture). Found while shooting it: at 6 a side on
+  desktop the board's top ink sat 6 px into the lap chips under the shield (chips to y 76, the board from y 70, Hud frame); so
+  off touch the board's area now starts under the scoreboard's deepest ink in play (HudScreen.boardBottom, the period counted
+  while it shows), its 3 px margin keeping Q203's clearance; on touch under SCORES or that ink, whichever is lower. Asked with
+  the rulings to check: the pop 0.2 s and fade 0.25 s (Q194); scroll on touch, shrink to fit off touch; the area under SCORES
+  takes taps only while open; plain white circles for ids that are no Roblox user. **"Yes, ship it"**. Next: #357's commit and
+  PR, then #358, #355.
 
 ## Roller Champions
 
