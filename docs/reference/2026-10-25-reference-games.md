@@ -1685,6 +1685,25 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   Luckiest Guy draws 1-5 0.150-0.165 of the text size high, so `look.bannerDigitRise` 0.16 moves the digit down;
   measured after: within 0.5 px of the ring's centre on desktop, 0 on the phone): **"Yes, ship it"**
   (recommended). Next: #354 the desktop hints.
+- **Q206 mouse buttons as mouse icons** (session 73, asked whether to ship #354 as built, shown on the new page
+  https://claude.ai/artifact/Rsh5nQcGHQoRbhRrr3RNW1, the earlier CJkm6TCEoYNBkti4y6N82t being the previous
+  account's; with four rulings to confirm: the >> 0.3 s vs RC's ~0.13 s, the sweep clockwise from 12 o'clock, one
+  orange, the inked >>): not yet; the owner's words: "For LMB and RMB can we show mouse icons with the button
+  highlighted show me a visualization in the artificat first to see if that is possible". So the hint caps of the
+  mouse's buttons (Focus/Throw on RMB, today lettered "LMB"/"RMB") show a mouse with the pressed button lit, drawn
+  on the page first. The phone screenshot waits ("Check my mouse icon request first then ill switch").
+- **Q207 the mouse icon: A1** (session 73, recommended; three versions rendered by Studio in the real hint rows on
+  the page, built from released UI with no image upload: Roblox ships no mouse-button picture): **a white mouse on
+  the yellow key cap, the button filled in ink** (Throw lights the left button, Focus the right; the cap turns
+  orange and pops on a press like every key). Not chosen: A2 (the mouse in the cap's own colour, an ink outline, the
+  button in ink); B (no cap, a white mouse, the button yellow, orange while pressed, like the gamepad's bare glyphs).
+- **Q208 the rest of #354 as built** (session 73, recommended): the >> 0.3 s (the page's; RC ~0.13 s, Video 24), the
+  sweep clearing clockwise from 12 o'clock, one orange (#ff8a2c) for the pressed cap and the >>, the >> inked like
+  look C's lettering. Not chosen: RC's shorter >>. Next: the mouse icon test-first in #354, the phone shot, the PR.
+- **Q209 #354 shipped** (session 74, recommended; the built mouse caps shown on the page
+  https://claude.ai/artifact/Rsh5nQcGHQoRbhRrr3RNW1 version 3: the live game carrying, four frozen columns, 3x
+  close-ups): **"Yes, ship it"** as built (A1), after the phone screenshot. The owner Connected Rojo and switched
+  Studio's emulator to the phone. Next: the phone shot, #354's PR, then #356 the banners.
 
 ## Roller Champions
 

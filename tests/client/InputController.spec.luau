@@ -5,6 +5,7 @@ local JestGlobals = require(ReplicatedStorage.DevPackages.JestGlobals)
 local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.expect
 local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.InputController)
 
@@ -125,6 +126,64 @@ describe("InputController", function()
 		throw:Fire(false)
 		InputController:readActions(actions)
 		expect(actions.throw).toBe(false)
+	end)
+
+	-- The HUD's press feedback (#354, Q186): the key pressed pops, whatever its control does, while the game's
+	-- own reads still each see the press once.
+	it("counts every control's presses for the HUD, leaving the game's reads their own", function()
+		local context = InputController.context
+		local jump = Fixtures.scriptedBinding(context, "Jump")
+		local pump = Fixtures.scriptedBinding(context, "Pump")
+		local focus = Fixtures.scriptedBinding(context, "BallFocus")
+		expect(InputController:pressCount("jump")).toBe(0)
+		jump:Fire(true)
+		pump:Fire(true)
+		task.wait()
+		pump:Fire(false)
+		pump:Fire(true)
+		focus:Fire(true)
+		task.wait() -- Pressed is deferred
+		expect(InputController:pressCount("jump")).toBe(1)
+		expect(InputController:pressCount("pump")).toBe(2)
+		expect(InputController:pressCount("ballFocus")).toBe(1)
+		expect(InputController:pressCount("throw")).toBe(0)
+		local keys, camera = InputController.newKeys(), InputController.newCameraKeys()
+		InputController:read(keys)
+		InputController:readCamera(camera)
+		expect(keys.jump).toBe(true)
+		expect(camera.ballFocusPressed).toBe(true)
+		-- Read by the game, still counted for the HUD; and a count read by the HUD is still the game's.
+		expect(InputController:pressCount("jump")).toBe(1)
+		InputController:read(keys)
+		expect(keys.jump).toBe(false)
+		jump:Fire(false)
+		jump:Fire(true)
+		task.wait()
+		expect(InputController:pressCount("jump")).toBe(2)
+		InputController:read(keys)
+		expect(keys.jump).toBe(true)
+	end)
+
+	it("counts a press of every control", function()
+		local context = InputController.context
+		local controls: { { control: Config.Control, action: string } } = {
+			{ control = "jump", action = "Jump" },
+			{ control = "pump", action = "Pump" },
+			{ control = "brake", action = "Brake" },
+			{ control = "attach", action = "Attach" },
+			{ control = "tackle", action = "Tackle" },
+			{ control = "uppercut", action = "Uppercut" },
+			{ control = "pass", action = "Pass" },
+			{ control = "throw", action = "Throw" },
+			{ control = "ballFocus", action = "BallFocus" },
+		}
+		for _, each in controls do
+			Fixtures.scriptedBinding(context, each.action):Fire(true)
+		end
+		task.wait() -- Pressed is deferred
+		for _, each in controls do
+			expect(InputController:pressCount(each.control)).toBe(1)
+		end
 	end)
 
 	it("reads the score tab held on Tab or Select", function()
@@ -310,6 +369,7 @@ describe("InputController", function()
 		task.wait() -- Pressed is deferred
 		InputController:readActions(actions)
 		expect(actions.tackle).toBe(false)
+		expect(InputController:pressCount("tackle")).toBe(0)
 		tackle:Fire(false)
 
 		menu.MenuClosed:Fire()

@@ -89,6 +89,9 @@ export type UIText = {
 	touchMove: string,
 	-- The score tab's button that moves the player to the other team (#310).
 	switchTeam: string,
+	-- The seconds left on a key cooling down (one value), and the mark beside a key just pressed (#354).
+	cooldown: string,
+	pressMark: string,
 }
 
 export type Place = { position: UDim2, size: UDim2 }
@@ -136,6 +139,32 @@ export type RingSizes = { carry: number, charge: number, thickness: number }
 -- across at its stroke's outer edge, the stroke ringThickness pixels wide over look C's ink.
 export type CountSizes = { textSize: number, ringSize: number, ringThickness: number }
 
+-- A mouse on a mouse button's key cap (#354, the owner's Q207): a body width x height pixels in look C's ink `line`
+-- pixels thick, its buttons `buttons` pixels deep from its rounded top. Whole pixels (a UDim's offset drops a
+-- fraction).
+export type MouseSizes = { width: number, height: number, buttons: number, line: number }
+
+-- A look C key cap (Hud/Style.keyCap): `height` pixels tall and as wide as its key's name with `padding` each side,
+-- never narrower than tall, its corners `corner`, its name at textSize; a mouse button's cap square, with `mouse` on
+-- it. Pixels.
+export type CapSizes = { height: number, padding: number, corner: UDim, textSize: number, mouse: MouseSizes }
+
+-- The desktop hints in look C (Hud/ControlHints): position is the column's right middle's. A row per control is a
+-- look C box rowHeight pixels tall, with clearance pixels of the game between one row's drop shadow and the next
+-- row's outline; in it, inset pixels from its left and right, the key's cap, then `gap`, then its label at
+-- textSize, the key's cap sized by `cap`. A pressed key's mark (UI.text.pressMark) sits outside the row at
+-- press.textSize, its right edge press.gap pixels left of the row's outline. Sizes are pixels.
+export type HintsLayout = {
+	position: UDim2,
+	rowHeight: number,
+	clearance: number,
+	inset: { left: number, right: number },
+	gap: number,
+	textSize: number,
+	cap: CapSizes,
+	press: { textSize: number, gap: number },
+}
+
 -- Where each part of the HUD sits; sizes and row heights are pixels.
 export type HudLayout = {
 	-- A screen whose shorter side is under compactBelow pixels is a phone's: the compact scoreboard and the small
@@ -145,7 +174,7 @@ export type HudLayout = {
 	compactScoreboard: CompactScoreboardLayout,
 	banner: Place,
 	feed: { position: UDim2, size: UDim2, rowHeight: number },
-	hints: { position: UDim2, size: UDim2, rowHeight: number },
+	hints: HintsLayout,
 	-- position is the bottom-right corner's; on touch, touchPosition is the top-left corner's, clear of the touch
 	-- buttons and the score button. The reading's digits over its unit, at textSizes, compactTextSizes on a phone.
 	speedometer: {
@@ -186,7 +215,9 @@ export type HudLayout = {
 -- an ink shadow dropping `shadow` pixels below it; it is its colour at the top and that colour times (1 - shade) at the
 -- bottom. `box` colours a box that is no team's (the clock's, an empty lap chip); `teamColors` the HUD's team parts
 -- (Style.teamColor), brighter than the world's UI.teamColors. bannerFont draws a digit's middle bannerDigitRise of
--- its text size above its line's middle; a digit centred in a shape moves down by that (Hud/Countdown).
+-- its text size above its line's middle; a digit centred in a shape moves down by that (Hud/Countdown). A key's
+-- cap is `key` with its name in ink, `pressed` while it pops (the press's mark too); a cooling key's sweep is ink,
+-- sweepTransparency see-through.
 export type LookSettings = {
 	font: Enum.Font,
 	bannerFont: Enum.Font,
@@ -199,17 +230,25 @@ export type LookSettings = {
 	box: Color3,
 	shade: number,
 	teamColors: TeamColors,
+	key: Color3,
+	pressed: Color3,
+	sweepTransparency: number,
 }
 
+-- A bounce's shape (Hud/Motion.bounce): over `seconds`, a part goes to `scale` times its size, then to `rebound`
+-- times it, then back to its size, in three equal parts.
+export type BounceShape = { seconds: number, scale: number, rebound: number }
+
 -- How the HUD's parts move (Hud/Motion), in seconds. A part popping in grows from nothing past its size by
--- `overshoot` of it, then settles; a bounce grows to `scale` times its size, comes back to `rebound` times it, then
--- settles, in three equal parts; a meter's part fills or empties, and a part shrinks away, easing out over
--- easeSeconds. The last lap chip stays full lapHoldSeconds before the row empties for the next lap. A glow brightens
--- (a white veil down to `transparency`) and dims once every glow.seconds. The speedometer's reading eases toward the
--- speed, closing speedRate of the gap a second.
+-- `overshoot` of it, then settles; a bounce (a score that changes) grows past its size and comes back under it, a
+-- press (a key pressed) shrinks under its size and springs back past it; a meter's part fills or empties, and a
+-- part shrinks away, easing out over easeSeconds. The last lap chip stays full lapHoldSeconds before the row
+-- empties for the next lap. A glow brightens (a white veil down to `transparency`) and dims once every
+-- glow.seconds. The speedometer's reading eases toward the speed, closing speedRate of the gap a second.
 export type MotionSettings = {
 	pop: { seconds: number, overshoot: number },
-	bounce: { seconds: number, scale: number, rebound: number },
+	bounce: BounceShape,
+	press: BounceShape,
 	easeSeconds: number,
 	lapHoldSeconds: number,
 	glow: { seconds: number, transparency: number },
@@ -381,6 +420,10 @@ local defaults: UIConfig = {
 		touchPassTarget = "\u{25BC}",
 		touchMove = "Move",
 		switchTeam = "Switch team",
+		-- A cooling key's seconds left, to a tenth, as the page wrote them (#354, Q186); RC's >> beside a key
+		-- just pressed, as the page drew it.
+		cooldown = "%.1f",
+		pressMark = "\u{BB}",
 	},
 	-- The HUD's graybox look, which the Presentation part's issues replace part by part with look C (`look`).
 	hud = {
@@ -421,6 +464,11 @@ local defaults: UIConfig = {
 			-- The page's brighter pair (#3d8bff, #ff9a3c), for the HUD only (the owner, Q201: "I want the lighter
 			-- one"): the world's darker teamColors made a lit lap chip hard to tell from an empty one.
 			teamColors = { Blue = Color3.fromRGB(61, 139, 255), Orange = Color3.fromRGB(255, 154, 60) },
+			-- The page's key caps (#354): #ffd23f with ink lettering, #ff8a2c while pressed (the page drew RC's >>
+			-- beside it in a near orange, #f08a2c: one colour here), and its cooldown's 62% black sweep (Q186).
+			key = Color3.fromRGB(255, 210, 63),
+			pressed = Color3.fromRGB(255, 138, 44),
+			sweepTransparency = 0.38,
 		},
 		-- Every HUD change animates briefly, from settings (the owner, Q194), at the page's timings: a pop to 1.12 then
 		-- 1 (its banners), a score's bounce to 1.55, back to 0.9, then 1 in 0.4 s, its lap chips filling in 0.25 s
@@ -429,6 +477,9 @@ local defaults: UIConfig = {
 		motion = {
 			pop = { seconds = 0.2, overshoot = 0.12 },
 			bounce = { seconds = 0.4, scale = 1.55, rebound = 0.9 },
+			-- A pressed key pops (the owner, Q186) as the page drew it: held in to 0.88 for 0.3 s, then sprung back
+			-- past its size to its press keyframes' 1.06. RC's >> shows ~0.13 s (Video 24); ours keeps the page's 0.3.
+			press = { seconds = 0.3, scale = 0.88, rebound = 1.06 },
 			easeSeconds = 0.25,
 			lapHoldSeconds = 0.5,
 			glow = { seconds = 2.4, transparency = 0.8 },
@@ -468,7 +519,27 @@ local defaults: UIConfig = {
 			-- for its longest line, GO ORANGE TEAM! (691 px at bannerSize).
 			banner = { position = UDim2.new(0.5, 0, 0, 200), size = UDim2.fromOffset(720, 110) },
 			feed = { position = UDim2.new(0.5, 0, 1, -24), size = UDim2.fromOffset(460, 140), rowHeight = 24 },
-			hints = { position = UDim2.new(1, -24, 0.5, 0), size = UDim2.fromOffset(220, 300), rowHeight = 30 },
+			-- Look C's hints (#354), at the page's sizes (1.2 px a unit: 34-unit rows 6 apart, a 28-unit cap, 18-unit
+			-- labels), in today's place at the right; RC's >> outside the row, over the game (the owner, Q195b),
+			-- where the page drew it: its left edge 30 px from the row's outline (a 14 px mark).
+			hints = {
+				position = UDim2.new(1, -24, 0.5, 0),
+				rowHeight = 41,
+				clearance = 3,
+				inset = { left = 5, right = 12 },
+				gap = 11,
+				textSize = 22,
+				-- A mouse button's key a 16 x 24 mouse on its cap (the owner's Q207: A1, as the design page's Studio
+				-- render drew it).
+				cap = {
+					height = 34,
+					padding = 8,
+					corner = UDim.new(0, 10),
+					textSize = 17,
+					mouse = { width = 16, height = 24, buttons = 10, line = 2 },
+				},
+				press = { textSize = 24, gap = 16 },
+			},
 			-- Big digits in the viewer's team colour over a small KM/H, bottom right on desktop and small top left on
 			-- phones, where the touch buttons take the right side (the owner, Q192), at the page's sizes (46 and 14
 			-- units on desktop; 30 and 12 on the phone, 4 px under Roblox's top bar).
@@ -556,11 +627,11 @@ local function noDuplicates(values: { number }): boolean
 	return true
 end
 
--- How many values `text` takes: its %d and %s, each with an optional width (%02d). A doubled %% prints a percent sign
--- and takes none, so it is dropped first.
+-- How many values `text` takes: its %d, %s and %f, each with an optional width and precision (%02d, %.1f). A
+-- doubled %% prints a percent sign and takes none, so it is dropped first.
 local function placeholders(text: string): number
 	local plain = string.gsub(text, "%%%%", "")
-	local _, count = string.gsub(plain, "%%%d*[ds]", "")
+	local _, count = string.gsub(plain, "%%[%d%.]*[dsf]", "")
 	return count
 end
 
@@ -606,6 +677,8 @@ local positive = Validate.number({ above = 0 })
 local partSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
 local udim2 = Validate.datatype("UDim2")
 local pixels = Validate.pixels()
+-- Whole pixels, where a UDim's offset would drop a fraction (probed).
+local wholePixels = Validate.number({ min = 1, integer = true })
 local place = Validate.record({ position = udim2, size = pixels })
 local list = Validate.record({ position = udim2, size = pixels, rowHeight = positive })
 local columns = Validate.record({ position = udim2, size = pixels, rowHeight = positive, columnWidth = positive })
@@ -718,6 +791,8 @@ local fields = Validate.record({
 		touchPassTarget = label,
 		touchMove = label,
 		switchTeam = label,
+		cooldown = template(1),
+		pressMark = label,
 	}),
 	hud = Validate.record({
 		font = Validate.enumItem(Enum.Font),
@@ -750,6 +825,10 @@ local fields = Validate.record({
 			-- A bottom as dark as black would lose the box's colour there.
 			shade = seen,
 			teamColors = teamColors,
+			key = Validate.datatype("Color3"),
+			pressed = Validate.datatype("Color3"),
+			-- A sweep that shows nothing would show no cooldown.
+			sweepTransparency = seen,
 		}),
 		motion = Validate.record({
 			pop = Validate.record({ seconds = positive, overshoot = nonNegative }),
@@ -758,6 +837,12 @@ local fields = Validate.record({
 				seconds = positive,
 				scale = Validate.number({ min = 1 }),
 				rebound = Validate.number({ above = 0, max = 1 }),
+			}),
+			-- A press goes in (or keeps its size) to a size that still shows, then springs back no smaller than it.
+			press = Validate.record({
+				seconds = positive,
+				scale = Validate.number({ above = 0, max = 1 }),
+				rebound = Validate.number({ min = 1 }),
 			}),
 			easeSeconds = positive,
 			lapHoldSeconds = nonNegative,
@@ -788,7 +873,27 @@ local fields = Validate.record({
 			}),
 			banner = place,
 			feed = list,
-			hints = list,
+			hints = Validate.record({
+				position = udim2,
+				rowHeight = positive,
+				clearance = nonNegative,
+				inset = Validate.record({ left = nonNegative, right = nonNegative }),
+				gap = nonNegative,
+				textSize = textSize,
+				cap = Validate.record({
+					height = positive,
+					padding = nonNegative,
+					corner = Validate.datatype("UDim"),
+					textSize = textSize,
+					mouse = Validate.record({
+						width = wholePixels,
+						height = wholePixels,
+						buttons = wholePixels,
+						line = wholePixels,
+					}),
+				}),
+				press = Validate.record({ textSize = textSize, gap = nonNegative }),
+			}),
 			speedometer = Validate.record({
 				position = udim2,
 				touchPosition = udim2,
@@ -853,6 +958,32 @@ local schema = Validate.checkAll(fields, {
 		holds = function(ui: UIConfig): boolean
 			local countdown, ink = ui.hud.layout.countdown, ui.hud.look.textOutline
 			return digitFits(countdown.sizes, ink) and digitFits(countdown.compactSizes, ink)
+		end,
+	},
+	-- A hint's cap and label sit in its row's box (Hud/ControlHints), the cap's name on the cap.
+	{
+		message = "a hint's key cap and label must fit its row (cap.height and textSize <= rowHeight, "
+			.. "cap.textSize <= cap.height)",
+		holds = function(ui: UIConfig): boolean
+			local hints = ui.hud.layout.hints
+			local cap = hints.cap
+			return cap.height <= hints.rowHeight and hints.textSize <= hints.rowHeight and cap.textSize <= cap.height
+		end,
+	},
+	-- A mouse button's cap draws its mouse inside its ink on the cap, and the line under its buttons where the body's
+	-- sides run straight, never across its round top or bottom (Hud/Style.keyCap).
+	{
+		message = "a hint cap's mouse must fit its cap in its ink, the line under its buttons on its "
+			.. "straight sides (height + 2 × line <= cap.height, width / 2 + line / 2 <= buttons <= "
+			.. "height - width / 2 - line / 2)",
+		holds = function(ui: UIConfig): boolean
+			local cap = ui.hud.layout.hints.cap
+			local mouse = cap.mouse
+			-- Where a round end meets the straight sides, with the line's half.
+			local edge = (mouse.width + mouse.line) / 2
+			return mouse.height + 2 * mouse.line <= cap.height
+				and mouse.buttons >= edge
+				and mouse.buttons <= mouse.height - edge
 		end,
 	},
 	{

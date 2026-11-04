@@ -10,9 +10,10 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Motion = require(ReplicatedStorage.Shared.Hud.Motion)
 local React = require(ReplicatedStorage.Packages.React)
 
--- Pop: in from where it is, past `to` and back; Bounce: about `to`; Ease: to `to`; Lap: full, held, then to `to`
--- (a lap chip, Motion.lap); Glow: Motion.glow's veil, cycle after cycle until the next motion or a rest.
-export type Curve = "Pop" | "Bounce" | "Ease" | "Lap" | "Glow"
+-- Pop: in from where it is, past `to` and back; Bounce (a score) and Press (a key): about `to`, each its own
+-- shape; Ease: to `to`; Lap: full, held, then to `to` (a lap chip, Motion.lap); Glow: Motion.glow's veil, cycle
+-- after cycle until the next motion or a rest.
+export type Curve = "Pop" | "Bounce" | "Press" | "Ease" | "Lap" | "Glow"
 
 export type Track = {
 	binding: React.Binding<number>,
@@ -89,6 +90,8 @@ local function seconds(motion: Config.MotionSettings, curve: Curve): number
 		return motion.pop.seconds
 	elseif curve == "Bounce" then
 		return motion.bounce.seconds
+	elseif curve == "Press" then
+		return motion.press.seconds
 	elseif curve == "Lap" then
 		return 2 * motion.easeSeconds + motion.lapHoldSeconds
 	elseif curve == "Glow" then
@@ -103,7 +106,9 @@ local function at(motion: Config.MotionSettings, track: Track, t: number): numbe
 	if curve == "Pop" then
 		return from + (to - from) * Motion.pop(motion, t)
 	elseif curve == "Bounce" then
-		return to * Motion.bounce(motion, t)
+		return to * Motion.bounce(motion.bounce, t)
+	elseif curve == "Press" then
+		return to * Motion.bounce(motion.press, t)
 	elseif curve == "Lap" then
 		return Motion.lap(motion, from, to, t)
 	elseif curve == "Glow" then

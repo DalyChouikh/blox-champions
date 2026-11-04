@@ -7,10 +7,12 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 local Animator = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.Hud.Animator)
 local Config = require(ReplicatedStorage.Shared.Config)
 
--- Motion.spec's round timings: every part eases out, 0.875 of the way halfway through.
+-- Motion.spec's round timings: every part eases out, 0.875 of the way halfway through. The press lasts twice
+-- Motion.spec's, longer than the bounce, so a press timed as a bounce shows.
 local MOTION: Config.MotionSettings = {
 	pop = { seconds = 0.2, overshoot = 0.12 },
 	bounce = { seconds = 0.3, scale = 1.6, rebound = 0.9 },
+	press = { seconds = 0.6, scale = 0.8, rebound = 1.1 },
 	easeSeconds = 0.2,
 	lapHoldSeconds = 0.5,
 	glow = { seconds = 2, transparency = 0.8 },
@@ -55,6 +57,19 @@ describe("Animator", function()
 		animator:step(0.1)
 		expect(track.value).toBeCloseTo(0.9, 6)
 		animator:step(0.1)
+		expect(track.value).toBe(1)
+		expect(track.moving).toBe(false)
+	end)
+
+	it("presses a part in and springs it back", function()
+		local animator = Animator.new(MOTION)
+		local track = animator:track(1)
+		animator:play(track, "Press", 1)
+		animator:step(0.2)
+		expect(track.value).toBeCloseTo(0.8, 6)
+		animator:step(0.2)
+		expect(track.value).toBeCloseTo(1.1, 6)
+		animator:step(0.2)
 		expect(track.value).toBe(1)
 		expect(track.moving).toBe(false)
 	end)

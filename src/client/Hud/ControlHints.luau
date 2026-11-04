@@ -1,9 +1,15 @@
 --!strict
--- The control hints (spec §11.1), at the right of the screen: a row per control, in ControlLabels' order, showing its
--- key and what it does now. The key is the name the player's own keyboard gives it, or Roblox's glyph on a gamepad. A
--- row's label and fade are bindings, so they follow the play each frame without a render: the row hides while its
--- control would do nothing (an empty label), and fades, key and label, while it shows but does not work (Magnetic Pass
--- with nobody to pass to, #315: RC fades the whole row, Video 34 at 43.0 s). A plain function of its props.
+-- The control hints (spec §11.1) in look C (#354; the owner's Q186, Q195b), at the right of the screen: a row per
+-- control, in ControlLabels' order, a look C box round the key's cap (Style.keyCap) and what the control does now.
+-- The key is the name the player's own keyboard gives it, or Roblox's glyph on a gamepad. What follows the play is a
+-- binding, so a row changes without a render: it hides while its control would do nothing (an empty label), and fades
+-- whole (box, cap and label: a CanvasGroup) while it shows but does not work (Magnetic Pass with nobody to pass to,
+-- #315: RC fades the whole row, Video 34 at 43.0 s). A key just pressed pops in the pressed colour, with RC's >>
+-- outside its row, over the game (Q195b: the box keeps no room for it); a key cooling down shows its seconds left and
+-- an ink sweep clearing clockwise. Each row is as wide as its parts, measured (Style.textWidth, Style.capWidth): an
+-- auto-sized row would grow without end round its box's ink, which reaches past the box. The rows stack
+-- right-aligned, clearance pixels of the game between one row's drop shadow and the next one's outline. A plain
+-- function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -13,52 +19,119 @@ local React = require(ReplicatedStorage.Packages.React)
 local Style = require(script.Parent.Style)
 
 export type HintKeys = { [Config.TouchControl]: Style.KeyView }
--- What each control does now; "" while it would do nothing.
-export type HintLabels = { [Config.TouchControl]: React.Binding<string> }
--- How see-through each row is: 0 while its control works, UI.hud.dimTransparency while it is greyed.
-export type HintFades = { [Config.TouchControl]: React.Binding<number> }
+-- One row's bindings: what its control does now ("" while it would do nothing), how see-through the whole row is (0
+-- while its control works, UI.hud.dimTransparency while it is greyed), and what moves on its key's cap.
+export type HintRow = {
+	label: React.Binding<string>,
+	fade: React.Binding<number>,
+	cap: Style.CapBindings,
+}
+export type HintRows = { [Config.TouchControl]: HintRow }
 
 export type ControlHintsProps = {
 	config: Config.GameConfig,
 	keys: HintKeys,
-	labels: HintLabels,
-	fades: HintFades,
+	rows: HintRows,
 }
 
 local function shown(label: string): boolean
 	return label ~= ""
 end
 
+-- A row at `order`: its mark, then its box with the key's cap and the label in a group that fades them as one. The
+-- group reaches past the box by its outline and drop shadow, so the ink it holds is not clipped.
+local function hint(config: Config.GameConfig, view: Style.KeyView, moving: HintRow, order: number): React.ReactElement
+	local look = config.UI.hud.look
+	local place = config.UI.hud.layout.hints
+	local outline, shadow = look.outline, look.shadow
+	local keyName, key = Style.keyCap(config, view, place.cap, 1, moving.cap)
+	-- Across: the outlines, the insets, the cap and the gap, then the label's text.
+	local across = 2 * outline
+		+ place.inset.left
+		+ Style.capWidth(config, view, place.cap)
+		+ place.gap
+		+ place.inset.right
+	local height = place.rowHeight + 2 * outline + shadow
+	local line: { [string]: React.Node } = {
+		Inset = React.createElement("UIPadding", {
+			PaddingLeft = UDim.new(0, place.inset.left),
+			PaddingRight = UDim.new(0, place.inset.right),
+		}),
+		Layout = Style.list(config, Enum.FillDirection.Horizontal, { Padding = UDim.new(0, place.gap) }),
+		[keyName] = key,
+		Label = React.createElement(
+			"TextLabel",
+			Style.lettering(config, {
+				LayoutOrder = 2,
+				AutomaticSize = Enum.AutomaticSize.X,
+				Size = UDim2.fromScale(0, 1),
+				Text = moving.label,
+				TextSize = place.textSize,
+			})
+		),
+	}
+	return React.createElement(
+		"Frame",
+		Style.holder({
+			LayoutOrder = order,
+			Size = moving.label:map(function(label: string): UDim2
+				return UDim2.fromOffset(across + Style.textWidth(config, label, place.textSize), height)
+			end),
+			Visible = moving.label:map(shown),
+		}),
+		{
+			Mark = React.createElement(
+				"TextLabel",
+				Style.lettering(config, {
+					AnchorPoint = Vector2.new(1, 0),
+					Position = UDim2.fromOffset(-place.press.gap, outline),
+					Size = UDim2.fromOffset(0, place.rowHeight),
+					AutomaticSize = Enum.AutomaticSize.X,
+					Text = config.UI.text.pressMark,
+					TextColor3 = look.pressed,
+					TextSize = place.press.textSize,
+					Visible = moving.cap.pressed,
+				}),
+				{ Ink = Style.inked(config) }
+			),
+			Group = React.createElement(
+				"CanvasGroup",
+				Style.holder({ Size = Style.FULL, GroupTransparency = moving.fade }),
+				{
+					Ink = React.createElement("UIPadding", {
+						PaddingLeft = UDim.new(0, outline),
+						PaddingRight = UDim.new(0, outline),
+						PaddingTop = UDim.new(0, outline),
+						PaddingBottom = UDim.new(0, outline + shadow),
+					}),
+					Box = Style.box(config, { Size = Style.FULL }, look.box),
+					Line = React.createElement("Frame", Style.holder(Style.above({ Size = Style.FULL })), line),
+				}
+			),
+		}
+	)
+end
+
 local function ControlHints(props: ControlHintsProps): React.ReactElement
 	local config = props.config
 	local place = config.UI.hud.layout.hints
-	local height = place.rowHeight
 	local rows: { [string]: React.Node } = {
-		Layout = Style.list(
-			config,
-			Enum.FillDirection.Vertical,
-			{ HorizontalAlignment = Enum.HorizontalAlignment.Right }
-		),
+		Layout = Style.list(config, Enum.FillDirection.Vertical, {
+			HorizontalAlignment = Enum.HorizontalAlignment.Right,
+			Padding = UDim.new(0, place.clearance),
+		}),
 	}
 	for order, control: Config.TouchControl in ControlLabels.CONTROLS do
-		local label, fade = props.labels[control], props.fades[control]
-		local keyName, key = Style.key(config, props.keys[control], height, 1, fade)
-		local children: { [string]: React.Node } = {
-			Layout = Style.list(config, Enum.FillDirection.Horizontal, {
-				HorizontalAlignment = Enum.HorizontalAlignment.Right,
-			}),
-			[keyName] = key,
-			Label = Style.label(config, label, 2, fade),
-		}
-		rows[control] = React.createElement(
-			"Frame",
-			Style.holder({ LayoutOrder = order, Size = UDim2.new(1, 0, 0, height), Visible = label:map(shown) }),
-			children
-		)
+		rows[control] = hint(config, props.keys[control], props.rows[control], order)
 	end
 	return React.createElement(
 		"Frame",
-		Style.holder({ AnchorPoint = Vector2.new(1, 0.5), Position = place.position, Size = place.size }),
+		Style.holder({
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = place.position,
+			Size = UDim2.new(),
+			AutomaticSize = Enum.AutomaticSize.XY,
+		}),
 		rows
 	)
 end

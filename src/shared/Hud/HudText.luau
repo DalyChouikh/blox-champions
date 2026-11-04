@@ -1,7 +1,7 @@
 --!strict
--- Every string the HUD shows (spec §11.1), written from Config.UI.text. The clock and the speedometer change every
--- frame, so their strings are cached per whole second and per km/h, and the goal's worth per value: once seen, a value
--- costs no allocation.
+-- Every string the HUD shows (spec §11.1), written from Config.UI.text. The clock, the speedometer and a cooling key's
+-- seconds change every frame, so their strings are cached per whole second, per km/h and per tenth of a second, and
+-- the goal's worth per value: once seen, a value costs no allocation.
 
 local Config = require(script.Parent.Parent.Config)
 local GoalJudge = require(script.Parent.Parent.Rules.GoalJudge)
@@ -20,12 +20,16 @@ type Fields = {
 	_clocks: { [number]: string },
 	_speeds: { [number]: string },
 	_worths: { [number]: string },
+	_cooldowns: { [number]: string },
 }
 
 export type HudText = typeof(setmetatable({} :: Fields, HudText))
 
 function HudText.new(config: Config.GameConfig): HudText
-	return setmetatable({ _config = config, _clocks = {}, _speeds = {}, _worths = {} } :: Fields, HudText)
+	return setmetatable(
+		{ _config = config, _clocks = {}, _speeds = {}, _worths = {}, _cooldowns = {} } :: Fields,
+		HudText
+	)
 end
 
 -- Whole seconds as minutes and seconds.
@@ -46,6 +50,17 @@ function HudText.speed(self: HudText, studsPerSecond: number): string
 	if cached == nil then
 		cached = string.format(self._config.UI.text.speed, shown)
 		self._speeds[shown] = cached
+	end
+	return cached
+end
+
+-- A key's seconds left to cool down (#354), to the nearest tenth, as the page wrote them.
+function HudText.cooldown(self: HudText, seconds: number): string
+	local tenths = math.floor(seconds * 10 + 0.5)
+	local cached = self._cooldowns[tenths]
+	if cached == nil then
+		cached = string.format(self._config.UI.text.cooldown, tenths / 10)
+		self._cooldowns[tenths] = cached
 	end
 	return cached
 end

@@ -11,10 +11,14 @@
 -- What changes every frame (the clock, the speed, what each control does now and whether it works, how far a throw has
 -- charged) goes through bindings instead, each set only when it changes, and so does what moves (Animator's tracks,
 -- stepped each frame; the scoreboard's from BoardMotion, which watches each new state): the texts come from caches and
--- the config, so a quiet frame allocates nothing. The speedometer's reading eases toward the skater's speed
+-- the config, so a quiet frame allocates nothing. Each hint row (#354, look C) fades in and out over motion.easeSeconds
+-- as its control greys and lights, pops its key for motion.press when the keys working it now are pressed
+-- (InputController's counts, against the count the row saw last, so the game's own reads keep their presses), and shows
+-- a cooling action's seconds and sweep. The speedometer's reading eases toward the skater's speed
 -- (UI.hud.motion.speedRate), from the speed itself whenever a skater appears. Hints name each key as the device shows
 -- it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout gives it, else
--- Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the labels; each render
+-- Config.UI.keyNames, else the KeyCode's name, and the mouse's buttons as a mouse with that button inked (Q207).
+-- There are none on touch, where the buttons carry the labels; each render
 -- names the pass key for the mark over a pass's target (passKey, #315). The Get Up prompt (a skater knocked down by a
 -- strike or a fall: SkateController.promptsGetUp, #242) names the movement keys the same way: the first composite's
 -- four keys, the gamepad's stick, or on touch Config.UI.text's name for the stick. The score tab shows while its key is
@@ -61,6 +65,20 @@ local PASS: Config.TouchControl = "pass"
 
 -- A value shown through a binding: its setter, and the value last set.
 type Shown<T> = { binding: React.Binding<T>, set: (value: T) -> (), value: T }
+
+-- One hint row's moving parts (#354): what it reads, its fade and its key's pop (Animator tracks), whether the pop
+-- shows, the share of its cooldown still to run and its seconds left, and the control whose presses it counted last
+-- (nil before the first step) with how many it saw.
+type Row = {
+	label: Shown<string>,
+	fade: Animator.Track,
+	press: Animator.Track,
+	pressed: Shown<boolean>,
+	cooldown: Shown<number>,
+	seconds: Shown<string>,
+	worked: Config.Control?,
+	presses: number,
+}
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its members.
 export type Hud = {
@@ -118,8 +136,7 @@ export type Hud = {
 	_bindings: App.HudBindings,
 	_clock: Shown<string>,
 	_speed: Shown<string>,
-	_labels: { [string]: Shown<string> },
-	_fades: { [string]: Shown<number> },
+	_rows: { [string]: Row },
 	_charge: Shown<number>,
 	-- The stage last set on its binding, and the setter.
 	_stage: Vector2,
@@ -177,7 +194,14 @@ local function measure(self: Hud, device: Enum.PreferredInput)
 	self._aim = HudScreen.aim(self._config, self._insetArea(Enum.ScreenInsets.None), safe)
 end
 
--- The first of `codes` the device has: on a gamepad the first with a glyph; otherwise the first without one, named.
+-- The mouse's buttons, whose keys the hints draw as a mouse with that button inked (#354, the owner's Q207).
+local MOUSE_BUTTONS: { [Enum.KeyCode]: Style.MouseButton } = {
+	[Enum.KeyCode.MouseLeftButton] = "Left",
+	[Enum.KeyCode.MouseRightButton] = "Right",
+}
+
+-- The first of `codes` the device has: on a gamepad the first with a glyph; otherwise the first without one, named
+-- (a mouse's button saying which).
 local function keyView(self: Hud, codes: { Enum.KeyCode }, gamepad: boolean): Style.KeyView
 	for _, code in codes do
 		local image = self._keyImage(code)
@@ -185,7 +209,10 @@ local function keyView(self: Hud, codes: { Enum.KeyCode }, gamepad: boolean): St
 			return { image = image }
 		elseif not gamepad and image == "" then
 			local name = string.match(self._keyString(code), "^%s*(.-)%s*$") :: string
-			return { text = if name ~= "" then name else self._config.UI.keyNames[code.Name] or code.Name }
+			return {
+				text = if name ~= "" then name else self._config.UI.keyNames[code.Name] or code.Name,
+				mouse = MOUSE_BUTTONS[code],
+			}
 		end
 	end
 	return {}
@@ -306,8 +333,7 @@ local Hud: Hud = {
 	_bindings = nil :: any,
 	_clock = nil :: any,
 	_speed = nil :: any,
-	_labels = {},
-	_fades = {},
+	_rows = {},
 	_charge = nil :: any,
 	_stage = Vector2.zero,
 	_setStage = function(_stage: Vector2) end,
@@ -390,17 +416,33 @@ local Hud: Hud = {
 
 		self._clock = newShown(self._text:clock(self._store.state:clockSeconds()))
 		self._speed = newShown("")
-		local labels: { [string]: Shown<string> } = {}
-		local labelBindings: ControlHints.HintLabels = {}
-		local fades: { [string]: Shown<number> } = {}
-		local fadeBindings: ControlHints.HintFades = {}
+		local animator = self._animator
+		local rows: { [string]: Row } = {}
+		local hints: ControlHints.HintRows = {}
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
-			local label, fade = newShown(""), newShown(0)
-			labels[control], fades[control] = label, fade
-			labelBindings[control], fadeBindings[control] = label.binding, fade.binding
+			local row: Row = {
+				label = newShown(""),
+				fade = animator:track(0),
+				press = animator:track(1),
+				pressed = newShown(false),
+				cooldown = newShown(0),
+				seconds = newShown(""),
+				worked = nil,
+				presses = 0,
+			}
+			rows[control] = row
+			hints[control] = {
+				label = row.label.binding,
+				fade = row.fade.binding,
+				cap = {
+					press = row.press.binding,
+					pressed = row.pressed.binding,
+					cooldown = row.cooldown.binding,
+					seconds = row.seconds.binding,
+				},
+			}
 		end
-		self._labels = labels
-		self._fades = fades
+		self._rows = rows
 		self._charge = newShown(0)
 		local stage, setStage = React.createBinding(Vector2.zero)
 		self._stage = Vector2.zero
@@ -408,8 +450,7 @@ local Hud: Hud = {
 		self._bindings = {
 			clock = self._clock.binding,
 			speed = self._speed.binding,
-			labels = labelBindings,
-			fades = fadeBindings,
+			hints = hints,
 			stage = stage,
 			charge = self._charge.binding,
 		}
@@ -535,11 +576,27 @@ local Hud: Hud = {
 			self._shownSpeed = nil
 		end
 		self._animator:step(dt)
-		local config, actions = self._config, self._actions
+		local config, actions, input, text, animator =
+			self._config, self._actions, self._input, self._text, self._animator
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
+			local row = self._rows[control]
 			local label, greyed = ControlLabels.label(control, config, actions, skate)
-			show(self._labels[control], label or "")
-			show(self._fades[control], Style.dim(config, greyed))
+			show(row.label, label or "")
+			local fade = Style.dim(config, greyed)
+			if fade ~= row.fade.target then
+				animator:play(row.fade, "Ease", fade)
+			end
+			-- A row whose keys changed (the throw's, catching the ball) only counts on from here.
+			local worked: Config.Control = ControlLabels.worked(control, actions)
+			local presses = input:pressCount(worked)
+			if worked == row.worked and presses ~= row.presses then
+				animator:play(row.press, "Press", 1)
+			end
+			row.worked, row.presses = worked, presses
+			show(row.pressed, row.press.moving)
+			local left, share = ControlLabels.cooldown(control, config, actions)
+			show(row.cooldown, share)
+			show(row.seconds, if left > 0 then text:cooldown(left) else "")
 		end
 		show(self._charge, actions:chargeSeconds() or 0)
 	end,
