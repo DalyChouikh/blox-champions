@@ -1779,6 +1779,12 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
 - **Q223 #367 shipped** (session 76, recommended; page https://claude.ai/artifact/H6nXzFP8Q6MKyA6gWjux5y version 4,
   'A held key stays pressed': in a real Play Shift held for seconds kept Pump's cap orange with its >>, back to
   yellow when let go): **"Yes, ship it"**. Next: #367's commit and PR, then #368 (rows stay).
+- **Q224 #368 shipped** (session 77, recommended; the design page moved to
+  https://claude.ai/artifact/XWrav5BHeWqVQ8eebfqrP9, the earlier H6nXzFP8Q6MKyA6gWjux5y being the previous account's;
+  section 'Rows and buttons stay, greyed or cooling': Play shots of an Uppercut's leap, a carrier's dive, knocked down,
+  and the phone's buttons in the air and knocked down; asked with one ruling to check: while attached to a teammate,
+  Jump, Pump and Brake grey too, because the skates do nothing there): **"Yes, ship it"**. Next: #368's commit and PR,
+  then #369 (the Get Up prompt and the feed, banner style).
 
 ## Roller Champions
 

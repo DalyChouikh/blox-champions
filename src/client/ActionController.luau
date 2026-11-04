@@ -63,9 +63,13 @@ export type ActionController = {
 	-- The running action's pose in its windup or active phase, else "None": how PoseController poses the local skater.
 	pose: (self: ActionController) -> Config.PoseName,
 	-- The action `key` names now (Config.Input.actions), or nil when none fits, and whether it would start: a pass
-	-- names Magnetic Pass with the ball, greyed while nobody is there to take it (#315). What touch buttons and hints
-	-- show.
+	-- names Magnetic Pass with the ball, greyed while nobody is there to take it (#315).
 	keyAction: (self: ActionController, key: Config.ActionKey) -> (Config.ActionName?, boolean),
+	-- The action `key`'s button and hint name now, and whether it would start (#368, the owner's Q220, Q222): the one
+	-- keyAction names; else the Dive from that key, through its flight and slide; else the key's usual one for the ball
+	-- (its first that is no follow-up and fits the ball: the Uppercut through its leap), greyed; nil while none fits
+	-- (the throw without the ball).
+	keyShown: (self: ActionController, key: Config.ActionKey) -> (Config.ActionName?, boolean),
 	-- The teammate the pass key would pass to now (#315); nil while it would not pass: what the name tags mark.
 	passTarget: (self: ActionController) -> PlayerId?,
 	-- While a throw charges, how long its key has been held (on past a full charge); nil otherwise: what the
@@ -548,6 +552,28 @@ local ActionController: ActionController = {
 
 	keyAction = function(self: ActionController, key: Config.ActionKey): (Config.ActionName?, boolean)
 		return actionFor(self, key, holdsBall(self))
+	end,
+
+	keyShown = function(self: ActionController, key: Config.ActionKey): (Config.ActionName?, boolean)
+		local hasBall = holdsBall(self)
+		local name: Config.ActionName?, ready = actionFor(self, key, hasBall)
+		if name ~= nil then
+			return name, ready
+		end
+		-- A dive lasts through its flight and its own knockdown's slide, past its run, which a touchdown stops and a
+		-- long flight outlives.
+		local listed = self._config.Input.actions[key]
+		local skate = self._skate
+		local landing: Config.ActionName? = self._landing
+		if landing ~= nil and (skate.diving or skate.knockdown == "Dive") and table.find(listed, landing) ~= nil then
+			return landing, false
+		end
+		for _, each in listed do
+			if self.runner:usual(each, hasBall) then
+				return each, false
+			end
+		end
+		return nil, false
 	end,
 
 	passTarget = function(self: ActionController): PlayerId?

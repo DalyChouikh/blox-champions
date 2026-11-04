@@ -198,7 +198,10 @@ describe("TouchControls", function()
 		expect(button("tackle").Text).toBe(labels.Dodge)
 		expect(button("pass").Text).toBe(labels.Pass)
 		expect(button("throw").Text).toBe(labels.ChargeThrow)
-		expect(button("uppercut").Visible).toBe(false)
+		-- Roll Ball waits for a charge: the button stays, greyed (#368, the owner's Q220).
+		expect(button("uppercut").Visible).toBe(true)
+		expect(button("uppercut").Text).toBe(labels.RollBall)
+		expect(button("uppercut").TextTransparency).toBeCloseTo(config.UI.hud.dimTransparency, 4)
 
 		-- In the air, without the ball, the button tackles, then dives in the tackle's follow-up window (#240).
 		BallCarrier:set(nil)
