@@ -105,6 +105,7 @@ local function App(props: AppProps): React.ReactElement
 	local compact, top, aim = props.compact, props.boardTop, props.aim
 	local period = match ~= nil and text:period(match) ~= nil
 	local banners = props.banners
+	local feedLines = state:feedLines()
 	local shownBanner = state.banner
 	local lineSize = HudScreen.bannerSize(config, compact, if shownBanner ~= nil then shownBanner.kind else "Go")
 	local viewer = Style.teamColor(config, HudState.teamOf(match, props.localId))
@@ -185,6 +186,8 @@ local function App(props: AppProps): React.ReactElement
 					config = config,
 					text = text,
 					feed = state.feed,
+					lines = feedLines,
+					chips = banners.chips,
 					names = state.names,
 					compact = compact,
 					area = bindings.stage,
@@ -194,7 +197,7 @@ local function App(props: AppProps): React.ReactElement
 						config = config,
 						keys = props.getUpKeys,
 						compact = compact,
-						lines = #state.feed,
+						lines = feedLines,
 						scale = banners.promptScale.binding,
 						leave = banners.promptLeave.binding,
 						area = bindings.stage,

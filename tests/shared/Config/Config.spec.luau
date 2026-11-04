@@ -578,7 +578,7 @@ describe("Config defaults", function()
 			titleSize = 32,
 			bannerSeconds = { headline = 2.5, lap = 3.6, message = 5 },
 			feedSeconds = 6,
-			feedMaxEntries = 5,
+			feedMaxEntries = 3,
 			glowThickness = 3,
 			spacing = 6,
 			screenMargin = 8,
