@@ -167,19 +167,76 @@ describe("HudState", function()
 			table.insert(kinds, entry.kind)
 			table.insert(ids, entry.id)
 		end
-		-- feedMaxEntries is 5: the oldest of the six is gone.
-		expect(kinds).toEqual({ "Goal", "Goal", "Possession", "Goal", "Possession" })
-		expect(ids).toEqual({ 2, 3, 4, 5, 6 })
-		expect(state.feed[1].player).toBe("1")
-		expect(state.feed[5]).toEqual({
+		-- feedMaxEntries is 3: the oldest three of the six are gone.
+		expect(kinds).toEqual({ "Possession", "Goal", "Possession" })
+		expect(ids).toEqual({ 4, 5, 6 })
+		expect(state.feed[1].player).toBe("2")
+		expect(state.feed[3]).toEqual({
 			id = 6,
 			kind = "Possession",
 			team = "Blue",
 			player = "1",
 			timeLeft = config.UI.hud.feedSeconds,
+			replaced = false,
 		})
 		state:step(config.UI.hud.feedSeconds + 0.01)
 		expect(#state.feed).toBe(0)
+	end)
+
+	-- The owner's Q227: no stack of ball lines however fast the carrier changes; the last fades as the new one comes.
+	it("keeps one ball line: a new carrier's replaces the last, which has only its fade left", function()
+		local state = liveState()
+		state:applyEvents({ { name = "PossessionChanged", team = "Blue", player = "1" } })
+		state:step(1)
+		state:applyEvents({
+			{ name = "PossessionChanged", team = "Orange", player = "2", previousTeam = "Blue" },
+		})
+		local fade = config.UI.hud.motion.easeSeconds
+		expect(#state.feed).toBe(2)
+		expect(state.feed[1].replaced).toBe(true)
+		expect(state.feed[1].timeLeft).toBe(fade)
+		expect(state.feed[2].replaced).toBe(false)
+		expect(state.feed[2].timeLeft).toBe(config.UI.hud.feedSeconds)
+		expect(state:feedLines()).toBe(1)
+		state:step(fade + 0.01)
+		expect(#state.feed).toBe(1)
+		expect(state.feed[1].player).toBe("2")
+		expect(state:feedLines()).toBe(1)
+	end)
+
+	it("never lengthens a ball line already nearly gone when it is replaced", function()
+		local state = liveState()
+		state:applyEvents({ { name = "PossessionChanged", team = "Blue", player = "1" } })
+		local fade = config.UI.hud.motion.easeSeconds
+		state:step(config.UI.hud.feedSeconds - fade / 2)
+		state:applyEvents({
+			{ name = "PossessionChanged", team = "Orange", player = "2", previousTeam = "Blue" },
+		})
+		expect(state.feed[1].timeLeft).toBeCloseTo(fade / 2, 4)
+	end)
+
+	it("leaves a line about points alone when the carrier changes", function()
+		local state = liveState()
+		state:applyEvents({
+			{ name = "GoalScored", team = "Blue", scorer = "1", points = 1 },
+			{ name = "PossessionChanged", team = "Blue", player = "1" },
+			{ name = "PossessionChanged", team = "Orange", player = "2", previousTeam = "Blue" },
+		})
+		expect(state.feed[1].kind).toBe("Goal")
+		expect(state.feed[1].replaced).toBe(false)
+		expect(state.feed[1].timeLeft).toBe(config.UI.hud.feedSeconds)
+		expect(state:feedLines()).toBe(2)
+	end)
+
+	it("leaves the ball line alone when a line about points comes", function()
+		local state = liveState()
+		state:applyEvents({
+			{ name = "PossessionChanged", team = "Blue", player = "1" },
+			{ name = "GoalScored", team = "Blue", scorer = "1", points = 1 },
+		})
+		expect(state.feed[1].kind).toBe("Possession")
+		expect(state.feed[1].replaced).toBe(false)
+		expect(state.feed[1].timeLeft).toBe(config.UI.hud.feedSeconds)
 	end)
 
 	-- RC shows a completed lap under its scoreboard (Video 4 at 7:22.7), on our banner line (the owner, Q210).

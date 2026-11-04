@@ -480,7 +480,9 @@ local defaults: UIConfig = {
 		-- lap 3.6 s and the goal message about 5 s (Video 4 at 7:22.7).
 		bannerSeconds = { headline = 2.5, lap = 3.6, message = 5 },
 		feedSeconds = 6,
-		feedMaxEntries = 5,
+		-- One ball line at a time (the owner, Q227) leaves room for lines about points. Five lines pushed the Get Up
+		-- prompt into the banner line on a phone (measured, Q230); with three it stays clear, under GOAL! too.
+		feedMaxEntries = 3,
 		glowThickness = 3,
 		spacing = 6,
 		screenMargin = 8,

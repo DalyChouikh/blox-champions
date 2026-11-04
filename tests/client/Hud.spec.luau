@@ -624,6 +624,67 @@ describe("Hud", function()
 		expect(HudScreen.getUpBottom(config, true, 1) > HudScreen.getUpBottom(config, true, 0)).toBe(true)
 	end)
 
+	-- Five lines pushed the prompt into the banner line on this phone (Q230): the feed's most no longer can, even under
+	-- GOAL!, the tallest banner.
+	it("keeps the Get Up prompt clear of the banner line at the feed's most lines, on this phone", function()
+		preferred = Enum.PreferredInput.Touch
+		local rig = Fixtures.spawnSkater(folder, config)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
+		SkateController:step(DT)
+		Hud:step(0)
+		local scored: { any } = {}
+		for _ = 1, config.UI.hud.feedMaxEntries do
+			table.insert(scored, { name = "GoalScored", team = "Blue", scorer = "1", points = 1 })
+		end
+		HudStore:onEvents(Fixtures.ruleEvents(scored))
+		Hud:step(0)
+		expect(#HudStore.state.feed).toBe(config.UI.hud.feedMaxEntries)
+		local prompt, banner = part("GetUp") :: Frame, part("Banner") :: Frame
+		expect(banner.Visible).toBe(true)
+		-- Both in the stage's pixels from its top.
+		local promptTop = part("Stage").Size.Y.Offset + prompt.Position.Y.Offset - prompt.Size.Y.Offset
+		local bannerBottom = banner.Position.Y.Offset + (1 - banner.AnchorPoint.Y) * banner.Size.Y.Offset
+		expect(bannerBottom + config.UI.hud.layout.banner.clearance <= promptTop).toBe(true)
+	end)
+
+	-- A replaced ball line takes no row, so the prompt over the feed stays put as the carrier changes (the owner,
+	-- Q227).
+	it("does not move the Get Up prompt when a ball line is replaced", function()
+		local rig = Fixtures.spawnSkater(folder, config)
+		rig:SetAttribute(Attributes.KnockedDown, "Hit")
+		SkateController:step(DT)
+		Hud:step(0)
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "PossessionChanged", team = "Blue", player = "1" } }))
+		Hud:step(0)
+		local place = part("GetUp").Position
+		HudStore:onEvents(Fixtures.ruleEvents({
+			{ name = "PossessionChanged", team = "Orange", player = "1", previousTeam = "Blue" },
+		}))
+		Hud:step(0)
+		expect(#HudStore.state.feed).toBe(2)
+		expect(part("GetUp").Position).toEqual(place)
+		expect(part("Feed").Size.Y.Offset).toBe(HudScreen.feedHeight(config, true, 1))
+	end)
+
+	-- The pop on the Hud's clock, the fade on the line's time left, as the banners'.
+	it("pops a feed line in and fades it out through the Hud", function()
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "PossessionChanged", team = "Blue", player = "1" } }))
+		Hud:step(0)
+		local id = tostring(HudStore.state.feed[1].id)
+		local group = part("Feed"):FindFirstChild(id).Group :: CanvasGroup
+		local pop = group:FindFirstChild("Pop") :: UIScale
+		expect(pop.Scale).toBeCloseTo(0, 4)
+		Hud:step(config.UI.hud.motion.pop.seconds)
+		expect(pop.Scale).toBe(1)
+		expect(group.GroupTransparency).toBe(0)
+		HudStore:step(config.UI.hud.feedSeconds - config.UI.hud.motion.easeSeconds / 2)
+		Hud:step(0)
+		expect(group.GroupTransparency > 0).toBe(true)
+		HudStore:step(config.UI.hud.motion.easeSeconds)
+		Hud:step(0)
+		expect(part("Feed"):FindFirstChild(id)).toBeNil()
+	end)
+
 	-- The prompt's own spec holds the rule; this holds its wire to the stage the Hud measures.
 	it("shrinks the Get Up prompt to fit a stage too narrow for it", function()
 		local rig = Fixtures.spawnSkater(folder, config)

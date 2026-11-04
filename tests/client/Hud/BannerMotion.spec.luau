@@ -29,7 +29,7 @@ describe("BannerMotion", function()
 	-- Each pops in with a quick overshoot (the owner, Q191).
 	it("pops each new banner in from nothing, on its own line, and nothing that was already shown", function()
 		local animator = Animator.new(config.UI.hud.motion)
-		local motion = BannerMotion.new(config.UI.hud.motion, animator)
+		local motion = BannerMotion.new(config.UI.hud.motion, animator, 1)
 		local state = live()
 		motion:watch(state)
 		expect(motion.line.scale.moving).toBe(false)
@@ -54,10 +54,93 @@ describe("BannerMotion", function()
 	end)
 
 	-- ... holds, then floats up as it fades (Q191, Q194): over its last easeSeconds.
+	-- The feed's chips (#373, the owner's Q227): each line pops in and fades out whole, as a banner does.
+	it("seats each feed line in a slot that pops it in and fades it over its last moments", function()
+		local animator = Animator.new(config.UI.hud.motion)
+		local motion = BannerMotion.new(config.UI.hud.motion, animator, 2)
+		local state = live()
+		state:applyEvents({ { name = "PossessionChanged", team = "Blue", player = "1" } })
+		motion:watch(state)
+		local chip = motion.chips[state.feed[1].id]
+		expect(chip.scale.value).toBe(0)
+		animator:step(0.1)
+		expect(chip.scale.value > 1).toBe(true)
+		animator:step(0.1)
+		expect(chip.scale.value).toBe(1)
+		-- Nothing moves it again while the state only changes around it.
+		state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
+		motion:watch(state)
+		expect(chip.scale.moving).toBe(false)
+		expect(chip.scale.value).toBe(1)
+		motion:step(state)
+		expect(chip.leave:getValue()).toBe(0)
+		-- Half way through its last 0.4 s.
+		state:step(config.UI.hud.feedSeconds - 0.2)
+		motion:step(state)
+		local share = chip.leave:getValue()
+		expect(share > 0 and share < 1).toBe(true)
+	end)
+
+	it("gives a gone line's slot to a new one, which starts solid", function()
+		local animator = Animator.new(config.UI.hud.motion)
+		local motion = BannerMotion.new(config.UI.hud.motion, animator, 1)
+		local state = live()
+		state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
+		motion:watch(state)
+		local firstId = state.feed[1].id
+		local chip = motion.chips[firstId]
+		animator:step(0.2)
+		state:step(config.UI.hud.feedSeconds - 0.1)
+		motion:step(state)
+		expect(chip.leave:getValue() > 0).toBe(true)
+		state:step(0.2)
+		expect(#state.feed).toBe(0)
+		motion:watch(state)
+		expect(motion.chips[firstId]).toBeNil()
+		state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
+		motion:watch(state)
+		expect(motion.chips[state.feed[1].id] == chip).toBe(true)
+		expect(chip.scale.value).toBe(0)
+		motion:step(state)
+		expect(chip.leave:getValue()).toBe(0)
+	end)
+
+	-- The oldest gives up its slot in the same change that brings the new line, so the feed's most never runs out.
+	it("seats a line that pushes the oldest out of a full feed", function()
+		local most = config.UI.hud.feedMaxEntries
+		local motion = BannerMotion.new(config.UI.hud.motion, Animator.new(config.UI.hud.motion), most)
+		local state = live()
+		local function score()
+			state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
+			motion:watch(state)
+		end
+		for _ = 1, most do
+			score()
+		end
+		local oldest = state.feed[1].id
+		score()
+		expect(motion.chips[oldest]).toBeNil()
+		for _, entry in state.feed do
+			expect(motion.chips[entry.id] ~= nil).toBe(true)
+		end
+	end)
+
+	it("writes nothing for a chip on a quiet step", function()
+		local motion = BannerMotion.new(config.UI.hud.motion, Animator.new(config.UI.hud.motion), 2)
+		local state = live()
+		state:applyEvents({ { name = "GoalScored", team = "Blue", scorer = "1", points = 1 } })
+		motion:watch(state)
+		motion:step(state)
+		local writes = motion.writes
+		state:step(1)
+		motion:step(state)
+		expect(motion.writes).toBe(writes)
+	end)
+
 	-- The Get Up prompt (#369, the owner's Q221): it has no time left to count, it ends when the skater is up.
 	it("pops the prompt in as it starts, fades it out as it ends, and shows it until it has gone", function()
 		local animator = Animator.new(config.UI.hud.motion)
-		local motion = BannerMotion.new(config.UI.hud.motion, animator)
+		local motion = BannerMotion.new(config.UI.hud.motion, animator, 1)
 		expect(motion:promptShown()).toBe(false)
 		motion:prompting(false)
 		expect(motion:promptShown()).toBe(false)
@@ -93,7 +176,7 @@ describe("BannerMotion", function()
 
 	it("leaves each line over its banner's last easeSeconds, writing only when that changes", function()
 		local animator = Animator.new(config.UI.hud.motion)
-		local motion = BannerMotion.new(config.UI.hud.motion, animator)
+		local motion = BannerMotion.new(config.UI.hud.motion, animator, 1)
 		local state = live()
 		state:applyEvents({
 			{ name = "LapCompleted", team = "Blue", streak = 1, holder = "1" },

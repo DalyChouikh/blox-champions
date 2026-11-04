@@ -22,7 +22,7 @@ local function periodOf(period: string): any
 end
 
 local function entry(kind: HudState.FeedKind, team: "Blue" | "Orange", player: string): HudState.FeedEntry
-	return { id = 1, kind = kind, team = team, player = player, timeLeft = 1 }
+	return { id = 1, kind = kind, team = team, player = player, timeLeft = 1, replaced = false }
 end
 
 describe("HudText", function()

@@ -410,7 +410,7 @@ local Hud: Hud = {
 		end
 		self._animator = Animator.new(config.UI.hud.motion)
 		self._board = BoardMotion.new(self._text, self._animator)
-		self._banners = BannerMotion.new(config.UI.hud.motion, self._animator)
+		self._banners = BannerMotion.new(config.UI.hud.motion, self._animator, config.UI.hud.feedMaxEntries)
 		self._compact = false
 		self._boardTop = 0
 		self._aim = 0

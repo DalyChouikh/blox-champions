@@ -1807,6 +1807,22 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   feed lines and alone; asked with one thing to check: the prompt moves up to stay clear of the chips, where the earlier
   drawing overlapped them): **"Yes, ship it"**. Next: #369's commit and PR, then the chips' pop and fade with one possession
   line at a time (Q227), then #357, #358, #355.
+- **Q230 the owner's question before #369's merge** (session 78): "did we test the get up prompt and the player has ball with
+  other prompts that is their place? Like for example the orange goal active prompt". Not in Play until then; measured
+  then in Play, desktop 1556 x 793 and phone 750 x 381, shots on the page ('With everything else on screen'): prompt to
+  goal message 17.5 px (phone); with two lines, prompt to chips 3, chips to message 3.5, LAP banner to prompt 377.5
+  (desktop), 98 (phone); with five lines, 248.5 (desktop), and on the phone the prompt overlaps the LAP banner by 13 px;
+  an open score tab covers the prompt's top half.
+- **Q231** (recommended): **ship #369 as it is**; the one-line rule (Q227) removes the five-line overlap, tested there; the
+  score tab's overlap goes to #357, which rebuilds the tab. Not chosen: fixing both inside #369.
+- **Q232** (recommended): #372's commit says "3 survivors" where 2 survived and 3 gaps were foreseen: **corrected in the PR
+  text now and in the squash message at merge**, no force push (the auto-mode check had refused the amend and force
+  push). Not chosen: amending now.
+- **Q233 #373 shipped** (session 78, recommended; the page's 'One ball line at a time, and chips that pop and fade' section: a
+  looping drawing at the game's timings, a frame-by-frame strip of the real chips, the worst stacks in Play; asked with two
+  rulings to check: at most 3 lines (a fourth pushes the oldest out), and a wider old chip showing past a narrower new one for
+  the 0.25 s swap): **"Yes, ship it"**. Next: #373's commit and PR, then #357 (the TAB board, also not cutting the prompt in
+  half, Q231), #358, #355.
 
 ## Roller Champions
 

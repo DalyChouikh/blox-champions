@@ -5,9 +5,10 @@
 -- lasts, then GO, a completed lap and the others for UI.hud.bannerSeconds of play, held through a celebration so GOAL!
 -- lasts until the count; a new one replaces the last), the goal message on a line of its own while the goal it names is
 -- open (#356, the owner's Q210), and feed entries for possession and points (each for UI.hud.feedSeconds, at most
--- UI.hud.feedMaxEntries, oldest first; Q211). The kickoff's count and GO are the viewer's team's. The end of a match
--- shows from MatchEnded, or from a snapshot of the ended match for a player who joins then, until the next match's
--- first snapshot. `version` grows whenever anything it shows changes, but not as the clocks count, so the HUD redraws
+-- UI.hud.feedMaxEntries, oldest first; Q211), of which one ball line stays: a new carrier's replaces the last, left
+-- only its fade (#373, Q227). The kickoff's count and GO are the viewer's team's. The end of a match shows from
+-- MatchEnded, or from a snapshot of the ended match for a player who joins then, until the next match's first
+-- snapshot. `version` grows whenever anything it shows changes, but not as the clocks count, so the HUD redraws
 -- only then; stepping allocates nothing.
 
 local Config = require(script.Parent.Parent.Config)
@@ -35,8 +36,15 @@ export type BannerKind =
 -- seconds a clock warning marks, or a completed lap's streak.
 export type Banner = { kind: BannerKind, team: Team?, value: number? }
 export type FeedKind = "Possession" | "Goal"
--- `id`: a running number, the entry's stable key.
-export type FeedEntry = { id: number, kind: FeedKind, team: Team, player: PlayerId, timeLeft: number }
+-- `id`: a running number, the entry's stable key. `replaced`: a ball line a newer one replaced, fading out.
+export type FeedEntry = {
+	id: number,
+	kind: FeedKind,
+	team: Team,
+	player: PlayerId,
+	timeLeft: number,
+	replaced: boolean,
+}
 -- `winner`: nil after a draw.
 export type Ended = { winner: Team?, mvp: PlayerId?, stats: Types.MatchStats }
 
@@ -100,12 +108,22 @@ end
 local function addEntry(self: HudState, kind: FeedKind, team: Team, player: PlayerId)
 	self._lastId += 1
 	local feed = self.feed
+	if kind == "Possession" then
+		local fade = self._config.UI.hud.motion.easeSeconds
+		for _, entry in feed do
+			if entry.kind == "Possession" then
+				entry.replaced = true
+				entry.timeLeft = math.min(entry.timeLeft, fade)
+			end
+		end
+	end
 	table.insert(feed, {
 		id = self._lastId,
 		kind = kind,
 		team = team,
 		player = player,
 		timeLeft = self._config.UI.hud.feedSeconds,
+		replaced = false,
 	})
 	while #feed > self._config.UI.hud.feedMaxEntries do
 		table.remove(feed, 1)
@@ -290,6 +308,17 @@ function HudState.step(self: HudState, dt: number)
 	if changed then
 		self.version += 1
 	end
+end
+
+-- How many rows the feed stands: a replaced line takes none.
+function HudState.feedLines(self: HudState): number
+	local lines = 0
+	for _, entry in self.feed do
+		if not entry.replaced then
+			lines += 1
+		end
+	end
+	return lines
 end
 
 -- The whole seconds the clock shows: left in regulation (0 through Last Chance), then in overtime; the match's full
