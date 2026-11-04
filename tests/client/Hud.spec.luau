@@ -444,8 +444,14 @@ describe("Hud", function()
 		local pump = hint("pump")
 		local scale = pump.face:FindFirstChildOfClass("UIScale") :: UIScale
 		expect(pump.mark.Visible).toBe(false)
-		Fixtures.scriptedBinding(context, "Pump"):Fire(true)
-		task.wait() -- Pressed is deferred
+		-- A tap: pressed and let go before the next frame.
+		local function tap(action: string)
+			local key = Fixtures.scriptedBinding(context, action)
+			key:Fire(true)
+			key:Fire(false)
+			task.wait() -- Pressed is deferred
+		end
+		tap("Pump")
 		Hud:step(0)
 		expect(pump.mark.Visible).toBe(true)
 		expect(pump.face.BackgroundColor3 == look.pressed).toBe(true)
@@ -456,24 +462,43 @@ describe("Hud", function()
 		expect(scale.Scale).toBe(1)
 		expect(pump.face.BackgroundColor3 == look.key).toBe(true)
 		-- Without the ball the throw's row is Ball Focus's: its key pops it, the throw's own does not.
-		Fixtures.scriptedBinding(context, "Throw"):Fire(true)
-		task.wait()
+		tap("Throw")
 		Hud:step(0)
 		expect(hint("throw").mark.Visible).toBe(false)
-		Fixtures.scriptedBinding(context, "BallFocus"):Fire(true)
-		task.wait()
+		tap("BallFocus")
 		Hud:step(0)
 		expect(hint("throw").mark.Visible).toBe(true)
 		-- Catching the ball gives the row the throw's keys: their earlier presses pop nothing.
 		Hud:step(press.seconds)
-		local throw = Fixtures.scriptedBinding(context, "Throw")
-		throw:Fire(false)
-		throw:Fire(true)
-		task.wait()
+		tap("Throw")
 		Hud:step(0)
 		BallCarrier:set(LOCAL_ID)
 		Hud:step(0)
 		expect(hint("throw").mark.Visible).toBe(false)
+	end)
+
+	-- The owner (#367, Q219): every key shows pressed for as long as it is held; a tap still pops for the press's time.
+	it("keeps a held key's row pressed, with its mark, until the key is let go", function()
+		local press = config.UI.hud.motion.press
+		local look = config.UI.hud.look
+		Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		local pump = hint("pump")
+		local scale = pump.face:FindFirstChildOfClass("UIScale") :: UIScale
+		local key = Fixtures.scriptedBinding(InputController.context, "Pump")
+		key:Fire(true)
+		task.wait() -- Pressed is deferred
+		Hud:step(0)
+		Hud:step(4 * press.seconds)
+		-- The pop is over; the hold is not.
+		expect(scale.Scale).toBe(1)
+		expect(pump.mark.Visible).toBe(true)
+		expect(pump.face.BackgroundColor3 == look.pressed).toBe(true)
+		key:Fire(false)
+		task.wait()
+		Hud:step(0)
+		expect(pump.mark.Visible).toBe(false)
+		expect(pump.face.BackgroundColor3 == look.key).toBe(true)
 	end)
 
 	-- The owner (Q186): a key on cooldown fills back clockwise with the seconds left on it.

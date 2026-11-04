@@ -16,21 +16,21 @@
 -- BoardMotion, which watches each new state): the texts come from caches and the config, so a quiet frame allocates
 -- nothing. Each hint row (#354, look C) fades in and out over motion.easeSeconds as its control greys and lights, pops
 -- its key for motion.press when the keys working it now are pressed (InputController's counts, against the count the
--- row saw last, so the game's own reads keep their presses), and shows a cooling action's seconds and sweep. The
--- speedometer's reading eases toward the skater's speed (UI.hud.motion.speedRate), from the speed itself whenever a
--- skater appears. Hints name each key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the
--- player's own keyboard layout gives it, else Config.UI.keyNames, else the KeyCode's name, and the mouse's buttons as a
--- mouse with that button inked (Q207). There are none on touch, where the buttons carry the labels; each render names
--- the pass key for the mark over a pass's target (passKey, #315). The Get Up prompt (a skater knocked down by a strike
--- or a fall: SkateController.promptsGetUp, #242) names the movement keys the same way: the first composite's four keys,
--- the gamepad's stick, or on touch Config.UI.text's name for the stick. The score tab shows while its key is held; on
--- touch a button toggles it, and the toggle clears once the device is not touch and whenever the end screen appears or
--- goes, so the tab never pops open unasked. While the tab shows its Switch team button (HudState.switchOffer, #310),
--- the button's key, or a tap on touch, asks the server for a switch when one works. The banner, the feed, the score tab
--- and the end screen centre and fit in the HUD's stage, a binding: on touch the part of the HUD's area left of the
--- touch buttons (TouchArea, from the two guis' areas that GuiService gives), elsewhere the whole of it. It is measured
--- again, with the screen's form, when the screen's size or Roblox's top bar changes (from start on) and when the device
--- does.
+-- row saw last, so the game's own reads keep their presses), shows its key pressed for as long as one of them is held
+-- (#367, the owner's Q219: every key), and shows a cooling action's seconds and sweep. The speedometer's reading eases
+-- toward the skater's speed (UI.hud.motion.speedRate), from the speed itself whenever a skater appears. Hints name each
+-- key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout gives
+-- it, else Config.UI.keyNames, else the KeyCode's name, and the mouse's buttons as a mouse with that button inked
+-- (Q207). There are none on touch, where the buttons carry the labels; each render names the pass key for the mark over
+-- a pass's target (passKey, #315). The Get Up prompt (a skater knocked down by a strike or a fall:
+-- SkateController.promptsGetUp, #242) names the movement keys the same way: the first composite's four keys, the
+-- gamepad's stick, or on touch Config.UI.text's name for the stick. The score tab shows while its key is held; on touch
+-- a button toggles it, and the toggle clears once the device is not touch and whenever the end screen appears or goes,
+-- so the tab never pops open unasked. While the tab shows its Switch team button (HudState.switchOffer, #310), the
+-- button's key, or a tap on touch, asks the server for a switch when one works. The banner, the feed, the score tab and
+-- the end screen centre and fit in the HUD's stage, a binding: on touch the part of the HUD's area left of the touch
+-- buttons (TouchArea, from the two guis' areas that GuiService gives), elsewhere the whole of it. It is measured again,
+-- with the screen's form, when the screen's size or Roblox's top bar changes (from start on) and when the device does.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -70,9 +70,9 @@ local PASS: Config.TouchControl = "pass"
 -- A value shown through a binding: its setter, and the value last set.
 type Shown<T> = { binding: React.Binding<T>, set: (value: T) -> (), value: T }
 
--- One hint row's moving parts (#354): what it reads, its fade and its key's pop (Animator tracks), whether the pop
--- shows, the share of its cooldown still to run and its seconds left, and the control whose presses it counted last
--- (nil before the first step) with how many it saw.
+-- One hint row's moving parts (#354): what it reads, its fade and its key's pop (Animator tracks), whether its key
+-- shows pressed (popping, or held), the share of its cooldown still to run and its seconds left, and the control whose
+-- presses it counted last (nil before the first step) with how many it saw.
 type Row = {
 	label: Shown<string>,
 	fade: Animator.Track,
@@ -642,7 +642,7 @@ local Hud: Hud = {
 				animator:play(row.press, "Press", 1)
 			end
 			row.worked, row.presses = worked, presses
-			show(row.pressed, row.press.moving)
+			show(row.pressed, row.press.moving or input:held(worked))
 			local left, share = ControlLabels.cooldown(control, config, actions)
 			show(row.cooldown, share)
 			show(row.seconds, if left > 0 then text:cooldown(left) else "")

@@ -1,16 +1,16 @@
 --!strict
 -- The controls (spec §8.3) on Roblox's Input Action System, built from Config.Input. One context sits above Roblox's
 -- own character controls and sinks the keys it binds, so their defaults never fire on ours. SkateController reads the
--- skating keys once per physics step, ActionController the action keys, and CameraController the look and Ball Focus.
--- A press is counted when it happens, so one that starts and ends between two reads still counts; every button's
--- presses are counted, and each reader keeps the count it last saw, so the HUD can show the key pressed (#354)
--- without taking the press from the game. A hold is read as it is now, and the look as the rate Roblox's own camera
--- reads (turn = state × dt). Touch controls hook their stick
--- pad and buttons in here. Every key stops while Roblox's menu or its Developer Console is open (also when the menu is
--- open as this starts): the keys fire then too (measured), and a hold lets go. The menu has signals; the console has
--- none, so watchOverlays reads it once a frame. `paused` tells the skating and the actions that a hold let go because
--- of Roblox's menu or console, not the player, and the camera to free the cursor. The HUD reads the score tab's key as
--- held, and Switch team's as a press (#310).
+-- skating keys once per physics step, ActionController the action keys, and CameraController the look and Ball Focus. A
+-- press is counted when it happens, so one that starts and ends between two reads still counts; every button's presses
+-- are counted, and each reader keeps the count it last saw, so the HUD can show the key pressed (#354) without taking
+-- the press from the game. A hold is read as it is now, and the look as the rate Roblox's own camera reads (turn =
+-- state × dt). Touch controls hook their stick pad and buttons in here. Every key stops while Roblox's menu or its
+-- Developer Console is open (also when the menu is open as this starts): the keys fire then too (measured), and a hold
+-- lets go. The menu has signals; the console has none, so watchOverlays reads it once a frame. `paused` tells the
+-- skating and the actions that a hold let go because of Roblox's menu or console, not the player, and the camera to
+-- free the cursor. The HUD reads the score tab's key as held, Switch team's as a press (#310), and each control's keys
+-- as held, to show a key pressed while it is (#367, the owner's Q219).
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -80,18 +80,17 @@ export type InputController = {
 	-- How many times `control`'s keys were pressed since the controls were built: the HUD compares it with the count
 	-- it last saw (#354), so it takes no press from the game's reads.
 	pressCount: (self: InputController, control: Config.Control) -> number,
+	-- Whether any of `control`'s keys (or its touch button) is held now: the HUD shows it pressed for as long as it is
+	-- (#367, the owner's Q219).
+	held: (self: InputController, control: Config.Control) -> boolean,
 	-- Roblox's menu or Developer Console is open: every key is stopped.
 	paused: boolean,
 	destroy: (self: InputController) -> (),
 	_input: Config.InputConfig,
 	_move: InputAction,
-	_jump: InputAction,
-	_pump: InputAction,
-	_brake: InputAction,
-	_attach: InputAction,
-	_throw: InputAction,
+	-- Each control's keys (and touch button), one InputAction each.
+	_buttons: { [Config.Control]: InputAction },
 	_look: InputAction,
-	_ballFocus: InputAction,
 	_scoreTab: InputAction,
 	_lookBindings: LookBindings,
 	_stick: InputBinding,
@@ -164,6 +163,19 @@ local NAMES = {
 	touchMove = "TouchMove",
 	touchStick = "TouchStick",
 }
+
+-- Every control's button, in the order they are built.
+local BUTTONS = table.freeze({
+	"jump",
+	"pump",
+	"brake",
+	"attach",
+	"tackle",
+	"uppercut",
+	"pass",
+	"throw",
+	"ballFocus",
+} :: { Config.Control })
 
 local function newAction(context: InputContext, name: string, actionType: Enum.InputActionType): InputAction
 	local action = Instance.new("InputAction")
@@ -240,13 +252,8 @@ local InputController: InputController = {
 	paused = false,
 	_input = nil :: any,
 	_move = nil :: any,
-	_jump = nil :: any,
-	_pump = nil :: any,
-	_brake = nil :: any,
-	_attach = nil :: any,
-	_throw = nil :: any,
+	_buttons = {},
 	_look = nil :: any,
-	_ballFocus = nil :: any,
 	_scoreTab = nil :: any,
 	_lookBindings = nil :: any,
 	_stick = nil :: any,
@@ -294,15 +301,11 @@ local InputController: InputController = {
 		stick.Parent = move
 		self._move = move
 		self._stick = stick
-		self._jump = newPressButton(self, NAMES.jump, input.jump, "jump")
-		self._pump = newPressButton(self, NAMES.pump, input.pump, "pump")
-		self._brake = newPressButton(self, NAMES.brake, input.brake, "brake")
-		self._attach = newPressButton(self, NAMES.attach, input.attach, "attach")
-		newPressButton(self, NAMES.tackle, input.tackle, "tackle")
-		newPressButton(self, NAMES.uppercut, input.uppercut, "uppercut")
-		newPressButton(self, NAMES.pass, input.pass, "pass")
-		self._throw = newPressButton(self, NAMES.throw, input.throw, "throw")
-		self._ballFocus = newPressButton(self, NAMES.ballFocus, input.ballFocus, "ballFocus")
+		local buttons: { [Config.Control]: InputAction } = {}
+		for _, control: Config.Control in BUTTONS do
+			buttons[control] = newPressButton(self, NAMES[control], input[control], control)
+		end
+		self._buttons = buttons
 		self._scoreTab = newButton(context, NAMES.scoreTab, input.scoreTab)
 		newPressButton(self, NAMES.switchTeam, input.switchTeam, "switchTeam")
 
@@ -344,11 +347,11 @@ local InputController: InputController = {
 
 	read = function(self: InputController, into: SkateKeys)
 		into.move = self._move:GetState() :: Vector2
-		into.pump = self._pump:GetState() :: boolean
-		into.brake = self._brake:GetState() :: boolean
-		into.attach = self._attach:GetState() :: boolean
+		into.pump = self:held("pump")
+		into.brake = self:held("brake")
+		into.attach = self:held("attach")
 		into.jump = takePress(self, "jump")
-		into.jumpHeld = self._jump:GetState() :: boolean
+		into.jumpHeld = self:held("jump")
 	end,
 
 	newActionKeys = function(): ActionKeys
@@ -359,7 +362,7 @@ local InputController: InputController = {
 		into.tackle = takePress(self, "tackle")
 		into.uppercut = takePress(self, "uppercut")
 		into.pass = takePress(self, "pass")
-		into.throw = self._throw:GetState() :: boolean
+		into.throw = self:held("throw")
 	end,
 
 	newCameraKeys = function(): CameraKeys
@@ -373,7 +376,7 @@ local InputController: InputController = {
 			self:setLookSettings(mouse, stick, invertY)
 		end
 		into.look = self._look:GetState() :: Vector2
-		into.ballFocus = self._ballFocus:GetState() :: boolean
+		into.ballFocus = self:held("ballFocus")
 		into.ballFocusPressed = takePress(self, "ballFocus")
 	end,
 
@@ -390,7 +393,7 @@ local InputController: InputController = {
 	bindButton = function(self: InputController, control: Config.Control, button: GuiButton)
 		local binding = Instance.new("InputBinding")
 		binding.UIButton = button
-		binding.Parent = self.context:FindFirstChild(NAMES[control]) :: InputAction
+		binding.Parent = self._buttons[control]
 	end,
 
 	bindTouchStick = function(self: InputController, pad: GuiButton): InputAction
@@ -416,6 +419,10 @@ local InputController: InputController = {
 
 	pressCount = function(self: InputController, control: Config.Control): number
 		return self._presses[control]
+	end,
+
+	held = function(self: InputController, control: Config.Control): boolean
+		return self._buttons[control]:GetState() :: boolean
 	end,
 
 	watchOverlays = function(self: InputController)
