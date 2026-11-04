@@ -1666,6 +1666,25 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
 - **Q202 #352 shipped** (session 69, after the brighter pair was built and shown on the new page
   https://claude.ai/artifact/EQmcWw9Ywe8n1GeeUMPBD8, the old AzDJLnLXcTPeyuaZ4pvi7a being the previous account's):
   **"Yes, ship it"** (recommended). Next: #353 the crosshair.
+- **Q203 the kickoff count beside a tall scoreboard** (session 70, #353; page version 3's to-scale section: the
+  desktop view 1556 x 793, the phone's whole 874 x 401 screen with its 750 x 381 safe area, a 1280 x 600 window,
+  over the built S2/S5, animated). Throws aim through the dot, so it never moves: the rings shrink just enough where
+  they would come within 3 px of the scoreboard (the phone while OVERTIME or LAST CHANCE hangs under S5: 46 -> 41
+  px; a short window). Found while drawing it: overtime can begin with a kickoff (a Last Chance equaliser), and then
+  the phone's OVERTIME sits where the count would. **A: the count moves down just enough** (recommended), keeping
+  its size (the phone in overtime: 18 px lower, 36% down instead of 31.5%). Not chosen: B, the count shrinks in
+  place (to 0.56 there). Sizes as drawn and kept: desktop charge ring 130, carrying ring 61, stroke 4, the count's
+  ring 200 with a 76 px digit and an 8 px stroke; phone 46 / 24 / 3, the count's ring 76 with a 40 px digit and a 4
+  px stroke; every stroke on look C's 2.5 px ink; the dot 6 px in the team colour.
+- **Q204 the count's digit centred** (session 71, #353's built screenshots on the new page
+  https://claude.ai/artifact/CJkm6TCEoYNBkti4y6N82t, the earlier EQmcWw9Ywe8n1GeeUMPBD8 being the previous
+  account's; asked whether to ship #353): "Just fix one thing, center the number of the countdown in the circle
+  currently it feels is a little up from the center of the circle". So the digit's drawn shape sits at the ring's
+  centre (a font draws digits above the middle of its text line); fixed in #353 before it ships, then shown again.
+- **Q205 #353 shipped** (session 71, after the digit was centred, shown as a before/after close-up on the page:
+  Luckiest Guy draws 1-5 0.150-0.165 of the text size high, so `look.bannerDigitRise` 0.16 moves the digit down;
+  measured after: within 0.5 px of the ring's centre on desktop, 0 on the phone): **"Yes, ship it"**
+  (recommended). Next: #354 the desktop hints.
 
 ## Roller Champions
 

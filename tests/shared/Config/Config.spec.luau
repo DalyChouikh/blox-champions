@@ -574,7 +574,6 @@ describe("Config defaults", function()
 			titleSize = 32,
 			bannerSize = 96,
 			bannerSeconds = 2,
-			countdown = { textSize = 76, ringSize = 200, ringThickness = 8 },
 			feedSeconds = 6,
 			feedMaxEntries = 5,
 			glowThickness = 3,
@@ -584,6 +583,7 @@ describe("Config defaults", function()
 			look = {
 				font = Enum.Font.FredokaOne,
 				bannerFont = Enum.Font.LuckiestGuy,
+				bannerDigitRise = 0.16,
 				ink = Color3.fromRGB(11, 14, 24),
 				outline = 3,
 				shadow = 4,
@@ -638,15 +638,23 @@ describe("Config defaults", function()
 					textSizes = { speed = 55, unit = 17 },
 					compactTextSizes = { speed = 30, unit = 12 },
 				},
-				-- RC's crosshair (#312): 31.5% down (Q123/Q127), its ring 130 px across at 1918 x 1078 (Video 32),
-				-- blinking every 0.4 s once closed (Q142).
+				-- RC's crosshair (#312): 31.5% down (Q123/Q127), its charge ring 130 px across at 1918 x 1078 (Video
+				-- 32), blinking every 0.4 s once closed (Q142); X1 (#353, Q188b): the carrying ring growing into it
+				-- over the charge's first quarter, the page's phone sizes (Q203), 3 px clear of the scoreboard.
 				reticle = {
 					size = 6,
 					height = 0.315,
-					ringSize = 130,
-					ringThickness = 4,
-					ringGap = 29,
 					blinkSeconds = 0.4,
+					growShare = 0.25,
+					clearance = 3,
+					sizes = { carry = 61, charge = 130, thickness = 4 },
+					compactSizes = { carry = 24, charge = 46, thickness = 3 },
+				},
+				-- RC's count a third down (#353, Q185): its 200 px ring and 75 px digit (Q108); the page's phone sizes
+				-- (Q203).
+				countdown = {
+					sizes = { textSize = 76, ringSize = 200, ringThickness = 8 },
+					compactSizes = { textSize = 40, ringSize = 76, ringThickness = 4 },
 				},
 				scoreTab = {
 					position = UDim2.fromScale(0.5, 0.5),
@@ -1872,20 +1880,24 @@ describe("Config.forMode", function()
 		end
 	end)
 
-	-- RC's crosshair (#312): 130 - 2 x 4 leaves 122 px inside the ring.
+	-- The X1 crosshair (#353) with a 2 px ink: a 50 px carrying ring with 2 px strokes leaves 50 - 2 x 2 - 4 x 2 = 38
+	-- px between the inks, so a 37.9 px dot fits; the carrying ring a hair smaller than the charge ring.
 	it("accepts a crosshair just inside its limits", function()
-		local inside = { size = 121, height = 0.999, ringGap = 129, blinkSeconds = 0.01 }
-		local reticle = Fixtures.config({ UI = { hud = { layout = { reticle = inside } } } }).UI.hud.layout.reticle
-		expect(reticle).toEqual({
-			size = 121,
+		local rings = { carry = 50, charge = 50.1, thickness = 2 }
+		local inside = {
+			size = 37.9,
 			height = 0.999,
-			ringSize = 130,
-			ringThickness = 4,
-			ringGap = 129,
 			blinkSeconds = 0.01,
-		})
-		local top = Fixtures.config({ UI = { hud = { layout = { reticle = { height = 0.001, ringGap = 0 } } } } })
+			growShare = 1,
+			clearance = 0,
+			sizes = rings,
+			compactSizes = rings,
+		}
+		local ui = Fixtures.config({ UI = { hud = { look = { textOutline = 2 }, layout = { reticle = inside } } } }).UI
+		expect(ui.hud.layout.reticle).toEqual(inside)
+		local top = Fixtures.config({ UI = { hud = { layout = { reticle = { height = 0.001, growShare = 0.001 } } } } })
 		expect(top.UI.hud.layout.reticle.height).toBe(0.001)
+		expect(top.UI.hud.layout.reticle.growShare).toBe(0.001)
 	end)
 
 	-- The ball's trail (#313).
@@ -1904,11 +1916,13 @@ describe("Config.forMode", function()
 		expect(Fixtures.config({ UI = { text = { touchPassTarget = "v" } } }).UI.text.touchPassTarget).toBe("v")
 	end)
 
-	it("accepts a kickoff count whose digit just fits inside its ring", function()
-		-- 116 - 2 x 8 = 100: a 99 px digit fits.
-		local countdown =
-			Fixtures.config({ UI = { hud = { countdown = { textSize = 99, ringSize = 116 } } } }).UI.hud.countdown
-		expect(countdown).toEqual({ textSize = 99, ringSize = 116, ringThickness = 8 })
+	it("accepts a kickoff count whose digit just fits inside its ring's ink", function()
+		-- With a 2 px ink, 116 - 2 x (8 + 2) = 96: a 95 px digit fits, on either kind of screen.
+		local count = { textSize = 95, ringSize = 116, ringThickness = 8 }
+		local overrides =
+			{ look = { textOutline = 2 }, layout = { countdown = { sizes = count, compactSizes = count } } }
+		local countdown = Fixtures.config({ UI = { hud = overrides } }).UI.hud.layout.countdown
+		expect(countdown).toEqual({ sizes = count, compactSizes = count })
 	end)
 
 	it("rejects HUD text and settings that contradict themselves", function()
@@ -1986,13 +2000,40 @@ describe("Config.forMode", function()
 			{ overrides = { UI = { text = { draw = "" } } }, message = "UI.text.draw: must not be empty" },
 			{ overrides = { UI = { text = { go = "GO!" } } }, message = "UI.text.go: placeholder count must be 1" },
 			{
-				overrides = { UI = { hud = { countdown = { ringThickness = 0 } } } },
-				message = "UI.hud.countdown.ringThickness: must be > 0",
+				overrides = { UI = { hud = { layout = { countdown = { sizes = { ringThickness = 0 } } } } } },
+				message = "UI.hud.layout.countdown.sizes.ringThickness: must be > 0 (got 0)",
 			},
-			-- Inside the ring's stroke, 116 - 2 x 8 leaves 100 px: a 100 px digit would touch it.
 			{
-				overrides = { UI = { hud = { countdown = { textSize = 100, ringSize = 116 } } } },
-				message = "UI: the count's digit must fit inside its ring (textSize < ringSize - 2 × ringThickness)",
+				overrides = { UI = { hud = { layout = { countdown = { compactSizes = { ringSize = 0 } } } } } },
+				message = "UI.hud.layout.countdown.compactSizes.ringSize: must be > 0 (got 0)",
+			},
+			-- Inside the ring's ink, with a 2 px ink 116 - 2 x (8 + 2) leaves 96 px: a 96 px digit would touch it,
+			-- on a desktop's screen or a phone's.
+			{
+				overrides = {
+					UI = {
+						hud = {
+							look = { textOutline = 2 },
+							layout = { countdown = { sizes = { textSize = 96, ringSize = 116, ringThickness = 8 } } },
+						},
+					},
+				},
+				message = "UI: the count's digit must fit inside its ring's ink "
+					.. "(textSize < ringSize - 2 × (ringThickness + look.textOutline))",
+			},
+			{
+				overrides = {
+					UI = {
+						hud = {
+							look = { textOutline = 2 },
+							layout = {
+								countdown = { compactSizes = { textSize = 96, ringSize = 116, ringThickness = 8 } },
+							},
+						},
+					},
+				},
+				message = "UI: the count's digit must fit inside its ring's ink "
+					.. "(textSize < ringSize - 2 × (ringThickness + look.textOutline))",
 			},
 			{
 				overrides = { UI = { hud = { layout = { getUp = { size = UDim2.fromScale(0.5, 0.1) } } } } },
@@ -2012,8 +2053,8 @@ describe("Config.forMode", function()
 				overrides = { UI = { hud = { layout = { scoreTab = { size = UDim2.fromOffset(0, 360) } } } } },
 				message = "UI.hud.layout.scoreTab.size: must be in pixels (scales 0, offsets > 0)",
 			},
-			-- RC's crosshair (#312): on the screen, a ring that holds its dot, halves that keep some arc, a blink that
-			-- takes some time.
+			-- RC's crosshair (#312, #353): on the screen, rings that hold their dot, the carrying ring growing into the
+			-- charge ring, a blink that takes some time.
 			{
 				overrides = { UI = { hud = { layout = { reticle = { height = 0 } } } } },
 				message = "UI.hud.layout.reticle.height: must be > 0 (got 0)",
@@ -2023,25 +2064,72 @@ describe("Config.forMode", function()
 				message = "UI.hud.layout.reticle.height: must be < 1 (got 1)",
 			},
 			{
-				overrides = { UI = { hud = { layout = { reticle = { ringThickness = 0 } } } } },
-				message = "UI.hud.layout.reticle.ringThickness: must be > 0 (got 0)",
+				overrides = { UI = { hud = { layout = { reticle = { sizes = { thickness = 0 } } } } } },
+				message = "UI.hud.layout.reticle.sizes.thickness: must be > 0 (got 0)",
 			},
 			{
-				overrides = { UI = { hud = { layout = { reticle = { ringGap = -1 } } } } },
-				message = "UI.hud.layout.reticle.ringGap: must be >= 0 (got -1)",
+				overrides = { UI = { hud = { layout = { reticle = { compactSizes = { carry = 0 } } } } } },
+				message = "UI.hud.layout.reticle.compactSizes.carry: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { reticle = { growShare = 0 } } } } },
+				message = "UI.hud.layout.reticle.growShare: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { reticle = { growShare = 1.01 } } } } },
+				message = "UI.hud.layout.reticle.growShare: must be <= 1 (got 1.01)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { reticle = { clearance = -1 } } } } },
+				message = "UI.hud.layout.reticle.clearance: must be >= 0 (got -1)",
 			},
 			{
 				overrides = { UI = { hud = { layout = { reticle = { blinkSeconds = 0 } } } } },
 				message = "UI.hud.layout.reticle.blinkSeconds: must be > 0 (got 0)",
 			},
-			-- 130 - 2 x 4 leaves 122 px inside the ring: a 122 px dot would touch it.
+			-- With a 2 px ink, a 30 px carrying ring with 2 px strokes leaves 30 - 2 x 2 - 4 x 2 = 18 px between the
+			-- inks: an 18 px dot would touch the phone's (the desktop's 61 px ring would hold it).
 			{
-				overrides = { UI = { hud = { layout = { reticle = { size = 122 } } } } },
-				message = "UI: the reticle's dot must fit inside its ring (size < ringSize - 2 × ringThickness)",
+				overrides = {
+					UI = {
+						hud = {
+							look = { textOutline = 2 },
+							layout = {
+								reticle = { size = 18, compactSizes = { carry = 30, charge = 40, thickness = 2 } },
+							},
+						},
+					},
+				},
+				message = "UI: the reticle's dot must fit inside each carrying ring's ink "
+					.. "(size < carry - 2 × thickness - 4 × look.textOutline)",
+			},
+			-- The same 18 px dot would touch a desktop's 30 px carrying ring (a phone's 40 px ring holds it: 40 - 2 x 2
+			-- - 4 x 2 = 28 px between the inks).
+			{
+				overrides = {
+					UI = {
+						hud = {
+							look = { textOutline = 2 },
+							layout = {
+								reticle = {
+									size = 18,
+									sizes = { carry = 30, charge = 130, thickness = 2 },
+									compactSizes = { carry = 40, charge = 46, thickness = 2 },
+								},
+							},
+						},
+					},
+				},
+				message = "UI: the reticle's dot must fit inside each carrying ring's ink "
+					.. "(size < carry - 2 × thickness - 4 × look.textOutline)",
 			},
 			{
-				overrides = { UI = { hud = { layout = { reticle = { ringGap = 130 } } } } },
-				message = "UI: the reticle ring's gap must leave its halves some arc (ringGap < ringSize)",
+				overrides = { UI = { hud = { layout = { reticle = { sizes = { carry = 130, charge = 130 } } } } } },
+				message = "UI: the reticle's carrying ring must be smaller than its charge ring (carry < charge)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { reticle = { compactSizes = { carry = 47 } } } } } },
+				message = "UI: the reticle's carrying ring must be smaller than its charge ring (carry < charge)",
 			},
 			-- Five number columns of 120 and their gaps, inside the padding: 642 px, wider than the 640 px tab.
 			{
@@ -2075,6 +2163,15 @@ describe("Config.forMode", function()
 			{
 				overrides = hud({ look = { textOutline = -1 } }),
 				message = "UI.hud.look.textOutline: must be >= 0 (got -1)",
+			},
+			-- Past half its size a digit's middle would sit above its whole line.
+			{
+				overrides = hud({ look = { bannerDigitRise = -0.01 } }),
+				message = "UI.hud.look.bannerDigitRise: must be >= 0 (got -0.01)",
+			},
+			{
+				overrides = hud({ look = { bannerDigitRise = 0.51 } }),
+				message = "UI.hud.look.bannerDigitRise: must be <= 0.5 (got 0.51)",
 			},
 			-- A box as dark at its bottom as the ink would lose its colour there.
 			{ overrides = hud({ look = { shade = 1 } }), message = "UI.hud.look.shade: must be < 1 (got 1)" },
@@ -2183,7 +2280,7 @@ describe("Config.forMode", function()
 		local hud = Fixtures.config({
 			UI = {
 				hud = {
-					look = { outline = 0, shadow = 0, textOutline = 0, shade = 0.99 },
+					look = { outline = 0, shadow = 0, textOutline = 0, shade = 0.99, bannerDigitRise = 0 },
 					motion = {
 						pop = { seconds = 0.01, overshoot = 0 },
 						bounce = { seconds = 0.01, scale = 1, rebound = 0.01 },
@@ -2214,6 +2311,9 @@ describe("Config.forMode", function()
 		expect(hud.layout.compactScoreboard.textSizes).toEqual({ score = 44, clock = 44, worth = 34, period = 18 })
 		expect(hud.layout.compactBelow).toBe(0.01)
 		expect(hud.layout.scoreboard.chipClearance).toBe(0)
+		expect(hud.look.bannerDigitRise).toBe(0)
+		local halfway = Fixtures.config({ UI = { hud = { look = { bannerDigitRise = 0.5 } } } }).UI.hud.look
+		expect(halfway.bannerDigitRise).toBe(0.5)
 	end)
 
 	it("rejects the old lap text, score pips and speedometer size as unknown", function()

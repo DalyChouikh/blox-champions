@@ -6,11 +6,13 @@
 -- first snapshot on; the hints and the Get Up prompt wherever the Hud gives their keys; the score tab while it is open.
 -- Once the match is over the end screen shows until the next match in place of the scoreboard, holding the final
 -- score. Off touch it holds its own score tab too, so an open one shows no other; on touch it is compact (the owner's
--- choice) and the score tab opens over it, from its button, shown on touch throughout, or a held key. The reticle and
--- the scoreboard are drawn in guis the Hud gives (portals): the reticle in the full-screen one, where throws aim, the
--- scoreboard in the safe area's, from its top (in Roblox's top bar's free band where it fits, HudScreen); the reticle
--- hides while the score tab or the end screen shows. The speedometer reads in the viewer's team colour. A plain
--- function of its props.
+-- choice) and the score tab opens over it, from its button, shown on touch throughout, or a held key. The reticle,
+-- the kickoff count and the scoreboard are drawn in guis the Hud gives (portals): the reticle and the count in the
+-- full-screen one, where throws aim, the scoreboard in the safe area's, from its top (in Roblox's top bar's free band
+-- where it fits, HudScreen). The reticle shows only while the local player holds the ball (RC's way, the owner's
+-- Q185); its rings shrink, and the count moves down, where they would touch the scoreboard (HudScreen); both hide
+-- while the score tab or the end screen shows. The reticle and the speedometer read in the viewer's team colour. A
+-- plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -18,9 +20,11 @@ local Banner = require(script.Parent.Banner)
 local BoardMotion = require(script.Parent.BoardMotion)
 local Config = require(ReplicatedStorage.Shared.Config)
 local ControlHints = require(script.Parent.ControlHints)
+local Countdown = require(script.Parent.Countdown)
 local EndScreen = require(script.Parent.EndScreen)
 local Feed = require(script.Parent.Feed)
 local GetUp = require(script.Parent.GetUp)
+local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local React = require(ReplicatedStorage.Packages.React)
@@ -53,14 +57,17 @@ export type AppProps = {
 	state: HudState.HudState,
 	device: Enum.PreferredInput,
 	localId: Types.PlayerId,
-	-- A phone's screen (HudScreen.compact), and the scoreboard's top in pixels from the top of the safe area
-	-- (HudScreen.boardTop).
+	-- A phone's screen (HudScreen.compact), the scoreboard's top and the crosshair's aim in pixels from the top of the
+	-- safe area (HudScreen.boardTop, HudScreen.aim).
 	compact: boolean,
 	boardTop: number,
+	aim: number,
 	-- How the scoreboard moves, having watched the state's match.
 	board: BoardMotion.BoardMotion,
 	-- Whether the local player has a skater: a spectator has no speed and no hints.
 	hasSkater: boolean,
+	-- Whether the local player holds the ball: the reticle shows only then.
+	carrying: boolean,
 	-- Each hint's key on this device; nil where no hints show.
 	keys: ControlHints.HintKeys?,
 	-- The movement keys on this device while the local skater is knocked down; nil otherwise.
@@ -87,12 +94,28 @@ local function App(props: AppProps): React.ReactElement
 	local match, keys, ended = state.match, props.keys, state.ended
 	local touch = props.device == Enum.PreferredInput.Touch
 	local scoreTab = props.scoreTabOpen and match ~= nil and (ended == nil or touch)
+	local uncovered = not scoreTab and ended == nil
+	local compact, top, aim = props.compact, props.boardTop, props.aim
+	local period = match ~= nil and text:period(match) ~= nil
+	local viewer = Style.teamColor(config, HudState.teamOf(match, props.localId))
 	return React.createElement(React.Fragment, nil, {
 		Centre = ReactRoblox.createPortal({
-			Reticle = React.createElement(
-				Reticle,
-				{ config = config, visible = not scoreTab and ended == nil, charge = bindings.charge }
-			),
+			Reticle = React.createElement(Reticle, {
+				config = config,
+				compact = compact,
+				color = viewer,
+				visible = uncovered and props.carrying,
+				charge = bindings.charge,
+				scale = HudScreen.ringScale(config, compact, top, aim, period),
+			}),
+			Countdown = React.createElement(Countdown, {
+				config = config,
+				text = text,
+				banner = state.banner,
+				compact = compact,
+				visible = uncovered,
+				drop = HudScreen.countDrop(config, compact, top, aim, period),
+			}),
 		}, props.centre),
 		Top = ReactRoblox.createPortal({
 			Scoreboard = if match ~= nil and ended == nil
@@ -100,8 +123,8 @@ local function App(props: AppProps): React.ReactElement
 					config = config,
 					text = text,
 					match = match,
-					compact = props.compact,
-					top = props.boardTop,
+					compact = compact,
+					top = top,
 					clock = bindings.clock,
 					motion = props.board,
 				})
@@ -119,9 +142,9 @@ local function App(props: AppProps): React.ReactElement
 			Speedometer = React.createElement(Speedometer, {
 				config = config,
 				speed = bindings.speed,
-				color = Style.teamColor(config, HudState.teamOf(match, props.localId)),
+				color = viewer,
 				touch = touch,
-				compact = props.compact,
+				compact = compact,
 				visible = props.hasSkater,
 			}),
 			ScoreButton = if touch

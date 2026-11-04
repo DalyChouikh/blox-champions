@@ -50,24 +50,15 @@ describe("Banner", function()
 		expect(label.Visible).toBe(false)
 	end)
 
-	-- The owner (Q108, Q110): RC's count, a digit inside a ring, both in the player's own team colour.
-	it("shows the kickoff count's digit inside a ring, both in its team's colour, and the ring only then", function()
-		local countdown = config.UI.hud.countdown
+	-- The kickoff count sits a third down in its own part (Hud/Countdown, #353, the owner's Q185).
+	it("leaves the kickoff count to the Countdown, a third down", function()
 		local mounted, rerender = Fixtures.mount(banner({ kind = "Countdown", team = "Orange", value = 2 }), folder)
 		local label = mounted:FindFirstChild("Banner") :: TextLabel
-		expect(label.Text).toBe("2")
-		expect(label.TextSize).toBe(countdown.textSize)
-		expect(label.TextColor3 == config.UI.hud.look.teamColors.Orange).toBe(true)
-		local ring = label:FindFirstChild("Ring") :: Frame
-		expect(ring.Visible).toBe(true)
-		expect(ring.Size).toEqual(UDim2.fromOffset(countdown.ringSize, countdown.ringSize))
-		local stroke = ring:FindFirstChildOfClass("UIStroke") :: UIStroke
-		expect(stroke.Thickness).toBe(countdown.ringThickness)
-		expect(stroke.Color == config.UI.hud.look.teamColors.Orange).toBe(true)
+		expect(label.Visible).toBe(false)
+		expect(label:FindFirstChild("Ring")).toBeNil()
 		rerender(banner({ kind = "Go", team = "Orange" }))
+		expect(label.Visible).toBe(true)
 		expect(label.Text).toBe("GO ORANGE TEAM!")
-		expect(label.TextSize).toBe(config.UI.hud.bannerSize)
-		expect(ring.Visible).toBe(false)
 	end)
 
 	it("fits every banner's text on its label", function()
@@ -84,14 +75,10 @@ describe("Banner", function()
 		for _, seconds in config.UI.clockWarnings do
 			table.insert(banners, { kind = "ClockWarning", value = seconds })
 		end
-		for digit = 1, config.Match.kickoffCountdownSeconds do
-			table.insert(banners, { kind = "Countdown", value = digit })
-		end
 		local tooBig: { string } = {}
 		for _, shown in banners do
 			local written = text:banner(shown)
-			local textSize = if shown.kind == "Countdown" then hud.countdown.textSize else hud.bannerSize
-			local bounds = TextService:GetTextSize(written, textSize, hud.font, Vector2.new(math.huge, math.huge))
+			local bounds = TextService:GetTextSize(written, hud.bannerSize, hud.font, Vector2.new(math.huge, math.huge))
 			if bounds.X > size.X.Offset or bounds.Y > size.Y.Offset then
 				table.insert(tooBig, written)
 			end

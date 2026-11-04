@@ -111,15 +111,44 @@ describe("Style (look C)", function()
 		expect(stroke.ApplyStrokeMode).toBe(Enum.ApplyStrokeMode.Contextual)
 	end)
 
+	-- X1's strokes (#353): the colour over an ink 1.5 px wider each side here. A UIStroke lies outside its frame, so a
+	-- 40 px ring with a 4 px stroke is a 32 px frame; its ink a 29 px frame with a 7 px stroke, reaching 43 across.
+	it("draws a look C ring: its stroke over an ink stroke wider each side, both faded alike", function()
+		local fade = React.createBinding(0.25)
+		local held: { [string]: React.Node } = { Digit = React.createElement("TextLabel", { Text = "3" }) }
+		local mounted = mount(Style.inkedRing(config, { Position = UDim2.fromOffset(5, 6) }, 40, 4, RED, fade, held))
+		local ring = mounted:FindFirstChild("Box") :: Frame
+		expect(ring.Size).toEqual(UDim2.fromOffset(43, 43))
+		expect(ring.Position).toEqual(UDim2.fromOffset(5, 6))
+		expect(ring.BackgroundTransparency).toBe(1)
+		local line = ring:FindFirstChild("Line") :: Frame
+		local ink = ring:FindFirstChild("Ink") :: Frame
+		expect(line.Size).toEqual(UDim2.fromOffset(32, 32))
+		expect(ink.Size).toEqual(UDim2.fromOffset(29, 29))
+		for _, stroked in { line, ink } do
+			expect(stroked.AnchorPoint == Vector2.new(0.5, 0.5)).toBe(true)
+			expect(stroked.Position).toEqual(UDim2.fromScale(0.5, 0.5))
+			expect(stroked.BackgroundTransparency).toBe(1)
+			expect((stroked:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(Style.ROUND)
+		end
+		local lineStroke = line:FindFirstChildOfClass("UIStroke") :: UIStroke
+		local inkStroke = ink:FindFirstChildOfClass("UIStroke") :: UIStroke
+		expect(lineStroke.Thickness).toBe(4)
+		expect(lineStroke.Color == RED).toBe(true)
+		expect(inkStroke.Thickness).toBe(7)
+		expect(inkStroke.Color == Color3.fromRGB(10, 20, 30)).toBe(true)
+		expect(lineStroke.Transparency).toBe(0.25)
+		expect(inkStroke.Transparency).toBe(0.25)
+		-- The ink under the stroke, what the ring holds above both.
+		local content = ring:FindFirstChild("Content") :: Frame
+		expect(content.Size).toEqual(UDim2.fromScale(1, 1))
+		expect(content:FindFirstChild("Digit") ~= nil).toBe(true)
+		expect(ink.ZIndex < line.ZIndex and line.ZIndex < content.ZIndex).toBe(true)
+	end)
+
 	it("colours a team in the HUD's own pair, not the world's, and no team in the text colour", function()
 		expect(Style.teamColor(config, "Blue") == Color3.fromRGB(0, 100, 250)).toBe(true)
 		expect(Style.teamColor(config, "Orange") == Color3.fromRGB(250, 150, 0)).toBe(true)
 		expect(Style.teamColor(config, nil) == config.UI.hud.textColor).toBe(true)
-	end)
-
-	it("steps a box under another so their inks stay a clearance apart", function()
-		-- The upper ink reaches 2 + 5 below its box, the lower's 2 above its own: 4 px clear at a 13 px step.
-		expect(Style.under(config, 4)).toBe(13)
-		expect(Style.under(config, 0)).toBe(9)
 	end)
 end)

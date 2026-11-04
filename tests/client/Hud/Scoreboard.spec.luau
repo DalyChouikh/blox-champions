@@ -10,6 +10,7 @@ local Animator = require(Hud.Animator)
 local BoardMotion = require(Hud.BoardMotion)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local React = require(ReplicatedStorage.Packages.React)
 local Scoreboard = require(Hud.Scoreboard)
@@ -241,5 +242,87 @@ describe("Scoreboard, S5 Compact chips on phones", function()
 		expect(period.Parent.Name).toBe("Scoreboard")
 		expect(period.Text).toBe("OVERTIME")
 		expect(period.TextSize).toBe(layout.compactScoreboard.textSizes.period)
+	end)
+end)
+
+-- The crosshair and the kickoff count keep clear of the board by HudScreen.boardDepth (#353): measured here on the
+-- board as Roblox lays it out (a ScreenGui under StarterGui is laid out in Edit, after a frame).
+describe("Scoreboard, laid out", function()
+	local gui: ScreenGui?
+
+	afterEach(function()
+		if gui ~= nil then
+			gui:Destroy()
+			gui = nil
+		end
+	end)
+
+	-- Whether `object` shows: it and every frame up to the scoreboard's (`drawn`) visible.
+	local function shown(object: Instance, drawn: Instance): boolean
+		local at: Instance? = object
+		while at ~= nil and at ~= drawn do
+			if at:IsA("GuiObject") and not at.Visible then
+				return false
+			end
+			at = at.Parent
+		end
+		return true
+	end
+
+	-- How far below the board's top its ink reaches: every look C box's ink, and the period's lettering with its
+	-- outline (what every other part sits inside).
+	local function reach(mounted: Instance): number
+		local drawn = mounted:FindFirstChild("Scoreboard") :: Frame
+		local deepest = 0
+		for _, object in drawn:GetDescendants() do
+			if object:IsA("GuiObject") and shown(object, drawn) then
+				local extra = if string.match(object.Name, "^Ink%d+$") ~= nil
+					then 0
+					elseif object.Name == "Period" then config.UI.hud.look.textOutline
+					else nil
+				if extra ~= nil then
+					deepest = math.max(deepest, object.AbsolutePosition.Y + object.AbsoluteSize.Y + extra)
+				end
+			end
+		end
+		return deepest - drawn.AbsolutePosition.Y
+	end
+
+	-- In play the possessing team's lap chips and the open goal's worth chip, held at its widest (the pop's overshoot
+	-- or the bounce); at a kickoff neither (the laps and the goal reset).
+	it("reaches exactly as deep as HudScreen.boardDepth says, at a kickoff and in play, on either screen", function()
+		local motionSettings = config.UI.hud.motion
+		local widest = math.max(1 + motionSettings.pop.overshoot, motionSettings.bounce.scale)
+		local layer = Instance.new("ScreenGui")
+		layer.Name = "ScoreboardLaidOutTest"
+		layer.Parent = game:GetService("StarterGui")
+		gui = layer
+		local results: { string } = {}
+		local expected: { string } = {}
+		for _, compact in { false, true } do
+			for _, period in { "Regulation", "Overtime" } do
+				for _, playing in { false, true } do
+					local overrides: { [string]: any } = { period = period }
+					if playing then
+						overrides.possessingTeam = "Blue"
+						overrides.lapProgress = 3
+						overrides.streak = 2
+						overrides.goalOpenFor = "Blue"
+					end
+					animator = Animator.new(config.UI.hud.motion)
+					motion = BoardMotion.new(text, animator)
+					local mounted, _, unmount = Fixtures.mount(board(overrides, compact), layer)
+					animator:rest(motion.worthBounce, widest)
+					task.wait()
+					local case = `compact={compact} period={period} playing={playing}`
+					table.insert(results, `{case}: {math.floor(reach(mounted) * 100 + 0.5) / 100}`)
+					local depth = HudScreen.boardDepth(config, compact, period ~= "Regulation", playing)
+					table.insert(expected, `{case}: {math.floor(depth * 100 + 0.5) / 100}`)
+					unmount()
+					mounted:Destroy()
+				end
+			end
+		end
+		expect(results).toEqual(expected)
 	end)
 end)

@@ -28,6 +28,11 @@ local Style = {}
 
 -- A corner that rounds a part's shorter side all the way.
 Style.ROUND = UDim.new(0.5, 0)
+-- A part centred on its place (its AnchorPoint), placed in the middle of its parent, or as big as its parent.
+Style.CENTRE = Vector2.new(0.5, 0.5)
+Style.MIDDLE = UDim2.fromScale(0.5, 0.5)
+Style.FULL = UDim2.fromScale(1, 1)
+local CENTRE, MIDDLE, FULL = Style.CENTRE, Style.MIDDLE, Style.FULL
 
 -- `props` written over `base`, which the caller made fresh: React keeps each element's props.
 local function over(base: Props, props: Props?): Props
@@ -75,6 +80,11 @@ end
 -- A panel drawn over the game (the score tab, the end screen): Style.panel, but overlayTransparency see-through.
 function Style.overlay(config: Config.GameConfig, props: Props?): Props
 	return Style.panel(config, over({ BackgroundTransparency = config.UI.hud.overlayTransparency }, props))
+end
+
+-- What a part holds, `children`, in a "Content" frame as big as it, above the part's own drawing.
+local function holding(children: Props?): React.ReactElement
+	return React.createElement("Frame", Style.holder({ Size = FULL, ZIndex = 3 }), children)
 end
 
 -- Drawn above its siblings that keep the default ZIndex (1): with equal ZIndex, the sibling parented later draws on
@@ -170,15 +180,8 @@ function Style.box(
 			Shade = Style.shading(config, color, piece.top, piece.top + piece.height),
 		})
 	end
-	parts.Content = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1), ZIndex = 3 }), children)
+	parts.Content = holding(children)
 	return React.createElement("Frame", Style.holder(props), parts)
-end
-
--- How far below a look C box's bottom another starts so `clearance` pixels show between them: the upper box's ink
--- reaches look.outline + look.shadow below it (Style.box), the lower one's look.outline above it.
-function Style.under(config: Config.GameConfig, clearance: number): number
-	local look = config.UI.hud.look
-	return look.outline + look.shadow + clearance + look.outline
 end
 
 -- A ring: a see-through disc frame (`props` place and size it) with an outline, a UIStroke (`outline` sets its Color,
@@ -188,6 +191,42 @@ function Style.ring(props: Props, outline: Props, effects: { [string]: React.Nod
 		Corner = Style.round(),
 		Stroke = React.createElement("UIStroke", outline, effects),
 	})
+end
+
+-- Look C's ring (#353): a `thickness`-pixel stroke in `color` over an ink stroke look.textOutline wider each side,
+-- round a disc `size` pixels across at the colour stroke's outer edge (a UIStroke lies outside its frame), in a frame
+-- as big as the ink reaches, which `props` place. `fade` sees both strokes through alike; `children` sit above them, in
+-- its "Content" frame.
+function Style.inkedRing(
+	config: Config.GameConfig,
+	props: Props,
+	size: number,
+	thickness: number,
+	color: Color3,
+	fade: Fade?,
+	children: Props?
+): React.ReactElement
+	local look = config.UI.hud.look
+	local ink = look.textOutline
+	local reach = size + 2 * ink
+	local parts: { [string]: React.Node } = {
+		Ink = Style.ring({
+			AnchorPoint = CENTRE,
+			Position = MIDDLE,
+			Size = UDim2.fromOffset(size - 2 * thickness - 2 * ink, size - 2 * thickness - 2 * ink),
+			ZIndex = 1,
+		}, { Color = look.ink, Thickness = thickness + 2 * ink, Transparency = fade }),
+		Line = Style.ring({
+			AnchorPoint = CENTRE,
+			Position = MIDDLE,
+			Size = UDim2.fromOffset(size - 2 * thickness, size - 2 * thickness),
+			ZIndex = 2,
+		}, { Color = color, Thickness = thickness, Transparency = fade }),
+	}
+	if children ~= nil then
+		parts.Content = holding(children)
+	end
+	return React.createElement("Frame", Style.holder(over({ Size = UDim2.fromOffset(reach, reach) }, props)), parts)
 end
 
 -- Shrinks a part to fit the HUD's area (a binding), screenMargin inside each edge (Fit). The part is `size`, or, for a

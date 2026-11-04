@@ -1,29 +1,30 @@
 --!strict
 -- The HUD on screen (spec §11.1), drawn with React Luau through a legacy root, which renders at once. Its panels sit in
--- the ScreenGui "Hud", below Roblox's own top bar; the reticle sits in "HudCentre", which spans the whole screen, so
--- its place there is the screen point throws and passes aim through (#312); the scoreboard sits in "HudTop", the
--- device's safe area, the frame Roblox measures its top bar's free band in (GuiService.TopbarInset), so it can sit in
--- that band beside Roblox's buttons on a phone with a notch too (#352; App draws both through portals). Before each
--- frame is drawn (FrameController), after HudStore has counted the clocks, the Hud renders App again only when
--- something App shows has changed: the HUD state's version, the device, the screen's form (a phone's or not, and where
--- the scoreboard sits under Roblox's top bar: HudScreen), the carrier, whether the local player has a skater, whether
--- it shows the Get Up prompt, or whether the score tab is open. What changes every frame (the clock, the speed, what
--- each control does now and whether it works, how far a throw has charged) goes through bindings instead, each set only
--- when it changes, and so does what moves (Animator's tracks, stepped each frame; the scoreboard's from BoardMotion,
--- which watches each new state): the texts come from caches and the config, so a quiet frame allocates nothing. The
--- speedometer's reading eases toward the skater's speed (UI.hud.motion.speedRate), from the speed itself whenever a
--- skater appears. Hints name each key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the
--- player's own keyboard layout gives it, else Config.UI.keyNames, else the KeyCode's name. There are none on touch,
--- where the buttons carry the labels; each render names the pass key for the mark over a pass's target (passKey, #315).
--- The Get Up prompt (a skater knocked down by a strike or a fall: SkateController.promptsGetUp, #242) names the
--- movement keys the same way: the first composite's four keys, the gamepad's stick, or on touch Config.UI.text's name
--- for the stick. The score tab shows while its key is held; on touch a button toggles it, and the toggle clears once
--- the device is not touch and whenever the end screen appears or goes, so the tab never pops open unasked. While the
--- tab shows its Switch team button (HudState.switchOffer, #310), the button's key, or a tap on touch, asks the server
--- for a switch when one works. The banner, the feed, the score tab and the end screen centre and fit in the HUD's
--- stage, a binding: on touch the part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas
--- that GuiService gives), elsewhere the whole of it. It is measured again, with the screen's form, when the screen's
--- size or Roblox's top bar changes (from start on) and when the device does.
+-- the ScreenGui "Hud", below Roblox's own top bar; the reticle and the kickoff count sit in "HudCentre", which spans
+-- the whole screen, so the reticle's place there is the screen point throws and passes aim through (#312); the
+-- scoreboard sits in "HudTop", the device's safe area, the frame Roblox measures its top bar's free band in
+-- (GuiService.TopbarInset), so it can sit in that band beside Roblox's buttons on a phone with a notch too (#352; App
+-- draws both through portals). Before each frame is drawn (FrameController), after HudStore has counted the clocks, the
+-- Hud renders App again only when something App shows has changed: the HUD state's version, the device, the screen's
+-- form (a phone's or not, where the scoreboard sits under Roblox's top bar, and the crosshair's aim: HudScreen), the
+-- carrier, whether the local player has a skater, whether it shows the Get Up prompt, or whether the score tab is open.
+-- What changes every frame (the clock, the speed, what each control does now and whether it works, how far a throw has
+-- charged) goes through bindings instead, each set only when it changes, and so does what moves (Animator's tracks,
+-- stepped each frame; the scoreboard's from BoardMotion, which watches each new state): the texts come from caches and
+-- the config, so a quiet frame allocates nothing. The speedometer's reading eases toward the skater's speed
+-- (UI.hud.motion.speedRate), from the speed itself whenever a skater appears. Hints name each key as the device shows
+-- it: on a gamepad Roblox's glyph, otherwise the name the player's own keyboard layout gives it, else
+-- Config.UI.keyNames, else the KeyCode's name. There are none on touch, where the buttons carry the labels; each render
+-- names the pass key for the mark over a pass's target (passKey, #315). The Get Up prompt (a skater knocked down by a
+-- strike or a fall: SkateController.promptsGetUp, #242) names the movement keys the same way: the first composite's
+-- four keys, the gamepad's stick, or on touch Config.UI.text's name for the stick. The score tab shows while its key is
+-- held; on touch a button toggles it, and the toggle clears once the device is not touch and whenever the end screen
+-- appears or goes, so the tab never pops open unasked. While the tab shows its Switch team button
+-- (HudState.switchOffer, #310), the button's key, or a tap on touch, asks the server for a switch when one works. The
+-- banner, the feed, the score tab and the end screen centre and fit in the HUD's stage, a binding: on touch the part of
+-- the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that GuiService gives), elsewhere the
+-- whole of it. It is measured again, with the screen's form, when the screen's size or Roblox's top bar changes (from
+-- start on) and when the device does.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -106,9 +107,11 @@ export type Hud = {
 	-- The HUD's moving values, and the scoreboard's motion.
 	_animator: Animator.Animator,
 	_board: BoardMotion.BoardMotion,
-	-- The screen's form, as last measured: a phone's, and the scoreboard's top from the top of the safe area.
+	-- The screen's form, as last measured: a phone's, and the scoreboard's top and the crosshair's aim from the top of
+	-- the safe area.
 	_compact: boolean,
 	_boardTop: number,
+	_aim: number,
 	-- The speed the speedometer reads, eased (studs per second); nil without a skater.
 	_shownSpeed: number?,
 	_root: ReactRoblox.RootType,
@@ -135,6 +138,7 @@ export type Hud = {
 	_device: Enum.PreferredInput?,
 	_shownCompact: boolean,
 	_shownBoardTop: number,
+	_shownAim: number,
 	_shownCarrier: PlayerId?,
 	_hasSkater: boolean,
 	_promptsGetUp: boolean,
@@ -155,7 +159,8 @@ end
 
 -- Sets the stage for `device`: on touch the HUD's area left of the touch buttons, elsewhere the whole of it; and the
 -- screen's form (HudScreen), from the device's safe area and Roblox's top bar. The safe area, not the whole screen:
--- a notched phone's screen reaches past it, where neither Roblox's top bar nor the touch controls go (probed).
+-- a notched phone's screen reaches past it, where neither Roblox's top bar nor the touch controls go (probed); only the
+-- crosshair's aim is a share of the whole screen, where the 3D view is centred.
 local function measure(self: Hud, device: Enum.PreferredInput)
 	local hud = self._insetArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local safe = self._insetArea(Enum.ScreenInsets.DeviceSafeInsets)
@@ -169,6 +174,7 @@ local function measure(self: Hud, device: Enum.PreferredInput)
 	local screen = safe.Max - safe.Min
 	self._compact = HudScreen.compact(self._config, screen)
 	self._boardTop = HudScreen.boardTop(self._config, self._compact, screen.X, self._topbar())
+	self._aim = HudScreen.aim(self._config, self._insetArea(Enum.ScreenInsets.None), safe)
 end
 
 -- The first of `codes` the device has: on a gamepad the first with a glyph; otherwise the first without one, named.
@@ -294,6 +300,7 @@ local Hud: Hud = {
 	_board = nil :: any,
 	_compact = false,
 	_boardTop = 0,
+	_aim = 0,
 	_shownSpeed = nil,
 	_root = nil :: any,
 	_bindings = nil :: any,
@@ -313,6 +320,7 @@ local Hud: Hud = {
 	_device = nil,
 	_shownCompact = false,
 	_shownBoardTop = 0,
+	_shownAim = 0,
 	_shownCarrier = nil,
 	_hasSkater = false,
 	_promptsGetUp = false,
@@ -354,6 +362,7 @@ local Hud: Hud = {
 		self._board = BoardMotion.new(self._text, self._animator)
 		self._compact = false
 		self._boardTop = 0
+		self._aim = 0
 		self._shownSpeed = nil
 		self.renders = 0
 		self.passKey = nil
@@ -361,6 +370,7 @@ local Hud: Hud = {
 		self._device = nil
 		self._shownCompact = false
 		self._shownBoardTop = 0
+		self._shownAim = 0
 		self._shownCarrier = nil
 		self._hasSkater = false
 		self._promptsGetUp = false
@@ -461,7 +471,7 @@ local Hud: Hud = {
 		if self._input:switchTeamPressed() and scoreTabOpen then
 			self:switchTeam()
 		end
-		local compact, boardTop = self._compact, self._boardTop
+		local compact, boardTop, aim = self._compact, self._boardTop, self._aim
 		if state.version ~= self._version then
 			self._board:watch(state.match)
 		end
@@ -470,6 +480,7 @@ local Hud: Hud = {
 			or device ~= self._device
 			or compact ~= self._shownCompact
 			or boardTop ~= self._shownBoardTop
+			or aim ~= self._shownAim
 			or carrier ~= self._shownCarrier
 			or hasSkater ~= self._hasSkater
 			or promptsGetUp ~= self._promptsGetUp
@@ -479,6 +490,7 @@ local Hud: Hud = {
 			self._device = device
 			self._shownCompact = compact
 			self._shownBoardTop = boardTop
+			self._shownAim = aim
 			self._shownCarrier = carrier
 			self._hasSkater = hasSkater
 			self._promptsGetUp = promptsGetUp
@@ -494,8 +506,10 @@ local Hud: Hud = {
 				localId = self._localId,
 				compact = compact,
 				boardTop = boardTop,
+				aim = aim,
 				board = self._board,
 				hasSkater = hasSkater,
+				carrying = carrier == self._localId,
 				keys = keys,
 				getUpKeys = if promptsGetUp then moveKeys(self, device) else nil,
 				scoreTabOpen = scoreTabOpen,
