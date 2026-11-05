@@ -85,8 +85,9 @@ export type SkateController = {
 	-- Set by ActionController each step while a throw charges (#312): the pump key does nothing then and is not
 	-- reported as pumping (the owner, Q106: RC greys Pump while charging). A new character starts without it.
 	charging: boolean,
-	-- Set each step: attached, or right behind a teammate with no cooldown, so holding Attach would attach.
-	attachable: boolean,
+	-- Set each step: the teammate the skater is attached to, or the one right ahead with no cooldown left, so
+	-- holding Attach would attach (the Attach mark shows over them: #381, the owner's Q246, Q247); nil otherwise.
+	attachWith: PlayerId?,
 	-- Every other player's skater as this one sees them (a reused list): who the local player's strikes home onto
 	-- (#277).
 	others: (self: SkateController) -> { SkaterView },
@@ -280,7 +281,10 @@ local function moveSkater(self: SkateController, root: BasePart, skater: SkateMa
 		elseif keys.attach then found
 		else nil
 	local change = attach:update(dt, keys.attach, leader, self._input.move)
-	self.attachable = attach.leader ~= nil or (found ~= nil and attach.cooldownLeft == 0)
+	self.attachWith = if attach.leader ~= nil
+		then attach.leader
+		elseif found ~= nil and attach.cooldownLeft == 0 then found.player
+		else nil
 	if attach.leader ~= nil and leader ~= nil then
 		skater:follow(Attach.target(movement, leader), root.Position, leader.velocity, leader.forward)
 		return
@@ -430,7 +434,7 @@ local SkateController: SkateController = {
 	frozen = false,
 	diving = false,
 	charging = false,
-	attachable = false,
+	attachWith = nil,
 	_config = nil :: any,
 	_inputController = nil :: any,
 	_camera = nil :: any,
@@ -551,7 +555,7 @@ local SkateController: SkateController = {
 		self.frozen = false
 		self.diving = false
 		self.charging = false
-		self.attachable = false
+		self.attachWith = nil
 	end,
 
 	start = function(self: SkateController)
@@ -607,7 +611,7 @@ local SkateController: SkateController = {
 
 	step = function(self: SkateController, dt: number)
 		-- Only a free skater's step finds a teammate to attach behind.
-		self.attachable = false
+		self.attachWith = nil
 		if not self:hasSkater() then
 			return
 		end

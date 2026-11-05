@@ -1948,6 +1948,12 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   phone, the hint column zoomed, the phone with the board open, which also showed #383 on the phone): **"Yes, ship it"**. The
   hint rows, feed chips, Get Up prompt and banners fade in Style.fadeGroup, now centred on its part so a pop inside scales round
   the part's middle (a banner's round its letters); every group measured 2 px or more round its ink.
+- **Q259 #381 shipped, its 2-player check later** (session 85; the design page version 8, section 'The Attach mark over
+  your teammate, built': the real tags drawn by the game's code in Studio at desktop and phone sizes, every combination, zoomed
+  4x; asked to try it in a real 2-player test with both windows recording): "Currently I am not near the pc, so ship it for now
+  and ill test later if any issue ill mention them". So #381 ships on its tests and the Studio render; the owner's own
+  2-player check comes later, and anything found then gets its own fix. Rulings shown on the page with it: the word at the
+  key's text size and padding; the pointer in the box's colour where they meet; no pop-in, like the pass key; no drop shadow.
 
 ## Roller Champions
 

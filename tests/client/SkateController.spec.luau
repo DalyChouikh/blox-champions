@@ -340,15 +340,16 @@ describe("SkateController", function()
 		expect(SkateController.diving).toBe(false)
 	end)
 
-	it("knows when a teammate is close enough to attach behind", function()
+	-- The Attach mark shows over that teammate (#381, the owner's Q246, Q247).
+	it("names the teammate close enough to attach behind, and the leader while attached", function()
 		local leader = skaterAt("Leader", Vector3.new(0, 0, -5))
 		table.insert(others, { player = "2", team = "Blue", root = Fixtures.root(leader) })
 		SkateController:step(1 / 60)
-		expect(SkateController.attachable).toBe(true)
+		expect(SkateController.attachWith).toBe("2")
 
 		leader:PivotTo(CFrame.new(0, movement.hoverHeight, -40))
 		SkateController:step(1 / 60)
-		expect(SkateController.attachable).toBe(false)
+		expect(SkateController.attachWith).toBeNil()
 
 		-- Attached, then let go: during the cooldown the teammate right ahead is no one to attach behind.
 		leader:PivotTo(CFrame.new(0, movement.hoverHeight, -5))
@@ -356,11 +357,11 @@ describe("SkateController", function()
 		attachKey:Fire(true)
 		SkateController:step(1 / 60)
 		expect((SkateController.skater :: any).mode).toBe("Attached")
-		expect(SkateController.attachable).toBe(true)
+		expect(SkateController.attachWith).toBe("2")
 		attachKey:Fire(false)
 		SkateController:step(1 / 60)
 		SkateController:step(1 / 60)
-		expect(SkateController.attachable).toBe(false)
+		expect(SkateController.attachWith).toBeNil()
 	end)
 
 	it("boosts a release toward the stick held as the skater lets go", function()

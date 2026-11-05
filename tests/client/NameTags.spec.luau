@@ -24,9 +24,12 @@ local GLYPH = "rbxasset://textures/ui/Controls/DefaultController/ButtonY@2x.png"
 local folder: Folder
 -- The game's players as NameTags sees them; the first is the local player, on Blue.
 local players: { any }
--- The teammate a pass would go to now (ActionController:passTarget), the HUD's pass key and its screen's form.
+-- The teammate a pass would go to now (ActionController:passTarget), the HUD's pass and Attach keys and its screen's
+-- form.
 local target: string?
-local hud: { passKey: Style.KeyView?, compact: boolean }
+local hud: { passKey: Style.KeyView?, attachKey: Style.KeyView?, compact: boolean }
+-- The teammate the skater would attach behind now (SkateController.attachWith).
+local skate: { attachWith: string? }
 -- How many times the tags asked for a pass's target.
 local passAsks: number
 
@@ -88,6 +91,7 @@ local function start(settings: Config.GameConfig)
 			end,
 		},
 		Hud = hud,
+		SkateController = skate,
 		Parent = folder,
 		Players = function(): { any }
 			return players
@@ -102,7 +106,8 @@ beforeEach(function()
 	folder.Parent = workspace
 	players = {}
 	target = nil
-	hud = { passKey = { text = "R" }, compact = false }
+	hud = { passKey = { text = "R" }, attachKey = { text = "F" }, compact = false }
+	skate = { attachWith = nil }
 	passAsks = 0
 	join(1, "One", "Blue")
 	start(config)
@@ -380,6 +385,215 @@ describe("NameTags", function()
 		hud.passKey = { text = "R" }
 		NameTags:step(DT)
 		expect(passAsks).toBe(1)
+	end)
+
+	-- The Attach mark (#381, the owner's Q246, Q247 Look 1) over the teammate the skater would attach behind now
+	-- (SkateController.attachWith): a dark box as tall as the pass key's cap and outlined as it is, in the touch
+	-- buttons' fill as the page drew it; the Attach key's cap flush with its left, its right edge inked, then the word
+	-- with cap.padding round it; its pointer under its middle.
+	it("shows the Attach mark over the teammate to attach behind: its key's cap and the word in a dark box", function()
+		join(2, "Two", "Blue")
+		join(3, "Three", "Blue")
+		join(4, "Four", "Orange")
+		NameTags:step(DT)
+		expect(part(2, "Attach")).toBeNil()
+		skate.attachWith = "2"
+		NameTags:step(DT)
+		expect(part(3, "Attach")).toBeNil()
+		local mark = part(2, "Attach") :: Frame
+		local cap = sizes.cap
+		local keyWidth = Style.capWidth(config, { text = "F" }, cap)
+		local edge = math.ceil(look.textOutline)
+		local word = config.UI.controlLabels.Attach
+		local wordWidth = Style.textWidth(config, word, cap.textSize)
+		local width = keyWidth + edge + cap.padding + wordWidth + cap.padding
+		-- Alone, on the tag's middle and the pass key's line.
+		expect(mark.Size).toEqual(UDim2.fromOffset(width, cap.height))
+		expect(mark.Position).toEqual(
+			UDim2.fromOffset(math.floor((sizes.width - width) / 2), lineAt(sizes) - cap.height / 2)
+		)
+		-- The box: the touch buttons' fill, round at the cap's corners, outlined as the cap is.
+		local box = mark:FindFirstChild("Box") :: Frame
+		expect(box.Size).toEqual(UDim2.fromScale(1, 1))
+		-- White under its gradient, which multiplies the colour it covers.
+		expect(box.BackgroundColor3 == Color3.new(1, 1, 1)).toBe(true)
+		local outline = box:FindFirstChildOfClass("UIStroke") :: UIStroke
+		expect(outline.Thickness).toBe(look.textOutline)
+		expect(outline.Color == look.ink).toBe(true)
+		expect((box:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(cap.corner)
+		local fill = config.UI.touchStyle.fill
+		local shade = (box:FindFirstChildOfClass("UIGradient") :: UIGradient).Color.Keypoints
+		expect(shade[1].Value == fill.top and shade[#shade].Value == fill.bottom).toBe(true)
+		-- The key's cap at its left in the key's yellow, round on the left as the box is, square on the right, where
+		-- its edge is inked.
+		local key = box:FindFirstChild("Key") :: Frame
+		expect(key.Position).toEqual(UDim2.new())
+		expect(key.Size).toEqual(UDim2.new(0, keyWidth, 1, 0))
+		expect(key.BackgroundColor3 == look.key).toBe(true)
+		expect((key:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(cap.corner)
+		local square = key:FindFirstChild("Square") :: Frame
+		expect(square.Position).toEqual(UDim2.fromScale(0.5, 0))
+		expect(square.Size).toEqual(UDim2.fromScale(0.5, 1))
+		expect(square.BackgroundColor3 == look.key).toBe(true)
+		local letter = key:FindFirstChild("Legend") :: TextLabel
+		expect(letter.Text).toBe("F")
+		expect(letter.TextSize).toBe(cap.textSize)
+		expect(letter.TextColor3 == look.ink).toBe(true)
+		expect(letter.ZIndex > square.ZIndex).toBe(true)
+		local inked = box:FindFirstChild("Edge") :: Frame
+		expect(inked.Position).toEqual(UDim2.fromOffset(keyWidth, 0))
+		expect(inked.Size).toEqual(UDim2.new(0, edge, 1, 0))
+		expect(inked.BackgroundColor3 == look.ink).toBe(true)
+		-- The word white in look C's ink, cap.padding past the edge.
+		local words = box:FindFirstChild("Word") :: TextLabel
+		expect(words.Text).toBe(word)
+		expect(words.TextSize).toBe(cap.textSize)
+		expect(words.Font).toBe(look.font)
+		expect(words.TextColor3 == config.UI.hud.textColor).toBe(true)
+		expect(words:FindFirstChildOfClass("UIStroke") ~= nil).toBe(true)
+		expect(words.Position).toEqual(UDim2.fromOffset(keyWidth + edge + cap.padding, 0))
+		expect(words.Size).toEqual(UDim2.new(0, wordWidth, 1, 0))
+		-- Its pointer under its middle in the box's colour where they meet, half under the box.
+		local pointer = mark:FindFirstChild("Pointer") :: Frame
+		expect(pointer.BackgroundColor3 == fill.bottom).toBe(true)
+		expect(pointer.Rotation).toBe(45)
+		expect(pointer.Position).toEqual(UDim2.fromScale(0.5, 1))
+		expect(pointer.ZIndex < box.ZIndex).toBe(true)
+		-- Another teammate, then none; never over an opponent.
+		skate.attachWith = "3"
+		NameTags:step(DT)
+		expect(part(2, "Attach")).toBeNil()
+		expect(part(3, "Attach") ~= nil).toBe(true)
+		skate.attachWith = "4"
+		NameTags:step(DT)
+		expect(part(3, "Attach")).toBeNil()
+		expect(part(4, "Attach")).toBeNil()
+	end)
+
+	-- Q247's order: the badge, the pass key, the Attach mark; each that shows badgeGap from the next, the row on the
+	-- tag's middle.
+	it("lays the badge, the pass key and the Attach mark out in that order, badgeGap apart", function()
+		local mate = join(2, "Two", "Blue")
+		target = "2"
+		skate.attachWith = "2"
+		call(mate, 1)
+		NameTags:step(DT)
+		local gap = sizes.badgeGap
+		local ringed = 2 * (sizes.badge + sizes.rim)
+		local keyWidth = Style.capWidth(config, { text = "R" }, sizes.cap)
+		local attachWidth = (part(2, "Attach") :: Frame).Size.X.Offset
+		local function placed(): (number, number, number)
+			local badge, key = part(2, "Badge"), part(2, "PassKey")
+			return if badge ~= nil then badge.Position.X.Offset - sizes.badge - sizes.rim else -1,
+				if key ~= nil then key.Position.X.Offset else -1,
+				(part(2, "Attach") :: Frame).Position.X.Offset
+		end
+		local left = math.floor((sizes.width - (ringed + gap + keyWidth + gap + attachWidth)) / 2)
+		expect({ placed() }).toEqual({ left, left + ringed + gap, left + ringed + gap + keyWidth + gap })
+		target = nil
+		NameTags:step(DT)
+		left = math.floor((sizes.width - (ringed + gap + attachWidth)) / 2)
+		expect({ placed() }).toEqual({ left, -1, left + ringed + gap })
+		call(mate, nil)
+		target = "2"
+		NameTags:step(DT)
+		left = math.floor((sizes.width - (keyWidth + gap + attachWidth)) / 2)
+		expect({ placed() }).toEqual({ -1, left, left + keyWidth + gap })
+		target = nil
+		NameTags:step(DT)
+		expect({ placed() }).toEqual({ -1, -1, math.floor((sizes.width - attachWidth) / 2) })
+	end)
+
+	-- As the hints show the Attach key: a gamepad's glyph on the box, no cap; on touch, which has no key, the word
+	-- alone with cap.padding each side.
+	it("shows the Attach mark as the device shows its key: a gamepad's glyph, the word alone on touch", function()
+		join(2, "Two", "Blue")
+		skate.attachWith = "2"
+		hud.attachKey = { image = GLYPH }
+		NameTags:step(DT)
+		local word = config.UI.controlLabels.Attach
+		local cap = sizes.cap
+		local box = part(2, "Box") :: Frame
+		local glyph = box:FindFirstChild("Glyph") :: Frame
+		expect(glyph.Position).toEqual(UDim2.new())
+		expect(glyph.Size).toEqual(UDim2.fromOffset(cap.height, cap.height))
+		expect((glyph:FindFirstChild("Face") :: ImageLabel).Image).toBe(GLYPH)
+		expect(box:FindFirstChild("Key")).toBeNil()
+		expect(box:FindFirstChild("Edge")).toBeNil()
+		local wordWidth = Style.textWidth(config, word, cap.textSize)
+		expect((box:FindFirstChild("Word") :: TextLabel).Position.X.Offset).toBe(cap.height + cap.padding)
+		expect((part(2, "Attach") :: Frame).Size.X.Offset).toBe(cap.height + 2 * cap.padding + wordWidth)
+		hud.attachKey = nil
+		hud.compact = true
+		NameTags:step(DT)
+		local small = compactSizes.cap
+		box = part(2, "Box") :: Frame
+		expect(box:FindFirstChild("Glyph")).toBeNil()
+		expect(box:FindFirstChild("Key")).toBeNil()
+		expect(box:FindFirstChild("Edge")).toBeNil()
+		local words = box:FindFirstChild("Word") :: TextLabel
+		local smallWidth = Style.textWidth(config, word, small.textSize)
+		expect(words.TextSize).toBe(small.textSize)
+		expect(words.Position).toEqual(UDim2.fromOffset(small.padding, 0))
+		expect((part(2, "Attach") :: Frame).Size).toEqual(
+			UDim2.fromOffset(smallWidth + 2 * small.padding, small.height)
+		)
+	end)
+
+	-- Hud.attachKey is a new key at each of the Hud's renders: alike, it draws nothing; the mark or its key changing,
+	-- once; a key changing while no one is to attach behind, nothing.
+	it("draws the Attach mark again only when it or its key changes", function()
+		join(2, "Two", "Blue")
+		join(3, "Three", "Blue")
+		NameTags:step(DT)
+		local function redraws(): number
+			local before = NameTags.renders
+			NameTags:step(DT)
+			return NameTags.renders - before
+		end
+		hud.attachKey = { text = "F" }
+		expect(redraws()).toBe(0)
+		skate.attachWith = "2"
+		expect(redraws()).toBe(1)
+		hud.attachKey = { text = "F" }
+		expect(redraws()).toBe(0)
+		hud.attachKey = { text = "G" }
+		expect(redraws()).toBe(1)
+		expect(((part(2, "Key") :: Frame):FindFirstChild("Legend") :: TextLabel).Text).toBe("G")
+		hud.attachKey = nil
+		expect(redraws()).toBe(1)
+		expect(part(2, "Key")).toBeNil()
+		skate.attachWith = "3"
+		expect(redraws()).toBe(2)
+		skate.attachWith = nil
+		expect(redraws()).toBe(1)
+		hud.attachKey = { text = "H" }
+		expect(redraws()).toBe(0)
+	end)
+
+	-- The widest row (#381): the badge at its widest ripple, the pass key and the Attach mark in its ink, inside the
+	-- tag on a desktop and on a phone, by touch and with keys, at the default keys and words.
+	it("keeps its widest row inside the tag on either kind of screen", function()
+		local mate = join(2, "Two", "Blue")
+		target = "2"
+		skate.attachWith = "2"
+		call(mate, 1)
+		type Case = { compact: boolean, pass: Style.KeyView, attach: Style.KeyView? }
+		local keys: Case = { compact = false, pass = { text = "R" }, attach = { text = "F" } }
+		local cases: { Case } = {
+			keys,
+			{ compact = true, pass = { text = config.UI.text.touchPassTarget }, attach = nil },
+			{ compact = true, pass = keys.pass, attach = keys.attach },
+		}
+		for _, case in cases do
+			hud.compact, hud.passKey, hud.attachKey = case.compact, case.pass, case.attach
+			NameTags:step(DT)
+			local tagSizes = if hud.compact then compactSizes else sizes
+			local ring = tagSizes.badge + tagSizes.ripple + tagSizes.rippleLine
+			local mark = part(2, "Attach") :: Frame
+			expect((part(2, "Badge") :: Frame).Position.X.Offset - ring >= 0).toBe(true)
+			expect(mark.Position.X.Offset + mark.Size.X.Offset + look.textOutline <= tagSizes.width).toBe(true)
+		end
 	end)
 
 	-- H4: while anyone calls, the glove waves and the ring ripples out, by writing the shared bindings; at rest
