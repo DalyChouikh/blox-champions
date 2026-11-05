@@ -1936,6 +1936,14 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   and register laps after that, because maximum is +5 points, so when player reaches +5, don't show markers and count the laps".
   Today (Match.goalPointsByLap {1, 3, 5}) a goal is worth +1, +3, +5 after 1, 2, 3 laps of a streak and keeps +5 past that, while
   the streak keeps counting laps. Each finding gets its own issue.
+- **Q256 #383 shipped** (session 84, recommended; the design page version 5, section '#383 built', desktop Play zoomed 6x):
+  **"Yes, ship it"**. Found by measuring in Play: Switch team's row group was exactly the T cap's 34 px, and the cap's 2.5 px
+  outline sits outside it, so the group cut it at the top and bottom (and the board's group 2.5 px under it). The row now counts
+  the cap's ink (40 px), and both groups fade in Style.fadeGroup with UI.hud.look.groupRoom (moved from UI.touchStyle: one
+  setting, one helper).
+- **Q257 the other fading groups** (session 84, recommended): the desktop hint rows' ink touches their groups' edges exactly
+  (0 px measured), and the feed chips, the Get Up prompt and the banners are built the same way: **"Yes, as its own issue
+  next"**: every remaining fading group gets the same room through the shared helper, checked by a laid-out test.
 
 ## Roller Champions
 

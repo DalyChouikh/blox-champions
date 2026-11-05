@@ -512,8 +512,6 @@ describe("Config defaults", function()
 			knobTransparency = 0,
 			fill = { top = Color3.fromRGB(58, 69, 102), bottom = Color3.fromRGB(28, 35, 64) },
 			jumpFill = { top = Color3.fromRGB(255, 178, 90), bottom = Color3.fromRGB(232, 116, 28) },
-			-- Probed on the phone emulator: 2 px keep a disc's sides whole (#355, Q254).
-			groupRoom = 2,
 		})
 		expect(ui.teamNames).toEqual({ Blue = "Blue", Orange = "Orange" })
 		-- Keys Roblox's GetStringForKeyCode names "" or " ".
@@ -607,6 +605,8 @@ describe("Config defaults", function()
 				key = Color3.fromRGB(255, 210, 63),
 				pressed = Color3.fromRGB(255, 138, 44),
 				sweepTransparency = 0.38,
+				-- Probed on the phone emulator: 2 px keep a disc's sides whole (#355, Q254; #383).
+				groupRoom = 2,
 			},
 			-- Every change animates briefly (#352, Q194): the page's pop, bounce, fill and glow.
 			motion = {
@@ -3198,7 +3198,7 @@ describe("Config.forMode", function()
 		end).toThrow("UI.hud.layout.scoreButton.position: unknown key")
 	end)
 
-	it("rejects touch fills, a face's room and a score button outside their limits", function()
+	it("rejects touch fills, a fading group's room and a score button outside their limits", function()
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			{
 				overrides = { UI = { touchStyle = { fill = { top = "#3a4566" } } } },
@@ -3209,12 +3209,12 @@ describe("Config.forMode", function()
 				message = "UI.touchStyle.jumpFill.bottom: expected Color3, got number",
 			},
 			{
-				overrides = { UI = { touchStyle = { groupRoom = 0 } } },
-				message = "UI.touchStyle.groupRoom: must be >= 1 (got 0)",
+				overrides = { UI = { hud = { look = { groupRoom = 0 } } } },
+				message = "UI.hud.look.groupRoom: must be >= 1 (got 0)",
 			},
 			{
-				overrides = { UI = { touchStyle = { groupRoom = 1.5 } } },
-				message = "UI.touchStyle.groupRoom: must be an integer (got 1.5)",
+				overrides = { UI = { hud = { look = { groupRoom = 1.5 } } } },
+				message = "UI.hud.look.groupRoom: must be an integer (got 1.5)",
 			},
 			{
 				overrides = { UI = { hud = { layout = { scoreButton = { top = -1 } } } } },
@@ -3240,7 +3240,7 @@ describe("Config.forMode", function()
 		end
 		local place = Fixtures.config({ UI = { hud = { layout = { scoreButton = { top = 0 } } } } }).UI.hud.layout
 		expect(place.scoreButton.top).toBe(0)
-		expect(Fixtures.config({ UI = { touchStyle = { groupRoom = 1 } } }).UI.touchStyle.groupRoom).toBe(1)
+		expect(Fixtures.config({ UI = { hud = { look = { groupRoom = 1 } } } }).UI.hud.look.groupRoom).toBe(1)
 	end)
 
 	it("rejects team spawns that would not fit on a straight", function()

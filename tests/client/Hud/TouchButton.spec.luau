@@ -17,9 +17,15 @@ local TouchButton = require(Client.Hud.TouchButton)
 local config = Fixtures.config({
 	UI = {
 		hud = {
-			look = { outline = 2, shadow = 5, textOutline = 1.5, pressed = Color3.fromRGB(240, 120, 40) },
+			look = {
+				outline = 2,
+				shadow = 5,
+				textOutline = 1.5,
+				pressed = Color3.fromRGB(240, 120, 40),
+				groupRoom = 3,
+			},
 		},
-		touchStyle = { textPadding = 4, groupRoom = 3 },
+		touchStyle = { textPadding = 4 },
 	},
 })
 local look = config.UI.hud.look
@@ -109,7 +115,8 @@ describe("TouchButton", function()
 			expect(group.Position).toEqual(UDim2.fromOffset(-3, -3))
 			expect(group.Size).toEqual(UDim2.new(1, 6, 1, 11))
 			local box = group:FindFirstChild("Box") :: Frame
-			expect(box.Position).toEqual(UDim2.fromOffset(5, 5))
+			-- Inside the group's padding (its room), the outline in from the button's sides.
+			expect(box.Position).toEqual(UDim2.fromOffset(2, 2))
 			expect(box.Size).toEqual(UDim2.fromOffset(56, 56))
 			local fill = box:FindFirstChild("Fill1") :: Frame
 			expect((fill:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(Style.ROUND)

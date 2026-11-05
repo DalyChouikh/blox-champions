@@ -389,13 +389,13 @@ describe("HudScreen", function()
 		expect(HudScreen.tabBody(config, false, 6)).toBe(230)
 		expect(HudScreen.tabBody(config, true, 3)).toBe(104)
 		expect(HudScreen.tabBody(config, false, 0)).toBe(50)
-		-- None; the label alone (touch) in its ink, 10 + 16 + 2 x 2; a key cap beside it, 10 + 30.
+		-- None; the label alone (touch) in its ink, 10 + 16 + 2 x 2; a key cap beside it in its ink, 10 + 30 + 2 x 2.
 		expect(HudScreen.tabSwitch(config, false, nil)).toBe(0)
 		expect(HudScreen.tabSwitch(config, false, "Label")).toBe(30)
-		expect(HudScreen.tabSwitch(config, false, "Key")).toBe(40)
-		-- The phone: 4 + 12 + 4; with a key 4 + 30.
+		expect(HudScreen.tabSwitch(config, false, "Key")).toBe(44)
+		-- The phone: 4 + 12 + 4; with a key 4 + 30 + 4.
 		expect(HudScreen.tabSwitch(config, true, "Label")).toBe(20)
-		expect(HudScreen.tabSwitch(config, true, "Key")).toBe(34)
+		expect(HudScreen.tabSwitch(config, true, "Key")).toBe(38)
 		-- Words taller than the key's cap: the row stands as tall as the words in their ink, 10 + 36 + 2 x 2.
 		local tall = Fixtures.config({
 			UI = {
@@ -411,13 +411,13 @@ describe("HudScreen", function()
 	-- The owner's Q190: on phones the board scrolls when its rows do not fit. Off touch its key is held, so nothing
 	-- could scroll it: it shrinks to fit, as the HUD's other panels do.
 	it("shrinks the TAB board only to fit off touch, and scrolls its rows on touch where they do not fit", function()
-		-- Desktop, six rows and the key: 7 px of ink + the 20 px header + 40 for Switch team, over 230 of teams, in a
+		-- Desktop, six rows and the key: 7 px of ink + the 20 px header + 44 for Switch team, over 230 of teams, in a
 		-- 504 px box with its ink; 4 px kept clear of each edge.
 		local scale, rows = HudScreen.tabFit(config, false, false, Vector2.new(1000, 600), 6, "Key")
 		expect(scale).toBe(1)
 		expect(rows).toBe(230)
 		scale, rows = HudScreen.tabFit(config, false, false, Vector2.new(1000, 250), 6, "Key")
-		expect(scale).toBeCloseTo(242 / 297, 5)
+		expect(scale).toBeCloseTo(242 / 301, 5)
 		expect(rows).toBe(230)
 		scale = HudScreen.tabFit(config, false, false, Vector2.new(400, 600), 6, "Key")
 		expect(scale).toBeCloseTo(392 / 504, 5)

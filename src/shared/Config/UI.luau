@@ -48,9 +48,6 @@ export type TouchStyle = {
 	knobTransparency: number,
 	fill: Gradient,
 	jumpFill: Gradient,
-	-- Empty pixels a button's face keeps round its ink inside the group that fades it: a CanvasGroup clips what it
-	-- holds at its own edges, snapped to the screen's pixels, and cut a disc's sides flat where they touched them.
-	groupRoom: number,
 }
 
 -- Every string the HUD shows. %d stands for a number (%02d pads it to two digits) and %s for a name; a text takes
@@ -321,6 +318,9 @@ export type LookSettings = {
 	key: Color3,
 	pressed: Color3,
 	sweepTransparency: number,
+	-- Empty pixels a group that fades parts as one (Style.fadeGroup) keeps round their ink: a CanvasGroup cuts off
+	-- what reaches its edges, and where an edge falls between the screen's pixels it shaves ink touching it.
+	groupRoom: number,
 }
 
 -- A bounce's shape (Hud/Motion.bounce): over `seconds`, a part goes to `scale` times its size, then to `rebound`
@@ -515,8 +515,6 @@ local defaults: UIConfig = {
 		knobTransparency = 0,
 		fill = { top = Color3.fromRGB(58, 69, 102), bottom = Color3.fromRGB(28, 35, 64) },
 		jumpFill = { top = Color3.fromRGB(255, 178, 90), bottom = Color3.fromRGB(232, 116, 28) },
-		-- 2 px keep a disc's sides as round as with no group (probed on the phone emulator; #355, Q254).
-		groupRoom = 2,
 	},
 	text = {
 		clock = "%d:%02d",
@@ -614,6 +612,9 @@ local defaults: UIConfig = {
 			key = Color3.fromRGB(255, 210, 63),
 			pressed = Color3.fromRGB(255, 138, 44),
 			sweepTransparency = 0.38,
+			-- 2 px keep a disc's sides as round as with no group (probed on the phone emulator: the owner saw the touch
+			-- buttons' sides, then Switch team's cap, cut; #355 Q254, #383).
+			groupRoom = 2,
 		},
 		-- Every HUD change animates briefly, from settings (the owner, Q194), at the page's timings: a pop to 1.12 then
 		-- 1 (its banners), a score's bounce to 1.55, back to 0.9, then 1 in 0.4 s, its lap chips filling in 0.25 s
@@ -1184,7 +1185,6 @@ local fields = Validate.record({
 		knobTransparency = transparency,
 		fill = gradient,
 		jumpFill = gradient,
-		groupRoom = wholePixels,
 	}),
 	text = Validate.record({
 		clock = template(2),
@@ -1259,6 +1259,7 @@ local fields = Validate.record({
 			pressed = Validate.datatype("Color3"),
 			-- A sweep that shows nothing would show no cooldown.
 			sweepTransparency = seen,
+			groupRoom = wholePixels,
 		}),
 		motion = Validate.record({
 			pop = Validate.record({ seconds = positive, overshoot = nonNegative }),

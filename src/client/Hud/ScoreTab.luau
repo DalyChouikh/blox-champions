@@ -90,11 +90,7 @@ local function switchButton(
 			[React.Event.Activated] = switchTeam.onActivated,
 		}),
 		{
-			Row = React.createElement(
-				"CanvasGroup",
-				Style.holder({ Size = Style.FULL, GroupTransparency = Style.dim(config, not switchTeam.open) }),
-				parts
-			),
+			Row = Style.fadeGroup(config, Style.dim(config, not switchTeam.open), 0, parts),
 		}
 	)
 end
@@ -162,42 +158,40 @@ local function ScoreTab(props: ScoreTabProps): React.ReactElement
 							return scale
 						end),
 					}),
-					Group = React.createElement(
-						"CanvasGroup",
-						Style.holder({
-							AnchorPoint = Style.CENTRE,
-							Position = Style.MIDDLE,
-							Size = Style.FULL,
-							GroupTransparency = props.leave,
-						}),
+					-- It pops round its middle, and its group fades it whole.
+					Popping = React.createElement(
+						"Frame",
+						Style.holder({ AnchorPoint = Style.CENTRE, Position = Style.MIDDLE, Size = Style.FULL }),
 						{
 							Pop = React.createElement("UIScale", { Scale = props.scale }),
-							Box = React.createElement(TeamTable, {
-								config = config,
-								text = props.text,
-								stats = props.stats,
-								names = props.names,
-								localId = props.localId,
-								compact = compact,
-								position = UDim2.fromOffset(line, line),
-								shown = rows,
+							Group = Style.fadeGroup(config, props.leave, 0, {
+								Box = React.createElement(TeamTable, {
+									config = config,
+									text = props.text,
+									stats = props.stats,
+									names = props.names,
+									localId = props.localId,
+									compact = compact,
+									position = UDim2.fromOffset(line, line),
+									shown = rows,
+								}),
+								SwitchTeam = if switchTeam ~= nil
+									then switchButton(
+										config,
+										sizes,
+										switchTeam,
+										rows:map(function(teamsShown: number): UDim2
+											local under = 2 * line
+												+ sizes.headHeight
+												+ teamsShown
+												+ shadow
+												+ sizes.switchGap
+											return UDim2.fromOffset(0, under)
+										end),
+										switchHeight - sizes.switchGap
+									)
+									else nil,
 							}),
-							SwitchTeam = if switchTeam ~= nil
-								then switchButton(
-									config,
-									sizes,
-									switchTeam,
-									rows:map(function(teamsShown: number): UDim2
-										local under = 2 * line
-											+ sizes.headHeight
-											+ teamsShown
-											+ shadow
-											+ sizes.switchGap
-										return UDim2.fromOffset(0, under)
-									end),
-									switchHeight - sizes.switchGap
-								)
-								else nil,
 						}
 					),
 				}

@@ -344,14 +344,16 @@ function HudScreen.tabBody(config: Config.GameConfig, compact: boolean, players:
 end
 
 -- How far the Switch team row (`row`) reaches under the TAB board's ink: switchGap, then its words in their ink, or a
--- key's cap (UI.hud.layout.hints.cap) beside them where that is taller; nothing without the row.
+-- key's cap (UI.hud.layout.hints.cap) in its ink beside them where that is taller; nothing without the row. The
+-- cap's ink counts as the words' does, or the row's group would cut it (#383, the owner's Q255).
 function HudScreen.tabSwitch(config: Config.GameConfig, compact: boolean, row: SwitchRow?): number
 	if row == nil then
 		return 0
 	end
 	local sizes = HudScreen.tabSizes(config, compact)
-	local words = sizes.switchSize + 2 * math.ceil(config.UI.hud.look.textOutline)
-	local height = if row == "Key" then math.max(config.UI.hud.layout.hints.cap.height, words) else words
+	local ink = 2 * math.ceil(config.UI.hud.look.textOutline)
+	local words = sizes.switchSize + ink
+	local height = if row == "Key" then math.max(config.UI.hud.layout.hints.cap.height + ink, words) else words
 	return sizes.switchGap + height
 end
 
