@@ -101,6 +101,18 @@ describe("BoardMotion", function()
 		expect(fills(motion)).toEqual({ 0, 0, 0, 0 })
 	end)
 
+	-- A goal ends its streak in the match's snapshot (#377, the owner's Q242): the scoring team keeps the ball's colour
+	-- through the celebration, and its chips ease empty as a lap's do.
+	it("eases the chips empty when a goal ends the streak", function()
+		local motion, animator = board()
+		motion:watch(match({ possessingTeam = "Blue", lapProgress = 3, streak = 1 }))
+		motion:watch(match({ possessingTeam = "Blue", lapProgress = 0, streak = 0, state = "Celebration" }))
+		animator:step(0.1)
+		expect(fills(motion)).toEqual({ 0.125, 0.125, 0.125, 0 })
+		animator:step(0.1)
+		expect(fills(motion)).toEqual({ 0, 0, 0, 0 })
+	end)
+
 	it("moves the chips at once when the ball changes teams or goes loose", function()
 		local motion = board()
 		motion:watch(match({ possessingTeam = "Blue", lapProgress = 3, streak = 1 }))
