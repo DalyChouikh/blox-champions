@@ -45,9 +45,10 @@ export type Snapshot = {
 	lastHolder: PlayerId?,
 	streak: number,
 	lapProgress: number,
-	-- The gates in a lap, and the one that counts next for the possessing team: the goal's when a streak starts.
+	-- The gates in a lap, and the one that counts next for the possessing team: the goal's when a streak starts,
+	-- none once the streak has counted its last lap (its lap then stays full: lapProgress = gateCount).
 	gateCount: number,
-	nextGate: number,
+	nextGate: number?,
 	goalOpenFor: Team?,
 	-- The score tab: every player still in the match (#309), by team, then score.
 	stats: Types.MatchStats,
@@ -286,8 +287,10 @@ function MatchEngine.new(options: EngineOptions): MatchEngine
 			_pendingBlockUntil = 0,
 			_events = {},
 			_possession = Possession.new(),
-			-- Every streak starts at the goal's gate, so a lap ends just before the goal (spec §4.2).
-			_laps = LapTracker.new(arena.gates, config.Arena.goalGateIndex),
+			-- Every streak starts at the goal's gate, so a lap ends just before the goal (spec §4.2). It counts as many
+			-- laps as the goal has worths (the owner's Q255 and Q269): once a goal is worth its most, laps stop
+			-- counting, so no gate, lap or lap points come until the streak ends.
+			_laps = LapTracker.new(arena.gates, config.Arena.goalGateIndex, #match.goalPointsByLap),
 			_goal = GoalJudge.new(arena.goal),
 			_clock = MatchClock.new(match.durationSeconds, config.UI.clockWarnings),
 			_assists = AssistTracker.new(config.Scoring.assistWindowSeconds),

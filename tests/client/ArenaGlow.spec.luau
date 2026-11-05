@@ -11,6 +11,7 @@ local ArenaParts = require(Client.ArenaParts)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local HudStore = require(Client.HudStore)
+local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
 
 local config = Config.defaults()
 local glow = config.UI.arenaGlow
@@ -29,9 +30,13 @@ local plain: { color: Color3, material: Enum.Material, transparency: number }
 -- Every slide asked for: the part's name, where to, over how long.
 local slides: { { part: string, to: CFrame, seconds: number } }
 
-local function snapshot(overrides: { [string]: any }?)
-	HudStore:onSnapshot(Fixtures.matchSnapshot(overrides))
+local function show(payload: Payloads.MatchSnapshot)
+	HudStore:onSnapshot(payload)
 	ArenaGlow:step(DT)
+end
+
+local function snapshot(overrides: { [string]: any }?)
+	show(Fixtures.matchSnapshot(overrides))
 end
 
 -- Whether `part` glows in `color`, or looks as it did before anything glowed (`color` nil).
@@ -128,6 +133,20 @@ describe("ArenaGlow", function()
 		expect(panelShows(markers[AFTER_GOAL_GATE], colors.Orange)).toBe(true)
 		snapshot()
 		expect(panelShows(markers[AFTER_GOAL_GATE], nil)).toBe(true)
+	end)
+
+	-- The owner's Q255: once the streak has counted its last lap, no gate is next, so no gate's panel shows; the goal
+	-- still glows.
+	it("shows no gate's panel once the streak has counted its last lap", function()
+		snapshot({ possessingTeam = "Blue", goalOpenFor = "Blue", nextGate = AFTER_GOAL_GATE })
+		expect(panelShows(arena.markers[AFTER_GOAL_GATE], colors.Blue)).toBe(true)
+		show(Fixtures.lapCapped("Blue"))
+		for _, marker in arena.markers do
+			expect(panelShows(marker, nil)).toBe(true)
+		end
+		for _, rim in arena.rim do
+			expect(glows(rim, colors.Blue)).toBe(true)
+		end
 	end)
 
 	it("hides every gate's panel from the start, and never the goal", function()
