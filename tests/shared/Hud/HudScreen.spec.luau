@@ -472,3 +472,40 @@ describe("HudScreen", function()
 		expect(rows).toBe(HudScreen.tabBody(defaults, false, 12))
 	end)
 end)
+
+-- The desktop hints' column (#378, the owner's Q242): centred on its place by its own height, it sat on half pixels
+-- whenever that height and its area's differed by an odd number (every row 51 px, 3 apart: always odd), and a seam on
+-- a half pixel shows a line (#363, Q212). Its top is a whole pixel now: its middle at its place's, or half a pixel up.
+describe("HudScreen, the hints' column", function()
+	-- Rows 40 px tall in 2 px of outline and 3 of shadow: 47 px of ink each, 3 apart.
+	local hints = Fixtures.config({
+		UI = {
+			hud = {
+				look = { outline = 2, shadow = 3 },
+				layout = { hints = { position = UDim2.new(1, -24, 0.5, 0), rowHeight = 40, clearance = 3 } },
+			},
+		},
+	})
+
+	it("measures a hint row by its ink: its box, the outline round it and the shadow under it", function()
+		expect(HudScreen.hintRow(hints)).toBe(47)
+	end)
+
+	it("puts the column's top on a whole pixel, its middle at its place's or half a pixel above it", function()
+		-- 7 rows: 7 x 47 + 6 x 3 = 347 px. In 772 px its middle is at 386: 212.5 down, so 212; in 771, 212 exactly.
+		expect(HudScreen.hintsTop(hints, 772, 7)).toBe(212)
+		expect(HudScreen.hintsTop(hints, 771, 7)).toBe(212)
+		-- 8 rows: 397 px, 187.5 down in 772, so 187.
+		expect(HudScreen.hintsTop(hints, 772, 8)).toBe(187)
+		-- At a quarter of the way down and 10 px lower: 193 + 10 - 173.5 = 29.5, so 29.
+		local high = Fixtures.config({
+			UI = {
+				hud = {
+					look = { outline = 2, shadow = 3 },
+					layout = { hints = { position = UDim2.new(1, -24, 0.25, 10), rowHeight = 40, clearance = 3 } },
+				},
+			},
+		})
+		expect(HudScreen.hintsTop(high, 772, 7)).toBe(29)
+	end)
+end)

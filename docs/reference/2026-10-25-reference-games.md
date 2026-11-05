@@ -1954,6 +1954,16 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   and ill test later if any issue ill mention them". So #381 ships on its tests and the Studio render; the owner's own
   2-player check comes later, and anything found then gets its own fix. Rulings shown on the page with it: the word at the
   key's text size and padding; the pointer in the box's colour where they meet; no pop-in, like the pass key; no drop shadow.
+- **Q260 #377 shipped** (session 86, recommended; the design page https://claude.ai/artifact/L7fJyQ7iJax4PGW4H5pn5A version 10,
+  section 'A goal empties the lap chips': the real scoreboard rendered by the game's code in Studio, the chips lit through the
+  celebration before and empty after): **"Yes, ship it"**. A goal ends its streak in the rules (MatchEngine.pointScored resets the
+  laps once the goal's worth is judged), so the chips empty through the celebration and the end screen. Next: #378 (hint rows
+  on whole pixels), #379, #376, #384.
+- **Q261 #378 shipped** (session 86, recommended; the design page version 11, section 'Hint rows on whole pixels': each row's
+  top measured in Play, before 198.5 ... 522.5 in a 772 px HUD area (last session's 2-player window), after 179 ... 503 in a
+  734 px area and 180 ... 504 in the usual 735 px one; 4x zooms before and after): **"Yes, ship it"**. The column's top is a
+  whole pixel (HudScreen.hintsTop: its middle at its place's or half a pixel above), from the HUD's area and the rows shown.
+  Next: #379 (a HUD error boundary), #376, #384.
 
 ## Roller Champions
 
