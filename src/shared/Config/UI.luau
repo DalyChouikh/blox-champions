@@ -32,18 +32,25 @@ export type ControlLabels = {
 	GetUp: string,
 }
 
--- How the touch controls look: the stick's ring and the buttons on `background`, the knob and the labels in
--- `foreground` (the knob knobTransparency see-through), rounded by `corner`. A label is at most textSize pixels tall,
--- shrinking to fit within textPadding pixels of its button's sides.
+-- A fill from `top` at a box's top to `bottom` at its bottom (Hud/Style.box).
+export type Gradient = { top: Color3, bottom: Color3 }
+
+-- How the touch controls look: the stick's ring on `background`, the knob and the Ball Focus ring in `foreground` (the
+-- knob knobTransparency see-through), rounded by `corner`. The buttons are look C's (Hud/TouchButton): each filled
+-- with `fill`, Jump with jumpFill, its words (Config.Input.touch's textSize at most) shrinking to fit within
+-- textPadding pixels of its fill's sides.
 export type TouchStyle = {
 	background: Color3,
 	backgroundTransparency: number,
 	foreground: Color3,
-	font: Enum.Font,
 	corner: UDim,
-	textSize: number,
 	textPadding: number,
 	knobTransparency: number,
+	fill: Gradient,
+	jumpFill: Gradient,
+	-- Empty pixels a button's face keeps round its ink inside the group that fades it: a CanvasGroup clips what it
+	-- holds at its own edges, snapped to the screen's pixels, and cut a disc's sides flat where they touched them.
+	groupRoom: number,
 }
 
 -- Every string the HUD shows. %d stands for a number (%02d pads it to two digits) and %s for a name; a text takes
@@ -95,8 +102,6 @@ export type UIText = {
 	cooldown: string,
 	pressMark: string,
 }
-
-export type Place = { position: UDim2, size: UDim2 }
 
 -- A colour for each team.
 export type TeamColors = { Blue: Color3, Orange: Color3 }
@@ -279,8 +284,10 @@ export type HudLayout = {
 	-- pixels in from its area's edges (HudScreen.tabFit); its rows scroll on touch behind a bar scrollBar pixels wide,
 	-- in the rows' right side.
 	scoreTab: { margin: number, scrollBar: number, sizes: TabSizes, compactSizes: TabSizes },
-	-- The touch button that opens the score tab.
-	scoreButton: Place,
+	-- The touch button that opens the score tab: `size`, its top `top` pixels under Roblox's top bar (the HUD's
+	-- area's top), its right edge lined up with the touch buttons' (Input/TouchArea.lineUp); a look C box `corner`
+	-- rounded inside its ink, its words textSize pixels tall at most.
+	scoreButton: { top: number, size: UDim2, corner: UDim, textSize: number },
 	-- The end screen (Hud/EndScreen): its parts `gap` apart, at `sizes` on a desktop's screen and compactSizes on a
 	-- phone's, over the whole screen dimmed in look.ink, `dim` see-through.
 	endScreen: { gap: number, dim: number, sizes: EndSizes, compactSizes: EndSizes },
@@ -497,16 +504,19 @@ local defaults: UIConfig = {
 		MouseLeftButton = "LMB",
 		MouseRightButton = "RMB",
 	},
-	-- Roblox's own touch thumbstick colors; the art pass restyles them.
+	-- Roblox's own touch thumbstick colors; the art pass restyles them. The buttons' fills are the design page's,
+	-- as the owner played them (#355, Q249; measured in the trial's shot): a deep blue, Jump orange.
 	touchStyle = {
 		background = Color3.fromRGB(18, 18, 21),
 		backgroundTransparency = 0.4,
 		foreground = Color3.fromRGB(213, 215, 221),
-		font = Enum.Font.BuilderSansBold,
 		corner = UDim.new(0.5, 0),
-		textSize = 18,
 		textPadding = 6,
 		knobTransparency = 0,
+		fill = { top = Color3.fromRGB(58, 69, 102), bottom = Color3.fromRGB(28, 35, 64) },
+		jumpFill = { top = Color3.fromRGB(255, 178, 90), bottom = Color3.fromRGB(232, 116, 28) },
+		-- 2 px keep a disc's sides as round as with no group (probed on the phone emulator; #355, Q254).
+		groupRoom = 2,
 	},
 	text = {
 		clock = "%d:%02d",
@@ -763,7 +773,9 @@ local defaults: UIConfig = {
 					switchSize = 15,
 				},
 			},
-			scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
+			-- S2 (#355, the owner's Q250): today's 96 x 36, 16 px under Roblox's top bar (74 px from a phone's top),
+			-- lined up with Jump; the design page's 10 px corner outside its 3 px ink, and its 17 px words.
+			scoreButton = { top = 16, size = UDim2.fromOffset(96, 36), corner = UDim.new(0, 7), textSize = 17 },
 			-- Today's parts in look C (#358, the owner's Q243), at the design page's sizes: the result in GOAL!'s
 			-- lettering, the MVP's card, the team totals on chips, then the TAB board's table (not on touch), the game
 			-- half-dimmed behind them.
@@ -952,7 +964,7 @@ local function keyNames(value: any, path: string): { string }
 	return errors
 end
 
-local textSize = Validate.number({ min = 1, max = 100, integer = true })
+local textSize = Validate.textSize()
 local transparency = Validate.number({ min = 0, max = 1 })
 -- A transparency that still shows something.
 local seen = Validate.number({ min = 0, below = 1 })
@@ -963,7 +975,7 @@ local udim2 = Validate.datatype("UDim2")
 local pixels = Validate.pixels()
 -- Whole pixels, where a UDim's offset would drop a fraction (probed).
 local wholePixels = Validate.number({ min = 1, integer = true })
-local place = Validate.record({ position = udim2, size = pixels })
+local gradient = Validate.record({ top = Validate.datatype("Color3"), bottom = Validate.datatype("Color3") })
 local nonNegative = Validate.number({ min = 0 })
 -- Whole pixels or none.
 local wholeOrNone = Validate.number({ min = 0, integer = true })
@@ -1167,12 +1179,12 @@ local fields = Validate.record({
 		background = Validate.datatype("Color3"),
 		backgroundTransparency = transparency,
 		foreground = Validate.datatype("Color3"),
-		font = Validate.enumItem(Enum.Font),
 		corner = Validate.datatype("UDim"),
-		-- Roblox clamps text sizes to 1..100 (measured).
-		textSize = textSize,
 		textPadding = Validate.number({ min = 0 }),
 		knobTransparency = transparency,
+		fill = gradient,
+		jumpFill = gradient,
+		groupRoom = wholePixels,
 	}),
 	text = Validate.record({
 		clock = template(2),
@@ -1349,7 +1361,12 @@ local fields = Validate.record({
 				sizes = tabSizes,
 				compactSizes = tabSizes,
 			}),
-			scoreButton = place,
+			scoreButton = Validate.record({
+				top = nonNegative,
+				size = pixels,
+				corner = Validate.datatype("UDim"),
+				textSize = textSize,
+			}),
 			endScreen = Validate.record({
 				gap = wholeOrNone,
 				dim = transparency,

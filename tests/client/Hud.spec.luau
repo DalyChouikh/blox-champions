@@ -10,6 +10,7 @@ local ActionController = require(Client.ActionController)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallCarrier = require(Client.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
+local ControlLabels = require(Client.ControlLabels)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Hud = require(Client.Hud)
 local HudStore = require(Client.HudStore)
@@ -18,6 +19,7 @@ local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local InputController = require(Client.InputController)
 local SkateController = require(Client.SkateController)
 local Style = require(Client.Hud.Style)
+local TouchArea = require(ReplicatedStorage.Shared.Input.TouchArea)
 
 local config = Config.defaults()
 local LOCAL_ID = "1"
@@ -35,6 +37,8 @@ local switches = 0
 -- The fonts the Hud asked to load, and what it asked to be called once they have (deps.LoadFonts).
 local loadingFonts: { Font } = {}
 local fontsLoaded = function() end
+-- The touch controls' hit buttons, which the Hud draws each face into (TouchControls.buttons, #355).
+local touchButtons: { [string]: TextButton }
 
 -- A gamepad's button, D-pad or stick: Roblox names each by its KeyCode and gives it a glyph (probed).
 local function gamepadKey(name: string): boolean
@@ -108,6 +112,22 @@ local function hintKey(control: string): (string?, string?)
 	return if keyboard then parts.legend.Text else nil, if keyboard then nil else parts.face.Image
 end
 
+-- A touch button's look C face (#355), drawn into its hit button; nil while none is drawn.
+local function face(control: string): any
+	return touchButtons[control]:FindFirstChild("Face")
+end
+
+-- What a touch button's face reads: its seconds while it cools, else its words.
+local function faceText(control: string): string
+	local front = face(control)
+	local seconds = front:FindFirstChild("Seconds", true) :: TextLabel
+	return if seconds.Visible then seconds.Text else (front:FindFirstChild("Words", true) :: TextLabel).Text
+end
+
+local function near(a: Color3, b: Color3): boolean
+	return math.abs(a.R - b.R) < 1e-3 and math.abs(a.G - b.G) < 1e-3 and math.abs(a.B - b.B) < 1e-3
+end
+
 -- Lets what is closing (the Get Up prompt, the score tab) fade out and go: the fade's time, then a step that renders
 -- without it.
 local function fadeOut()
@@ -124,6 +144,13 @@ beforeEach(function()
 	switches = 0
 	skaters = {}
 	Fixtures.startSkating(folder, config, LOCAL_ID, skaters)
+	touchButtons = {}
+	for _, control: Config.TouchControl in ControlLabels.CONTROLS do
+		local button = Instance.new("TextButton")
+		button.Name = control
+		button.Parent = folder
+		touchButtons[control] = button
+	end
 	HudStore:init({ Config = config, LocalId = LOCAL_ID })
 	HudStore:onSnapshot(Fixtures.matchSnapshot())
 	Hud:init({
@@ -133,6 +160,7 @@ beforeEach(function()
 		SkateController = SkateController,
 		ActionController = ActionController,
 		BallCarrier = BallCarrier,
+		TouchControls = { buttons = touchButtons },
 		Parent = folder,
 		LocalId = LOCAL_ID,
 		PreferredInput = function(): Enum.PreferredInput
@@ -210,6 +238,11 @@ describe("Hud", function()
 		expect(dim.Parent == folder).toBe(true)
 		expect(dim.DisplayOrder).toBe(config.UI.hud.displayOrder - 1)
 		expect(dim.DisplayOrder > 0).toBe(true)
+		-- None clipped to the device's safe area: SCORES lines up with the touch buttons past it (#355, Q250), and the
+		-- dim covers the whole screen.
+		for _, each in { gui, centre, top, dim } do
+			expect(`{each.Name} {each.ClipToDeviceSafeArea}`).toBe(`{each.Name} false`)
+		end
 	end)
 
 	-- One rule for every part (#352): a phone's screen by size (HudScreen.compact), S5 there and S2 elsewhere.
@@ -548,6 +581,125 @@ describe("Hud", function()
 		Hud:step(0)
 		expect(pass.legend.Text).toBe(key)
 		expect(right.Rotation).toBeCloseTo(360, 3)
+	end)
+
+	-- #355 (the owner's Q187, Q193, Q245): no hint column on touch; each button's look C face reads what its control
+	-- does now, through the hint rows' own bindings, at its own size and words.
+	it("draws each touch button's look C face into its button on touch, reading what its control does now", function()
+		local labels, touch, style = config.UI.controlLabels, config.Input.touch, config.UI.touchStyle
+		Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		expect(face("jump")).toBeNil()
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		expect(part("ControlHints")).toBeNil()
+		expect(faceText("jump")).toBe(labels.Jump)
+		expect(faceText("pass")).toBe(labels.CallPass)
+		expect(faceText("throw")).toBe(labels.BallFocus)
+		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
+			local button = touch.buttons[control]
+			local front = face(control)
+			local words = front:FindFirstChild("Words", true) :: TextLabel
+			local fit = words:FindFirstChildOfClass("UITextSizeConstraint") :: UITextSizeConstraint
+			expect(`{control} {fit.MaxTextSize}`).toBe(`{control} {button.textSize}`)
+			-- Its fill inside its outline: the sweep's square.
+			local inner = button.size - 2 * config.UI.hud.look.outline
+			expect((front:FindFirstChild("Sweep", true) :: Frame).Size).toEqual(UDim2.fromOffset(inner, inner))
+			-- Jump in its own orange, the rest in the buttons' fill.
+			local fill = (front:FindFirstChild("Box", true) :: Frame):FindFirstChild("Fill1") :: Frame
+			local keys = (fill:FindFirstChildOfClass("UIGradient") :: UIGradient).Color.Keypoints
+			local gradient = if control == "jump" then style.jumpFill else style.fill
+			expect(`{control} {near(keys[1].Value, gradient.top)}`).toBe(`{control} true`)
+		end
+		BallCarrier:set(LOCAL_ID)
+		Hud:step(0)
+		expect(faceText("pass")).toBe(labels.Pass)
+		expect(faceText("throw")).toBe(labels.ChargeThrow)
+		preferred = Enum.PreferredInput.KeyboardAndMouse
+		Hud:step(0)
+		expect(face("jump")).toBeNil()
+	end)
+
+	-- As the desktop's hints (the owner's Q186): a press pops, a cooling button shows its seconds, a greyed one fades.
+	it("pops, cools and greys a touch button's face as its hint row would", function()
+		local press = config.UI.hud.motion.press
+		local cooldown = config.Actions.CallPass.cooldown
+		preferred = Enum.PreferredInput.Touch
+		Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		local pump = face("pump")
+		local pop = pump:FindFirstChildOfClass("UIScale") :: UIScale
+		local pressed = pump:FindFirstChild("Pressed", true) :: Frame
+		local key = Fixtures.scriptedBinding(InputController.context, "Pump")
+		key:Fire(true)
+		key:Fire(false)
+		task.wait() -- Pressed is deferred
+		Hud:step(0)
+		expect(pressed.Visible).toBe(true)
+		Hud:step(press.seconds / 3)
+		expect(pop.Scale).toBeCloseTo(press.scale, 4)
+		expect(pressed.Visible).toBe(true)
+		Hud:step(press.seconds)
+		expect(pop.Scale).toBe(1)
+		expect(pressed.Visible).toBe(false)
+		-- A call cools: its seconds stand in for its word.
+		local runner = ActionController.runner
+		runner:start("CallPass", { hasBall = false, knockedDown = false })
+		Hud:step(0)
+		expect(faceText("pass")).toBe(string.format(config.UI.text.cooldown, cooldown))
+		runner:step(cooldown)
+		Hud:step(0)
+		expect(faceText("pass")).toBe(config.UI.controlLabels.CallPass)
+		-- Magnetic Pass with nobody in the aim fades whole, at the HUD's dim.
+		BallCarrier:set(LOCAL_ID)
+		ActionController:step(DT)
+		Hud:step(0)
+		Hud:step(config.UI.hud.motion.easeSeconds)
+		local group = face("pass"):FindFirstChild("Group") :: CanvasGroup
+		expect(group.GroupTransparency).toBeCloseTo(config.UI.hud.dimTransparency, 4)
+		expect((face("throw"):FindFirstChild("Group") :: CanvasGroup).GroupTransparency).toBe(0)
+	end)
+
+	-- S2 (#355, the owner's Q250): its right edge lined up with the touch buttons' (Jump's, 22 px from the whole
+	-- screen's edge), 16 px under Roblox's top bar, in look C; a tap pops it.
+	it("lines SCORES up with the touch buttons, under Roblox's top bar, in look C, popping when tapped", function()
+		local press = config.UI.hud.motion.press
+		local place = config.UI.hud.layout.scoreButton
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		local button = part("ScoreButton") :: TextButton
+		expect(button.AnchorPoint).toEqual(Vector2.new(1, 0))
+		-- This phone's whole screen ends 62 px right of the HUD's area: 812 - 22.
+		expect(button.Position).toEqual(UDim2.fromOffset(790, place.top))
+		expect(button.Position.X.Offset).toBe(TouchArea.lineUp(config.Input.touch, PHONE.hud, PHONE.whole))
+		expect(button.Size).toEqual(place.size)
+		expect(button.BackgroundTransparency).toBe(1)
+		expect(button.Text).toBe("")
+		-- Its face shows the press: no tint of Roblox's own.
+		expect(button.AutoButtonColor).toBe(false)
+		local front = button:FindFirstChild("Face") :: Frame
+		local words = front:FindFirstChild("Words", true) :: TextLabel
+		expect(words.Text).toBe(config.UI.text.scores)
+		local fit = words:FindFirstChildOfClass("UITextSizeConstraint") :: UITextSizeConstraint
+		expect(fit.MaxTextSize).toBe(place.textSize)
+		local fill = (front:FindFirstChild("Box", true) :: Frame):FindFirstChild("Fill1") :: Frame
+		expect((fill:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(place.corner)
+		local keys = (fill:FindFirstChildOfClass("UIGradient") :: UIGradient).Color.Keypoints
+		expect(near(keys[1].Value, config.UI.touchStyle.fill.top)).toBe(true)
+		-- A tap pops it, pressed while it pops.
+		local pop = front:FindFirstChildOfClass("UIScale") :: UIScale
+		local pressed = front:FindFirstChild("Pressed", true) :: Frame
+		Hud:toggleScoreTab()
+		Hud:step(press.seconds / 3)
+		expect(pop.Scale).toBeCloseTo(press.scale, 4)
+		expect(pressed.Visible).toBe(true)
+		Hud:step(press.seconds)
+		expect(pop.Scale).toBe(1)
+		expect(pressed.Visible).toBe(false)
+		-- A big screen: the buttons grow, and SCORES follows their edge, 33 px in.
+		screen = BIG
+		Hud:resize()
+		expect(button.Position).toEqual(UDim2.fromOffset(1247, place.top))
 	end)
 
 	-- The letter NameTags shows over a pass's target (#315; RC Video 34 at 41.6 s): the pass hint's own key, or on
@@ -896,17 +1048,32 @@ describe("Hud", function()
 		Hud:step(0)
 		local tab = part("ScoreTab") :: Frame
 		expect((tab.Parent :: Instance).Name).toBe("Root")
-		expect(tab.Position.Y.Offset).toBe(HudScreen.tabTop(config, true, 323, 0))
-		expect(tab.Size).toEqual(UDim2.new(1, 0, 1, -HudScreen.tabTop(config, true, 323, 0)))
-		expect(tab.Active).toBe(true)
+		local top = HudScreen.tabTop(config, true, 0)
+		expect(tab.Position.Y.Offset).toBe(top)
+		expect(tab.Size).toEqual(UDim2.new(1, 0, 1, -top))
+		-- Its shield spans this phone's whole screen (62 px past the HUD's area each side), over the touch buttons.
+		local shield = tab:FindFirstChild("Shield") :: Frame
+		expect(shield.Active).toBe(true)
+		expect(shield.Position).toEqual(UDim2.fromOffset(-62, 0))
+		expect(shield.Size).toEqual(UDim2.fromOffset(874, 323 - top))
+		-- Measured from the HUD's area, wherever GuiService's rects start: the same screen, both 10 px right, 5 down.
+		screen = {
+			whole = Rect.new(-52, -73, 822, 328),
+			hud = Rect.new(10, 5, 760, 328),
+			controls = Rect.new(10, -53, 760, 328),
+			topbar = PHONE.topbar,
+		}
+		Hud:resize()
+		expect(shield.Position).toEqual(UDim2.fromOffset(-62, 0))
+		expect(shield.Size).toEqual(UDim2.fromOffset(874, 323 - top))
 		-- The SCORES button stays clear above it.
 		local button = part("ScoreButton") :: TextButton
 		local place = config.UI.hud.layout.scoreButton
-		expect(place.position.Y.Offset + place.size.Y.Offset <= tab.Position.Y.Offset).toBe(true)
+		expect(place.top + place.size.Y.Offset <= tab.Position.Y.Offset).toBe(true)
 		expect(button.Parent == tab.Parent).toBe(true)
 		Hud:toggleScoreTab()
 		Hud:step(0)
-		expect(tab.Active).toBe(false)
+		expect(shield.Active).toBe(false)
 	end)
 
 	-- It never covers the scoreboard (Q203's rule): on this desktop S2 hangs into the HUD's area, 58 px under the safe
@@ -920,7 +1087,7 @@ describe("Hud", function()
 		Hud:step(0)
 		local boardTop = HudScreen.boardTop(config, false, 1280, BIG.topbar)
 		local under = math.ceil(HudScreen.boardBottom(config, false, boardTop, false) - 58)
-		local button = HudScreen.tabTop(config, true, 742, 0)
+		local button = HudScreen.tabTop(config, true, 0)
 		expect(under > button).toBe(true)
 		expect((part("ScoreTab") :: Frame).Position).toEqual(UDim2.fromOffset(0, under))
 		held:Fire(false)
@@ -954,7 +1121,7 @@ describe("Hud", function()
 			local box = tab:FindFirstChild("Box", true) :: Frame
 			return box, tab:FindFirstChild("Fit", true) :: UIScale, tab:FindFirstChild("Teams", true) :: ScrollingFrame
 		end
-		-- The phone's 750 px hold its 610 px box at its size (the 504 px stage would not); 12 rows scroll.
+		-- The phone's 750 px hold its 610 px box at its size (the 548 px stage would not); 12 rows scroll.
 		local box, fit, teams = board()
 		expect(box.Size.X.Offset).toBe(config.UI.hud.layout.scoreTab.compactSizes.width)
 		expect(fit.Scale).toBe(1)
@@ -1131,12 +1298,14 @@ describe("Hud", function()
 		expect(part("Stage").Size).toEqual(UDim2.fromOffset(750, 323))
 		preferred = Enum.PreferredInput.Touch
 		Hud:step(0)
-		expect(part("Stage").Size).toEqual(UDim2.fromOffset(504, 323))
+		-- The buttons sit at the whole screen's corner (#355), 62 px past the HUD's area: 812 - 264.
+		expect(part("Stage").Size).toEqual(UDim2.fromOffset(548, 323))
 		expect(fit("Banner")).toBe(1)
 		expect(fit("Feed")).toBe(1)
 		-- The end screen fits the stage too: on touch, without its table, the MVP's card is the widest part, wider
-		-- than the stage the buttons leave on a screen whose controls' area is 600 px wide.
-		screen = { whole = PHONE.whole, hud = PHONE.hud, controls = Rect.new(0, -58, 600, 323), topbar = PHONE.topbar }
+		-- than the 354 px stage the buttons leave on a whole screen that ends at 618.
+		screen =
+			{ whole = Rect.new(-62, -78, 618, 323), hud = PHONE.hud, controls = PHONE.controls, topbar = PHONE.topbar }
 		Hud:resize()
 		endMatch()
 		Hud:step(0)
@@ -1374,17 +1543,17 @@ describe("Hud", function()
 	it("measures the stage again when the device changes or the screen turns", function()
 		preferred = Enum.PreferredInput.Touch
 		Hud:step(0)
-		expect(part("Stage").Size).toEqual(UDim2.fromOffset(504, 323))
-		-- A big screen: the buttons grow 1.5 times and reach 369 px in.
+		expect(part("Stage").Size).toEqual(UDim2.fromOffset(548, 323))
+		-- A big screen: the buttons grow 1.5 times and reach 396 px in.
 		screen = BIG
 		Hud:resize()
-		expect(part("Stage").Size).toEqual(UDim2.fromOffset(911, 742))
+		expect(part("Stage").Size).toEqual(UDim2.fromOffset(884, 742))
 		preferred = Enum.PreferredInput.KeyboardAndMouse
 		Hud:step(0)
 		expect(part("Stage").Size).toEqual(UDim2.fromOffset(1280, 742))
 		preferred = Enum.PreferredInput.Touch
 		Hud:step(0)
-		expect(part("Stage").Size).toEqual(UDim2.fromOffset(911, 742))
+		expect(part("Stage").Size).toEqual(UDim2.fromOffset(884, 742))
 	end)
 
 	it("unmounts its React root when destroyed, the reticle with it", function()

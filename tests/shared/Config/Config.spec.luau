@@ -420,17 +420,17 @@ describe("Config defaults", function()
 			bigScreenSide = 500,
 			bigScreenStickScale = 2,
 			bigScreenButtonScale = 1.5,
-			buttonSize = UDim2.fromOffset(72, 72),
-			-- Pixels from the bottom-right corner, 80 apart: three columns, the right one a step higher.
+			-- Arrangement A, sized by use (#355, the owner's Q245, played in Q249): centres in pixels from the whole
+			-- screen's bottom-right corner, sizes and words in pixels.
 			buttons = {
-				uppercut = UDim2.new(1, -50, 1, -230),
-				tackle = UDim2.new(1, -50, 1, -150),
-				jump = UDim2.new(1, -50, 1, -70),
-				pass = UDim2.new(1, -130, 1, -210),
-				throw = UDim2.new(1, -130, 1, -130),
-				pump = UDim2.new(1, -130, 1, -50),
-				attach = UDim2.new(1, -210, 1, -130),
-				brake = UDim2.new(1, -210, 1, -50),
+				jump = { place = UDim2.new(1, -70, 1, -70), size = 96, textSize = 18 },
+				throw = { place = UDim2.new(1, -163, 1, -53), size = 70, textSize = 16 },
+				tackle = { place = UDim2.new(1, -150, 1, -132), size = 64, textSize = 15 },
+				pump = { place = UDim2.new(1, -72, 1, -160), size = 64, textSize = 15 },
+				pass = { place = UDim2.new(1, -225, 1, -133), size = 64, textSize = 13 },
+				uppercut = { place = UDim2.new(1, -150, 1, -206), size = 64, textSize = 13 },
+				brake = { place = UDim2.new(1, -235, 1, -59), size = 58, textSize = 14 },
+				attach = { place = UDim2.new(1, -77, 1, -229), size = 50, textSize = 12 },
 			},
 		})
 	end)
@@ -502,16 +502,18 @@ describe("Config defaults", function()
 			BallFocus = "Focus",
 			GetUp = "GET UP!",
 		})
-		-- Roblox's own touch thumbstick colors.
+		-- Roblox's own touch thumbstick colors; the buttons' fills as the owner played them (#355, Q249).
 		expect(ui.touchStyle).toEqual({
 			background = Color3.fromRGB(18, 18, 21),
 			backgroundTransparency = 0.4,
 			foreground = Color3.fromRGB(213, 215, 221),
-			font = Enum.Font.BuilderSansBold,
 			corner = UDim.new(0.5, 0),
-			textSize = 18,
 			textPadding = 6,
 			knobTransparency = 0,
+			fill = { top = Color3.fromRGB(58, 69, 102), bottom = Color3.fromRGB(28, 35, 64) },
+			jumpFill = { top = Color3.fromRGB(255, 178, 90), bottom = Color3.fromRGB(232, 116, 28) },
+			-- Probed on the phone emulator: 2 px keep a disc's sides whole (#355, Q254).
+			groupRoom = 2,
 		})
 		expect(ui.teamNames).toEqual({ Blue = "Blue", Orange = "Orange" })
 		-- Keys Roblox's GetStringForKeyCode names "" or " ".
@@ -734,7 +736,8 @@ describe("Config defaults", function()
 						switchSize = 15,
 					},
 				},
-				scoreButton = { position = UDim2.new(1, -16, 0, 16), size = UDim2.fromOffset(96, 36) },
+				-- S2 (#355, the owner's Q250): 96 x 36 under Roblox's top bar, the page's 10 px outer corner.
+				scoreButton = { top = 16, size = UDim2.fromOffset(96, 36), corner = UDim.new(0, 7), textSize = 17 },
 				endScreen = {
 					gap = 16,
 					dim = 0.5,
@@ -2013,31 +2016,93 @@ describe("Config.forMode", function()
 				overrides = { Input = { actions = { tackle = { "Fly" } } } },
 				message = "Input.actions.tackle[1]: must name an action",
 			},
-			-- A button nearer another than its size, sideways (Pump 60 px from Jump) or up and down (Brake 20 px
-			-- under Throw).
+			-- Throw (70 px) and Attach (50 px) moved clear of the rest: nearer than half of both sizes, 60 px, across
+			-- (59 px apart) or down; their hit areas would overlap, whatever the faces' shape.
 			{
-				overrides = { Input = { touch = { buttons = { pump = UDim2.new(1, -110, 1, -70) } } } },
+				overrides = {
+					Input = {
+						touch = {
+							buttons = {
+								throw = { place = UDim2.new(1, -500, 1, -300) },
+								attach = { place = UDim2.new(1, -559, 1, -300) },
+							},
+						},
+					},
+				},
 				message = "Input.touch: buttons must not overlap",
 			},
 			{
-				overrides = { Input = { touch = { buttons = { brake = UDim2.new(1, -130, 1, -110) } } } },
+				overrides = {
+					Input = {
+						touch = {
+							buttons = {
+								throw = { place = UDim2.new(1, -500, 1, -300) },
+								attach = { place = UDim2.new(1, -500, 1, -359) },
+							},
+						},
+					},
+				},
+				message = "Input.touch: buttons must not overlap",
+			},
+			-- Every pair, the first button's (Jump, 96 px) too: Attach 70 px above it, under half of both, 73.
+			{
+				overrides = {
+					Input = {
+						touch = {
+							buttons = {
+								jump = { place = UDim2.new(1, -500, 1, -300) },
+								attach = { place = UDim2.new(1, -500, 1, -370) },
+							},
+						},
+					},
+				},
 				message = "Input.touch: buttons must not overlap",
 			},
 			-- The buttons' reach (TouchArea) measures from the bottom-right corner.
 			{
-				overrides = { Input = { touch = { buttons = { jump = UDim2.new(0.5, -50, 1, -70) } } } },
+				overrides = { Input = { touch = { buttons = { jump = { place = UDim2.new(0.5, -50, 1, -70) } } } } },
 				message = "Input.touch: buttons must sit at the bottom-right corner (scales 1, 1)",
 			},
-			-- The overlap rule measures pixels, so a button's size must be in pixels.
 			{
-				overrides = { Input = { touch = { buttonSize = UDim2.fromScale(0.1, 0.1) } } },
-				message = "Input.touch.buttonSize: must be in pixels (scales 0, offsets > 0)",
+				overrides = { Input = { touch = { buttons = { jump = { place = UDim2.new(1, -70, 0.5, -70) } } } } },
+				message = "Input.touch: buttons must sit at the bottom-right corner (scales 1, 1)",
+			},
+			{
+				overrides = { Input = { touch = { buttons = { jump = { size = 0 } } } } },
+				message = "Input.touch.buttons.jump.size: must be >= 1 (got 0)",
+			},
+			-- Whole pixels: a UDim's offset would drop the half.
+			{
+				overrides = { Input = { touch = { buttons = { jump = { size = 96.5 } } } } },
+				message = "Input.touch.buttons.jump.size: must be an integer (got 96.5)",
+			},
+			-- Roblox clamps text sizes to 1..100.
+			{
+				overrides = { Input = { touch = { buttons = { attach = { textSize = 0 } } } } },
+				message = "Input.touch.buttons.attach.textSize: must be >= 1 (got 0)",
+			},
+			{
+				overrides = { Input = { touch = { buttons = { attach = { textSize = 101 } } } } },
+				message = "Input.touch.buttons.attach.textSize: must be <= 100 (got 101)",
 			},
 		}
 		for _, case in cases do
 			expect(function()
 				Fixtures.config(case.overrides)
 			end).toThrow(case.message)
+		end
+	end)
+
+	-- Throw (70 px) and Attach (50 px) moved clear of the rest, half of both sizes apart (60 px) across, or 59 px
+	-- across and 60 down: they touch, and neither covers the other.
+	it("accepts touch buttons that just touch", function()
+		for _, attach in { UDim2.new(1, -560, 1, -300), UDim2.new(1, -559, 1, -360) } do
+			local buttons = {
+				throw = { place = UDim2.new(1, -500, 1, -300) },
+				attach = { place = attach },
+			}
+			local touch = Fixtures.config({ Input = { touch = { buttons = buttons } } }).Input.touch
+			expect(touch.buttons.attach.place).toEqual(attach)
 		end
 	end)
 
@@ -3114,6 +3179,68 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ UI = { hud = { layout = { speedometer = { size = UDim2.fromOffset(160, 40) } } } } })
 		end).toThrow("UI.hud.layout.speedometer.size: unknown key")
+	end)
+
+	-- #355: each touch button has its own size and words; their font is look C's; SCORES sits by its top and the
+	-- buttons' edge.
+	it("rejects the old touch button size, label font and score button place as unknown", function()
+		expect(function()
+			Fixtures.config({ Input = { touch = { buttonSize = UDim2.fromOffset(72, 72) } } })
+		end).toThrow("Input.touch.buttonSize: unknown key")
+		expect(function()
+			Fixtures.config({ UI = { touchStyle = { font = Enum.Font.BuilderSansBold } } })
+		end).toThrow("UI.touchStyle.font: unknown key")
+		expect(function()
+			Fixtures.config({ UI = { touchStyle = { textSize = 18 } } })
+		end).toThrow("UI.touchStyle.textSize: unknown key")
+		expect(function()
+			Fixtures.config({ UI = { hud = { layout = { scoreButton = { position = UDim2.new(1, -16, 0, 16) } } } } })
+		end).toThrow("UI.hud.layout.scoreButton.position: unknown key")
+	end)
+
+	it("rejects touch fills, a face's room and a score button outside their limits", function()
+		local cases: { { overrides: { [string]: any }, message: string } } = {
+			{
+				overrides = { UI = { touchStyle = { fill = { top = "#3a4566" } } } },
+				message = "UI.touchStyle.fill.top: expected Color3, got string",
+			},
+			{
+				overrides = { UI = { touchStyle = { jumpFill = { bottom = 1 } } } },
+				message = "UI.touchStyle.jumpFill.bottom: expected Color3, got number",
+			},
+			{
+				overrides = { UI = { touchStyle = { groupRoom = 0 } } },
+				message = "UI.touchStyle.groupRoom: must be >= 1 (got 0)",
+			},
+			{
+				overrides = { UI = { touchStyle = { groupRoom = 1.5 } } },
+				message = "UI.touchStyle.groupRoom: must be an integer (got 1.5)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreButton = { top = -1 } } } } },
+				message = "UI.hud.layout.scoreButton.top: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreButton = { size = UDim2.fromScale(0.1, 0.1) } } } } },
+				message = "UI.hud.layout.scoreButton.size: must be in pixels (scales 0, offsets > 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreButton = { corner = 7 } } } } },
+				message = "UI.hud.layout.scoreButton.corner: expected UDim, got number",
+			},
+			{
+				overrides = { UI = { hud = { layout = { scoreButton = { textSize = 0 } } } } },
+				message = "UI.hud.layout.scoreButton.textSize: must be >= 1 (got 0)",
+			},
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config(case.overrides)
+			end).toThrow(case.message)
+		end
+		local place = Fixtures.config({ UI = { hud = { layout = { scoreButton = { top = 0 } } } } }).UI.hud.layout
+		expect(place.scoreButton.top).toBe(0)
+		expect(Fixtures.config({ UI = { touchStyle = { groupRoom = 1 } } }).UI.touchStyle.groupRoom).toBe(1)
 	end)
 
 	it("rejects team spawns that would not fit on a straight", function()

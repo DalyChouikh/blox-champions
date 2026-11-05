@@ -4,9 +4,10 @@
 -- offers it, Switch team (#310): its key on look C's cap (none on touch, where it is tapped), greyed whole while a
 -- switch can't happen (Q117, Q118). It fits the HUD's area under the scoreboard's ink (HudScreen.tabTop, tabFit; Q203's
 -- rule), on touch under the SCORES button too, which stays above it (Q234, Q236): off touch it shrinks to fit; on touch
--- its teams scroll where they do not fit (Q190), and while open it takes the touches over that area, so the touch
--- buttons under it are not pressed (the HUD's gui draws over theirs). It pops in and fades out whole (a Reveal's
--- bindings, Q194), drawn above the HUD's stage. A plain function of its props.
+-- its teams scroll where they do not fit (Q190), and while open its shield takes the touches over the whole screen
+-- under it, so the touch buttons are not pressed (the HUD's gui draws over theirs), though they reach the screen's
+-- corner past the HUD's area (#355). It pops in and fades out whole (a Reveal's bindings, Q194), drawn above the HUD's
+-- stage. A plain function of its props.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -33,7 +34,7 @@ export type ScoreTabProps = {
 	localId: Types.PlayerId,
 	-- A phone's screen (HudScreen.compact): the board's compact sizes.
 	compact: boolean,
-	-- Played by touch: under the SCORES button, its rows scrolling, taking the touches over its area while open.
+	-- Played by touch: under the SCORES button, its rows scrolling, taking the touches under it while open.
 	touch: boolean,
 	-- Open, not only fading out after it closed.
 	open: boolean,
@@ -44,6 +45,8 @@ export type ScoreTabProps = {
 	-- less the HUD's top; 0 without a scoreboard).
 	area: React.Binding<Vector2>,
 	boardBottom: number,
+	-- The whole screen in the HUD's area's pixels (from that area's top-left): where the shield reaches.
+	screen: React.Binding<Rect>,
 	-- The Switch team button; nil where the board has none.
 	switchTeam: SwitchTeam?,
 }
@@ -111,11 +114,8 @@ local function ScoreTab(props: ScoreTabProps): React.ReactElement
 	local line, shadow = look.outline, look.shadow
 	local area, boardBottom = props.area, props.boardBottom
 	-- Where its part of the HUD's area starts, and its scale and how tall its teams show there.
-	local function topOf(shown: Vector2): number
-		return HudScreen.tabTop(config, touch, shown.Y, boardBottom)
-	end
+	local top = HudScreen.tabTop(config, touch, boardBottom)
 	local function fitted(shown: Vector2): (number, number)
-		local top = topOf(shown)
 		return HudScreen.tabFit(config, compact, touch, Vector2.new(shown.X, shown.Y - top), players, switchRow)
 	end
 	local rows = area:map(function(shown: Vector2): number
@@ -125,15 +125,24 @@ local function ScoreTab(props: ScoreTabProps): React.ReactElement
 	return React.createElement(
 		"Frame",
 		Style.topmost(Style.holder({
-			Position = area:map(function(shown: Vector2): UDim2
-				return UDim2.fromOffset(0, topOf(shown))
-			end),
-			Size = area:map(function(shown: Vector2): UDim2
-				return UDim2.new(1, 0, 1, -topOf(shown))
-			end),
-			Active = touch and props.open,
+			Position = UDim2.fromOffset(0, top),
+			Size = UDim2.new(1, 0, 1, -top),
 		})),
 		{
+			-- Under the board (whose Switch team button and rows take their own touches), across the whole screen.
+			Shield = React.createElement(
+				"Frame",
+				Style.holder({
+					Position = props.screen:map(function(screen: Rect): UDim2
+						return UDim2.fromOffset(screen.Min.X, 0)
+					end),
+					Size = props.screen:map(function(screen: Rect): UDim2
+						return UDim2.fromOffset(screen.Width, screen.Max.Y - top)
+					end),
+					Active = touch and props.open,
+					ZIndex = 0,
+				})
+			),
 			Board = React.createElement(
 				"Frame",
 				Style.holder({

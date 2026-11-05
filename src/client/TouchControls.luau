@@ -1,14 +1,15 @@
 --!strict
 -- Our touch controls (spec §8.3, §11.1), shown only while the player plays by touch; Roblox's own are off
--- (RobloxDefaults). A touch that starts on the stick pad (the lower left) grows a stick under the thumb, with Roblox's
--- own stick math (TouchStick) and sizes. One button per control sits in the lower right, placed in pixels from the
--- corner (Config.Input.touch), each working its control through InputController as its keys do; the throw button also
--- works Ball Focus. On a big screen the stick and the buttons grow, as Roblox's own do (TouchArea), and they follow the
--- screen's size. Before each frame is drawn (FrameController), every button reads what its control does now
--- (ControlLabels), hiding only while it has no label (no skater; Attach with no teammate ahead) and greyed (its text
--- faded by UI.hud.dimTransparency) while it shows but does nothing now (#315, #368), and the throw button rings while
--- Ball Focus is on (CameraController.focusing). A property is written only when it changes. Hiding the controls under
--- a thumb ends that touch.
+-- (RobloxDefaults). A touch that starts on the stick pad (the lower left of the device's safe area, as Roblox's own)
+-- grows a stick under the thumb, with Roblox's own stick math (TouchStick) and sizes. One button per control sits at
+-- the whole screen's bottom-right corner, past a notched phone's safe area (#355, the owner's Q246, Q249), each its own
+-- size and place (Config.Input.touch), working its control through InputController as its keys do; the throw button
+-- also works Ball Focus. A button here is its hit area only: the Hud draws its look C face into it (Hud/TouchButton),
+-- reading what its control does now. On a big screen the stick and the buttons grow, as Roblox's own do (TouchArea),
+-- each button whole by one UIScale, its face with it; they follow the screen's size. Before each frame is drawn
+-- (FrameController), each button shows only while its control has a label (ControlLabels: none without a skater, nor
+-- for Attach with no teammate ahead), and the throw button rings while Ball Focus is on (CameraController.focusing),
+-- over its face. A property is written only when it changes. Hiding the controls under a thumb ends that touch.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -20,7 +21,6 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local ControlLabels = require(script.Parent.ControlLabels)
 local InputController = require(script.Parent.InputController)
 local SkateController = require(script.Parent.SkateController)
-local Style = require(script.Parent.Hud.Style)
 local TouchArea = require(ReplicatedStorage.Shared.Input.TouchArea)
 local TouchStick = require(ReplicatedStorage.Shared.Input.TouchStick)
 
@@ -34,18 +34,21 @@ export type TouchControls = {
 	init: (self: TouchControls, deps: { [string]: any }) -> (),
 	start: (self: TouchControls) -> (),
 	step: (self: TouchControls, dt: number) -> (),
-	-- Sizes the stick and places and sizes the buttons for the screen: larger on a big one.
+	-- Sizes the stick and places and grows the buttons for the screen: larger on a big one.
 	layout: (self: TouchControls) -> (),
+	-- The stick's, in the device's safe area.
 	gui: ScreenGui,
-	-- Each control's button, by its name in Config.Input.touch.buttons.
+	-- The buttons', the whole screen.
+	buttonGui: ScreenGui,
+	-- Each control's button, by its name in Config.Input.touch.buttons: its hit area, its face the Hud's.
 	buttons: { [string]: TextButton },
 	-- Invisible: a touch that begins here moves the skater.
 	pad: ImageButton,
 	-- Drawn while a touch on the pad lasts: the ring where it began, the knob under the thumb.
 	ring: Frame,
 	knob: Frame,
-	-- Outlines the throw button while Ball Focus is on.
-	focusRing: UIStroke,
+	-- Rings the throw button while Ball Focus is on.
+	focusRing: Frame,
 	_config: Config.GameConfig,
 	_input: InputController.InputController,
 	_actions: ActionController.ActionController,
@@ -53,11 +56,9 @@ export type TouchControls = {
 	_camera: { focusing: boolean },
 	_preferredInput: () -> Enum.PreferredInput,
 	_screenSize: () -> Vector2,
-	-- What the gui and each button last showed, so a step writes only what changed.
+	-- What the guis and each button last showed, so a step writes only what changed.
 	_enabled: boolean,
-	_texts: { [string]: string },
 	_shown: { [string]: boolean },
-	_fades: { [string]: number },
 	_focusShown: boolean,
 	-- The touch on the pad: where it began, nil while none lasts.
 	_origin: Vector2?,
@@ -66,9 +67,9 @@ export type TouchControls = {
 	_buttonScale: number,
 }
 
--- A rounded shape in the touch style's background.
-local function disc(class: "Frame" | "TextButton", style: Config.TouchStyle): GuiObject
-	local shape = Instance.new(class) :: GuiObject
+-- A rounded shape in the touch style's background: the stick's ring and knob.
+local function disc(style: Config.TouchStyle): Frame
+	local shape = Instance.new("Frame")
 	shape.AnchorPoint = Vector2.new(0.5, 0.5)
 	shape.BackgroundColor3 = style.background
 	shape.BackgroundTransparency = style.backgroundTransparency
@@ -79,44 +80,64 @@ local function disc(class: "Frame" | "TextButton", style: Config.TouchStyle): Gu
 	return shape
 end
 
+-- One of the touch controls' ScreenGuis, covering the screen as `insets` says: kept across respawns, as Roblox's own,
+-- its parts drawn in their ZIndex order among siblings, shown on touch only.
+local function screenGui(name: string, insets: Enum.ScreenInsets): ScreenGui
+	local gui = Instance.new("ScreenGui")
+	gui.Name = name
+	gui.Enabled = false
+	gui.ResetOnSpawn = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.ScreenInsets = insets
+	gui.ClipToDeviceSafeArea = false
+	return gui
+end
+
+-- `control`'s hit area, its size across its face's ink and grown by its UIScale "Grow"; its face draws it.
 local function newButton(control: Config.TouchControl, config: Config.GameConfig, parent: Instance): TextButton
-	local style = config.UI.touchStyle
-	local button = disc("TextButton", style) :: TextButton
+	local size = config.Input.touch.buttons[control].size
+	local button = Instance.new("TextButton")
 	button.Name = control
+	button.AnchorPoint = Vector2.new(0.5, 0.5)
+	button.Size = UDim2.fromOffset(size, size)
+	button.BackgroundTransparency = 1
+	button.BorderSizePixel = 0
 	button.Text = ""
-	button.TextColor3 = style.foreground
-	button.Font = style.font
-	button.TextScaled = true
-	local cap = Instance.new("UITextSizeConstraint")
-	cap.MaxTextSize = style.textSize
-	cap.Parent = button
-	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0, style.textPadding)
-	padding.PaddingRight = UDim.new(0, style.textPadding)
-	padding.Parent = button
+	button.AutoButtonColor = false
+	local grow = Instance.new("UIScale")
+	grow.Name = "Grow"
+	grow.Parent = button
 	button.Parent = parent
 	return button
 end
 
--- Shows `control`'s button reading `label`, `greyed` or not, or hides it when there is none.
-local function show(self: TouchControls, control: Config.TouchControl, label: string?, greyed: boolean)
-	local visible = label ~= nil
-	local button = self.buttons[control]
+-- The ring round the throw button while Ball Focus is on: over its face (ZIndex 2 over the face's 1), so the face's
+-- shadow does not cut it.
+local function newFocusRing(config: Config.GameConfig, parent: Instance): Frame
+	local style = config.UI.touchStyle
+	local ring = Instance.new("Frame")
+	ring.Name = "Focus"
+	ring.Size = UDim2.fromScale(1, 1)
+	ring.BackgroundTransparency = 1
+	ring.ZIndex = 2
+	ring.Visible = false
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = style.corner
+	corner.Parent = ring
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = style.foreground
+	stroke.Thickness = config.UI.hud.glowThickness
+	stroke.Parent = ring
+	ring.Parent = parent
+	return ring
+end
+
+-- Shows `control`'s button while `visible`, else hides it.
+local function show(self: TouchControls, control: Config.TouchControl, visible: boolean)
 	if self._shown[control] ~= visible then
 		self._shown[control] = visible
-		button.Visible = visible
-	end
-	if label == nil then
-		return
-	end
-	if self._texts[control] ~= label then
-		self._texts[control] = label
-		button.Text = label
-	end
-	local fade = Style.dim(self._config, greyed)
-	if self._fades[control] ~= fade then
-		self._fades[control] = fade
-		button.TextTransparency = fade
+		self.buttons[control].Visible = visible
 	end
 end
 
@@ -126,9 +147,9 @@ local function onPad(self: TouchControls, point: Vector2): UDim2
 	return UDim2.fromOffset(offset.X, offset.Y)
 end
 
--- `size` (pixels) times `scale`.
-local function scaled(size: UDim2, scale: number): UDim2
-	return UDim2.new(size.X.Scale, size.X.Offset * scale, size.Y.Scale, size.Y.Offset * scale)
+-- `place` (pixels from the corner) times `scale`.
+local function scaled(place: UDim2, scale: number): UDim2
+	return UDim2.new(place.X.Scale, place.X.Offset * scale, place.Y.Scale, place.Y.Offset * scale)
 end
 
 -- A touch began on the pad at `position`: the stick is drawn there, sized for this screen.
@@ -164,6 +185,7 @@ local TouchControls: TouchControls = {
 	name = "TouchControls",
 	dependencies = { "Config", "InputController", "ActionController", "SkateController", "CameraController" },
 	gui = nil :: any,
+	buttonGui = nil :: any,
 	buttons = {},
 	pad = nil :: any,
 	ring = nil :: any,
@@ -181,15 +203,13 @@ local TouchControls: TouchControls = {
 		return Vector2.zero
 	end,
 	_enabled = false,
-	_texts = {},
 	_shown = {},
-	_fades = {},
 	_focusShown = false,
 	_origin = nil,
 	_stickScale = 1,
 	_buttonScale = 0,
 
-	-- deps.Parent keeps the gui out of the local player's PlayerGui in tests; deps.PreferredInput and deps.ScreenSize
+	-- deps.Parent keeps the guis out of the local player's PlayerGui in tests; deps.PreferredInput and deps.ScreenSize
 	-- replace the live game there.
 	init = function(self: TouchControls, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
@@ -204,26 +224,19 @@ local TouchControls: TouchControls = {
 				return UserInputService.PreferredInput
 			end
 		self._screenSize = deps.ScreenSize or function(): Vector2
-			return self.gui.AbsoluteSize
+			return self.buttonGui.AbsoluteSize
 		end
 		self._enabled = false
-		self._texts = {}
 		self._shown = {}
-		self._fades = {}
 		self._focusShown = false
 		self._origin = nil
 		self._stickScale = 1
 		self._buttonScale = 0
 
-		-- As Roblox's own touch gui: kept across respawns, inside the device's safe area.
-		local gui = Instance.new("ScreenGui")
-		gui.Name = "TouchControls"
-		gui.Enabled = false
-		gui.ResetOnSpawn = false
-		gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-		gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
-		gui.ClipToDeviceSafeArea = false
+		local gui = screenGui("TouchControls", Enum.ScreenInsets.DeviceSafeInsets)
 		self.gui = gui
+		local buttonGui = screenGui("TouchButtons", Enum.ScreenInsets.None)
+		self.buttonGui = buttonGui
 
 		local pad = Instance.new("ImageButton")
 		pad.Name = "StickPad"
@@ -235,12 +248,12 @@ local TouchControls: TouchControls = {
 		pad.AutoButtonColor = false
 		pad.Parent = gui
 		self.pad = pad
-		local ring = disc("Frame", style) :: Frame
+		local ring = disc(style)
 		ring.Name = "StickRing"
 		ring.Visible = false
 		ring.Parent = pad
 		self.ring = ring
-		local knob = disc("Frame", style) :: Frame
+		local knob = disc(style)
 		knob.Name = "StickKnob"
 		knob.BackgroundColor3 = style.foreground
 		knob.BackgroundTransparency = style.knobTransparency
@@ -252,30 +265,25 @@ local TouchControls: TouchControls = {
 		local input = self._input
 		local buttons: { [string]: TextButton } = {}
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
-			local button = newButton(control, config, gui)
+			local button = newButton(control, config, buttonGui)
 			buttons[control] = button
 			input:bindButton(control, button)
 		end
 		input:bindButton("ballFocus", buttons.throw)
 		self.buttons = buttons
-		local focusRing = Instance.new("UIStroke")
-		focusRing.Name = "Focus"
-		focusRing.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-		focusRing.Color = style.foreground
-		focusRing.Thickness = config.UI.hud.glowThickness
-		focusRing.Enabled = false
-		focusRing.Parent = buttons.throw
-		self.focusRing = focusRing
+		self.focusRing = newFocusRing(config, buttons.throw)
 		input:bindTouchStick(pad).StateChanged:Connect(function(position: Vector2)
 			onTouch(self, position)
 		end)
-		gui.Parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
+		local parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
+		gui.Parent = parent
+		buttonGui.Parent = parent
 		self:layout()
 	end,
 
 	-- The screen's size changes when a window is resized or a device turned.
 	start = function(self: TouchControls)
-		self.gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		self.buttonGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 			self:layout()
 		end)
 	end,
@@ -289,11 +297,11 @@ local TouchControls: TouchControls = {
 			return
 		end
 		self._buttonScale = scale
-		local size = scaled(touch.buttonSize, scale)
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
 			local button = self.buttons[control]
-			button.Position = scaled(touch.buttons[control], scale)
-			button.Size = size
+			local grow = button:FindFirstChild("Grow") :: UIScale
+			button.Position = scaled(touch.buttons[control].place, scale)
+			grow.Scale = scale
 		end
 	end,
 
@@ -302,6 +310,7 @@ local TouchControls: TouchControls = {
 		if enabled ~= self._enabled then
 			self._enabled = enabled
 			self.gui.Enabled = enabled
+			self.buttonGui.Enabled = enabled
 			-- Hidden under a thumb (a gamepad plugged in mid-touch): that touch ends here.
 			if not enabled and self._origin ~= nil then
 				onTouch(self, NO_TOUCH)
@@ -312,13 +321,12 @@ local TouchControls: TouchControls = {
 		end
 		local config, actions, skate = self._config, self._actions, self._skate
 		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
-			local label, greyed = ControlLabels.label(control, config, actions, skate)
-			show(self, control, label, greyed)
+			show(self, control, ControlLabels.label(control, config, actions, skate) ~= nil)
 		end
 		local focusing = self._camera.focusing
 		if focusing ~= self._focusShown then
 			self._focusShown = focusing
-			self.focusRing.Enabled = focusing
+			self.focusRing.Visible = focusing
 		end
 	end,
 }

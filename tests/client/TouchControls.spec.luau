@@ -16,7 +16,6 @@ local TouchControls = require(Client.TouchControls)
 
 local config = Config.defaults()
 local touch = config.Input.touch
-local labels = config.UI.controlLabels
 local style = config.UI.touchStyle
 local DT = 1 / 60
 local LOCAL_ID = "1"
@@ -99,22 +98,33 @@ afterEach(function()
 end)
 
 describe("TouchControls", function()
-	it("lays out a button for every control from Config.Input.touch", function()
-		expect(TouchControls.gui.Name).toBe("TouchControls")
-		expect(TouchControls.gui.ResetOnSpawn).toBe(false)
+	-- The stick as Roblox's own, in the device's safe area; the buttons at the whole screen's corner, past it (#355,
+	-- the owner's Q246, Q249), each an invisible hit area the Hud draws its look C face into (Hud/TouchButton).
+	it("lays out the stick in the safe area and a hit button per control at the whole screen's corner", function()
+		local gui, buttons = TouchControls.gui, TouchControls.buttonGui
+		expect(gui.Name).toBe("TouchControls")
+		expect(gui.ResetOnSpawn).toBe(false)
+		expect(gui.ScreenInsets).toBe(Enum.ScreenInsets.DeviceSafeInsets)
+		expect(TouchControls.pad.Parent == gui).toBe(true)
+		expect(buttons.Name).toBe("TouchButtons")
+		expect(buttons.ResetOnSpawn).toBe(false)
+		expect(buttons.ScreenInsets).toBe(Enum.ScreenInsets.None)
+		expect(buttons.ClipToDeviceSafeArea).toBe(false)
+		expect(buttons.ZIndexBehavior).toBe(Enum.ZIndexBehavior.Sibling)
+		expect(buttons.Parent == folder).toBe(true)
 		for _, entry in ACTIONS do
 			local made = button(entry.control)
+			local place = touch.buttons[entry.control]
 			expect(made.Name).toBe(entry.control)
-			expect(made.Position).toEqual(touch.buttons[entry.control])
-			expect(made.Size).toEqual(touch.buttonSize)
+			expect(made.Parent == buttons).toBe(true)
+			expect(made.Position).toEqual(place.place)
+			expect(made.Size).toEqual(UDim2.fromOffset(place.size, place.size))
 			expect(made.AnchorPoint).toEqual(Vector2.new(0.5, 0.5))
-			-- Short labels capped at textSize, long ones shrunk to fit inside the padding.
-			expect(made.TextScaled).toBe(true)
-			local cap = made:FindFirstChildOfClass("UITextSizeConstraint")
-			expect(cap and cap.MaxTextSize).toBe(style.textSize)
-			local padding = made:FindFirstChildOfClass("UIPadding")
-			expect(padding and padding.PaddingLeft).toEqual(UDim.new(0, style.textPadding))
-			expect(padding and padding.PaddingRight).toEqual(UDim.new(0, style.textPadding))
+			expect((made:FindFirstChild("Grow") :: UIScale).Scale).toBe(1)
+			-- Its face draws it: no background, no text, no tint of Roblox's own.
+			expect(made.BackgroundTransparency).toBe(1)
+			expect(made.Text).toBe("")
+			expect(made.AutoButtonColor).toBe(false)
 		end
 		local pad = TouchControls.pad
 		expect(pad.Size).toEqual(touch.stickArea)
@@ -147,12 +157,15 @@ describe("TouchControls", function()
 		expect(TouchControls.knob.Visible).toBe(false)
 	end)
 
+	-- Each button grows whole by its UIScale, the face drawn into it too (ink and words).
 	it("grows the stick and the buttons on a big screen, as Roblox's own controls do", function()
 		screen = Vector2.new(1280, 800)
 		TouchControls:layout()
 		local grow = touch.bigScreenButtonScale
-		local size, place = touch.buttonSize, touch.buttons.jump
-		expect(button("jump").Size).toEqual(UDim2.fromOffset(size.X.Offset * grow, size.Y.Offset * grow))
+		local jump = touch.buttons.jump
+		local place = jump.place
+		expect((button("jump"):FindFirstChild("Grow") :: UIScale).Scale).toBe(grow)
+		expect(button("jump").Size).toEqual(UDim2.fromOffset(jump.size, jump.size))
 		expect(button("jump").Position).toEqual(
 			UDim2.new(place.X.Scale, place.X.Offset * grow, place.Y.Scale, place.Y.Offset * grow)
 		)
@@ -167,7 +180,7 @@ describe("TouchControls", function()
 		-- Back on a phone-sized screen (a window resized, a device turned).
 		screen = Vector2.new(800, 400)
 		TouchControls:layout()
-		expect(button("jump").Size).toEqual(size)
+		expect((button("jump"):FindFirstChild("Grow") :: UIScale).Scale).toBe(1)
 		expect(button("jump").Position).toEqual(place)
 	end)
 
@@ -184,81 +197,60 @@ describe("TouchControls", function()
 		expect(TouchControls.ring.Visible).toBe(false)
 	end)
 
-	it("names and shows each button for what it does now", function()
+	-- What each button reads, and its greying, are its face's (the Hud's, Hud.spec): here, only whether it shows.
+	it("shows each button only while its control has a label", function()
 		TouchControls:step(DT)
-		expect(button("jump").Text).toBe(labels.Jump)
-		expect(button("tackle").Text).toBe(labels.Tackle)
-		expect(button("pass").Text).toBe(labels.CallPass)
-		expect(button("throw").Text).toBe(labels.BallFocus)
+		expect(button("jump").Visible).toBe(true)
 		expect(button("uppercut").Visible).toBe(true)
+		-- Attach with no teammate ahead.
 		expect(button("attach").Visible).toBe(false)
-
+		-- Roll Ball waits for a charge: the button stays, greyed by its face (#368, the owner's Q220).
 		BallCarrier:set(LOCAL_ID)
 		TouchControls:step(DT)
-		expect(button("tackle").Text).toBe(labels.Dodge)
-		expect(button("pass").Text).toBe(labels.Pass)
-		expect(button("throw").Text).toBe(labels.ChargeThrow)
-		-- Roll Ball waits for a charge: the button stays, greyed (#368, the owner's Q220).
 		expect(button("uppercut").Visible).toBe(true)
-		expect(button("uppercut").Text).toBe(labels.RollBall)
-		expect(button("uppercut").TextTransparency).toBeCloseTo(config.UI.hud.dimTransparency, 4)
-
-		-- In the air, without the ball, the button tackles, then dives in the tackle's follow-up window (#240).
-		BallCarrier:set(nil)
-		local skater = SkateController.skater :: any
-		skater.mode = "Airborne"
-		TouchControls:step(DT)
-		expect(button("tackle").Text).toBe(labels.Tackle)
-		Fixtures.intoDiveWindow(config)
-		TouchControls:step(DT)
-		expect(button("tackle").Text).toBe(labels.Dive)
-
 		SkateController.attachable = true
 		TouchControls:step(DT)
 		expect(button("attach").Visible).toBe(true)
+		-- A spectator has no skater, and no buttons.
+		SkateController.skater = nil
+		TouchControls:step(DT)
+		for _, entry in ACTIONS do
+			expect(`{entry.control} {button(entry.control).Visible}`).toBe(`{entry.control} false`)
+		end
 	end)
 
-	-- Magnetic Pass (#315, the owner: Q103): the button stays with nobody in the aim, greyed (its text faded by the
-	-- HUD's dim, as the hint's), and does nothing; lit with a teammate there.
-	it("greys the pass button with nobody to pass to", function()
-		BallCarrier:set(LOCAL_ID)
-		ActionController:step(DT)
-		TouchControls:step(DT)
-		expect(button("pass").Visible).toBe(true)
-		expect(button("pass").Text).toBe(labels.Pass)
-		expect(button("pass").TextTransparency).toBeCloseTo(config.UI.hud.dimTransparency, 4)
-		expect(button("throw").TextTransparency).toBe(0)
-		table.insert(
-			others,
-			(Fixtures.otherSkater(folder, "2", Vector3.new(0, config.Movement.hoverHeight, -40), "Blue"))
-		)
-		ActionController:step(DT)
-		TouchControls:step(DT)
-		expect(button("pass").TextTransparency).toBe(0)
-	end)
-
+	-- Over the button's face (drawn into it, under this ring), all round, its shadow too.
 	it("rings the throw button while Ball Focus is on", function()
 		TouchControls:step(DT)
-		local ring = button("throw"):FindFirstChild("Focus") :: UIStroke
-		expect(ring.Thickness).toBe(config.UI.hud.glowThickness)
-		expect(ring.Enabled).toBe(false)
+		local ring = button("throw"):FindFirstChild("Focus") :: Frame
+		expect(ring.Size).toEqual(UDim2.fromScale(1, 1))
+		expect(ring.BackgroundTransparency).toBe(1)
+		expect(ring.ZIndex).toBe(2)
+		expect((ring:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(style.corner)
+		local stroke = ring:FindFirstChildOfClass("UIStroke") :: UIStroke
+		expect(stroke.Thickness).toBe(config.UI.hud.glowThickness)
+		expect(stroke.Color == style.foreground).toBe(true)
+		expect(ring.Visible).toBe(false)
 		camera.focusing = true
 		TouchControls:step(DT)
-		expect(ring.Enabled).toBe(true)
+		expect(ring.Visible).toBe(true)
 		camera.focusing = false
 		TouchControls:step(DT)
-		expect(ring.Enabled).toBe(false)
+		expect(ring.Visible).toBe(false)
 	end)
 
 	it("shows only on touch", function()
 		TouchControls:step(DT)
 		expect(TouchControls.gui.Enabled).toBe(true)
+		expect(TouchControls.buttonGui.Enabled).toBe(true)
 		preferred = Enum.PreferredInput.KeyboardAndMouse
 		TouchControls:step(DT)
 		expect(TouchControls.gui.Enabled).toBe(false)
+		expect(TouchControls.buttonGui.Enabled).toBe(false)
 		preferred = Enum.PreferredInput.Gamepad
 		TouchControls:step(DT)
 		expect(TouchControls.gui.Enabled).toBe(false)
+		expect(TouchControls.buttonGui.Enabled).toBe(false)
 	end)
 
 	it("steps in under 0.1 ms", function()
