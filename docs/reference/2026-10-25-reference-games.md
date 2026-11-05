@@ -1976,6 +1976,46 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   'Remote event invocation discarded event ... BallState' message (NetService.spec's stream test fires to no client, since
   #331); (3) in an idle single-player Play the server logged 'MovementGuard: returned <id>' (cause not known). Each its own
   issue, after #376 and #384.
+- **Q264 the off-screen ball marker** (session 87, #376; the design page https://claude.ai/artifact/2VPvUoeq1YxxQFhw3quNhw
+  version 2, section 'Where the ball is when you can't see it': today's chevron, A RC's ball badge in look C, B a look C arrow,
+  to scale on desktop 1556 x 793 and the phone 874 x 401 with the HUD's parts as keep-out boxes, the ball circling off screen
+  for 12 s, an enlarged close-up). **A, RC's ball badge**, with the owner's words: "I like the RC Ball badge but can you make
+  it more similar to rc ball because it is already in my todo list to update the ball, so can you add that band in the middle
+  of the ball like the two lines take a thorough look". So the badge's ball is drawn like RC's ball (its band across the
+  middle, edged by two lines), studied in the RC frames and drawn again before it is built; the 3D ball's own new look stays
+  on the owner's list for later. **Sizes as drawn** (recommended): the badge 52 px on desktop (RC's ~70 px at 1078 px tall),
+  34 px on phones. **All three** (recommended): the next-gate arrow becomes a look C arrow and keeps clear of the same parts at
+  the edge; both markers hide while the TAB board or the end screen shows, like the crosshair; both use the HUD's brighter
+  team colours (Q201), white before any team has held the ball (the ball and its ring in the world keep the world's).
+- **Q265 the badge with RC's ball** (session 87, #376, both recommended; the design page version 3, same section, with RC's
+  held badge zoomed beside the kickoff one). RC's badge, read frame by frame: Video 31 at 20.6-21.6 s (no team yet): a dark
+  ring, a white ball crossed by two dark lines (the band's edges, leaning ~35 degrees), a small dark pointer apart from the
+  ring; Video 34 (`...2026-10-30 155713.mp4`) at 24.5-25.5 s and 97.6-98.6 s (Orange holding it, the ball above the screen,
+  the badge pinned over the scoreboard): the same in orange, the ring 79 px across at 1918 x 1078, ring 0.115 of it, the
+  lines +-0.2 of it from the middle and 0.04 thick, the pointer 21 x 11.5 px with a 4.5 px gap, the lines' lean changing
+  as the ball turns. **"Yes, build it"** as drawn: RC's white ball with its band's two lines in a ring, the ring, lines and
+  a separate pointer in the team's colour (the HUD's brighter pair), look C's ink outline and drop shadow; the pointer a
+  little bigger and further out than RC's (0.2 x 0.34 of the width, 5 px past the shadow) so the ink keeps it apart.
+  **Keep all three**: dark (look C's ink) before any team has held the ball, like RC's kickoff, not white; the band leans
+  a little and stays put until the 3D ball gets a band to follow; the badge's ball stays white whoever holds it (the world's
+  ball keeps its team colour, Q158).
+- **Q266 the pointer and the chevron** (session 87, #376, recommended; the design page version 4, same section). Probed in
+  Studio's editor first: a GuiObject's children turn with it, and a hard-step UIGradient cuts a frame at its true angle
+  through the frame's centre, so a square turned 45 degrees and cut in half is a clean right-angled triangle, Roblox's
+  screen parts having no triangle of their own. **"Yes, build both"**: the badge's pointer gets a right-angled tip (RC's
+  measures 21 x 11.5 px, nearly that); the next-gate arrow is a bold look C chevron of two rounded bars with a 60 degree
+  tip (look C's ink round rounded bars is exact; B's notched arrowhead would spike its ink in the notch; a 90 degree
+  chevron read as an "L").
+- **Q267 the chevron behind the scoreboard, and #376 shipped** (session 88, both recommended; the design page
+  https://claude.ai/artifact/2VPvUoeq1YxxQFhw3quNhw version 5, section 'Where the ball is when you can't see it, built':
+  Play shots on desktop 1556 x 793, the real parts drawn by the game's code, zoomed). Measured over 40 s of carried laps:
+  the chevron over an on-screen gate sits on the gate panel's middle (62 studs up), within 3 px of the scoreboard in 39
+  of 207 frames (19%), drawn under it there, half hidden; aimed at the gate's foot (3 studs up) it never came near the
+  scoreboard but came within 60 px of the crosshair in 32 of 138 frames (23%). **B, hide it there**: the on-screen
+  chevron hides while it would come within the markers' clearance of a HUD part (the same keep-out boxes as at the
+  edge); the gate's glowing wall still shows. Not chosen: A (aim at the gate's foot), C (keep it as built). **"Yes,
+  ship it"**, with B built in and the page's rulings as shown: the pointer's pixel-stepped cut edge, the small step in
+  its shadow, the fixed band, the >> press mark not counted in the hints' box; the phone not shown in Play.
 
 ## Roller Champions
 

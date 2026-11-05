@@ -40,7 +40,13 @@
 -- (UI.hud.displayOrder), so the open board covers their buttons; the end screen's dim draws one under the HUD's and
 -- over the touch controls'. No HUD gui is clipped to the device's safe area: SCORES reaches past it, as the buttons do.
 -- App is behind an error boundary as each of its parts is (Hud/PartBoundary, #379): a throw in App's own render hides
--- the whole HUD until the next match, and the Hud keeps stepping, instead of the error escaping each render.
+-- the whole HUD until the next match, and the Hud keeps stepping, instead of the error escaping each render. Each frame
+-- it marks the ball while it is off the screen (RC's badge, Hud/BallBadge) and, while the viewer carries it, their
+-- team's next gate (a chevron, Hud/GateChevron; over the gate while it is on the screen, hidden where the HUD's parts
+-- would cover it, Q267), from where the camera, which steps before it, puts them (ScreenMarker, #376): a pinned marker
+-- rides the safe area's edge, sliding clear of the HUD's parts (HudScreen.markerBoxes), its path routed again only
+-- when the screen's form, a render, or the box of a part sized to its text (the hints' column, the speedometer, which
+-- report it) changes; each marker's place goes through a binding in whole pixels, written only when a pixel changes.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -50,7 +56,9 @@ local UserInputService = game:GetService("UserInputService")
 local ActionController = require(script.Parent.ActionController)
 local Animator = require(script.Animator)
 local App = require(script.App)
+local ArenaParts = require(script.Parent.ArenaParts)
 local BallCarrier = require(script.Parent.BallCarrier)
+local BallPart = require(script.Parent.BallPart)
 local BannerMotion = require(script.BannerMotion)
 local BoardMotion = require(script.BoardMotion)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -68,6 +76,7 @@ local ReactRoblox = require(ReplicatedStorage.Packages.ReactRoblox)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Reveal = require(script.Reveal)
 local ScoreTab = require(script.ScoreTab)
+local ScreenMarker = require(ReplicatedStorage.Shared.Hud.ScreenMarker)
 local SkateController = require(script.Parent.SkateController)
 local Style = require(script.Style)
 local TextWidths = require(script.TextWidths)
@@ -97,6 +106,18 @@ type Row = {
 	presses: number,
 }
 
+-- A screen marker's moving parts (#376): where ScreenMarker last placed it on its path, its place in whole pixels
+-- (the binding written only when a pixel changes), its turn in degrees and whether it shows.
+type Marker = {
+	placement: ScreenMarker.Placement,
+	path: ScreenMarker.Path,
+	place: Shown<UDim2>,
+	x: number,
+	y: number,
+	turn: Shown<number>,
+	shown: Shown<boolean>,
+}
+
 -- Spelled out so the module is a Loader.LoadableModule and callers see its members.
 export type Hud = {
 	name: string,
@@ -110,7 +131,7 @@ export type Hud = {
 	switchTeam: (self: Hud) -> (),
 	-- The screen's size changed (the gui's AbsoluteSize): the stage is measured again.
 	resize: (self: Hud) -> (),
-	-- Unmounts the React root, the reticle with it (tests).
+	-- Unmounts the React root, the reticle with it, and destroys the HUD's ScreenGuis (tests).
 	destroy: (self: Hud) -> (),
 	gui: ScreenGui,
 	-- Spans the whole screen: the reticle's.
@@ -139,6 +160,21 @@ export type Hud = {
 	_input: InputController.InputController,
 	_actions: ActionController.ActionController,
 	_carrier: BallCarrier.BallCarrier,
+	_ballPart: BallPart.BallPart,
+	_arena: ArenaParts.ArenaParts,
+	-- Camera:WorldToViewportPoint, or a fake: where a point in the world is on the screen, and whether it is on it.
+	_project: (position: Vector3) -> (Vector3, boolean),
+	-- The ball's marker and the next gate's (#376), what they keep clear of as last measured (the parts sized to their
+	-- text by the boxes they reported, while they show), and whether their paths are routed for it.
+	_ball: Marker,
+	_gate: Marker,
+	_markerView: HudScreen.MarkerView,
+	_texts: { hints: Rect?, speed: Rect? },
+	_hintsShown: boolean,
+	_speedShown: boolean,
+	_routed: boolean,
+	_onHintsBox: (frame: GuiObject) -> (),
+	_onSpeedBox: (frame: GuiObject) -> (),
 	_localId: PlayerId,
 	_preferredInput: () -> Enum.PreferredInput,
 	-- UserInputService's key names and glyphs, or fakes.
@@ -222,6 +258,78 @@ local function show<T>(shown: Shown<T>, value: T)
 	end
 end
 
+local function newMarker(): Marker
+	return {
+		placement = ScreenMarker.newPlacement(),
+		path = ScreenMarker.newPath(),
+		place = newShown(UDim2.new()),
+		x = 0,
+		y = 0,
+		turn = newShown(0),
+		shown = newShown(false),
+	}
+end
+
+-- Shows `marker` where ScreenMarker places it for `point` (`onScreen`: where it is), or hides it while there is none
+-- or the HUD's parts would cover it there (an on-screen gate behind the scoreboard, the owner's Q267).
+local function mark(marker: Marker, point: Vector3?, onScreen: boolean)
+	if point == nil then
+		show(marker.shown, false)
+		return
+	end
+	local placement = marker.placement
+	ScreenMarker.place(point, onScreen, marker.path, placement)
+	if placement.covered then
+		show(marker.shown, false)
+		return
+	end
+	local x, y = math.round(placement.x), math.round(placement.y)
+	if x ~= marker.x or y ~= marker.y then
+		marker.x, marker.y = x, y
+		show(marker.place, UDim2.fromOffset(x, y))
+	end
+	show(marker.turn, math.deg(placement.angle))
+	show(marker.shown, true)
+end
+
+-- Routes both markers' paths (#376): the safe area's edge, edgeGap pixels of the game in from it to a marker's ink,
+-- each point of it kept `clearance` pixels from the HUD's parts (HudScreen.markerBoxes) by the marker's body, on
+-- `touch` with the period under the scoreboard while `period`.
+local function route(self: Hud, touch: boolean, period: boolean)
+	local config = self._config
+	local markers = config.UI.hud.layout.markers
+	local view = self._markerView
+	view.compact, view.touch, view.boardTop, view.period = self.compact, touch, self._boardTop, period
+	local texts: { Rect } = {}
+	local hints, speed = self._texts.hints, self._texts.speed
+	if self._hintsShown and hints ~= nil then
+		table.insert(texts, hints)
+	end
+	if self._speedShown and speed ~= nil then
+		table.insert(texts, speed)
+	end
+	view.texts = texts
+	local boxes = HudScreen.markerBoxes(config, view)
+	local whole, safe = view.whole, view.safe
+	local bounds = Rect.new(safe.Min - whole.Min, safe.Max - whole.Min)
+	local viewport = whole.Max - whole.Min
+	local function routeFor(kind: HudScreen.MarkerKind, marker: Marker)
+		local reach, body = HudScreen.markerReach(config, self.compact, kind)
+		ScreenMarker.route(viewport, bounds, markers.edgeGap + reach, boxes, body + markers.clearance, marker.path)
+	end
+	routeFor("Badge", self._ball)
+	routeFor("Chevron", self._gate)
+	self._routed = true
+end
+
+-- A part's laid-out box in the whole screen's pixels (the markers' gui spans it), its lettering's ink round it.
+local function textBox(self: Hud, frame: GuiObject): Rect
+	local ink = self._config.UI.hud.look.textOutline
+	local min = frame.AbsolutePosition - self.centre.AbsolutePosition
+	local max = min + frame.AbsoluteSize
+	return Rect.new(min.X - ink, min.Y - ink, max.X + ink, max.Y + ink)
+end
+
 -- Sets the stage for `device`: on touch the HUD's area left of the touch buttons, elsewhere the whole of it; where the
 -- touch buttons' right edge sits; and the screen's form (HudScreen), from the device's safe area and Roblox's top bar.
 -- The safe area, not the whole screen: a notched phone's screen reaches past it, where Roblox's top bar does not go
@@ -245,6 +353,10 @@ local function measure(self: Hud, device: Enum.PreferredInput)
 	self._aim = HudScreen.aim(self._config, whole, safe)
 	self._bannerAt = HudScreen.bannerAt(self._config, whole, safe)
 	self._stageTop = hud.Min.Y - safe.Min.Y
+	local view = self._markerView
+	view.whole, view.hud, view.safe, view.topbar = whole, hud, safe, self._topbar()
+	view.lineUp = TouchArea.lineUp(touch, hud, whole)
+	self._routed = false
 end
 
 -- The mouse's buttons, whose keys the hints draw as a mouse with that button inked (#354, the owner's Q207).
@@ -362,6 +474,8 @@ local Hud: Hud = {
 		"SkateController",
 		"ActionController",
 		"BallCarrier",
+		"BallPart",
+		"ArenaParts",
 		"TouchControls",
 	},
 	gui = nil :: any,
@@ -379,6 +493,20 @@ local Hud: Hud = {
 	_input = nil :: any,
 	_actions = nil :: any,
 	_carrier = nil :: any,
+	_ballPart = nil :: any,
+	_arena = nil :: any,
+	_project = function(position: Vector3): (Vector3, boolean)
+		return position, false
+	end,
+	_ball = nil :: any,
+	_gate = nil :: any,
+	_markerView = nil :: any,
+	_texts = {},
+	_hintsShown = false,
+	_speedShown = false,
+	_routed = false,
+	_onHintsBox = function(_frame: GuiObject) end,
+	_onSpeedBox = function(_frame: GuiObject) end,
 	_localId = "",
 	_preferredInput = function(): Enum.PreferredInput
 		return Enum.PreferredInput.KeyboardAndMouse
@@ -441,8 +569,8 @@ local Hud: Hud = {
 	_shownFontsLoaded = false,
 
 	-- deps.Parent keeps the guis out of the local player's PlayerGui in tests; deps.PreferredInput, deps.LocalId,
-	-- deps.KeyString, deps.KeyImage, deps.InsetArea, deps.TopbarInset, deps.SendSwitchTeam, deps.LoadFonts and
-	-- deps.Log replace the live game there.
+	-- deps.KeyString, deps.KeyImage, deps.InsetArea, deps.TopbarInset, deps.SendSwitchTeam, deps.LoadFonts, deps.Log
+	-- and deps.Project replace the live game there.
 	init = function(self: Hud, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -452,6 +580,39 @@ local Hud: Hud = {
 		self._input = deps.InputController
 		self._actions = deps.ActionController
 		self._carrier = deps.BallCarrier
+		self._ballPart = deps.BallPart
+		self._arena = deps.ArenaParts
+		self._project = deps.Project
+			or function(position: Vector3): (Vector3, boolean)
+				return workspace.CurrentCamera:WorldToViewportPoint(position)
+			end
+		self._ball = newMarker()
+		self._gate = newMarker()
+		local nowhere = Rect.new(0, 0, 0, 0)
+		self._markerView = {
+			compact = false,
+			touch = false,
+			whole = nowhere,
+			hud = nowhere,
+			safe = nowhere,
+			topbar = nowhere,
+			lineUp = 0,
+			boardTop = 0,
+			period = false,
+			texts = {},
+		}
+		self._texts = {}
+		self._hintsShown = false
+		self._speedShown = false
+		self._routed = false
+		self._onHintsBox = function(frame: GuiObject)
+			self._texts.hints = textBox(self, frame)
+			self._routed = false
+		end
+		self._onSpeedBox = function(frame: GuiObject)
+			self._texts.speed = textBox(self, frame)
+			self._routed = false
+		end
 		self._touchButtons = deps.TouchControls.buttons
 		self._localId = deps.LocalId or PlayerIds.of(Players.LocalPlayer :: Player)
 		self._preferredInput = deps.PreferredInput
@@ -573,6 +734,18 @@ local Hud: Hud = {
 				cooldown = Style.stillCap.cooldown,
 				seconds = Style.stillCap.seconds,
 			},
+			markers = {
+				ball = {
+					place = self._ball.place.binding,
+					turn = self._ball.turn.binding,
+					shown = self._ball.shown.binding,
+				},
+				gate = {
+					place = self._gate.place.binding,
+					turn = self._gate.turn.binding,
+					shown = self._gate.shown.binding,
+				},
+			},
 		}
 
 		local parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
@@ -606,8 +779,13 @@ local Hud: Hud = {
 		end
 	end,
 
+	-- The Hud made its guis, so they go with it wherever they were moved: a test laying the HUD out under StarterGui
+	-- would otherwise leave them there for the next Play to copy onto the screen.
 	destroy = function(self: Hud)
 		self._root:unmount()
+		for _, gui in { self.gui, self.centre, self.top, self.dim } do
+			gui:Destroy()
+		end
 	end,
 
 	resize = function(self: Hud)
@@ -677,6 +855,10 @@ local Hud: Hud = {
 			self._shownFontsLoaded = fontsLoaded
 			self.renders += 1
 			local keys = hintKeys(self, device, hasSkater)
+			-- What the markers keep clear of may have moved with this render (#376).
+			self._hintsShown = keys ~= nil and state.ended == nil
+			self._speedShown = hasSkater and state.ended == nil
+			self._routed = false
 			self.passKey = markKey(device, hasSkater, keys, PASS, { text = self._config.UI.text.touchPassTarget })
 			self.attachKey = markKey(device, hasSkater, keys, ATTACH, nil)
 			local app = React.createElement(App, {
@@ -709,6 +891,7 @@ local Hud: Hud = {
 				dim = self.dim,
 				top = self.top,
 				log = self._log,
+				boxes = { hints = self._onHintsBox, speed = self._onSpeedBox },
 			})
 			self._root:render(
 				React.createElement(
@@ -757,6 +940,30 @@ local Hud: Hud = {
 		end
 		show(self._charge, actions:chargeSeconds() or 0)
 		show(self._scorePressed, self._scorePress.moving)
+
+		-- The ball's marker while the ball is off the screen; the next gate's while the viewer carries the ball (#376).
+		local match = state.match
+		if not self._routed then
+			route(self, device == Enum.PreferredInput.Touch, match ~= nil and text:period(match) ~= nil)
+		end
+		local ball = self._ballPart:get()
+		local ballPoint: Vector3?, ballOnScreen = nil, false
+		if ball ~= nil then
+			ballPoint, ballOnScreen = self._project(ball.Position)
+		end
+		mark(self._ball, if ballOnScreen then nil else ballPoint, false)
+		local parts = self._arena.parts
+		local nextGate = if match ~= nil then match.nextGate else nil
+		local gate = if nextGate ~= nil
+				and parts ~= nil
+				and carrier == self._localId
+			then parts.markers[nextGate]
+			else nil
+		if gate ~= nil then
+			mark(self._gate, self._project(gate.position))
+		else
+			mark(self._gate, nil, false)
+		end
 	end,
 }
 

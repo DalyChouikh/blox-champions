@@ -35,6 +35,8 @@ export type ControlHintsProps = {
 	rows: HintRows,
 	-- The size in pixels of the HUD's area the column is placed in.
 	area: React.Binding<Vector2>,
+	-- Told the column's frame whenever its laid-out box changes: the screen markers keep clear of it (#376).
+	onBox: ((frame: GuiObject) -> ())?,
 }
 
 local function shown(label: string): boolean
@@ -142,6 +144,8 @@ local function ControlHints(props: ControlHintsProps): React.ReactElement
 			end),
 			Size = UDim2.new(),
 			AutomaticSize = Enum.AutomaticSize.XY,
+			[React.Change.AbsoluteSize] = props.onBox,
+			[React.Change.AbsolutePosition] = props.onBox,
 		}),
 		rows
 	)

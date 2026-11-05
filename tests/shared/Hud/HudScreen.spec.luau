@@ -6,6 +6,7 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
+local TouchArea = require(ReplicatedStorage.Shared.Input.TouchArea)
 
 -- Round sizes of this spec's own: S2 reaches (2 x 100 + 120 + 2 x 10) / 2 = 170 px either side of its centre; S5's
 -- row (2 x 50 + 80 + 2 x 10) / 2 = 100, and the worth chip 10 + 40 more beside either end: 150. Look C's boxes ink 2 px
@@ -507,5 +508,135 @@ describe("HudScreen, the hints' column", function()
 			},
 		})
 		expect(HudScreen.hintsTop(high, 772, 7)).toBe(29)
+	end)
+end)
+
+describe("HudScreen, the screen markers", function()
+	-- Round sizes: look C's ink 2 px round a part and 3 more below it; a badge 50 px wide (its ring 0.1 of that), its
+	-- pointer 0.2 of it tall, 4 px past the ring's ink; a chevron 40 px wide, its bars 0.2 of that thick, each arm 30
+	-- degrees off its line.
+	local markers = Fixtures.config({
+		UI = {
+			hud = {
+				look = { outline = 2, shadow = 3 },
+				layout = {
+					markers = {
+						edgeGap = 10,
+						clearance = 3,
+						badge = { ring = 0.1, band = 0.2, line = 2, lean = 0, gap = 4, pointer = 0.2 },
+						chevron = { bar = 0.2, spread = 30 },
+						sizes = { badge = 50, chevron = 40 },
+						compactSizes = { badge = 30, chevron = 20 },
+					},
+				},
+			},
+		},
+	})
+
+	local function expectRect(actual: Rect, minX: number, minY: number, maxX: number, maxY: number)
+		expect(actual.Min.X).toBeCloseTo(minX, 3)
+		expect(actual.Min.Y).toBeCloseTo(minY, 3)
+		expect(actual.Max.X).toBeCloseTo(maxX, 3)
+		expect(actual.Max.Y).toBeCloseTo(maxY, 3)
+	end
+
+	it("knows how far each marker's ink reaches from its centre, and its body's", function()
+		-- The badge: its ring's ink 25 + 2 (and the shadow 3 below) round it; the pointer's base 25 + 2 x 2 + 4 = 33
+		-- out, its tip 10 further, its ink 2 x sqrt 2 past the tip and the shadow 3 below that.
+		local reach, body = HudScreen.markerReach(markers, false, "Badge")
+		expect(reach).toBeCloseTo(43 + 2 * math.sqrt(2) + 3, 3)
+		expect(body).toBeCloseTo(30, 3)
+		-- The chevron: bars 8 thick, arms (40 - 8) / (2 sin 30) = 32 long; an arm's end 16 across and 13.86 down from
+		-- its centre, its round end 4 more, its ink 2 and the shadow 3: all of it is body.
+		local chevron, chevronBody = HudScreen.markerReach(markers, false, "Chevron")
+		expect(chevron).toBeCloseTo(math.sqrt(16 ^ 2 + (16 * math.sqrt(3) / 2) ^ 2) + 4 + 2 + 3, 3)
+		expect(chevronBody).toBeCloseTo(chevron, 6)
+		-- On a phone, at its sizes: a 30 px badge.
+		local small = HudScreen.markerReach(markers, true, "Badge")
+		expect(small).toBeCloseTo(15 + 4 + 4 + 6 + 2 * math.sqrt(2) + 3, 3)
+	end)
+
+	it("keeps desktop markers off Roblox's buttons, the scoreboard and the parts sized to their text", function()
+		local whole = Rect.new(0, 0, 1556, 793)
+		local topbar = Rect.new(100, 0, 1556, 58)
+		local top = HudScreen.boardTop(markers, false, 1556, topbar)
+		local hints, speed = Rect.new(1374, 233, 1537, 618), Rect.new(1440, 690, 1532, 776)
+		local boxes = HudScreen.markerBoxes(markers, {
+			compact = false,
+			touch = false,
+			whole = whole,
+			hud = Rect.new(0, 58, 1556, 793),
+			safe = whole,
+			topbar = topbar,
+			lineUp = 0,
+			boardTop = top,
+			period = false,
+			texts = { hints, speed },
+		})
+		expect(#boxes).toBe(4)
+		expectRect(boxes[1], 0, 0, 100, 58)
+		-- The board round its centre (778), its ink 2 px out at the sides and the top, down to its deepest in play.
+		local reach = HudScreen.boardReach(markers, false) + 2
+		expectRect(boxes[2], 778 - reach, top - 2, 778 + reach, HudScreen.boardBottom(markers, false, top, false))
+		expect(boxes[3]).toBe(hints)
+		expect(boxes[4]).toBe(speed)
+	end)
+
+	it("keeps touch markers off every touch button and SCORES too, in the whole screen's pixels", function()
+		-- The emulated phone: its whole screen 62 px past each side of the safe area and 20 above it.
+		local whole, safe, hud = Rect.new(-62, -78, 812, 323), Rect.new(0, -58, 750, 323), Rect.new(0, 0, 750, 323)
+		local topbar = Rect.new(96, 0, 750, 58)
+		local touch = markers.Input.touch
+		local lineUp = TouchArea.lineUp(touch, hud, whole)
+		local boxes = HudScreen.markerBoxes(markers, {
+			compact = true,
+			touch = true,
+			whole = whole,
+			hud = hud,
+			safe = safe,
+			topbar = topbar,
+			lineUp = lineUp,
+			boardTop = HudScreen.boardTop(markers, true, 750, topbar),
+			period = false,
+			texts = {},
+		})
+		-- Roblox's buttons, the board, SCORES, then the eight buttons.
+		expect(#boxes).toBe(3 + 8)
+		expectRect(boxes[1], 62, 20, 62 + 96, 78)
+		-- SCORES: its right edge at the buttons' (lineUp across the HUD's area), its top `top` under the bar, its ink
+		-- 2 px round it and 3 more below.
+		local button = markers.UI.hud.layout.scoreButton
+		local right, scoresTop = 62 + lineUp, 78 + button.top
+		local size = button.size
+		expectRect(boxes[3], right - size.X.Offset - 2, scoresTop - 2, right + 2, scoresTop + size.Y.Offset + 5)
+		-- Jump, 70 px in from the whole screen's bottom-right corner, 96 px across.
+		local jump = touch.buttons.jump
+		expect(jump.place).toEqual(UDim2.new(1, -70, 1, -70))
+		expectRect(boxes[4], 874 - 70 - 48, 401 - 70 - 48, 874 - 70 + 48, 401 - 70 + 48)
+	end)
+
+	it("grows the touch buttons' boxes with the buttons on a big touch screen", function()
+		-- A tablet's 1280 x 800, its shorter side past bigScreenSide: every button scale times its size and its place.
+		local whole = Rect.new(0, -58, 1280, 742)
+		local hud = Rect.new(0, 0, 1280, 742)
+		local topbar = Rect.new(164, 0, 1280, 58)
+		local touch = markers.Input.touch
+		local scale = TouchArea.buttonScale(touch, Vector2.new(1280, 800))
+		expect(scale).toBe(touch.bigScreenButtonScale)
+		local boxes = HudScreen.markerBoxes(markers, {
+			compact = false,
+			touch = true,
+			whole = whole,
+			hud = hud,
+			safe = whole,
+			topbar = topbar,
+			lineUp = TouchArea.lineUp(touch, hud, whole),
+			boardTop = HudScreen.boardTop(markers, false, 1280, topbar),
+			period = false,
+			texts = {},
+		})
+		-- Jump: its centre 70 x scale in from the corner, 96 x scale across.
+		local x, y, half = 1280 - 70 * scale, 800 - 70 * scale, 48 * scale
+		expectRect(boxes[4], x - half, y - half, x + half, y + half)
 	end)
 end)
