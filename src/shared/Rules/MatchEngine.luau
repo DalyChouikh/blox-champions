@@ -199,6 +199,9 @@ local function pointScored(self: MatchEngine, team: Team)
 	-- Play stops, so a block still waiting on the ball has done its job (a goal drops it before this).
 	confirmBlock(self)
 	closeGoal(self)
+	-- The point ends its streak (every streak starts again at the goal's gate, #205), so the laps go now, not at the
+	-- next kickoff: the scoreboard's lap chips empty with the goal (#377, the owner's Q242).
+	self._laps:reset()
 	local match = self._config.Match
 	local after: MatchOutcome.AfterPoint, winner: Team? =
 		MatchOutcome.afterPoint(self._period, self._scores:teamScores(), team, match.pointsToWin)
