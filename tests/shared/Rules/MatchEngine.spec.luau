@@ -397,6 +397,70 @@ describe("MatchEngine goals and points", function()
 		expect(engine:snapshot()).toMatchObject({ state = "Live", scores = { Blue = 0, Orange = 0 } })
 	end)
 
+	-- The owner's Q255 and Q269: a streak counts as many laps as there are goal worths (+1, +3, +5: three), so once a
+	-- goal is worth its most, no gate, lap or lap points count until the streak ends; the lap stays full with no next
+	-- gate (Q268: every lap chip stays lit), and the goal is still worth its most.
+	it("counts a streak's laps up to the last goal worth, then nothing more until a goal ends the streak", function()
+		local engine = liveEngine({ Match = { pointsToWin = 99 } })
+		local worths = DEFAULTS.Match.goalPointsByLap
+		local cap = #worths
+		engine:pickedUp("B1", ZERO, ZERO)
+		for _ = 1, cap - 1 do
+			lap(engine)
+		end
+		engine:drainEvents()
+		lap(engine)
+		local events = engine:drainEvents()
+		expect(events[#events]).toEqual({ name = "LapCompleted", team = "Blue", streak = cap, holder = "B1" })
+		local score = cap * DEFAULTS.Scoring.points.lapCompleted
+		expect(engine:stats().players[1]).toMatchObject({ player = "B1", score = score })
+		for _ = 1, 3 do
+			lap(engine)
+		end
+		expectEvents(engine, {})
+		expect(engine:stats().players[1]).toMatchObject({ player = "B1", score = score })
+		local snapshot = engine:snapshot()
+		expect(snapshot).toMatchObject({ streak = cap, lapProgress = GATE_COUNT })
+		expect(snapshot.nextGate).toBeNil()
+		engine:ballMoved(Fixtures.throughRing())
+		expect(engine:drainEvents()[1]).toMatchObject({ name = "GoalScored", points = worths[cap] })
+		expect(engine:snapshot()).toMatchObject({ streak = 0, lapProgress = 0, nextGate = GOAL_GATE })
+	end)
+
+	it("counts laps again from the goal's gate when the other team takes the ball at the cap", function()
+		local engine = liveEngine()
+		engine:pickedUp("B1", ZERO, ZERO)
+		for _ = 1, #DEFAULTS.Match.goalPointsByLap do
+			lap(engine)
+		end
+		engine:pickedUp("O1", ZERO, ZERO)
+		engine:drainEvents()
+		expect(engine:snapshot()).toMatchObject({ streak = 0, lapProgress = 0, nextGate = GOAL_GATE })
+		crossGates(engine, { GOAL_GATE })
+		expectEvents(engine, { { name = "GateCrossed", team = "Orange", gateIndex = GOAL_GATE, progress = 1 } })
+	end)
+
+	it("caps a streak after as many laps as the goal has worths", function()
+		for _, worths in { { 2 }, { 1, 2, 4, 8 } } do
+			local engine = liveEngine({ Match = { goalPointsByLap = worths, pointsToWin = 99 } })
+			engine:pickedUp("B1", ZERO, ZERO)
+			for _ = 1, #worths + 1 do
+				lap(engine)
+			end
+			local laps = {}
+			for _, event in engine:drainEvents() do
+				if event.name == "LapCompleted" then
+					table.insert(laps, event.streak)
+				end
+			end
+			expect(#laps).toBe(#worths)
+			expect(laps[#laps]).toBe(#worths)
+			expect(engine:snapshot().nextGate).toBeNil()
+			engine:ballMoved(Fixtures.throughRing())
+			expect(engine:drainEvents()[1]).toMatchObject({ name = "GoalScored", points = worths[#worths] })
+		end
+	end)
+
 	-- The owner (#305), RC's "first team to 5 points wins instantly": one +5 goal does it from 0.
 	it("ends the match at once on a +5 goal from 0", function()
 		local engine = liveEngine()

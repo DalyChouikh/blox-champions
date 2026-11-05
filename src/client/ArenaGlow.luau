@@ -193,7 +193,9 @@ local ArenaGlow: ArenaGlow = {
 			glowGoal(self, parts, goalTeam)
 		end
 		local team: Team? = if match ~= nil then match.possessingTeam else nil
-		local gate = if match ~= nil and team ~= nil then parts.markers[match.nextGate] else nil
+		-- No gate is next once the streak has counted its last lap (the owner's Q255): then no wall glows.
+		local nextGate: number? = if match ~= nil and team ~= nil then match.nextGate else nil
+		local gate = if nextGate ~= nil then parts.markers[nextGate] else nil
 		if fresh or gate ~= self._gate or team ~= self._gateTeam then
 			glowGate(self, gate, team)
 		end

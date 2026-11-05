@@ -101,6 +101,24 @@ describe("BoardMotion", function()
 		expect(fills(motion)).toEqual({ 0, 0, 0, 0 })
 	end)
 
+	-- The owner's Q268: the lap that reaches the cap (#384) fills the last chip, and the whole row stays lit until the
+	-- streak ends.
+	it("fills the last chip on the streak's last lap and keeps the whole row full", function()
+		local motion, animator = board()
+		local capped = Fixtures.lapCapped("Blue").match
+		motion:watch(match({ possessingTeam = "Blue", lapProgress = 3, streak = capped.streak - 1 }))
+		motion:watch(capped)
+		animator:step(0.1)
+		expect(fills(motion)).toEqual({ 1, 1, 1, 0.875 })
+		for _ = 1, 10 do
+			animator:step(0.1)
+			expect(fills(motion)).toEqual({ 1, 1, 1, 1 })
+		end
+		motion:watch(Fixtures.lapCapped("Blue", 1).match)
+		animator:step(0.1)
+		expect(fills(motion)).toEqual({ 1, 1, 1, 1 })
+	end)
+
 	-- A goal ends its streak in the match's snapshot (#377, the owner's Q242): the scoring team keeps the ball's colour
 	-- through the celebration, and its chips ease empty as a lap's do.
 	it("eases the chips empty when a goal ends the streak", function()

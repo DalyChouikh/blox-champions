@@ -1837,6 +1837,18 @@ describe("Hud, the screen markers", function()
 		Fixtures.expectNear(gateAimed :: Vector3, arena.markers[config.Arena.goalGateIndex]:GetPivot().Position)
 	end)
 
+	-- The owner's Q255: once the carrier's streak has counted its last lap, no gate is next, so no chevron shows.
+	it("marks no gate once the carrier's streak has counted its last lap", function()
+		BallCarrier:set(LOCAL_ID)
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ possessingTeam = "Blue", nextGate = 3 }))
+		Hud:step(0)
+		local chevron = marker("GateMarker") :: Frame
+		expect(chevron.Visible).toBe(true)
+		HudStore:onSnapshot(Fixtures.lapCapped("Blue", 1))
+		Hud:step(0)
+		expect(chevron.Visible).toBe(false)
+	end)
+
 	it("hides the chevron over an on-screen gate where a HUD part would cover it, as at the edge (Q267)", function()
 		BallCarrier:set(LOCAL_ID)
 		HudStore:onSnapshot(Fixtures.matchSnapshot({ possessingTeam = "Blue", nextGate = 3 }))

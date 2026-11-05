@@ -2016,6 +2016,21 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   edge); the gate's glowing wall still shows. Not chosen: A (aim at the gate's foot), C (keep it as built). **"Yes,
   ship it"**, with B built in and the page's rulings as shown: the pointer's pixel-stepped cut edge, the small step in
   its shadow, the fixed band, the >> press mark not counted in the hints' box; the phone not shown in Play.
+- **Q268 the lap chips at the cap, and Q269 the cap's rule** (session 88, #384, both recommended; the design page
+  version 6, section 'The lap cap at +5': the real S2 scoreboard drawn by the game's code in four states, and RC's lap
+  meter under its score pill, Video 4 at 7:23; none of the owner's RC recordings shows a third lap, Video 4 ending 5-2 on
+  +1 goals, so RC's look at the cap is not known). Settled by Q255's words: once a goal is worth +5 (after lap 3), no more
+  lap banners, lap points or gate progress, and the next gate's glowing wall and chevron go until the streak ends; since
+  the first team to 5 wins at once, a goal then always wins. **Q268 A: all four lap chips stay lit** from lap 3's last
+  gate until the streak ends. Not chosen: B (empty, stay empty), C (the row goes). **Q269: the cap follows the list of
+  goal worths** (`Match.goalPointsByLap`'s length: 3 today; a list of four would cap after 4). Not chosen: always 3.
+- **Q270 #384 shipped** (session 89, recommended; the design page https://claude.ai/artifact/2VPvUoeq1YxxQFhw3quNhw
+  version 7, section 'The lap cap at +5, built': a single-player desktop Play driven round the track by a test script, the
+  real scoreboard zoomed 3x): **"Yes, ship it"**. A streak counts as many laps as there are goal worths (3); the third lap
+  counts like the others (its gates, LAP 3 COMPLETED, its lap points), then nothing counts until the streak ends: no LAP 4
+  banner, no lap points, no glowing gate wall, no chevron; the four lap chips stay lit and the goal stays +5. Measured in
+  the Play: LAP 1/2/3 COMPLETED at 28.0/43.3/58.4 s; the wall and the chevron went in the same frame as LAP 3's; 20+ s of
+  carried laps after it changed nothing. Next: #394, #393, #392 (Q263).
 
 ## Roller Champions
 

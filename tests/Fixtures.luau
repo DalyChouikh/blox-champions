@@ -335,6 +335,19 @@ function Fixtures.matchSnapshot(overrides: { [string]: any }?, frame: number?): 
 	return { frame = frame or 0, match = match :: any, names = { ["1"] = "Ana", ["2"] = "Rex" } }
 end
 
+-- The match once `team`'s streak has counted its last lap (#384, the owner's Q255): the goal open at its most, the
+-- lap held full and no gate next, taken on server frame `frame` (default 0).
+function Fixtures.lapCapped(team: Team.Team, frame: number?): Payloads.MatchSnapshot
+	local payload = Fixtures.matchSnapshot({
+		possessingTeam = team,
+		goalOpenFor = team,
+		streak = #Config.defaults().Match.goalPointsByLap,
+		lapProgress = Fixtures.GATE_COUNT,
+	}, frame)
+	payload.match.nextGate = nil
+	return payload
+end
+
 -- One server frame's rule events as the server sends them, on frame `frame` (default 1: after matchSnapshot's).
 function Fixtures.ruleEvents(events: { Types.Event }, frame: number?): Payloads.RuleEvents
 	return { frame = frame or 1, events = events }

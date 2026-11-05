@@ -9,9 +9,19 @@ local LapTracker = require(ReplicatedStorage.Shared.Rules.LapTracker)
 
 -- Any gate but the first, so a tracker that starts at gate 1 fails.
 local START = 3
+-- The most laps a streak counts: room for every test's laps but the cap's own.
+local CAP = 3
+-- A lap from the start gate.
+local LAP = { 3, 4, 1, 2 }
 
-local function newTracker(): LapTracker.LapTracker
-	return LapTracker.new(Fixtures.gates(), START)
+local function newTracker(cap: number?): LapTracker.LapTracker
+	return LapTracker.new(Fixtures.gates(), START, cap or CAP)
+end
+
+local function lap(laps: LapTracker.LapTracker)
+	for _, gate in LAP do
+		laps:accept(gate)
+	end
 end
 
 describe("LapTracker", function()
@@ -33,9 +43,7 @@ describe("LapTracker", function()
 	it("keeps the sequence across laps", function()
 		local laps = newTracker()
 		for _ = 1, 2 do
-			for _, gate in { 3, 4, 1, 2 } do
-				laps:accept(gate)
-			end
+			lap(laps)
 		end
 		expect(laps.streak).toBe(2)
 		expect(laps:accept(2)).toBeNil()
@@ -73,7 +81,7 @@ describe("LapTracker", function()
 		expect(laps:crossedGates(to, from)).toEqual({ 2 })
 		expect(laps:crossedGates(Vector3.new(450, 0, 0), Vector3.new(50, 0, 0))).toEqual({ 4, 3, 2, 1 })
 
-		local reversed = LapTracker.new({ Fixtures.gate(300), Fixtures.gate(100) }, 1)
+		local reversed = LapTracker.new({ Fixtures.gate(300), Fixtures.gate(100) }, 1, CAP)
 		expect(reversed:crossedGates(Vector3.new(50, 0, 0), Vector3.new(350, 0, 0))).toEqual({ 2, 1 })
 	end)
 
@@ -87,18 +95,63 @@ describe("LapTracker", function()
 
 	it("requires at least one gate", function()
 		expect(function()
-			LapTracker.new({}, 1)
+			LapTracker.new({}, 1, CAP)
 		end).toThrow("LapTracker: at least one gate is required")
 	end)
 
 	it("requires a start gate among its gates", function()
 		for _, start in { 1, Fixtures.GATE_COUNT } do
-			expect(LapTracker.new(Fixtures.gates(), start).nextGate).toBe(start)
+			expect(LapTracker.new(Fixtures.gates(), start, CAP).nextGate).toBe(start)
 		end
 		for _, start in { 0, Fixtures.GATE_COUNT + 1, 1.5 } do
 			expect(function()
-				LapTracker.new(Fixtures.gates(), start)
+				LapTracker.new(Fixtures.gates(), start, CAP)
 			end).toThrow(`LapTracker: the start gate must be one of the {Fixtures.GATE_COUNT} gates (got {start})`)
+		end
+	end)
+
+	-- The owner's Q255: once a goal is worth its most, laps stop counting. The lap that reaches the cap counts as any
+	-- other (its gate, its lap); the streak then holds that lap full (Q268: every lap chip stays lit) with no next
+	-- gate.
+	it("counts laps up to its cap, then holds the last lap full with no next gate and takes no gate", function()
+		local laps = newTracker()
+		for _ = 1, CAP - 1 do
+			lap(laps)
+		end
+		for index = 1, Fixtures.GATE_COUNT - 1 do
+			laps:accept(LAP[index])
+		end
+		expect(laps:accept(LAP[Fixtures.GATE_COUNT])).toBe(Fixtures.GATE_COUNT)
+		expect(laps.streak).toBe(CAP)
+		expect(laps.progress).toBe(Fixtures.GATE_COUNT)
+		expect(laps.nextGate).toBeNil()
+		for _ = 1, 2 do
+			for gate = 1, Fixtures.GATE_COUNT do
+				expect(laps:accept(gate)).toBeNil()
+			end
+		end
+		expect(laps.streak).toBe(CAP)
+		expect(laps.progress).toBe(Fixtures.GATE_COUNT)
+		expect(laps.nextGate).toBeNil()
+	end)
+
+	it("counts again from its start gate after a reset at the cap", function()
+		local laps = newTracker(1)
+		lap(laps)
+		expect(laps.nextGate).toBeNil()
+		laps:reset()
+		expect(laps.streak).toBe(0)
+		expect(laps.progress).toBe(0)
+		expect(laps.nextGate).toBe(START)
+		expect(laps:accept(START)).toBe(1)
+	end)
+
+	it("requires a cap of one lap or more, in whole laps", function()
+		expect(newTracker(1).nextGate).toBe(START)
+		for _, cap in { 0, -1, 1.5 } do
+			expect(function()
+				newTracker(cap)
+			end).toThrow(`LapTracker: the lap cap must be a whole number of laps, at least 1 (got {cap})`)
 		end
 	end)
 end)
