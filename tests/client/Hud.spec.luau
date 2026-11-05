@@ -7,6 +7,7 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local Client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 local ActionController = require(Client.ActionController)
+local ArenaParts = require(Client.ArenaParts)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallCarrier = require(Client.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -28,6 +29,14 @@ local DT = 1 / 60
 local PHONE, BIG = Fixtures.PHONE, Fixtures.BIG_SCREEN
 
 local folder: Folder
+-- The ball, where the fake camera puts it and every other point (the gates'), and the last other point it was asked
+-- about: where the next gate's marker aims (#376).
+type OnScreen = { point: Vector3, onScreen: boolean }
+local ball: Part?
+local ballScreen: OnScreen
+local gateScreen: OnScreen
+local gateAimed: Vector3?
+local arena: Fixtures.HudArena
 -- The other skaters the skating sees, reset before each test.
 local skaters: { any }
 local preferred: Enum.PreferredInput
@@ -147,6 +156,19 @@ beforeEach(function()
 	skaters = {}
 	logged = {}
 	Fixtures.startSkating(folder, config, LOCAL_ID, skaters)
+	local ballPart = Instance.new("Part")
+	ballPart.Name = "Ball"
+	ballPart.Anchored = true
+	ballPart.Position = Vector3.new(0, 10, 0)
+	ballPart.Parent = folder
+	ball = ballPart
+	ballScreen = { point = Vector3.new(300, 200, 10), onScreen = true }
+	-- On the phone's screen, below the scoreboard and clear of every HUD part there.
+	gateScreen = { point = Vector3.new(600, 200, 20), onScreen = true }
+	gateAimed = nil
+	arena = Fixtures.hudArena(folder)
+	ArenaParts:init({})
+	ArenaParts:refresh()
 	touchButtons = {}
 	for _, control: Config.TouchControl in ControlLabels.CONTROLS do
 		local button = Instance.new("TextButton")
@@ -163,6 +185,20 @@ beforeEach(function()
 		SkateController = SkateController,
 		ActionController = ActionController,
 		BallCarrier = BallCarrier,
+		BallPart = {
+			get = function(_self: any): BasePart?
+				return ball
+			end,
+		},
+		ArenaParts = ArenaParts,
+		Project = function(position: Vector3): (Vector3, boolean)
+			local current = ball
+			if current ~= nil and position == current.Position then
+				return ballScreen.point, ballScreen.onScreen
+			end
+			gateAimed = position
+			return gateScreen.point, gateScreen.onScreen
+		end,
 		TouchControls = { buttons = touchButtons },
 		Parent = folder,
 		LocalId = LOCAL_ID,
@@ -200,6 +236,7 @@ end)
 afterEach(function()
 	Hud:destroy()
 	InputController:destroy()
+	ArenaParts:destroy()
 	folder:Destroy()
 end)
 
@@ -1685,6 +1722,22 @@ describe("Hud", function()
 		expect(Hud.centre:FindFirstChild("Reticle")).toBeNil()
 	end)
 
+	it("takes its ScreenGuis with it when destroyed, wherever they were moved", function()
+		local elsewhere = Instance.new("Folder")
+		elsewhere.Parent = workspace
+		local guis = { Hud.gui, Hud.centre, Hud.top, Hud.dim }
+		for _, gui in guis do
+			gui.Parent = elsewhere
+		end
+		Hud:destroy()
+		local left = #elsewhere:GetChildren()
+		elsewhere:Destroy()
+		expect(left).toBe(0)
+		for _, gui in guis do
+			expect(gui.Parent).toBeNil()
+		end
+	end)
+
 	it("steps in under 0.1 ms", function()
 		Fixtures.spawnSkater(folder, config)
 		-- Untimed: the first render of any React root in a fresh module registry does one-time work (measured: a
@@ -1701,5 +1754,181 @@ describe("Hud", function()
 			total += os.clock() - started
 		end
 		expect(total / 600).toBeLessThan(0.0001)
+	end)
+end)
+
+describe("Hud, the screen markers", function()
+	-- The phone's screen (Fixtures.PHONE): the whole screen 874 x 401, its centre (437, 200.5); the safe area from (62,
+	-- 20) to (812, 401) in its pixels.
+	local markers = config.UI.hud.layout.markers
+
+	local function marker(name: string): Frame?
+		return Hud.centre:FindFirstChild(name, true) :: Frame?
+	end
+
+	it(
+		"marks the ball while it is off the screen, pinned inside the safe area, and hides it on the screen or gone",
+		function()
+			Hud:step(0)
+			local badge = marker("BallMarker") :: Frame
+			expect(badge.Visible).toBe(false)
+			ballScreen = { point = Vector3.new(2000, 200.5, 10), onScreen = false }
+			Hud:step(0)
+			expect(badge.Visible).toBe(true)
+			-- Dark before a team has held the ball, in the HUD's colour of the team that last has after.
+			local ring = badge:FindFirstChild("Ring") :: Frame
+			expect(ring.BackgroundColor3).toEqual(config.UI.hud.look.ink)
+			HudStore:onSnapshot(Fixtures.matchSnapshot({ possessingTeam = "Orange" }, 1))
+			Hud:step(0)
+			expect(ring.BackgroundColor3).toEqual(Style.teamColor(config, "Orange"))
+			local reach = HudScreen.markerReach(config, Hud.compact, "Badge")
+			expect(badge.Position).toEqual(UDim2.fromOffset(math.round(812 - markers.edgeGap - reach), 201))
+			expect((badge:FindFirstChild("Pointer") :: Frame).Rotation).toBeCloseTo(90, 3)
+			ballScreen = { point = Vector3.new(300, 200, 10), onScreen = true }
+			Hud:step(0)
+			expect(badge.Visible).toBe(false)
+			ballScreen = { point = Vector3.new(2000, 200.5, 10), onScreen = false }
+			Hud:step(0)
+			ball = nil
+			Hud:step(0)
+			expect(badge.Visible).toBe(false)
+		end
+	)
+
+	it("slides the ball's marker along the edge clear of the scoreboard, still pointing at the ball", function()
+		-- Straight above the screen's centre: the path's top meets the line in the board's middle.
+		ballScreen = { point = Vector3.new(437, -5000, 10), onScreen = false }
+		Hud:step(0)
+		local badge = marker("BallMarker") :: Frame
+		local reach, body = HudScreen.markerReach(config, Hud.compact, "Badge")
+		expect(badge.Position.Y.Offset).toBe(math.round(20 + markers.edgeGap + reach))
+		local half = HudScreen.boardReach(config, Hud.compact) + config.UI.hud.look.outline
+		expect(math.abs(badge.Position.X.Offset - 437) >= half + body + markers.clearance - 1).toBe(true)
+		expect((badge:FindFirstChild("Pointer") :: Frame).Rotation).toBeCloseTo(0, 3)
+	end)
+
+	it("marks the carrier's next gate, over it on the screen and at the edge off it, for nobody else", function()
+		local chevron = function(): Frame
+			return marker("GateMarker") :: Frame
+		end
+		BallCarrier:set(LOCAL_ID)
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ possessingTeam = "Blue", nextGate = 3 }))
+		Hud:step(0)
+		expect(chevron().Visible).toBe(true)
+		expect(chevron().Position).toEqual(UDim2.fromOffset(600, 200))
+		-- In the viewer's colour: the local player plays for Blue in the fixture.
+		local bar = (chevron():FindFirstChild("Arrow") :: Frame):FindFirstChild("Right") :: Frame
+		expect(bar.BackgroundColor3).toEqual(Style.teamColor(config, "Blue"))
+		-- Pointing down at it, at its gate panel's pivot: its wall's middle.
+		expect((chevron():FindFirstChild("Arrow") :: Frame).Rotation).toBeCloseTo(180, 3)
+		Fixtures.expectNear(gateAimed :: Vector3, arena.markers[3]:GetPivot().Position)
+		gateScreen = { point = Vector3.new(-3000, 200.5, 20), onScreen = false }
+		Hud:step(0)
+		local reach = HudScreen.markerReach(config, Hud.compact, "Chevron")
+		expect(chevron().Position).toEqual(UDim2.fromOffset(math.round(62 + markers.edgeGap + reach), 201))
+		BallCarrier:set("2")
+		Hud:step(0)
+		expect(chevron().Visible).toBe(false)
+		-- Every streak starts at the goal's gate (the snapshot fixture's next gate): the marker shows from the pickup.
+		BallCarrier:set(LOCAL_ID)
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ possessingTeam = "Blue" }, 1))
+		Hud:step(0)
+		expect(chevron().Visible).toBe(true)
+		Fixtures.expectNear(gateAimed :: Vector3, arena.markers[config.Arena.goalGateIndex]:GetPivot().Position)
+	end)
+
+	it("hides the chevron over an on-screen gate where a HUD part would cover it, as at the edge (Q267)", function()
+		BallCarrier:set(LOCAL_ID)
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ possessingTeam = "Blue", nextGate = 3 }))
+		-- Behind the scoreboard: the phone's board is centred across its safe area (x 437 of the whole screen), at its
+		-- top.
+		gateScreen = { point = Vector3.new(437, 40, 20), onScreen = true }
+		Hud:step(0)
+		local chevron = marker("GateMarker") :: Frame
+		expect(chevron.Visible).toBe(false)
+		gateScreen = { point = Vector3.new(600, 200, 20), onScreen = true }
+		Hud:step(0)
+		expect(chevron.Visible).toBe(true)
+		expect(chevron.Position).toEqual(UDim2.fromOffset(600, 200))
+	end)
+
+	it("keeps the ball's marker off the boxes the hints' column and the speedometer report, laid out", function()
+		-- Laid out as Roblox lays a gui out in Studio's editor (under StarterGui, after a frame), on the editor's
+		-- screen; the Hud's destroy takes the guis back out after the test, passed or failed.
+		local view = workspace.CurrentCamera.ViewportSize
+		local whole = Rect.new(0, 0, view.X, view.Y)
+		screen = { whole = whole, hud = whole, controls = whole, topbar = Rect.new(164, 0, view.X, 58) }
+		Hud:resize()
+		local starter = game:GetService("StarterGui")
+		for _, gui in { Hud.gui, Hud.centre } do
+			gui.Parent = starter
+		end
+		local rig = Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		-- Reading a part's box lays it out at once, and Roblox tells its Change handlers at the next resumption point
+		-- (deferred events): a frame later the Hud has heard both boxes. Probed: a frame without the read was not
+		-- always enough, Studio's editor laying a gui out only when it draws.
+		local column = part("ControlHints") :: Frame
+		local meter = part("Speedometer") :: Frame
+		local _, _ = column.AbsoluteSize, meter.AbsoluteSize
+		task.wait()
+		-- In the markers' pixels: the whole screen's, from the markers' gui's corner.
+		local origin = Hud.centre.AbsolutePosition
+		local top = column.AbsolutePosition.Y - origin.Y
+		local bottom = top + column.AbsoluteSize.Y
+		local reach, body = HudScreen.markerReach(config, Hud.compact, "Badge")
+		local keep = body + markers.clearance
+		-- The marker's path, edgeGap and its reach inside the screen, and a ball off the screen on the line from the
+		-- screen's centre through the point (x, y) of it.
+		local inset = markers.edgeGap + reach
+		local pathRight, pathBottom = view.X - inset, view.Y - inset
+		local function beyond(x: number, y: number): OnScreen
+			return {
+				point = Vector3.new(view.X / 2 + (x - view.X / 2) * 10, view.Y / 2 + (y - view.Y / 2) * 10, 10),
+				onScreen = false,
+			}
+		end
+		-- The line to the ball meets the right edge at the column's middle: the marker slides above or below it.
+		local middle = (top + bottom) / 2
+		ballScreen = beyond(pathRight, middle)
+		Hud:step(0)
+		local badge = marker("BallMarker") :: Frame
+		local y = badge.Position.Y.Offset
+		expect(y <= top - keep + 1 or y >= bottom + keep - 1).toBe(true)
+		-- On the bottom edge just inside the speedometer's box: it slides left, clear of it.
+		local left = meter.AbsolutePosition.X - origin.X
+		expect(left + 1 < pathRight).toBe(true)
+		ballScreen = beyond(left + 1, pathBottom)
+		Hud:step(0)
+		expect(badge.Position.X.Offset <= left - keep + 1).toBe(true)
+		-- Without a skater the column and the speedometer go, and so do their boxes: back on its line.
+		rig:Destroy()
+		ballScreen = beyond(pathRight, middle)
+		Hud:step(0)
+		Hud:step(0)
+		expect(part("ControlHints")).toBeNil()
+		expect(badge.Position.Y.Offset).toBe(math.round(middle))
+		ballScreen = beyond(left + 1, pathBottom)
+		Hud:step(0)
+		expect(badge.Position.X.Offset).toBe(math.round(left + 1))
+	end)
+
+	it("hides both markers while the TAB board or the end screen shows, as the crosshair does", function()
+		ballScreen = { point = Vector3.new(2000, 200.5, 10), onScreen = false }
+		BallCarrier:set(LOCAL_ID)
+		Hud:step(0)
+		expect(marker("BallMarker") ~= nil and marker("GateMarker") ~= nil).toBe(true)
+		local held = Fixtures.scriptedBinding(InputController.context, "ScoreTab")
+		held:Fire(true)
+		Hud:step(0)
+		expect(marker("BallMarker")).toBeNil()
+		expect(marker("GateMarker")).toBeNil()
+		held:Fire(false)
+		fadeOut()
+		expect(marker("BallMarker") ~= nil).toBe(true)
+		endMatch()
+		Hud:step(0)
+		expect(marker("BallMarker")).toBeNil()
+		expect(marker("GateMarker")).toBeNil()
 	end)
 end)

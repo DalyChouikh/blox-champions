@@ -1,38 +1,28 @@
 --!strict
--- The ball's team colour, and the ball's and the next gate's markers (spec §9.4, §11.1), stepped before each frame is
--- drawn (FrameController):
+-- The ball's team colour and the ball's marks in the world (spec §9.4, §11.1), stepped before each frame is drawn
+-- (FrameController):
 -- - the ball itself in the colour of the team that last held it, carried, flying or loose, and in its skin's own colour
 --   until a team has since the kickoff (the owner, #327, Q158, Q159: Roller Champions', Video 31). A client's write
 --   stays on its client and the server never writes the colour again, so it is written when the ball or the colour
 --   changes (a respawn's new ball arrives in its skin's);
 -- - a ring around the ball, seen through walls (a BillboardGui, AlwaysOnTop), as wide as the ball plus ringSize pixels;
 -- - a line from the ball down to a disc on the ground below it (one ray through the ride surfaces), both hidden when
---   nothing lies within groundProbe studs;
--- - an arrow at the screen's edge pointing to the ball while it is off the screen (ScreenMarker);
--- - for the local player while they carry the ball, an arrow to their team's next gate: over its corner marker's pivot
---   (its glass wall's middle), or pinned to the screen's edge. Every streak starts at the goal's gate (spec §4.2), so
---   it shows from the pickup.
--- The markers take the colour of the team that last held the ball, or the HUD's text colour until a team has (the match
+--   nothing lies within groundProbe studs.
+-- The marks take the colour of the team that last held the ball, or the HUD's text colour until a team has (the match
 -- keeps its possessing team through throws, passes, drops and respawns until a kickoff), and hide while there is no
--- ball. The arrows sit in a ScreenGui without insets, so their pixels are the camera's. A property is written only
--- when it changes; a step allocates only the disc's frame, the ray's result and a shown arrow's place.
+-- ball. The screen's markers, for the ball off the screen and the carrier's next gate, are the HUD's (#376). A
+-- property is written only when it changes; a step allocates only the disc's frame and the ray's result.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local ArenaParts = require(script.Parent.ArenaParts)
-local BallCarrier = require(script.Parent.BallCarrier)
 local BallPart = require(script.Parent.BallPart)
 local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local Config = require(ReplicatedStorage.Shared.Config)
 local HudStore = require(script.Parent.HudStore)
-local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local RideSurfaces = require(script.Parent.RideSurfaces)
-local ScreenMarker = require(ReplicatedStorage.Shared.Hud.ScreenMarker)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
-local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
-type PlayerId = Types.PlayerId
 type Team = Team.Team
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its members.
@@ -45,92 +35,41 @@ export type WorldMarkers = {
 	ring: BillboardGui,
 	ground: Part,
 	line: Beam,
-	ballArrow: Frame,
-	gateArrow: Frame,
 	_config: Config.GameConfig,
 	_surfaces: RideSurfaces.RideSurfaces,
 	_ballPart: BallPart.BallPart,
-	_carrier: BallCarrier.BallCarrier,
 	_store: HudStore.HudStore,
-	_arena: ArenaParts.ArenaParts,
-	_localId: PlayerId,
-	-- Camera:WorldToViewportPoint, the camera's viewport size and workspace:Raycast, or fakes.
-	_project: (position: Vector3) -> (Vector3, boolean),
-	_viewportSize: () -> Vector2,
+	-- workspace:Raycast, or a fake.
 	_raycast: (origin: Vector3, direction: Vector3, params: RaycastParams) -> RaycastResult?,
-	-- The camera's viewport size, kept by start() (no read each frame).
-	_viewport: Vector2,
-	_gui: ScreenGui,
 	-- The line's ends: on the ball (moved to it each step) and on the disc.
 	_top: Attachment,
-	_strokes: { UIStroke },
-	_images: { ImageLabel },
+	_stroke: UIStroke,
 	-- The ball's colour until a team holds it: its skin's.
 	_neutral: Color3,
-	-- What was last written: the markers' colour, and the ball given a colour and that colour.
+	-- What was last written: the marks' colour, and the ball given a colour and that colour.
 	_color: Color3?,
 	_worn: BasePart?,
 	_wornColor: Color3?,
 	_hasBall: boolean,
 	_grounded: boolean,
-	_ballPlacement: ScreenMarker.Placement,
-	_gatePlacement: ScreenMarker.Placement,
 }
 
 -- Down, for the ray from the ball to the ground.
 local DOWN = -Vector3.yAxis
 
-local function newArrow(name: string, config: Config.GameConfig, parent: Instance): (Frame, ImageLabel)
-	local markers = config.UI.markers
-	local arrow = Instance.new("Frame")
-	arrow.Name = name
-	arrow.AnchorPoint = Vector2.new(0.5, 0.5)
-	arrow.Size = UDim2.fromOffset(markers.arrowSize, markers.arrowSize)
-	arrow.BackgroundTransparency = 1
-	arrow.Visible = false
-	local image = Instance.new("ImageLabel")
-	image.Name = "Image"
-	image.Size = UDim2.fromScale(1, 1)
-	image.BackgroundTransparency = 1
-	image.Image = markers.arrowImage
-	image.Parent = arrow
-	arrow.Parent = parent
-	return arrow, image
-end
-
--- Shows `arrow` where `placement` puts it, or hides it.
-local function showArrow(arrow: Frame, placement: ScreenMarker.Placement?)
-	local visible = placement ~= nil
-	if arrow.Visible ~= visible then
-		arrow.Visible = visible
-	end
-	if placement ~= nil then
-		arrow.Position = UDim2.fromOffset(placement.x, placement.y)
-		local rotation = math.deg(placement.angle)
-		if arrow.Rotation ~= rotation then
-			arrow.Rotation = rotation
-		end
-	end
-end
-
--- Every marker in `color`, written when it changes.
+-- Every mark in `color`, written when it changes.
 local function paint(self: WorldMarkers, color: Color3)
 	if color == self._color then
 		return
 	end
 	self._color = color
-	for _, stroke in self._strokes do
-		stroke.Color = color
-	end
-	for _, image in self._images do
-		image.ImageColor3 = color
-	end
+	self._stroke.Color = color
 	self.ground.Color = color
 	self.line.Color = ColorSequence.new(color)
 end
 
--- A marker's colour: `team`'s in the world (UI.teamColors; the HUD's brighter pair is for the screen only, the
--- owner's choice, Q201), or the HUD's text colour with no team.
+-- A mark's colour: `team`'s in the world (UI.teamColors; the HUD's brighter pair is for the screen only, the owner's
+-- choice, Q201), or the HUD's text colour with no team.
 local function worldColor(config: Config.GameConfig, team: Team?): Color3
 	return if team ~= nil then config.UI.teamColors[team] else config.UI.hud.textColor
 end
@@ -163,7 +102,6 @@ local function placeBall(self: WorldMarkers, ball: BasePart?)
 	end
 	if ball == nil then
 		setGrounded(self, false)
-		showArrow(self.ballArrow, nil)
 		return
 	end
 	if self.ring.Adornee ~= ball then
@@ -181,92 +119,39 @@ local function placeBall(self: WorldMarkers, ball: BasePart?)
 			CFrame.fromMatrix(hit.Position + normal * (markers.groundMarkerThickness / 2), normal, side)
 		self._top.WorldPosition = position
 	end
-	local point, onScreen = self._project(position)
-	if onScreen then
-		showArrow(self.ballArrow, nil)
-	else
-		local placement = self._ballPlacement
-		ScreenMarker.place(point, false, self._viewportSize(), markers.edgeMargin, placement)
-		showArrow(self.ballArrow, placement)
-	end
-end
-
--- `nextGate`: the possessing team's next gate, nil until the HUD has a match.
-local function placeGate(self: WorldMarkers, nextGate: number?)
-	local parts = self._arena.parts
-	local gate = if nextGate ~= nil
-			and parts ~= nil
-			and self._carrier.carrier == self._localId
-		then parts.markers[nextGate]
-		else nil
-	if gate == nil then
-		showArrow(self.gateArrow, nil)
-		return
-	end
-	local point, onScreen = self._project(gate.position)
-	local placement = self._gatePlacement
-	ScreenMarker.place(point, onScreen, self._viewportSize(), self._config.UI.markers.edgeMargin, placement)
-	showArrow(self.gateArrow, placement)
 end
 
 local WorldMarkers: WorldMarkers = {
 	name = "WorldMarkers",
-	dependencies = { "Config", "RideSurfaces", "BallPart", "BallCarrier", "HudStore", "ArenaParts" },
+	dependencies = { "Config", "RideSurfaces", "BallPart", "HudStore" },
 	ring = nil :: any,
 	ground = nil :: any,
 	line = nil :: any,
-	ballArrow = nil :: any,
-	gateArrow = nil :: any,
 	_config = nil :: any,
 	_surfaces = nil :: any,
 	_ballPart = nil :: any,
-	_carrier = nil :: any,
 	_store = nil :: any,
-	_arena = nil :: any,
-	_localId = "",
-	_project = function(position: Vector3): (Vector3, boolean)
-		return position, false
-	end,
-	_viewportSize = function(): Vector2
-		return Vector2.zero
-	end,
 	_raycast = function(_origin: Vector3, _direction: Vector3, _params: RaycastParams): RaycastResult?
 		return nil
 	end,
-	_viewport = Vector2.zero,
-	_gui = nil :: any,
 	_top = nil :: any,
-	_strokes = {},
-	_images = {},
+	_stroke = nil :: any,
 	_neutral = Color3.new(),
 	_color = nil,
 	_worn = nil,
 	_wornColor = nil,
 	_hasBall = false,
 	_grounded = false,
-	_ballPlacement = ScreenMarker.newPlacement(),
-	_gatePlacement = ScreenMarker.newPlacement(),
 
-	-- deps.Parent keeps the guis out of the local player's PlayerGui in tests, and deps.World the disc out of the
-	-- workspace; deps.Project, deps.ViewportSize, deps.Raycast and deps.LocalId replace the live game there.
+	-- deps.Parent keeps the ring out of the local player's PlayerGui in tests, and deps.World the disc out of the
+	-- workspace; deps.Raycast replaces the live game there.
 	init = function(self: WorldMarkers, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		local markers = config.UI.markers
 		self._config = config
 		self._surfaces = deps.RideSurfaces
 		self._ballPart = deps.BallPart
-		self._carrier = deps.BallCarrier
 		self._store = deps.HudStore
-		self._arena = deps.ArenaParts
-		self._localId = deps.LocalId or PlayerIds.of(Players.LocalPlayer :: Player)
-		self._project = deps.Project
-			or function(position: Vector3): (Vector3, boolean)
-				return workspace.CurrentCamera:WorldToViewportPoint(position)
-			end
-		self._viewport = workspace.CurrentCamera.ViewportSize
-		self._viewportSize = deps.ViewportSize or function(): Vector2
-			return self._viewport
-		end
 		self._raycast = deps.Raycast
 			or function(origin: Vector3, direction: Vector3, params: RaycastParams): RaycastResult?
 				return workspace:Raycast(origin, direction, params)
@@ -277,8 +162,6 @@ local WorldMarkers: WorldMarkers = {
 		self._wornColor = nil
 		self._hasBall = false
 		self._grounded = false
-		self._ballPlacement = ScreenMarker.newPlacement()
-		self._gatePlacement = ScreenMarker.newPlacement()
 		local parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
 
 		local ring = Instance.new("BillboardGui")
@@ -304,6 +187,7 @@ local WorldMarkers: WorldMarkers = {
 		stroke.Parent = circle
 		ring.Parent = parent
 		self.ring = ring
+		self._stroke = stroke
 
 		-- The disc touches nothing and no ray finds it.
 		local ground = Instance.new("Part")
@@ -336,28 +220,9 @@ local WorldMarkers: WorldMarkers = {
 		self.ground = ground
 		self.line = line
 		self._top = top
-
-		local gui = Instance.new("ScreenGui")
-		gui.Name = "Markers"
-		gui.ResetOnSpawn = false
-		gui.ScreenInsets = Enum.ScreenInsets.None
-		gui.Parent = parent
-		self._gui = gui
-		local ballArrow, ballImage = newArrow("BallArrow", config, gui)
-		local gateArrow, gateImage = newArrow("GateArrow", config, gui)
-		self.ballArrow = ballArrow
-		self.gateArrow = gateArrow
-		self._strokes = { stroke }
-		self._images = { ballImage, gateImage }
 	end,
 
-	-- The viewport's size changes when the window is resized or the device turned.
-	start = function(self: WorldMarkers)
-		local camera = workspace.CurrentCamera
-		camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-			self._viewport = camera.ViewportSize
-		end)
-	end,
+	start = function(_self: WorldMarkers) end,
 
 	step = function(self: WorldMarkers, _dt: number)
 		local match = self._store.state.match
@@ -366,7 +231,6 @@ local WorldMarkers: WorldMarkers = {
 		paint(self, worldColor(self._config, team))
 		wear(self, ball, team)
 		placeBall(self, ball)
-		placeGate(self, if match ~= nil then match.nextGate else nil)
 	end,
 }
 

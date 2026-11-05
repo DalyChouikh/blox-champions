@@ -264,6 +264,23 @@ function Style.box(
 	return React.createElement("Frame", Style.holder(props), parts)
 end
 
+-- A right-angled tip (#376): a square `side` pixels across turned 45 degrees, the half past its middle cut away by a
+-- hard-step gradient, as Roblox's screen parts have no triangle (probed: a gradient cuts at its true angle through the
+-- frame's centre), in `color`, its point up and its base's middle at the frame's place; `props` place it.
+function Style.tip(side: number, color: Color3, props: Props?): React.ReactElement
+	return React.createElement(
+		"Frame",
+		over({
+			AnchorPoint = CENTRE,
+			Size = UDim2.fromOffset(side, side),
+			Rotation = 45,
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+		}, props),
+		{ Cut = React.createElement("UIGradient", { Rotation = 45, Transparency = STEP }) }
+	)
+end
+
 -- A player's avatar `size` pixels across (#357): `image` (HudText.avatar: their headshot) on a disc in the HUD's text
 -- colour, which shows alone for an id that is no Roblox user's or while the headshot loads, ringed in look C's ink.
 function Style.avatar(config: Config.GameConfig, size: number, image: string?): React.ReactElement

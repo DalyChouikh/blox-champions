@@ -694,6 +694,17 @@ describe("Config defaults", function()
 					sizes = { carry = 61, charge = 130, thickness = 4 },
 					compactSizes = { carry = 24, charge = 46, thickness = 3 },
 				},
+				-- The screen markers (#376, Q264-Q266): RC's ball badge measured in Video 34 (ring 0.115, band lines
+				-- 0.2 out, a right-angled pointer), the gate's bold chevron, 10 px in from the safe area, 3 px clear
+				-- of the HUD's parts (Q203); the page's sizes.
+				markers = {
+					edgeGap = 10,
+					clearance = 3,
+					badge = { ring = 0.115, band = 0.2, line = 2, lean = -12, gap = 5, pointer = 0.17 },
+					chevron = { bar = 0.3, spread = 30 },
+					sizes = { badge = 52, chevron = 40 },
+					compactSizes = { badge = 34, chevron = 28 },
+				},
 				-- RC's count a third down (#353, Q185): its 200 px ring and 75 px digit (Q108); the page's phone sizes
 				-- (Q203).
 				countdown = {
@@ -790,9 +801,6 @@ describe("Config defaults", function()
 			groundMarkerSize = 4,
 			groundMarkerThickness = 0.2,
 			groundMarkerTransparency = 0.4,
-			edgeMargin = 48,
-			arrowSize = 28,
-			arrowImage = "rbxasset://textures/ui/MenuBar/arrow_up.png",
 		})
 		expect(ui.nameTag).toEqual({
 			studsOffset = Vector3.new(0, 4, 0),
@@ -1321,6 +1329,29 @@ describe("Config.forMode", function()
 			"Ball: a ball let go must start clear under a hovering root (radius + releaseClearance < "
 				.. "Movement.hoverHeight)"
 		)
+	end)
+
+	-- #376: the screen markers' look just inside the limits the rejections cross.
+	it("accepts screen markers just inside their limits", function()
+		local markers = Fixtures.config({
+			UI = {
+				hud = {
+					layout = {
+						markers = {
+							edgeGap = 0,
+							clearance = 0,
+							badge = { ring = 0.3, band = 0.199, line = 1, lean = 90, gap = 0, pointer = 0.01 },
+							chevron = { bar = 0.99, spread = 89.9 },
+							sizes = { badge = 1, chevron = 1 },
+						},
+					},
+				},
+			},
+		}).UI.hud.layout.markers
+		expect(markers.badge.band).toBe(0.199)
+		expect(markers.badge.lean).toBe(90)
+		expect(markers.chevron.spread).toBe(89.9)
+		expect(markers.sizes.badge).toBe(1)
 	end)
 
 	it("accepts a release clearance just inside its limits", function()
@@ -2194,9 +2225,59 @@ describe("Config.forMode", function()
 				message = "UI.text.clockWarning: placeholder count must be 1",
 			},
 			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
+			-- The screen markers (#376): whole pixels where seams show, the band's lines inside the ball, a chevron
+			-- whose arms lean between straight up and flat.
 			{
-				overrides = { UI = { markers = { arrowImage = "" } } },
-				message = "UI.markers.arrowImage: must not be empty",
+				overrides = { UI = { hud = { layout = { markers = { edgeGap = -1 } } } } },
+				message = "UI.hud.layout.markers.edgeGap: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { clearance = -1 } } } } },
+				message = "UI.hud.layout.markers.clearance: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { sizes = { badge = 51.5 } } } } } },
+				message = "UI.hud.layout.markers.sizes.badge: must be an integer (got 51.5)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { compactSizes = { chevron = 0 } } } } } },
+				message = "UI.hud.layout.markers.compactSizes.chevron: must be >= 1 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { badge = { ring = 0 } } } } } },
+				message = "UI.hud.layout.markers.badge.ring: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { badge = { line = 0 } } } } } },
+				message = "UI.hud.layout.markers.badge.line: must be >= 1 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { badge = { gap = 2.5 } } } } } },
+				message = "UI.hud.layout.markers.badge.gap: must be an integer (got 2.5)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { badge = { pointer = 0 } } } } } },
+				message = "UI.hud.layout.markers.badge.pointer: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { badge = { lean = 91 } } } } } },
+				message = "UI.hud.layout.markers.badge.lean: must be <= 90 (got 91)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { badge = { band = 0 } } } } } },
+				message = "UI.hud.layout.markers.badge.band: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { badge = { ring = 0.3, band = 0.2 } } } } } },
+				message = "UI.hud.layout.markers.badge: the band's lines must lie inside the ball (band < 0.5 - ring)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { chevron = { bar = 1 } } } } } },
+				message = "UI.hud.layout.markers.chevron.bar: must be < 1 (got 1)",
+			},
+			{
+				overrides = { UI = { hud = { layout = { markers = { chevron = { spread = 90 } } } } } },
+				message = "UI.hud.layout.markers.chevron.spread: must be < 90 (got 90)",
 			},
 			{
 				overrides = { UI = { hud = { layout = { endScreen = { sizes = { cardWidth = 0 } } } } } },

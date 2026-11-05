@@ -20,10 +20,14 @@
 -- drawn into TouchControls' button for it (portals), from its hint row's bindings: Jump in UI.touchStyle.jumpFill, the
 -- others in its fill; and SCORES lines up with their right edge. Each part, each face too, is behind its own error
 -- boundary (Hud/PartBoundary, #379): one whose render throws shows nothing until the next match, and the rest go on.
+-- The screen markers (#376) draw in the full-screen gui too: the ball's badge in the colour of the team that last held
+-- it, the next gate's chevron in the viewer's; both hide while the board or the end screen shows, as the reticle does.
+-- The hints' column and the speedometer report their laid-out boxes, which the markers keep clear of.
 -- A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BallBadge = require(script.Parent.BallBadge)
 local Banner = require(script.Parent.Banner)
 local BannerMotion = require(script.Parent.BannerMotion)
 local BoardMotion = require(script.Parent.BoardMotion)
@@ -33,6 +37,7 @@ local ControlLabels = require(script.Parent.Parent.ControlLabels)
 local Countdown = require(script.Parent.Countdown)
 local EndScreen = require(script.Parent.EndScreen)
 local Feed = require(script.Parent.Feed)
+local GateChevron = require(script.Parent.GateChevron)
 local GetUp = require(script.Parent.GetUp)
 local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
@@ -49,6 +54,13 @@ local Speedometer = require(script.Parent.Speedometer)
 local Style = require(script.Parent.Style)
 local TouchButton = require(script.Parent.TouchButton)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
+
+-- What moves a screen marker (#376): its centre's place, its turn in degrees and whether it shows.
+export type MarkerBindings = {
+	place: React.Binding<UDim2>,
+	turn: React.Binding<number>,
+	shown: React.Binding<boolean>,
+}
 
 -- What changes every frame, written straight to the instances that show it, without a render.
 export type HudBindings = {
@@ -68,6 +80,8 @@ export type HudBindings = {
 	screen: React.Binding<Rect>,
 	-- What moves on SCORES: its pop and whether it shows pressed (never cooling).
 	scoreButton: Style.CapBindings,
+	-- The ball's marker and the next gate's (#376).
+	markers: { ball: MarkerBindings, gate: MarkerBindings },
 }
 
 -- Everything the HUD shows; the Hud renders App again whenever one of them changes.
@@ -117,6 +131,8 @@ export type AppProps = {
 	dim: ScreenGui,
 	-- Where a part hidden after its render threw is reported (#379).
 	log: (line: string) -> (),
+	-- Where the hints' column and the speedometer report their laid-out boxes (#376).
+	boxes: { hints: (frame: GuiObject) -> (), speed: (frame: GuiObject) -> () },
 }
 
 -- The Stage frame's size: the stage, or the whole Root while the stage is not known.
@@ -212,6 +228,7 @@ local function App(props: AppProps): React.ReactElement
 				keys = keys,
 				rows = bindings.hints,
 				area = bindings.area,
+				onBox = props.boxes.hints,
 			})
 			else nil,
 		Speedometer = React.createElement(Speedometer, {
@@ -221,7 +238,28 @@ local function App(props: AppProps): React.ReactElement
 			touch = touch,
 			compact = compact,
 			visible = props.hasSkater and ended == nil,
+			onBox = props.boxes.speed,
 		}),
+		BallMarker = if uncovered
+			then React.createElement(BallBadge, {
+				config = config,
+				compact = compact,
+				team = if match ~= nil then match.possessingTeam else nil,
+				place = bindings.markers.ball.place,
+				turn = bindings.markers.ball.turn,
+				shown = bindings.markers.ball.shown,
+			})
+			else nil,
+		GateMarker = if uncovered
+			then React.createElement(GateChevron, {
+				config = config,
+				compact = compact,
+				color = viewer,
+				place = bindings.markers.gate.place,
+				turn = bindings.markers.gate.turn,
+				shown = bindings.markers.gate.shown,
+			})
+			else nil,
 		ScoreButton = if touch
 			then React.createElement(ScoreButton, {
 				config = config,
@@ -324,7 +362,12 @@ local function App(props: AppProps): React.ReactElement
 		end
 	end
 	return React.createElement(React.Fragment, nil, {
-		Centre = ReactRoblox.createPortal({ Reticle = parts.Reticle, Countdown = parts.Countdown }, props.centre),
+		Centre = ReactRoblox.createPortal({
+			Reticle = parts.Reticle,
+			Countdown = parts.Countdown,
+			BallMarker = parts.BallMarker,
+			GateMarker = parts.GateMarker,
+		}, props.centre),
 		Dim = ReactRoblox.createPortal({ Dim = parts.Dim }, props.dim),
 		Top = ReactRoblox.createPortal({ Scoreboard = parts.Scoreboard }, props.top),
 		Touch = if touch then React.createElement(React.Fragment, nil, faces) else nil,

@@ -20,6 +20,8 @@ export type SpeedometerProps = {
 	touch: boolean,
 	compact: boolean,
 	visible: boolean,
+	-- Told its frame whenever its laid-out box changes: the screen markers keep clear of it (#376).
+	onBox: ((frame: GuiObject) -> ())?,
 }
 
 local function Speedometer(props: SpeedometerProps): React.ReactElement
@@ -52,6 +54,8 @@ local function Speedometer(props: SpeedometerProps): React.ReactElement
 			Position = if touch then place.touchPosition else place.position,
 			AutomaticSize = Enum.AutomaticSize.XY,
 			Visible = props.visible,
+			[React.Change.AbsoluteSize] = props.onBox,
+			[React.Change.AbsolutePosition] = props.onBox,
 		}),
 		{
 			Layout = Style.list(config, Enum.FillDirection.Vertical, {

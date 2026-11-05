@@ -12,14 +12,36 @@
 -- Q211), and the Get Up prompt above that where the feed reaches it (#369). All in pixels from the safe area's top, but
 -- the message's, the feed's and the prompt's, from the stage's bottom. The TAB board (#357) fits the HUD's area under
 -- the scoreboard's ink, on touch under the SCORES button too, shrinking off touch and scrolling its rows on touch where
--- they do not fit.
+-- they do not fit. The screen markers (#376) keep clear of the parts at the screen's edges: Roblox's buttons, the
+-- scoreboard, the parts sized to their text, SCORES and the touch buttons (HudScreen.markerBoxes).
 
 local Config = require(script.Parent.Parent.Config)
 local Fit = require(script.Parent.Fit)
 local HudState = require(script.Parent.HudState)
+local Input = require(script.Parent.Parent.Config.Input)
+local TouchArea = require(script.Parent.Parent.Input.TouchArea)
 
 -- The Switch team row under the TAB board: its words alone (on touch, where it is tapped), or a key's cap beside them.
 export type SwitchRow = "Label" | "Key"
+-- A screen marker (#376): the ball's badge, or the next gate's chevron.
+export type MarkerKind = "Badge" | "Chevron"
+-- What the screen markers keep clear of, as the Hud measures it: the screen's form and whether it is touch; the whole
+-- screen, the HUD's area and the safe area (GuiService:GetInsetArea, one frame); Roblox's top bar's free band (from the
+-- safe area's top-left); where the touch buttons' right edge sits across the HUD's area (TouchArea.lineUp); the
+-- scoreboard's top (from the safe area's) and whether the period shows under it; and the parts sized to their text
+-- (the hints' column, the speedometer), as boxes in the whole screen's pixels.
+export type MarkerView = {
+	compact: boolean,
+	touch: boolean,
+	whole: Rect,
+	hud: Rect,
+	safe: Rect,
+	topbar: Rect,
+	lineUp: number,
+	boardTop: number,
+	period: boolean,
+	texts: { Rect },
+}
 
 local HudScreen = {}
 
@@ -399,6 +421,93 @@ function HudScreen.tabFit(
 		return 0, 0
 	end
 	return scale, math.clamp(math.floor((area.Y - 2 * margin) / scale - fixed), 0, body)
+end
+
+-- The screen markers' widths on a phone's screen or a desktop's (#376).
+function HudScreen.markerSizes(config: Config.GameConfig, compact: boolean): Config.MarkerSizes
+	local markers = config.UI.hud.layout.markers
+	return if compact then markers.compactSizes else markers.sizes
+end
+
+-- How far a marker's ink reaches from its centre at its farthest, its drop shadow counted, and its body's: the badge's
+-- ring, past which its pointer reaches (Hud/BallBadge: the pointer's base past the ring's ink, `gap` and its own ink,
+-- its right-angled tip's ink look.outline x sqrt 2 past the tip); the chevron's two rounded bars, all body
+-- (Hud/GateChevron: each arm from the tip at `spread` degrees off the line it points along, its width across both arms'
+-- round ends).
+function HudScreen.markerReach(config: Config.GameConfig, compact: boolean, kind: MarkerKind): (number, number)
+	local hud = config.UI.hud
+	local ink, drop = hud.look.outline, hud.look.shadow
+	local sizes, markers = HudScreen.markerSizes(config, compact), hud.layout.markers
+	if kind == "Badge" then
+		local width, badge = sizes.badge, markers.badge
+		local tip = width / 2 + 2 * ink + badge.gap + badge.pointer * width
+		return tip + ink * math.sqrt(2) + drop, width / 2 + ink + drop
+	end
+	local width, chevron = sizes.chevron, markers.chevron
+	local bar = chevron.bar * width
+	local spread = math.rad(chevron.spread)
+	local arm = (width - bar) / (2 * math.sin(spread))
+	local reach = math.sqrt((arm * math.sin(spread)) ^ 2 + (arm * math.cos(spread) / 2) ^ 2) + bar / 2 + ink + drop
+	return reach, reach
+end
+
+-- A box `offset` pixels from the whole screen's top-left (a frame's Min less the whole screen's), from (x0, y0) to
+-- (x1, y1) in that frame.
+local function boxIn(offset: Vector2, x0: number, y0: number, x1: number, y1: number): Rect
+	return Rect.new(offset.X + x0, offset.Y + y0, offset.X + x1, offset.Y + y1)
+end
+
+-- The boxes the screen markers keep clear of (#376, the owner's rule for the HUD's parts, Q203), in the whole screen's
+-- pixels: Roblox's buttons either side of the top bar's free band; the scoreboard round its centre, its ink out at its
+-- sides and top, down to its deepest in play (HudScreen.boardBottom); the parts sized to their text (`view.texts`); and
+-- on touch SCORES in its ink and each touch button, on the whole screen from its bottom-right corner (TouchArea).
+function HudScreen.markerBoxes(config: Config.GameConfig, view: MarkerView): { Rect }
+	local hud = config.UI.hud
+	local ink = hud.look.outline
+	local whole, safe = view.whole, view.safe
+	local inSafe = safe.Min - whole.Min
+	local width = safe.Max.X - safe.Min.X
+	local topbar = view.topbar
+	local boxes: { Rect } = {}
+	if topbar.Min.X > 0 then
+		table.insert(boxes, boxIn(inSafe, 0, 0, topbar.Min.X, topbar.Max.Y))
+	end
+	if topbar.Max.X < width then
+		table.insert(boxes, boxIn(inSafe, topbar.Max.X, 0, width, topbar.Max.Y))
+	end
+	local compact = view.compact
+	local position = if compact then hud.layout.compactScoreboard.position else hud.layout.scoreboard.position
+	local centre = width * position.X.Scale + position.X.Offset
+	local reach = HudScreen.boardReach(config, compact) + ink
+	local bottom = HudScreen.boardBottom(config, compact, view.boardTop, view.period)
+	table.insert(boxes, boxIn(inSafe, centre - reach, view.boardTop - ink, centre + reach, bottom))
+	for _, text in view.texts do
+		table.insert(boxes, text)
+	end
+	if not view.touch then
+		return boxes
+	end
+	local button = hud.layout.scoreButton
+	local right, size = view.lineUp, button.size
+	table.insert(
+		boxes,
+		boxIn(
+			view.hud.Min - whole.Min,
+			right - size.X.Offset - ink,
+			button.top - ink,
+			right + ink,
+			button.top + size.Y.Offset + ink + hud.look.shadow
+		)
+	)
+	local touch = config.Input.touch
+	local screen = whole.Max - whole.Min
+	local scale = TouchArea.buttonScale(touch, screen)
+	for _, each in Input.buttonList(touch) do
+		local x, y = screen.X + each.place.X.Offset * scale, screen.Y + each.place.Y.Offset * scale
+		local half = each.size * scale / 2
+		table.insert(boxes, Rect.new(x - half, y - half, x + half, y + half))
+	end
+	return boxes
 end
 
 return table.freeze(HudScreen)

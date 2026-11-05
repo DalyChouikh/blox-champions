@@ -228,6 +228,18 @@ export type HintsLayout = {
 }
 
 -- Where each part of the HUD sits; sizes and row heights are pixels.
+-- RC's ball badge (#376, Q265, Q266), in shares of its width but for `line` and `gap` (whole pixels): a white ball
+-- inside a ring `ring` wide, crossed by its band's two lines `line` pixels thick, `band` either side of its middle and
+-- leaning `lean` degrees; a right-angled pointer outside the ring, `pointer` tall, `gap` pixels of the game past the
+-- ring's ink, turned toward the ball. The ring, the lines and the pointer in the team's colour, look C's ink before a
+-- team has held the ball.
+export type BadgeLook = { ring: number, band: number, line: number, lean: number, gap: number, pointer: number }
+-- The next gate's chevron (#376, Q266): two rounded bars `bar` of its width thick, each arm leaning `spread` degrees
+-- from the line it points along.
+export type ChevronLook = { bar: number, spread: number }
+-- Each screen marker's width in pixels.
+export type MarkerSizes = { badge: number, chevron: number }
+
 export type HudLayout = {
 	-- A screen whose shorter side is under compactBelow pixels is a phone's: the compact scoreboard and the small
 	-- speedometer (HudScreen.compact).
@@ -273,6 +285,19 @@ export type HudLayout = {
 		clearance: number,
 		sizes: RingSizes,
 		compactSizes: RingSizes,
+	},
+	-- The screen markers (#376, the owner's Q242, Q264-Q266): for the ball while it is off the screen, RC's ball
+	-- badge (Video 31 at 21.0 s, Video 34 at 98.2 s); for the next gate while the viewer carries the ball, a bold
+	-- chevron. A marker pinned to the screen's edge sits edgeGap pixels of the game inside the safe area (its ink
+	-- counted), sliding along it to keep clearance pixels from the HUD's parts. `sizes` (each marker's width) on a
+	-- desktop's screen, compactSizes on a phone's.
+	markers: {
+		edgeGap: number,
+		clearance: number,
+		badge: BadgeLook,
+		chevron: ChevronLook,
+		sizes: MarkerSizes,
+		compactSizes: MarkerSizes,
 	},
 	-- The kickoff count (#353) at the crosshair's place, lower where its ring would come within reticle.clearance
 	-- pixels of the scoreboard (HudScreen.countDrop): `sizes` on a desktop's screen, compactSizes on a phone's.
@@ -375,8 +400,8 @@ export type HudSettings = {
 }
 
 -- The ball's ring (pixels: ringSize wider than the ball, so it rings it at any distance), its line and ground marker
--- (studs, the marker found within groundProbe studs below the ball), and the arrows pinned edgeMargin pixels inside the
--- screen's edge.
+-- (studs, the marker found within groundProbe studs below the ball). The screen's markers are the HUD's
+-- (UI.hud.layout.markers, #376).
 export type MarkerSettings = {
 	ringSize: number,
 	ringThickness: number,
@@ -386,12 +411,6 @@ export type MarkerSettings = {
 	groundMarkerSize: number,
 	groundMarkerThickness: number,
 	groundMarkerTransparency: number,
-	edgeMargin: number,
-	arrowSize: number,
-	-- The arrows' image, pointing up and white, so it takes their colour. The default is Roblox's own chevron from
-	-- its content folder (found in three installed Studio versions). No Roblox page documents it, so an update could
-	-- remove it and leave the arrows blank: the art pass swaps in ours, and Phase 9 checks it on real devices.
-	arrowImage: string,
 }
 
 -- One part of the call's glove (#358, the owner's Q240 G3, Q241 E2), in the glove's own units from its middle: a bar
@@ -730,6 +749,19 @@ local defaults: UIConfig = {
 				sizes = { carry = 61, charge = 130, thickness = 4 },
 				compactSizes = { carry = 24, charge = 46, thickness = 3 },
 			},
+			-- RC's ball badge measured in Video 34 at 98.2 s (79 px across at 1918 x 1078: the ring 9 px, the band's
+			-- lines 16 px either side of the middle, 3 px thick, a pointer 21 x 11.5 px apart from the ring), its
+			-- pointer a right angle and further out so look C's ink keeps it apart (Q266); the gate's chevron with a
+			-- 60 degree tip (a right angle read as an "L"); the page's sizes (Q264): RC's 79 px at 1078 px tall is
+			-- about 52 at our 793; on phones bigger than RC's share. 3 px of the game kept from the HUD's parts (Q203).
+			markers = {
+				edgeGap = 10,
+				clearance = 3,
+				badge = { ring = 0.115, band = 0.2, line = 2, lean = -12, gap = 5, pointer = 0.17 },
+				chevron = { bar = 0.3, spread = 30 },
+				sizes = { badge = 52, chevron = 40 },
+				compactSizes = { badge = 34, chevron = 28 },
+			},
 			-- The kickoff count a third down, where RC's sits (the owner, Q185): on desktop RC's at 1918 x 1078 (Video
 			-- 31 at 16.5 s), a 200 px ring with a 75 px digit (Q108); on a phone RC's share of the screen's height (a
 			-- 76 px ring) with a bigger digit, big and clear on phones (Q181), as the design page drew it (Q203).
@@ -836,9 +868,6 @@ local defaults: UIConfig = {
 		groundMarkerSize = 4,
 		groundMarkerThickness = 0.2,
 		groundMarkerTransparency = 0.4,
-		edgeMargin = 48,
-		arrowSize = 28,
-		arrowImage = "rbxasset://textures/ui/MenuBar/arrow_up.png",
 	},
 	-- M1 Stacked with H4's badge and the E2 glove (#358, the owner's Q197, Q198, Q240, Q241), over the head of a body
 	-- 4 studs up to its head's top (measured in Play), at the design page's
@@ -1001,6 +1030,22 @@ local boardTextSizes = Validate.record({ score = textSize, clock = textSize, wor
 local teamColors = Validate.record({ Blue = Validate.datatype("Color3"), Orange = Validate.datatype("Color3") })
 local speedTextSizes = Validate.record({ speed = textSize, unit = textSize })
 local ringSizes = Validate.record({ carry = positive, charge = positive, thickness = positive })
+-- The screen markers' widths, and the badge's lines and gap, in whole pixels, so their edges meet pixel edges.
+local markerSizes = Validate.record({ badge = wholePixels, chevron = wholePixels })
+local badgeLook = Validate.check(
+	Validate.record({
+		ring = positive,
+		band = positive,
+		line = wholePixels,
+		lean = Validate.number({ min = -90, max = 90 }),
+		gap = wholeOrNone,
+		pointer = positive,
+	}),
+	function(badge: BadgeLook): boolean
+		return badge.band < 0.5 - badge.ring
+	end,
+	"the band's lines must lie inside the ball (band < 0.5 - ring)"
+)
 local countSizes = Validate.record({ textSize = textSize, ringSize = positive, ringThickness = positive })
 local bannerSizes = Validate.record({
 	headline = textSize,
@@ -1364,6 +1409,17 @@ local fields = Validate.record({
 				sizes = ringSizes,
 				compactSizes = ringSizes,
 			}),
+			markers = Validate.record({
+				edgeGap = nonNegative,
+				clearance = nonNegative,
+				badge = badgeLook,
+				chevron = Validate.record({
+					bar = Validate.number({ above = 0, below = 1 }),
+					spread = Validate.number({ above = 0, below = 90 }),
+				}),
+				sizes = markerSizes,
+				compactSizes = markerSizes,
+			}),
 			countdown = Validate.record({ sizes = countSizes, compactSizes = countSizes }),
 			scoreTab = Validate.record({
 				margin = nonNegative,
@@ -1397,9 +1453,6 @@ local fields = Validate.record({
 		groundMarkerSize = positive,
 		groundMarkerThickness = positive,
 		groundMarkerTransparency = transparency,
-		edgeMargin = positive,
-		arrowSize = positive,
-		arrowImage = label,
 	}),
 	nameTag = Validate.record({
 		studsOffset = Validate.datatype("Vector3"),
