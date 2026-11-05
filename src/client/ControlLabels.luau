@@ -4,7 +4,7 @@
 -- it. With a skater every row shows, and one that does nothing now is greyed instead of hidden, as Roller Champions'
 -- rows are (#368, the owner's Q220: in the air RC greys Uppercut, Pump and Brake, Videos 10-11; through a carrier's
 -- dive every row but Charge Throw, Video 33 at 17.6-19.0 s); only Attach shows just while a teammate is right ahead
--- (SkateController.attachable, Q222). Nothing works without a skater. Jump jumps on the ground and strikes the Air Pose
+-- (SkateController.attachWith, Q222). Nothing works without a skater. Jump jumps on the ground and strikes the Air Pose
 -- in the air, once until landing (SkateMath); the skates push and brake only on the ground. An action key names what
 -- ActionController:keyShown names: the action it would start now, else the Dive through its flight and slide, else its
 -- usual one (Q222). While a throw charges (#312) the pump does nothing, and the Dodge reads Cancel & Dodge, as RC's
@@ -70,7 +70,7 @@ function ControlLabels.label(
 	elseif control == "brake" then
 		return labels.Brake, not skates
 	elseif control == "attach" then
-		return lit(if skate.attachable then labels.Attach else nil)
+		return lit(if skate.attachWith ~= nil then labels.Attach else nil)
 	end
 	local action, ready = actions:keyShown(control :: Config.ActionKey)
 	if action == nil then

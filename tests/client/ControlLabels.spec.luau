@@ -105,7 +105,7 @@ describe("ControlLabels", function()
 		expect(now("jump")).toBe(labels.AirPose)
 		expect(greyed("jump")).toBe(true)
 
-		SkateController.attachable = true
+		SkateController.attachWith = "2"
 		expect(now("attach")).toBe(labels.Attach)
 		-- Attached, the leader pulls them: the skates jump, push and brake nothing (SkateController follows).
 		skater.mode = "Attached"

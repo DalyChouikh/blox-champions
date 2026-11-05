@@ -75,6 +75,7 @@ type PlayerId = Types.PlayerId
 
 -- The pass's control, whose key marks a pass's target (#315).
 local PASS: Config.TouchControl = "pass"
+local ATTACH: Config.TouchControl = "attach"
 
 -- A value shown through a binding: its setter, and the value last set.
 type Shown<T> = { binding: React.Binding<T>, set: (value: T) -> (), value: T }
@@ -122,6 +123,10 @@ export type Hud = {
 	-- The pass key as the hints show it on this device, or on touch, where no key shows, UI.text.touchPassTarget: what
 	-- NameTags floats over the teammate a pass would go to (#315; RC Video 34 at 41.6 s). Nil without a skater.
 	passKey: Style.KeyView?,
+	-- The Attach key as the hints show it on this device; none on touch, where the word stands alone: what NameTags
+	-- shows with the word Attach over the teammate to attach behind (#381, the owner's Q246, Q247). Nil without a
+	-- skater.
+	attachKey: Style.KeyView?,
 	-- The screen's form, as last measured: a phone's (HudScreen.compact); the name tags draw at its sizes (#358).
 	compact: boolean,
 	_config: Config.GameConfig,
@@ -294,20 +299,21 @@ local function hintKeys(self: Hud, device: Enum.PreferredInput, hasSkater: boole
 	return keys
 end
 
--- The pass key on `device` for the mark over a pass's target (#315): the pass hint's own key (`keys`), or on touch,
--- where no hints show, the touch mark; nil without a skater.
-local function passKeyView(
-	self: Hud,
+-- `control`'s key on `device` for a mark over a teammate (the pass's target, #315; the one to attach behind, #381):
+-- the control's hint key (`keys`), or on touch, where no hints show, `touch`; nil without a skater.
+local function markKey(
 	device: Enum.PreferredInput,
 	hasSkater: boolean,
-	keys: ControlHints.HintKeys?
+	keys: ControlHints.HintKeys?,
+	control: Config.TouchControl,
+	touch: Style.KeyView?
 ): Style.KeyView?
 	if not hasSkater then
 		return nil
 	elseif device == Enum.PreferredInput.Touch then
-		return { text = self._config.UI.text.touchPassTarget }
+		return touch
 	end
-	return if keys ~= nil then keys[PASS] else nil
+	return if keys ~= nil then keys[control] else nil
 end
 
 -- The score tab's Switch team button on `device`: nil while it has none, else whether it works now (`carrier` holding
@@ -355,6 +361,7 @@ local Hud: Hud = {
 	top = nil :: any,
 	renders = 0,
 	passKey = nil,
+	attachKey = nil,
 	_touchButtons = {},
 	_config = nil :: any,
 	_text = nil :: any,
@@ -470,6 +477,7 @@ local Hud: Hud = {
 		self._shownSpeed = nil
 		self.renders = 0
 		self.passKey = nil
+		self.attachKey = nil
 		self._version = nil
 		self._device = nil
 		self._shownCompact = false
@@ -658,7 +666,8 @@ local Hud: Hud = {
 			self._shownFontsLoaded = fontsLoaded
 			self.renders += 1
 			local keys = hintKeys(self, device, hasSkater)
-			self.passKey = passKeyView(self, device, hasSkater, keys)
+			self.passKey = markKey(device, hasSkater, keys, PASS, { text = self._config.UI.text.touchPassTarget })
+			self.attachKey = markKey(device, hasSkater, keys, ATTACH, nil)
 			self._root:render(React.createElement(App, {
 				config = self._config,
 				text = self._text,

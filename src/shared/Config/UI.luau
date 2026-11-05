@@ -404,7 +404,8 @@ export type GlovePart = { x: number, y: number, width: number, height: number, c
 -- the pill's ink, `gap` and a pointer `pointer` pixels tall (a square turned 45 degrees, half under the cap), the
 -- pass key on look C's cap (`cap`); the call's badge (`badge` across its middle, a `rim` of ink) badgeGap beside
 -- the cap, its glove `glove` pixels a glove unit, gloveDrop below the badge's middle, and its ring growing `ripple`
--- pixels out, rippleLine thick. Pixels.
+-- pixels out, rippleLine thick; the Attach mark (#381) badgeGap after the pass key, as tall as its cap, its word at
+-- the cap's textSize with the cap's padding round it, as the design page drew it (the owner's Q247). Pixels.
 export type TagSizes = {
 	width: number,
 	height: number,
@@ -1094,12 +1095,20 @@ local function pillHolds(sizes: TagSizes, look: LookSettings): boolean
 	return sizes.textSize + 2 * math.ceil(look.textOutline) <= sizes.pillHeight
 end
 
--- A name tag's call row inside its gui: above the gui's middle (the pill's), the pill's top half and ink, the gap,
--- the pointer and the key cap, with the badge round the cap's middle at its widest ripple; and that ring across it.
+-- A name tag's marks' row inside its gui (#358, #381): above the gui's middle (the pill's), the pill's top half and
+-- ink, the gap, the pointer and the key cap, with the badge round the cap's middle at its widest ripple. Across, its
+-- widest row on the gui's middle: the badge in its rim, badgeGap, the pass key's cap, badgeGap, the Attach mark (its
+-- key's cap, inked edge and the word's padding), each cap at its narrowest (square) and the words, measured only when
+-- drawn, left out; past the row's left the ring, past its right the mark's ink.
 local function rowFits(sizes: TagSizes, look: LookSettings): boolean
-	local capMiddle = sizes.pillHeight / 2 + look.outline + sizes.gap + sizes.pointer + sizes.cap.height / 2
+	local cap = sizes.cap
+	local capMiddle = sizes.pillHeight / 2 + look.outline + sizes.gap + sizes.pointer + cap.height / 2
 	local ring = sizes.badge + sizes.ripple + sizes.rippleLine
-	return capMiddle + math.max(sizes.cap.height / 2, ring) <= sizes.height / 2 and 2 * ring <= sizes.width
+	local ringed = sizes.badge + sizes.rim
+	local attach = cap.height + math.ceil(look.textOutline) + 2 * cap.padding
+	local row = 2 * ringed + sizes.badgeGap + cap.height + sizes.badgeGap + attach
+	return capMiddle + math.max(cap.height / 2, ring) <= sizes.height / 2
+		and row + 2 * math.max(ring - ringed, look.textOutline) <= sizes.width
 end
 
 -- How many number columns a table of players' stats has: every column but the name's (UI.text.columns).
@@ -1480,8 +1489,8 @@ local schema = Validate.checkAll(fields, {
 		end,
 	},
 	{
-		message = "a name tag must hold its call's row (the pill, gap, pointer and key cap, "
-			.. "and the badge's widest ripple)",
+		message = "a name tag must hold its marks' row (the pill, gap, pointer and key cap; the badge's widest ripple, "
+			.. "the pass key and the Attach mark)",
 		holds = function(ui: UIConfig): boolean
 			local tag, look = ui.nameTag, ui.hud.look
 			return rowFits(tag.sizes, look) and rowFits(tag.compactSizes, look)

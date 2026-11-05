@@ -722,6 +722,23 @@ describe("Hud", function()
 		expect(Hud.passKey).toEqual({ text = config.UI.text.touchPassTarget })
 	end)
 
+	-- The key NameTags shows with the word Attach over the teammate to attach behind (#381, the owner's Q246, Q247):
+	-- the Attach hint's own key; on touch, where no key shows, none (the word stands alone).
+	it("names the Attach key as the hints show it, for the mark over the teammate to attach behind", function()
+		Hud:step(0)
+		expect(Hud.attachKey).toBeNil()
+		Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		expect(Hud.attachKey).toEqual({ text = "F" })
+		preferred = Enum.PreferredInput.Gamepad
+		Hud:step(0)
+		expect(Hud.attachKey).toEqual({ image = keyImage(Enum.KeyCode.ButtonL1) })
+		preferred = Enum.PreferredInput.Touch
+		Hud:step(0)
+		expect(Hud.attachKey).toBeNil()
+		expect(Hud.passKey).toEqual({ text = config.UI.text.touchPassTarget })
+	end)
+
 	-- Roller Champions' Get Up (#220): moving gets a knocked-down skater up sooner.
 	it("shows a Get Up prompt with the device's movement keys only while the skater is knocked down", function()
 		local rig = Fixtures.spawnSkater(folder, config)

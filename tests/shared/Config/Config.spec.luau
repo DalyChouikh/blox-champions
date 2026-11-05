@@ -2162,6 +2162,8 @@ describe("Config.forMode", function()
 	end)
 
 	it("rejects HUD text and settings that contradict themselves", function()
+		local tagRow = "UI: a name tag must hold its marks' row (the pill, gap, pointer and key cap; "
+			.. "the badge's widest ripple, the pass key and the Attach mark)"
 		local cases: { { overrides: { [string]: any }, message: string } } = {
 			-- A text takes exactly as many values as the HUD gives it.
 			{
@@ -2676,23 +2678,25 @@ describe("Config.forMode", function()
 				overrides = { UI = { nameTag = { compactSizes = { textSize = 15 } } } },
 				message = "UI: a name tag's name must fit its pill (textSize + 2 \u{D7} textOutline <= pillHeight)",
 			},
-			-- The call's row reaching 92 px above the tag's middle (13 + 3 + 2 + 9 + 17, then the badge's 24 + 20 + 4)
-			-- in a 182 px tag; on a phone 70 (10 + 3 + 2 + 7 + 12, 18 + 15 + 3) in 138; and the ripple 2 x 48 across a
-			-- 95 px tag.
+			-- The marks' row reaching 92 px above the tag's middle (13 + 3 + 2 + 9 + 17, then the badge's 24 + 20 + 4)
+			-- in a 182 px tag; on a phone 70 (10 + 3 + 2 + 7 + 12, 18 + 15 + 3) in 138.
+			{ overrides = { UI = { nameTag = { sizes = { height = 182 } } } }, message = tagRow },
+			{ overrides = { UI = { nameTag = { compactSizes = { height = 138 } } } }, message = tagRow },
+			-- Across (#381), the widest row round its words: the badge in its rim (2 x 28), 3, a square key cap
+			-- (34), 3, the Attach mark's square cap, inked edge and padding (34 + 3 + 2 x 8) is 149 px, with the
+			-- ring's 20 px past the rim each side 189, in a 188 px tag; on a phone 42 + 2 + 24 + 2 + (24 + 3 + 2 x 6)
+			-- = 109 and 2 x 15, 139 in 138. With no ripple and look C's ink 2.25 px (the key's edge its whole 3), the
+			-- Attach mark's ink past each end reaches 149 + 2 x 2.25 = 153.5 of 153.
+			{ overrides = { UI = { nameTag = { sizes = { width = 188 } } } }, message = tagRow },
+			{ overrides = { UI = { nameTag = { compactSizes = { width = 138 } } } }, message = tagRow },
 			{
-				overrides = { UI = { nameTag = { sizes = { height = 182 } } } },
-				message = "UI: a name tag must hold its call's row (the pill, gap, pointer and key cap, "
-					.. "and the badge's widest ripple)",
-			},
-			{
-				overrides = { UI = { nameTag = { compactSizes = { height = 138 } } } },
-				message = "UI: a name tag must hold its call's row (the pill, gap, pointer and key cap, "
-					.. "and the badge's widest ripple)",
-			},
-			{
-				overrides = { UI = { nameTag = { sizes = { width = 95 } } } },
-				message = "UI: a name tag must hold its call's row (the pill, gap, pointer and key cap, "
-					.. "and the badge's widest ripple)",
+				overrides = {
+					UI = {
+						hud = { look = { textOutline = 2.25 } },
+						nameTag = { sizes = { width = 153, ripple = 0, rippleLine = 1 } },
+					},
+				},
+				message = tagRow,
 			},
 			-- A tall cap with a small badge: 13 + 3 + 2 + 9 + 50 = 77 px to the cap's middle and its 50 px top half,
 			-- 127 of the 92 px over the tag's middle, where the ring's 2 px would pass.
@@ -2700,8 +2704,7 @@ describe("Config.forMode", function()
 				overrides = {
 					UI = { nameTag = { sizes = { cap = { height = 100 }, badge = 1, ripple = 0, rippleLine = 1 } } },
 				},
-				message = "UI: a name tag must hold its call's row (the pill, gap, pointer and key cap, "
-					.. "and the badge's widest ripple)",
+				message = tagRow,
 			},
 			-- The MVP's name (27 px) and its 3 px of ink over their numbers (15 px): 45 px beside a 44 px avatar.
 			{
@@ -3099,13 +3102,25 @@ describe("Config.forMode", function()
 	end)
 
 	-- The name tags (#358): their defaults already stand at the row's edge (92 px in a 184 px tag, 70 in 140);
-	-- the names at the pill's edge: 20 + 2 x 3 = 26, a phone's 14 + 6 = 20; the ripple 2 x 48 = 96 across 96.
+	-- the names at the pill's edge: 20 + 2 x 3 = 26, a phone's 14 + 6 = 20; the widest row round its words with the
+	-- ring each side (#381) 189 across 189, a phone's 139 across 139; with no ripple and 2.25 px of ink, 153.5 in 154.
 	it("accepts name tag sizes just inside their limits", function()
 		local config = Fixtures.config({
-			UI = { nameTag = { sizes = { textSize = 20, width = 96 }, compactSizes = { textSize = 14 } } },
+			UI = {
+				nameTag = { sizes = { textSize = 20, width = 189 }, compactSizes = { textSize = 14, width = 139 } },
+			},
 		})
 		local tag = config.UI.nameTag
-		expect(`{tag.sizes.textSize} {tag.sizes.width} {tag.compactSizes.textSize}`).toBe("20 96 14")
+		expect(`{tag.sizes.textSize} {tag.sizes.width} {tag.compactSizes.textSize} {tag.compactSizes.width}`).toBe(
+			"20 189 14 139"
+		)
+		local still = Fixtures.config({
+			UI = {
+				hud = { look = { textOutline = 2.25 } },
+				nameTag = { sizes = { width = 154, ripple = 0, rippleLine = 1 } },
+			},
+		})
+		expect(still.UI.nameTag.sizes.width).toBe(154)
 		-- Nothing between its parts, a still call, one square glove part with no seams.
 		local bare = Fixtures.config({
 			UI = {

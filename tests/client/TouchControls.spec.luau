@@ -208,7 +208,7 @@ describe("TouchControls", function()
 		BallCarrier:set(LOCAL_ID)
 		TouchControls:step(DT)
 		expect(button("uppercut").Visible).toBe(true)
-		SkateController.attachable = true
+		SkateController.attachWith = "2"
 		TouchControls:step(DT)
 		expect(button("attach").Visible).toBe(true)
 		-- A spectator has no skater, and no buttons.
