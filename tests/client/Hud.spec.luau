@@ -1853,16 +1853,17 @@ describe("Hud, the screen markers", function()
 	end)
 
 	it("keeps the ball's marker off the boxes the hints' column and the speedometer report, laid out", function()
-		-- Laid out as Roblox lays a gui out in Studio's editor (under StarterGui, after a frame), on the editor's
-		-- screen; the Hud's destroy takes the guis back out after the test, passed or failed.
-		local view = workspace.CurrentCamera.ViewportSize
-		local whole = Rect.new(0, 0, view.X, view.Y)
-		screen = { whole = whole, hud = whole, controls = whole, topbar = Rect.new(164, 0, view.X, 58) }
-		Hud:resize()
+		-- Laid out as Roblox lays a gui out under StarterGui, on the screen the HUD's whole-screen gui is laid out on:
+		-- the editor's in Studio, 800 x 600 on a server with no screen (the cloud's run), where the camera's viewport
+		-- reads 1 x 1 (probed). The Hud's destroy takes the guis back out after the test, passed or failed.
 		local starter = game:GetService("StarterGui")
 		for _, gui in { Hud.gui, Hud.centre } do
 			gui.Parent = starter
 		end
+		local view = Hud.centre.AbsoluteSize
+		local whole = Rect.new(0, 0, view.X, view.Y)
+		screen = { whole = whole, hud = whole, controls = whole, topbar = Rect.new(164, 0, view.X, 58) }
+		Hud:resize()
 		local rig = Fixtures.spawnSkater(folder, config)
 		Hud:step(0)
 		-- Reading a part's box lays it out at once, and Roblox tells its Change handlers at the next resumption point
@@ -1907,10 +1908,11 @@ describe("Hud, the screen markers", function()
 		Hud:step(0)
 		Hud:step(0)
 		expect(part("ControlHints")).toBeNil()
-		expect(badge.Position.Y.Offset).toBe(math.round(middle))
+		-- On the whole pixel nearest the line's point (the column's middle can be a half pixel).
+		expect(math.abs(badge.Position.Y.Offset - middle) <= 0.5 + 1e-6).toBe(true)
 		ballScreen = beyond(left + 1, pathBottom)
 		Hud:step(0)
-		expect(badge.Position.X.Offset).toBe(math.round(left + 1))
+		expect(math.abs(badge.Position.X.Offset - (left + 1)) <= 0.5 + 1e-6).toBe(true)
 	end)
 
 	it("hides both markers while the TAB board or the end screen shows, as the crosshair does", function()
