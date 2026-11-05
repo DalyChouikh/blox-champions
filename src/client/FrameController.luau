@@ -7,14 +7,33 @@
 -- the HUD's state, whose clocks count on, then the HUD, which shows it, then the world's markers, the arena's glow and
 -- the carrier's beam, which read that state too, then the ball's trail, then the name tags. Roblox gives RunService
 -- handlers no documented order (they ran in reverse of their connection order when measured), so only this module
--- connects them, one per phase.
+-- connects them, one per phase. Each module's step is guarded (#392, the owner's Q263): an error in one (a HUD
+-- binding's update, say) no longer skips the steps after it that frame; the first is reported, naming the module and
+-- where it was thrown, never every frame, and the module is still stepped each frame, so one that recovers goes on.
 
 local RunService = game:GetService("RunService")
 
--- Anything stepped once per physics step.
-type Steppable = { step: (self: any, dt: number) -> () }
--- What reads Roblox's overlays once a frame.
-type OverlayWatcher = { watchOverlays: (self: any) -> () }
+-- How a phase steps one module: its step(dt), or the watch of Roblox's overlays.
+type Stepper = (module: any, dt: number) -> ()
+-- One module of a phase, made once: the module, how it is stepped, and xpcall's handler for its step, which runs only
+-- when the step throws.
+type Step = { module: any, step: Stepper, failed: (problem: any) -> () }
+
+-- Each phase's modules by dependency name, in their order: the overlays first in each frame, then the drawn modules.
+local OVERLAYS = "InputController"
+local PHYSICS: { string } = { "SkateController", "ActionController", "PoseController" }
+local DRAWN: { string } = {
+	"BallView",
+	"CameraController",
+	"TouchControls",
+	"HudStore",
+	"Hud",
+	"WorldMarkers",
+	"ArenaGlow",
+	"CarrierBeam",
+	"BallTrail",
+	"NameTags",
+}
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
 export type FrameController = {
@@ -24,70 +43,82 @@ export type FrameController = {
 	start: (self: FrameController) -> (),
 	step: (self: FrameController, dt: number) -> (),
 	render: (self: FrameController, dt: number) -> (),
-	_input: OverlayWatcher,
-	_skate: Steppable,
-	_actions: Steppable,
-	_poses: Steppable,
-	_ballView: Steppable,
-	_camera: Steppable,
-	_touch: Steppable,
-	_hudStore: Steppable,
-	_hud: Steppable,
-	_worldMarkers: Steppable,
-	_arenaGlow: Steppable,
-	_carrierBeam: Steppable,
-	_ballTrail: Steppable,
-	_nameTags: Steppable,
+	_physics: { Step },
+	_frame: { Step },
+	-- Where a failed step is reported: the Output, or a fake in tests.
+	_log: (line: string) -> (),
 }
+
+local function joined(...: { string }): { string }
+	local all: { string } = {}
+	for _, names in { ... } do
+		table.move(names, 1, #names, #all + 1, all)
+	end
+	return all
+end
+
+local function logLine(line: string)
+	warn(line)
+end
+
+local function watchOverlays(input: any, _dt: number)
+	input:watchOverlays()
+end
+
+-- This module's name as the stack's lines give it.
+local SOURCE: string = debug.info(1, "s") :: any
+
+-- The report of a module's failed step: its name, the error, and where it was thrown: the stack's first line outside
+-- this module (a fixed depth would shift with the compiler's inlining and the stack's unnamed engine frames).
+local function failure(name: string, problem: any): string
+	local at = "?"
+	for line in string.gmatch(debug.traceback(), "[^\n]+") do
+		if string.sub(line, 1, #SOURCE) ~= SOURCE then
+			at = line
+			break
+		end
+	end
+	return `[BloxChampions] FrameController: {name}'s step failed: {tostring(problem)} ({at})`
+end
+
+-- A phase's steps, made once, so a frame makes no table or closure.
+local function phase(self: FrameController, deps: { [string]: any }, names: { string }): { Step }
+	local steps: { Step } = table.create(#names)
+	for _, name in names do
+		local module = deps[name]
+		local reported = false
+		table.insert(steps, {
+			module = module,
+			step = if name == OVERLAYS then watchOverlays else module.step,
+			failed = function(problem: any)
+				if not reported then
+					reported = true
+					self._log(failure(name, problem))
+				end
+			end,
+		})
+	end
+	return steps
+end
+
+local function run(steps: { Step }, dt: number)
+	for _, entry in steps do
+		xpcall(entry.step, entry.failed, entry.module, dt)
+	end
+end
 
 local FrameController: FrameController = {
 	name = "FrameController",
-	dependencies = {
-		"InputController",
-		"SkateController",
-		"ActionController",
-		"PoseController",
-		"BallView",
-		"CameraController",
-		"TouchControls",
-		"HudStore",
-		"Hud",
-		"WorldMarkers",
-		"ArenaGlow",
-		"CarrierBeam",
-		"BallTrail",
-		"NameTags",
-	},
-	_input = nil :: any,
-	_skate = nil :: any,
-	_actions = nil :: any,
-	_poses = nil :: any,
-	_ballView = nil :: any,
-	_camera = nil :: any,
-	_touch = nil :: any,
-	_hudStore = nil :: any,
-	_hud = nil :: any,
-	_worldMarkers = nil :: any,
-	_arenaGlow = nil :: any,
-	_carrierBeam = nil :: any,
-	_ballTrail = nil :: any,
-	_nameTags = nil :: any,
+	dependencies = joined({ OVERLAYS }, PHYSICS, DRAWN),
+	_physics = {},
+	_frame = {},
+	_log = logLine,
 
+	-- deps.Log replaces the Output in tests.
 	init = function(self: FrameController, deps: { [string]: any })
-		self._input = deps.InputController
-		self._skate = deps.SkateController
-		self._actions = deps.ActionController
-		self._poses = deps.PoseController
-		self._ballView = deps.BallView
-		self._camera = deps.CameraController
-		self._touch = deps.TouchControls
-		self._hudStore = deps.HudStore
-		self._hud = deps.Hud
-		self._worldMarkers = deps.WorldMarkers
-		self._arenaGlow = deps.ArenaGlow
-		self._carrierBeam = deps.CarrierBeam
-		self._ballTrail = deps.BallTrail
-		self._nameTags = deps.NameTags
+		self._log = deps.Log or logLine
+		self._physics = phase(self, deps, PHYSICS)
+		self._frame = phase(self, deps, joined({ OVERLAYS }, DRAWN))
 	end,
 
 	start = function(self: FrameController)
@@ -100,23 +131,11 @@ local FrameController: FrameController = {
 	end,
 
 	step = function(self: FrameController, dt: number)
-		self._skate:step(dt)
-		self._actions:step(dt)
-		self._poses:step(dt)
+		run(self._physics, dt)
 	end,
 
 	render = function(self: FrameController, dt: number)
-		self._input:watchOverlays()
-		self._ballView:step(dt)
-		self._camera:step(dt)
-		self._touch:step(dt)
-		self._hudStore:step(dt)
-		self._hud:step(dt)
-		self._worldMarkers:step(dt)
-		self._arenaGlow:step(dt)
-		self._carrierBeam:step(dt)
-		self._ballTrail:step(dt)
-		self._nameTags:step(dt)
+		run(self._frame, dt)
 	end,
 }
 
