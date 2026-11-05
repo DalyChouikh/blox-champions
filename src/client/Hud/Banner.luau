@@ -65,7 +65,7 @@ local function Banner(props: BannerProps): React.ReactElement
 		}),
 		{
 			Fit = Style.fit(config, props.area, box),
-			Group = Style.banner(
+			Lift = Style.banner(
 				config,
 				{
 					AnchorPoint = Vector2.new(0.5, centre),
@@ -73,13 +73,13 @@ local function Banner(props: BannerProps): React.ReactElement
 						return lifts[math.round(rise * share) + 1]
 					end),
 					Size = Style.FULL,
-					GroupTransparency = props.leave,
 				},
 				words,
 				size,
 				color,
 				HudScreen.banners(config, compact).edge,
 				ink,
+				props.leave,
 				{
 					Pop = React.createElement("UIScale", { Scale = props.scale }),
 				}

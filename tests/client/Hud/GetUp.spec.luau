@@ -20,7 +20,7 @@ local config = Fixtures.config({
 	UI = {
 		hud = {
 			screenMargin = 8,
-			look = { shadow = 4, textOutline = 2, bannerDigitRise = 0.1 },
+			look = { shadow = 4, textOutline = 2, bannerDigitRise = 0.1, groupRoom = 3 },
 			layout = {
 				getUp = {
 					sizes = {
@@ -111,7 +111,8 @@ describe("GetUp", function()
 		local frame = mounted(prompt(views))
 		expect(frame.BackgroundTransparency).toBe(1)
 		local group = child(frame, "Group") :: CanvasGroup
-		expect(group.Size).toEqual(UDim2.fromScale(1, 1))
+		-- Its room (3 px) past the prompt on every side.
+		expect(group.Size).toEqual(UDim2.new(1, 6, 1, 6))
 		local keys = child(group, "Keys") :: Frame
 		for index, name in names do
 			local key = child(keys, `Key{index}`)
@@ -237,5 +238,29 @@ describe("GetUp", function()
 		expect(fit.Scale).toBeCloseTo((150 - 2 * 8) / frame.Size.X.Offset, 4)
 		setArea(Vector2.new(1920, 1000))
 		expect(fit.Scale).toBe(1)
+	end)
+end)
+
+-- The prompt as Roblox lays it out (a ScreenGui under StarterGui is laid out in Edit, after a frame).
+describe("GetUp, laid out", function()
+	local gui: ScreenGui?
+
+	afterEach(function()
+		if gui ~= nil then
+			gui:Destroy()
+			gui = nil
+		end
+	end)
+
+	-- A group cuts off the ink that reaches past its edges (#386, the owner's Q257).
+	it("keeps look.groupRoom round its keys' and words' ink inside the group that fades it", function()
+		local layer = Instance.new("ScreenGui")
+		layer.Name = "GetUpLaidOutTest"
+		layer.Parent = game:GetService("StarterGui")
+		gui = layer
+		setArea(Vector2.new(1556, 735))
+		local frame = Fixtures.mount(prompt({ { text = "W" } }), layer):FindFirstChild("GetUp") :: Frame
+		task.wait()
+		expect(Fixtures.inkRoom(child(frame, "Group"))).toEqual({ left = 3, top = 3, right = 3, bottom = 3 })
 	end)
 end)

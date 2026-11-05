@@ -408,9 +408,9 @@ describe("Hud", function()
 		-- The lap's last moments: it fades as it leaves; the message, shown longer, stays whole.
 		HudStore:step(config.UI.hud.bannerSeconds.lap - config.UI.hud.motion.easeSeconds / 2)
 		Hud:step(0)
-		local group = banner:FindFirstChild("Group") :: CanvasGroup
+		local group = banner:FindFirstChild("Group", true) :: CanvasGroup
 		expect(group.GroupTransparency).toBeCloseTo(0.875, 4)
-		expect((message:FindFirstChild("Group") :: CanvasGroup).GroupTransparency).toBe(0)
+		expect((message:FindFirstChild("Group", true) :: CanvasGroup).GroupTransparency).toBe(0)
 	end)
 
 	it("counts the clock down on the scoreboard without rendering again", function()
@@ -1387,8 +1387,10 @@ describe("Hud", function()
 		Hud:step(config.UI.hud.motion.pop.seconds)
 		expect(pop.Scale).toBe(1)
 		expect(endScreen:FindFirstChild("Table", true) ~= nil).toBe(true)
-		local result = endScreen:FindFirstChild("Result", true) :: CanvasGroup
-		expect((result:FindFirstChild("Front") :: TextLabel).TextSize).toBe(HudScreen.bannerSize(config, true, "Goal"))
+		local result = endScreen:FindFirstChild("Result", true) :: Frame
+		expect((result:FindFirstChild("Front", true) :: TextLabel).TextSize).toBe(
+			HudScreen.bannerSize(config, true, "Goal")
+		)
 	end)
 
 	-- RC's way (the owner, Q185): nothing at the screen's centre without the ball.

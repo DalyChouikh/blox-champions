@@ -1944,6 +1944,10 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
 - **Q257 the other fading groups** (session 84, recommended): the desktop hint rows' ink touches their groups' edges exactly
   (0 px measured), and the feed chips, the Get Up prompt and the banners are built the same way: **"Yes, as its own issue
   next"**: every remaining fading group gets the same room through the shared helper, checked by a laid-out test.
+- **Q258 #386 shipped** (session 84, recommended; the design page version 7, section '#386', Play measurements desktop and
+  phone, the hint column zoomed, the phone with the board open, which also showed #383 on the phone): **"Yes, ship it"**. The
+  hint rows, feed chips, Get Up prompt and banners fade in Style.fadeGroup, now centred on its part so a pop inside scales round
+  the part's middle (a banner's round its letters); every group measured 2 px or more round its ink.
 
 ## Roller Champions
 

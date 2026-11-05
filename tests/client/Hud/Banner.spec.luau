@@ -19,7 +19,7 @@ local config = Fixtures.config({
 	UI = {
 		hud = {
 			screenMargin = 8,
-			look = { shadow = 4, textOutline = 2 },
+			look = { shadow = 4, textOutline = 2, groupRoom = 3 },
 			layout = {
 				banner = {
 					bottom = 20,
@@ -79,7 +79,7 @@ describe("Banner", function()
 	it("letters the banner in look C at its kind's size, in its team's colour, and nothing without one", function()
 		local mounted, rerender = Fixtures.mount(banner({ kind = "Goal", team = "Blue" }, 100), folder)
 		local holder = mounted:FindFirstChild("Banner") :: Frame
-		local group = holder:FindFirstChild("Group") :: CanvasGroup
+		local group = holder:FindFirstChild("Group", true) :: CanvasGroup
 		local front = group:FindFirstChild("Front") :: TextLabel
 		expect(holder.Visible).toBe(true)
 		expect(front.Text).toBe("GOAL!")
@@ -117,7 +117,7 @@ describe("Banner", function()
 	it("puts the goal message's text messageBottom above the stage's bottom", function()
 		local mounted = Fixtures.mount(banner({ kind = "GoalOpen", team = "Orange" }), folder)
 		local holder = mounted:FindFirstChild("Banner") :: Frame
-		local front = (holder:FindFirstChild("Group") :: CanvasGroup):FindFirstChild("Front") :: TextLabel
+		local front = (holder:FindFirstChild("Group", true) :: CanvasGroup):FindFirstChild("Front") :: TextLabel
 		expect(front.Text).toBe("ORANGE GOAL IS ACTIVE!")
 		expect(front.TextSize).toBe(20)
 		local size = box("ORANGE GOAL IS ACTIVE!", 20)
@@ -129,20 +129,26 @@ describe("Banner", function()
 	-- Each pops in with a quick overshoot, holds, then floats up as it fades (the owner, Q191, Q194).
 	it("pops round its text's centre, and fades whole while it leaves, floating up in whole pixels", function()
 		local mounted = Fixtures.mount(banner({ kind = "Goal", team = "Blue" }, 100), folder)
-		local group = (mounted:FindFirstChild("Banner") :: Frame):FindFirstChild("Group") :: CanvasGroup
+		-- The lift is anchored on the text's centre, and the group that fades and pops is centred on the letters
+		-- (the holder above the shadow), so the pop grows round the text's centre too.
+		local lift = (mounted:FindFirstChild("Banner") :: Frame):FindFirstChild("Lift") :: Frame
+		local group = lift:FindFirstChild("Group", true) :: CanvasGroup
 		local size = box("GOAL!", 60)
-		expect(group.AnchorPoint.Y).toBeCloseTo(35 / size.Y, 6)
+		expect(lift.AnchorPoint.Y).toBeCloseTo(35 / size.Y, 6)
+		expect((lift:FindFirstChild("Letters") :: Frame).Size).toEqual(UDim2.new(1, 0, 1, -4))
+		expect(group.AnchorPoint).toEqual(Vector2.new(0.5, 0.5))
+		expect(group.Position).toEqual(UDim2.fromScale(0.5, 0.5))
 		setScale(1.1)
 		expect((group:FindFirstChild("Pop") :: UIScale).Scale).toBeCloseTo(1.1, 4)
 		expect(group.GroupTransparency).toBe(0)
-		expect(group.Position.Y.Offset).toBe(0)
+		expect(lift.Position.Y.Offset).toBe(0)
 		-- Half gone: half see-through, and up half of its 30 px rise; nearly gone, up 29 of the 30.
 		setLeave(0.5)
 		expect(group.GroupTransparency).toBeCloseTo(0.5, 4)
-		expect(group.Position.Y.Offset).toBe(-15)
+		expect(lift.Position.Y.Offset).toBe(-15)
 		setLeave(0.97)
-		expect(group.Position.Y.Offset).toBe(-29)
-		expect(group.Position.Y.Scale).toBeCloseTo(35 / size.Y, 6)
+		expect(lift.Position.Y.Offset).toBe(-29)
+		expect(lift.Position.Y.Scale).toBeCloseTo(35 / size.Y, 6)
 	end)
 
 	it("shrinks to fit a stage narrower than itself", function()
@@ -187,5 +193,31 @@ describe("Banner's settings", function()
 			end
 		end
 		expect(tooWide).toEqual({})
+	end)
+end)
+
+-- The banner as Roblox lays it out (a ScreenGui under StarterGui is laid out in Edit, after a frame).
+describe("Banner, laid out", function()
+	local gui: ScreenGui?
+
+	afterEach(function()
+		if gui ~= nil then
+			gui:Destroy()
+			gui = nil
+		end
+	end)
+
+	-- A group cuts off the ink that reaches past its edges (#386, the owner's Q257).
+	it("keeps look.groupRoom round its letters' ink inside the group that fades it", function()
+		local layer = Instance.new("ScreenGui")
+		layer.Name = "BannerLaidOutTest"
+		layer.Parent = game:GetService("StarterGui")
+		gui = layer
+		setArea(Vector2.new(1556, 735))
+		local mounted = Fixtures.mount(banner({ kind = "Goal", team = "Blue" }, 100), layer)
+		task.wait()
+		local group = mounted:FindFirstChild("Group", true) :: CanvasGroup
+		-- Centred on the letters, the group reaches the shadow's 4 px above them too.
+		expect(Fixtures.inkRoom(group)).toEqual({ left = 3, top = 7, right = 3, bottom = 3 })
 	end)
 end)

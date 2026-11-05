@@ -18,7 +18,7 @@ local Style = require(Client.Hud.Style)
 local config = Fixtures.config({
 	UI = {
 		hud = {
-			look = { outline = 2, shadow = 3 },
+			look = { outline = 2, shadow = 3, groupRoom = 5 },
 			layout = {
 				hints = {
 					rowHeight = 30,
@@ -146,13 +146,12 @@ describe("ControlHints", function()
 		setters.tackle.label("Cancel & Dodge")
 		local longer = Style.textWidth(config, "Cancel & Dodge", 18)
 		expect(tackle.row.Size).toEqual(UDim2.fromOffset(2 + 4 + 24 + 7 + longer + 9 + 2, 37))
-		local padding = tackle.group:FindFirstChildOfClass("UIPadding") :: UIPadding
-		expect(padding.PaddingLeft).toEqual(UDim.new(0, 2))
-		expect(padding.PaddingRight).toEqual(UDim.new(0, 2))
-		expect(padding.PaddingTop).toEqual(UDim.new(0, 2))
-		expect(padding.PaddingBottom).toEqual(UDim.new(0, 5))
+		-- Its box and line inside its ink: the 2 px outline round them, the 3 px shadow under them.
 		local box = tackle.group:FindFirstChild("Box") :: Frame
-		expect(box.Size).toEqual(UDim2.fromScale(1, 1))
+		expect(box.Position).toEqual(UDim2.fromOffset(2, 2))
+		expect(box.Size).toEqual(UDim2.new(1, -4, 1, -7))
+		expect(tackle.line.Position).toEqual(UDim2.fromOffset(2, 2))
+		expect(tackle.line.Size).toEqual(UDim2.new(1, -4, 1, -7))
 		expect(box:FindFirstChild("Ink1") ~= nil and box:FindFirstChild("Fill1") ~= nil).toBe(true)
 		expect(tackle.line.ZIndex > box.ZIndex).toBe(true)
 		local inset = tackle.line:FindFirstChildOfClass("UIPadding") :: UIPadding
@@ -262,5 +261,8 @@ describe("ControlHints, laid out", function()
 		local mark = jump.mark
 		expect(mark.AbsolutePosition.X + mark.AbsoluteSize.X).toBe(jump.row.AbsolutePosition.X - 10)
 		expect(mark.AbsolutePosition.Y).toBe(jump.row.AbsolutePosition.Y + 2)
+		-- Each row's group keeps look.groupRoom round its ink: a group cuts off what reaches its edges (#386, Q257).
+		expect(Fixtures.inkRoom(jump.group)).toEqual({ left = 5, top = 5, right = 5, bottom = 5 })
+		expect(Fixtures.inkRoom(pump.group)).toEqual({ left = 5, top = 5, right = 5, bottom = 5 })
 	end)
 end)

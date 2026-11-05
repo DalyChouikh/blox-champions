@@ -112,8 +112,8 @@ describe("TouchButton", function()
 			local group = front:FindFirstChild("Group") :: CanvasGroup
 			expect(group.ClassName).toBe("CanvasGroup")
 			-- The room round the ink and the shadow below it, which a CanvasGroup would clip.
-			expect(group.Position).toEqual(UDim2.fromOffset(-3, -3))
-			expect(group.Size).toEqual(UDim2.new(1, 6, 1, 11))
+			expect(group.Position).toEqual(UDim2.fromScale(0.5, 0.5))
+			expect(group.Size).toEqual(UDim2.new(1, 6, 1, 16))
 			local box = group:FindFirstChild("Box") :: Frame
 			-- Inside the group's padding (its room), the outline in from the button's sides.
 			expect(box.Position).toEqual(UDim2.fromOffset(2, 2))
@@ -259,8 +259,9 @@ describe("TouchButton, laid out", function()
 		local round = face(moving(), nil, layer)
 		local scores = face(moving(), { size = Vector2.new(96, 36), corner = UDim.new(0, 7), label = "SCORES" }, layer)
 		task.wait()
-		-- The outline 2 px inside the button's sides, the shadow 5 px under its bottom, the group 3 px past them all.
-		expect(parts(round)).toEqual({ "fill 2 2 56 56", "ink 0 0 60 65", "group -3 -3 66 71" })
-		expect(parts(scores)).toEqual({ "fill 2 2 92 32", "ink 0 0 96 41", "group -3 -3 102 47" })
+		-- The outline 2 px inside the button's sides, the shadow 5 px under its bottom, the group 3 px past them all
+		-- (and 5 more above, centred on the button).
+		expect(parts(round)).toEqual({ "fill 2 2 56 56", "ink 0 0 60 65", "group -3 -8 66 76" })
+		expect(parts(scores)).toEqual({ "fill 2 2 92 32", "ink 0 0 96 41", "group -3 -8 102 52" })
 	end)
 end)
