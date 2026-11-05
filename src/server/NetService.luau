@@ -46,11 +46,17 @@ export type NetService = {
 	_folder: Folder?,
 	_events: { [string]: RemoteEvent },
 	_streams: { [string]: UnreliableRemoteEvent },
+	-- How a stream's values reach every client (its FireAllClients; a fake in tests).
+	_stream: (remote: UnreliableRemoteEvent, ...any) -> (),
 	_listeners: { [string]: Listener },
 	_drops: { [PlayerId]: number },
 	-- Seconds, for the rate limits (os.clock; a fake in tests).
 	_clock: () -> number,
 }
+
+local function streamToAll(remote: UnreliableRemoteEvent, ...: any)
+	remote:FireAllClients(...)
+end
 
 local function event(self: NetService, name: string): RemoteEvent
 	local remote: RemoteEvent? = self._events[name]
@@ -65,11 +71,14 @@ local NetService: NetService = {
 	dependencies = {},
 	_events = {},
 	_streams = {},
+	_stream = streamToAll,
 	_listeners = {},
 	_drops = {},
 	_clock = os.clock,
 
-	-- deps.Parent lets tests keep the remotes out of ReplicatedStorage; deps.Clock replaces os.clock.
+	-- deps.Parent lets tests keep the remotes out of ReplicatedStorage; deps.Clock replaces os.clock; deps.Stream
+	-- replaces a stream's send, since a real one fires to no client in Studio's editor and Roblox reports the dropped
+	-- event (#393).
 	init = function(self: NetService, deps: { [string]: any })
 		local folder = Remotes.create(deps.Parent or ReplicatedStorage)
 		self._folder = folder
@@ -81,6 +90,7 @@ local NetService: NetService = {
 		for _, name in Remotes.streams do
 			self._streams[name] = folder:FindFirstChild(name) :: UnreliableRemoteEvent
 		end
+		self._stream = deps.Stream or streamToAll
 		self._listeners = {}
 		self._drops = {}
 		self._clock = deps.Clock or os.clock
@@ -110,7 +120,7 @@ local NetService: NetService = {
 		if stream == nil then
 			error(`NetService: unknown stream "{name}"`, 0)
 		end
-		stream:FireAllClients(...)
+		self._stream(stream, ...)
 	end,
 
 	listen = function(

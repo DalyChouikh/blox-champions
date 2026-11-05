@@ -38,15 +38,28 @@ describe("NetService", function()
 		NetService:destroy()
 	end)
 
-	-- #316: the loose ball's state goes to everyone each frame it moves, on an unreliable remote.
+	-- #316: the loose ball's state goes to everyone each frame it moves, on an unreliable remote. The test hands the
+	-- service its own sender: a real stream fires to no client in Studio's editor, and Roblox reports the dropped event
+	-- (#393).
 	it("streams to every client and rejects an unknown stream", function()
-		NetService:init({ Parent = parent })
-		expect(function()
-			NetService:streamAll(Remotes.streams.BallState, Vector3.one, Vector3.zero, true, 1.5)
-		end).never.toThrow()
+		local sent: { { remote: UnreliableRemoteEvent, count: number, values: { any } } } = {}
+		NetService:init({
+			Parent = parent,
+			Stream = function(remote: UnreliableRemoteEvent, ...: any)
+				table.insert(sent, { remote = remote, count = select("#", ...), values = { ... } })
+			end,
+		})
+		NetService:streamAll(Remotes.streams.BallState, Vector3.one, Vector3.zero, true, 1.5)
+		local folder = parent:FindFirstChild(Remotes.FOLDER) :: Folder
+		expect(#sent).toBe(1)
+		expect(sent[1].remote).toBe(folder:FindFirstChild(Remotes.streams.BallState))
+		expect(sent[1].count).toBe(4)
+		local values: { any } = { Vector3.one, Vector3.zero, true, 1.5 }
+		expect(sent[1].values).toEqual(values)
 		expect(function()
 			NetService:streamAll(Remotes.names.BallCarrier, {})
 		end).toThrow('NetService: unknown stream "BallCarrier"')
+		expect(#sent).toBe(1)
 		NetService:destroy()
 	end)
 
