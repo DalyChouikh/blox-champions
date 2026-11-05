@@ -99,8 +99,16 @@ describe("MovementGuard", function()
 		moveTo(START_X + 180)
 		tick()
 		expect(Fixtures.root(rig).Position.X).toBeCloseTo(START_X + 30, 3)
-		expect(#logs).toBe(1)
-		expect(string.find(logs[1], "1", 1, true) ~= nil).toBe(true)
+		-- What the guard measured (#394): the move that made the third strike.
+		local y = Fixtures.root(rig).Position.Y
+		expect(logs).toEqual({
+			string.format(
+				"[BloxChampions] MovementGuard: returned 1: 3 moves in a row over the allowance, the last 50.0 studs in"
+					.. " 0.25 s (36.3 allowed), from (55.0, %.1f, 60.0) to (105.0, %.1f, 60.0)",
+				y,
+				y
+			),
+		})
 		expect(#placements).toBe(0)
 	end)
 
@@ -166,7 +174,15 @@ describe("MovementGuard", function()
 			tick()
 			expect(#placements).toBe(0)
 			expect(Fixtures.root(rig).Position.Z).toBeCloseTo(LANE_Z, 3)
-			expect(#logs).toBe(1)
+			local y = Fixtures.root(rig).Position.Y
+			expect(logs).toEqual({
+				string.format(
+					"[BloxChampions] MovementGuard: returned 1: one move of 100.0 studs in 0.25 s (36.3 allowed), from"
+						.. " (-75.0, %.1f, 60.0) to (-75.0, %.1f, 160.0)",
+					y,
+					y
+				),
+			})
 		end
 	)
 
