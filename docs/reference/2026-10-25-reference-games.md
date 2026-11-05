@@ -1964,6 +1964,18 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   734 px area and 180 ... 504 in the usual 735 px one; 4x zooms before and after): **"Yes, ship it"**. The column's top is a
   whole pixel (HudScreen.hintsTop: its middle at its place's or half a pixel above), from the HUD's area and the rows shown.
   Next: #379 (a HUD error boundary), #376, #384.
+- **Q262 #379 shipped** (session 86, recommended; the owner's /login moved the design page to
+  https://claude.ai/artifact/2VPvUoeq1YxxQFhw3quNhw, the earlier L7fJyQ7iJax4PGW4H5pn5A being the previous account's; section
+  'One broken part no longer blanks the whole HUD': the real HUD drawn by the game's code in Studio's editor, a normal LAP
+  banner beside session 78's broken lap message, where only the banner line goes; the Output line shown; said plainly: not a
+  live Play, since Studio 0.746 lets no probe fire a remote, and not shown on the phone emulator): **"Yes, ship it"**. Each
+  part (each touch face too) behind its own error boundary, App behind one; a broken part hidden until the next match
+  (HudState.matchNumber), one Output line naming the part, the error and the throw site.
+- **Q263 three findings get issues** (session 86, recommended, all three): (1) an error inside a per-frame binding update escapes
+  Hud:step, and FrameController's render phase skips the later steps that frame; (2) every full test run prints Roblox's
+  'Remote event invocation discarded event ... BallState' message (NetService.spec's stream test fires to no client, since
+  #331); (3) in an idle single-player Play the server logged 'MovementGuard: returned <id>' (cause not known). Each its own
+  issue, after #376 and #384.
 
 ## Roller Champions
 

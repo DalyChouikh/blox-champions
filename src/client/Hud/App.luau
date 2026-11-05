@@ -18,7 +18,9 @@
 -- would touch the scoreboard (HudScreen); both hide while the board or the end screen shows. The reticle and the
 -- speedometer read in the viewer's team colour. On touch each touch button's look C face (Hud/TouchButton, #355) is
 -- drawn into TouchControls' button for it (portals), from its hint row's bindings: Jump in UI.touchStyle.jumpFill, the
--- others in its fill; and SCORES lines up with their right edge. A plain function of its props.
+-- others in its fill; and SCORES lines up with their right edge. Each part, each face too, is behind its own error
+-- boundary (Hud/PartBoundary, #379): one whose render throws shows nothing until the next match, and the rest go on.
+-- A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -35,6 +37,7 @@ local GetUp = require(script.Parent.GetUp)
 local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
 local HudState = require(ReplicatedStorage.Shared.Hud.HudState)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
+local PartBoundary = require(script.Parent.PartBoundary)
 local React = require(ReplicatedStorage.Packages.React)
 local ReactRoblox = require(ReplicatedStorage.Packages.ReactRoblox)
 local Reticle = require(script.Parent.Reticle)
@@ -112,6 +115,8 @@ export type AppProps = {
 	centre: ScreenGui,
 	top: ScreenGui,
 	dim: ScreenGui,
+	-- Where a part hidden after its render threw is reported (#379).
+	log: (line: string) -> (),
 }
 
 -- The Stage frame's size: the stage, or the whole Root while the stage is not known.
@@ -119,30 +124,32 @@ local function stageSize(stage: Vector2): UDim2
 	return if stage.X > 0 and stage.Y > 0 then UDim2.fromOffset(stage.X, stage.Y) else UDim2.fromScale(1, 1)
 end
 
--- Each touch button's face, drawn into its button (`buttons`) from its hint row's bindings (`rows`).
-local function touchFaces(
-	config: Config.GameConfig,
-	buttons: { [string]: GuiButton },
-	rows: ControlHints.HintRows
+-- A touch button's face, from its hint row's bindings (`row`).
+local function touchFace(config: Config.GameConfig, control: Config.TouchControl, row: ControlHints.HintRow): React.Node
+	local button, style = config.Input.touch.buttons[control], config.UI.touchStyle
+	return React.createElement(TouchButton, {
+		config = config,
+		size = Vector2.new(button.size, button.size),
+		corner = Style.ROUND,
+		fill = if control == "jump" then style.jumpFill else style.fill,
+		textSize = button.textSize,
+		label = row.label,
+		moving = row.cap,
+		fade = row.fade,
+	})
+end
+
+-- Puts each of `parts` behind its own error boundary (#379): one whose render throws shows nothing until the next
+-- match (`match`), reported to `log` by its name, and the rest go on.
+local function guarded(
+	parts: { [string]: React.Node },
+	match: number,
+	log: (line: string) -> ()
 ): { [string]: React.Node }
-	local touch, style = config.Input.touch, config.UI.touchStyle
-	local faces: { [string]: React.Node } = {}
-	for _, control: Config.TouchControl in ControlLabels.CONTROLS do
-		local button, row = touch.buttons[control], rows[control]
-		faces[control] = ReactRoblox.createPortal({
-			Face = React.createElement(TouchButton, {
-				config = config,
-				size = Vector2.new(button.size, button.size),
-				corner = Style.ROUND,
-				fill = if control == "jump" then style.jumpFill else style.fill,
-				textSize = button.textSize,
-				label = row.label,
-				moving = row.cap,
-				fade = row.fade,
-			}),
-		}, buttons[control])
+	for name, part in parts do
+		parts[name] = React.createElement(PartBoundary, { name = name, part = part, match = match, report = log })
 	end
-	return faces
+	return parts
 end
 
 local function App(props: AppProps): React.ReactElement
@@ -160,161 +167,180 @@ local function App(props: AppProps): React.ReactElement
 	local shownBanner = state.banner
 	local lineSize = HudScreen.bannerSize(config, compact, if shownBanner ~= nil then shownBanner.kind else "Go")
 	local viewer = Style.teamColor(config, HudState.teamOf(match, props.localId))
-	return React.createElement(React.Fragment, nil, {
-		Centre = ReactRoblox.createPortal({
-			Reticle = React.createElement(Reticle, {
+	-- Every part, the touch buttons' faces by control among them, each behind its own error boundary; placed below.
+	local parts: { [string]: React.Node } = {
+		Reticle = React.createElement(Reticle, {
+			config = config,
+			compact = compact,
+			color = viewer,
+			visible = uncovered and props.carrying,
+			charge = bindings.charge,
+			scale = HudScreen.ringScale(config, compact, top, aim, period),
+		}),
+		Countdown = React.createElement(Countdown, {
+			config = config,
+			text = text,
+			banner = state.banner,
+			compact = compact,
+			visible = uncovered,
+			drop = HudScreen.countDrop(config, compact, top, aim, period),
+		}),
+		Dim = if ended ~= nil
+			then React.createElement("Frame", {
+				Size = Style.FULL,
+				BackgroundColor3 = config.UI.hud.look.ink,
+				BackgroundTransparency = props.ending.scale.binding:map(function(scale: number): number
+					return HudScreen.endDim(config, scale)
+				end),
+				BorderSizePixel = 0,
+			})
+			else nil,
+		Scoreboard = if scoreboard ~= nil
+			then React.createElement(Scoreboard, {
 				config = config,
+				text = text,
+				match = scoreboard,
 				compact = compact,
-				color = viewer,
-				visible = uncovered and props.carrying,
-				charge = bindings.charge,
-				scale = HudScreen.ringScale(config, compact, top, aim, period),
-			}),
-			Countdown = React.createElement(Countdown, {
+				top = top,
+				clock = bindings.clock,
+				motion = props.board,
+			})
+			else nil,
+		ControlHints = if keys ~= nil and ended == nil
+			then React.createElement(ControlHints, {
+				config = config,
+				keys = keys,
+				rows = bindings.hints,
+				area = bindings.area,
+			})
+			else nil,
+		Speedometer = React.createElement(Speedometer, {
+			config = config,
+			speed = bindings.speed,
+			color = viewer,
+			touch = touch,
+			compact = compact,
+			visible = props.hasSkater and ended == nil,
+		}),
+		ScoreButton = if touch
+			then React.createElement(ScoreButton, {
+				config = config,
+				left = bindings.lineUp,
+				moving = bindings.scoreButton,
+				onActivated = props.onScoreButton,
+			})
+			else nil,
+		Banner = if uncovered
+			then React.createElement(Banner, {
 				config = config,
 				text = text,
 				banner = state.banner,
 				compact = compact,
-				visible = uncovered,
-				drop = HudScreen.countDrop(config, compact, top, aim, period),
-			}),
-		}, props.centre),
-		Dim = ReactRoblox.createPortal({
-			Dim = if ended ~= nil
-				then React.createElement("Frame", {
-					Size = Style.FULL,
-					BackgroundColor3 = config.UI.hud.look.ink,
-					BackgroundTransparency = props.ending.scale.binding:map(function(scale: number): number
-						return HudScreen.endDim(config, scale)
-					end),
-					BorderSizePixel = 0,
-				})
-				else nil,
-		}, props.dim),
-		Top = ReactRoblox.createPortal({
-			Scoreboard = if scoreboard ~= nil
-				then React.createElement(Scoreboard, {
-					config = config,
-					text = text,
-					match = scoreboard,
-					compact = compact,
-					top = top,
-					clock = bindings.clock,
-					motion = props.board,
-				})
-				else nil,
-		}, props.top),
-		Touch = if touch
-			then React.createElement(React.Fragment, nil, touchFaces(config, props.touchButtons, bindings.hints))
+				line = HudScreen.bannerLine(config, compact, props.bannerAt, top, period, lineSize) - props.stageTop,
+				scale = banners.line.scale.binding,
+				leave = banners.line.leave,
+				area = bindings.stage,
+			})
 			else nil,
-		Root = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1) }), {
-			ControlHints = if keys ~= nil and ended == nil
-				then React.createElement(ControlHints, {
-					config = config,
-					keys = keys,
-					rows = bindings.hints,
-					area = bindings.area,
-				})
-				else nil,
-			Speedometer = React.createElement(Speedometer, {
+		Message = if uncovered
+			then React.createElement(Banner, {
 				config = config,
-				speed = bindings.speed,
-				color = viewer,
-				touch = touch,
+				text = text,
+				banner = state.message,
 				compact = compact,
-				visible = props.hasSkater and ended == nil,
-			}),
-			ScoreButton = if touch
-				then React.createElement(ScoreButton, {
-					config = config,
-					left = bindings.lineUp,
-					moving = bindings.scoreButton,
-					onActivated = props.onScoreButton,
-				})
-				else nil,
+				scale = banners.message.scale.binding,
+				leave = banners.message.leave,
+				area = bindings.stage,
+			})
+			else nil,
+		Feed = if uncovered
+			then React.createElement(Feed, {
+				config = config,
+				text = text,
+				feed = state.feed,
+				lines = feedLines,
+				chips = banners.chips,
+				names = state.names,
+				compact = compact,
+				area = bindings.stage,
+			})
+			else nil,
+		GetUp = if props.getUpKeys ~= nil and uncovered
+			then React.createElement(GetUp, {
+				config = config,
+				keys = props.getUpKeys,
+				compact = compact,
+				lines = feedLines,
+				scale = props.prompt.scale.binding,
+				leave = props.prompt.leave.binding,
+				area = bindings.stage,
+			})
+			else nil,
+		EndScreen = if ended ~= nil and not tabShown
+			then React.createElement(EndScreen, {
+				config = config,
+				text = text,
+				ended = ended,
+				names = state.names,
+				localId = props.localId,
+				area = bindings.stage,
+				compact = compact,
+				touch = touch,
+				scale = props.ending.scale.binding,
+			})
+			else nil,
+		ScoreTab = if tabShown and match ~= nil
+			then React.createElement(ScoreTab, {
+				config = config,
+				text = text,
+				stats = if ended ~= nil then ended.stats else match.stats,
+				names = state.names,
+				localId = props.localId,
+				compact = compact,
+				touch = touch,
+				open = props.tabOpen,
+				scale = props.tab.scale.binding,
+				leave = props.tab.leave.binding,
+				area = bindings.area,
+				screen = bindings.screen,
+				boardBottom = if scoreboard ~= nil
+					then HudScreen.boardBottom(config, compact, top, period) - props.stageTop
+					else 0,
+				switchTeam = props.switchTeam,
+			})
+			else nil,
+	}
+	if touch then
+		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
+			parts[control] = touchFace(config, control, bindings.hints[control])
+		end
+	end
+	guarded(parts, state.matchNumber, props.log)
+	-- Each face drawn into its touch button.
+	local faces: { [string]: React.Node } = {}
+	if touch then
+		for _, control: Config.TouchControl in ControlLabels.CONTROLS do
+			faces[control] = ReactRoblox.createPortal({ Face = parts[control] }, props.touchButtons[control])
+		end
+	end
+	return React.createElement(React.Fragment, nil, {
+		Centre = ReactRoblox.createPortal({ Reticle = parts.Reticle, Countdown = parts.Countdown }, props.centre),
+		Dim = ReactRoblox.createPortal({ Dim = parts.Dim }, props.dim),
+		Top = ReactRoblox.createPortal({ Scoreboard = parts.Scoreboard }, props.top),
+		Touch = if touch then React.createElement(React.Fragment, nil, faces) else nil,
+		Root = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1) }), {
+			ControlHints = parts.ControlHints,
+			Speedometer = parts.Speedometer,
+			ScoreButton = parts.ScoreButton,
 			-- Above the other parts.
 			Stage = React.createElement("Frame", Style.holder(Style.above({ Size = bindings.stage:map(stageSize) })), {
-				Banner = if uncovered
-					then React.createElement(Banner, {
-						config = config,
-						text = text,
-						banner = state.banner,
-						compact = compact,
-						line = HudScreen.bannerLine(config, compact, props.bannerAt, top, period, lineSize)
-							- props.stageTop,
-						scale = banners.line.scale.binding,
-						leave = banners.line.leave,
-						area = bindings.stage,
-					})
-					else nil,
-				Message = if uncovered
-					then React.createElement(Banner, {
-						config = config,
-						text = text,
-						banner = state.message,
-						compact = compact,
-						scale = banners.message.scale.binding,
-						leave = banners.message.leave,
-						area = bindings.stage,
-					})
-					else nil,
-				Feed = if uncovered
-					then React.createElement(Feed, {
-						config = config,
-						text = text,
-						feed = state.feed,
-						lines = feedLines,
-						chips = banners.chips,
-						names = state.names,
-						compact = compact,
-						area = bindings.stage,
-					})
-					else nil,
-				GetUp = if props.getUpKeys ~= nil and uncovered
-					then React.createElement(GetUp, {
-						config = config,
-						keys = props.getUpKeys,
-						compact = compact,
-						lines = feedLines,
-						scale = props.prompt.scale.binding,
-						leave = props.prompt.leave.binding,
-						area = bindings.stage,
-					})
-					else nil,
-				EndScreen = if ended ~= nil and not tabShown
-					then React.createElement(EndScreen, {
-						config = config,
-						text = text,
-						ended = ended,
-						names = state.names,
-						localId = props.localId,
-						area = bindings.stage,
-						compact = compact,
-						touch = touch,
-						scale = props.ending.scale.binding,
-					})
-					else nil,
+				Banner = parts.Banner,
+				Message = parts.Message,
+				Feed = parts.Feed,
+				GetUp = parts.GetUp,
+				EndScreen = parts.EndScreen,
 			}),
-			ScoreTab = if tabShown and match ~= nil
-				then React.createElement(ScoreTab, {
-					config = config,
-					text = text,
-					stats = if ended ~= nil then ended.stats else match.stats,
-					names = state.names,
-					localId = props.localId,
-					compact = compact,
-					touch = touch,
-					open = props.tabOpen,
-					scale = props.tab.scale.binding,
-					leave = props.tab.leave.binding,
-					area = bindings.area,
-					screen = bindings.screen,
-					boardBottom = if scoreboard ~= nil
-						then HudScreen.boardBottom(config, compact, top, period) - props.stageTop
-						else 0,
-					switchTeam = props.switchTeam,
-				})
-				else nil,
+			ScoreTab = parts.ScoreTab,
 		}),
 	})
 end

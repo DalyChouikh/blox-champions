@@ -236,6 +236,35 @@ function Fixtures.unmountAll()
 	table.clear(roots)
 end
 
+-- The console React Luau reports to outside __DEV__ (the luau-polyfill's), found by its package's name so no version
+-- is written here.
+local function reactConsole(): any
+	for _, package in ReplicatedStorage.Packages._Index:GetChildren() do
+		if string.find(package.Name, "^roblox_luau%-polyfill%-console@") ~= nil then
+			return require(package:FindFirstChild("luau-polyfill-console") :: ModuleScript) :: any
+		end
+	end
+	error("Fixtures.reactReports: React's console package was not found", 0)
+end
+
+-- What React reports while `run` runs: each error an error boundary catches, which React warns of outside __DEV__.
+-- Kept out of the Output, so a test that breaks a part on purpose leaves it clean; React's console is put back after,
+-- even when `run` throws.
+function Fixtures.reactReports(run: () -> ...any): { string }
+	local console = reactConsole()
+	local report = console.error
+	local reports: { string } = {}
+	console.error = function(message: any)
+		table.insert(reports, tostring(message))
+	end
+	local ok, problem = pcall(run)
+	console.error = report
+	if not ok then
+		error(problem, 0)
+	end
+	return reports
+end
+
 -- A binding tests can drive with Fire, added to the context's input action called `name`.
 function Fixtures.scriptedBinding(context: InputContext, name: string): InputBinding
 	local binding = Instance.new("InputBinding")
