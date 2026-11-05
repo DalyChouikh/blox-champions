@@ -43,6 +43,24 @@ local function logLine(line: string)
 	warn(line)
 end
 
+local function spot(position: Vector3): string
+	return string.format("(%.1f, %.1f, %.1f)", position.X, position.Y, position.Z)
+end
+
+-- What the guard measured, so a skater returned by mistake can be told from a cheat (#394, the owner's Q271).
+local function measured(move: MovementCheck.Move): string
+	local what = if move.jumped then "one move of" else `{move.strikes} moves in a row over the allowance, the last`
+	return string.format(
+		"%s %.1f studs in %.2f s (%.1f allowed), from %s to %s",
+		what,
+		move.distance,
+		move.seconds,
+		move.allowed,
+		spot(move.from),
+		spot(move.to)
+	)
+end
+
 local function forget(self: MovementGuard, player: string)
 	self._check:forget(player)
 	self._inside[player] = nil
@@ -59,7 +77,8 @@ local function returnToValid(self: MovementGuard, holder: BallService.Holder)
 	if self._ball.state.carrier == holder.player then
 		self._ball:jumped()
 	end
-	self._log(`[BloxChampions] MovementGuard: returned {holder.player}`)
+	local move = self._check:lastMove(holder.player) :: MovementCheck.Move
+	self._log(`[BloxChampions] MovementGuard: returned {holder.player}: {measured(move)}`)
 end
 
 -- Puts a skater found outside the arena on their spawn, their ball left where they were last inside (or, with no

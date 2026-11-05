@@ -2031,6 +2031,14 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   banner, no lap points, no glowing gate wall, no chevron; the four lap chips stay lit and the goal stays +5. Measured in
   the Play: LAP 1/2/3 COMPLETED at 28.0/43.3/58.4 s; the wall and the chevron went in the same frame as LAP 3's; 20+ s of
   carried laps after it changed nothing. Next: #394, #393, #392 (Q263).
+- **Q271 #394's next step, and Rojo** (session 89, both recommended). #394 (MovementGuard returning an honest skater)
+  was not reproduced: Studio's guard instrumented in place, 8 Plays (~10 min: idle, driven laps, session 88's exact
+  driving probe, window-shot bursts, a resize, a full test run right before an idle Play) gave no strike at all; flat
+  skating stays near 51 studs/s against the guard's 145.2, so only a jump in position could trip it. **"Make the line tell
+  why"**: the guard's 'returned' line says what it measured (how far, in what time, from where to where, one jump or a run
+  of strikes), built test-first, so any later case shows its cause; #394 stays open meanwhile, and #393 and #392 go on.
+  Not chosen: keep hunting now; the owner describing a repro. Also: **"Yes, restart it"** (Rojo serve, the previous
+  session's process having exited with that session).
 
 ## Roller Champions
 
