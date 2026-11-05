@@ -43,6 +43,11 @@ local function hint(config: Config.GameConfig, view: Style.KeyView, moving: Hint
 	local look = config.UI.hud.look
 	local place = config.UI.hud.layout.hints
 	local outline, shadow = look.outline, look.shadow
+	-- The row's box inside its ink: the outline round it, the shadow under it.
+	local inside = {
+		Position = UDim2.fromOffset(outline, outline),
+		Size = UDim2.new(1, -2 * outline, 1, -2 * outline - shadow),
+	}
 	local keyName, key = Style.keyCap(config, view, place.cap, 1, moving.cap)
 	-- Across: the outlines, the insets, the cap and the gap, then the label's text.
 	local across = 2 * outline
@@ -93,20 +98,10 @@ local function hint(config: Config.GameConfig, view: Style.KeyView, moving: Hint
 				}),
 				{ Ink = Style.inked(config) }
 			),
-			Group = React.createElement(
-				"CanvasGroup",
-				Style.holder({ Size = Style.FULL, GroupTransparency = moving.fade }),
-				{
-					Ink = React.createElement("UIPadding", {
-						PaddingLeft = UDim.new(0, outline),
-						PaddingRight = UDim.new(0, outline),
-						PaddingTop = UDim.new(0, outline),
-						PaddingBottom = UDim.new(0, outline + shadow),
-					}),
-					Box = Style.box(config, { Size = Style.FULL }, look.box),
-					Line = React.createElement("Frame", Style.holder(Style.above({ Size = Style.FULL })), line),
-				}
-			),
+			Group = Style.fadeGroup(config, moving.fade, 0, {
+				Box = Style.box(config, inside, look.box),
+				Line = React.createElement("Frame", Style.holder(Style.above(inside)), line),
+			}),
 		}
 	)
 end

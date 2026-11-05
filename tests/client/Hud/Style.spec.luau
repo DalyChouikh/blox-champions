@@ -86,20 +86,24 @@ local function capBindings(): any
 end
 
 describe("Style (look C)", function()
-	-- A group fading parts as one (#355 Q254, #383): it reaches look.groupRoom past its parent on every side, and
-	-- `below` pixels more under it, padded back in by the same, so ink drawn to its parent's edges keeps that room.
-	it("fades parts as one in a group reaching its room past its parent, padded back in", function()
+	-- A group fading parts as one (#355 Q254, #383, #386): centred on its parent, so a UIScale in it scales round the
+	-- parent's middle, it reaches look.groupRoom past its parent and `below` pixels under it on every side, padded
+	-- back in to them, so ink drawn to their edges keeps that room.
+	it("fades parts as one in a group centred on its parent, reaching its room past it, padded back in", function()
 		local fade, setFade = React.createBinding(0.4)
 		local element = Style.fadeGroup(config, fade, 5, { Part = React.createElement("Frame") })
 		local group = mount(element):FindFirstChild("Box") :: CanvasGroup
 		expect(group.ClassName).toBe("CanvasGroup")
 		expect(group.BackgroundTransparency).toBe(1)
-		expect(group.Position).toEqual(UDim2.fromOffset(-3, -3))
-		expect(group.Size).toEqual(UDim2.new(1, 6, 1, 11))
+		expect(group.AnchorPoint).toEqual(Vector2.new(0.5, 0.5))
+		expect(group.Position).toEqual(UDim2.fromScale(0.5, 0.5))
+		-- 3 px past each side, and the 5 px under it past the top too, to stay centred.
+		expect(group.Size).toEqual(UDim2.new(1, 6, 1, 16))
 		local padding = group:FindFirstChildOfClass("UIPadding") :: UIPadding
-		for _, side in { padding.PaddingLeft, padding.PaddingRight, padding.PaddingTop, padding.PaddingBottom } do
+		for _, side in { padding.PaddingLeft, padding.PaddingRight, padding.PaddingBottom } do
 			expect(side).toEqual(UDim.new(0, 3))
 		end
+		expect(padding.PaddingTop).toEqual(UDim.new(0, 8))
 		expect(group:FindFirstChild("Part") ~= nil).toBe(true)
 		expect(group.GroupTransparency).toBeCloseTo(0.4, 5)
 		setFade(0.6)
@@ -310,10 +314,11 @@ describe("Style (look C)", function()
 	it("letters a banner in three layers inside a group that fades whole, nothing clipped", function()
 		local look = config.UI.hud.look
 		local width = Style.textWidth(config, "GOAL!", 40, look.bannerFont)
-		local group = mount(Style.banner(config, {}, "GOAL!", 40, RED, 3, 6)):FindFirstChild("Box") :: CanvasGroup
-		expect(group.ClassName).toBe("CanvasGroup")
+		local holder = mount(Style.banner(config, {}, "GOAL!", 40, RED, 3, 6)):FindFirstChild("Box") :: Frame
 		-- The text and 6 px of ink each side, and the shadow's 5 px under that.
-		expect(group.Size).toEqual(UDim2.fromOffset(width + 12, 40 + 12 + 5))
+		expect(holder.Size).toEqual(UDim2.fromOffset(width + 12, 40 + 12 + 5))
+		local group = holder:FindFirstChild("Group", true) :: CanvasGroup
+		expect(group.ClassName).toBe("CanvasGroup")
 		local front = group:FindFirstChild("Front") :: TextLabel
 		local edge = group:FindFirstChild("Edge") :: TextLabel
 		local shadow = group:FindFirstChild("Shadow") :: TextLabel
@@ -339,7 +344,8 @@ describe("Style (look C)", function()
 	end)
 
 	it("letters a banner about nobody with no team ring, its shadow as wide as its ink", function()
-		local group = mount(Style.banner(config, {}, "60 SECONDS", 40, nil, 3, 6)):FindFirstChild("Box") :: CanvasGroup
+		local holder = mount(Style.banner(config, {}, "60 SECONDS", 40, nil, 3, 6)):FindFirstChild("Box") :: Frame
+		local group = holder:FindFirstChild("Group", true) :: CanvasGroup
 		expect(group:FindFirstChild("Edge")).toBeNil()
 		local shadow = group:FindFirstChild("Shadow") :: TextLabel
 		expect((shadow:FindFirstChild("Ink") :: UIStroke).Thickness).toBe(1.5)

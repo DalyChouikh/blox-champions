@@ -29,6 +29,7 @@ local config = Fixtures.config({
 				shadow = 3,
 				textOutline = 2,
 				shade = 0,
+				groupRoom = 4,
 				box = BOX,
 				teamColors = { Blue = Color3.fromRGB(10, 20, 30), Orange = Color3.fromRGB(200, 100, 40) },
 			},
@@ -144,7 +145,8 @@ describe("Feed", function()
 		expect(group.ClassName).toBe("CanvasGroup")
 		expect(group.AnchorPoint == Vector2.new(0.5, 0.5)).toBe(true)
 		expect(group.Position).toEqual(UDim2.fromScale(0.5, 0.5))
-		expect(group.Size).toEqual(UDim2.fromScale(1, 1))
+		-- Its room (4 px) past the chip's slot on every side.
+		expect(group.Size).toEqual(UDim2.new(1, 8, 1, 8))
 		-- Seated and popping from nothing: the HUD's motion moves it from here.
 		expect(child(group, "Pop").Scale).toBeCloseTo(0, 4)
 		animator:step(config.UI.hud.motion.pop.seconds)
@@ -252,5 +254,31 @@ describe("Feed", function()
 		expect(fit.Scale).toBeCloseTo((100 - 2 * 8) / frame.Size.X.Offset, 4)
 		setArea(Vector2.new(1920, 1000))
 		expect(fit.Scale).toBe(1)
+	end)
+end)
+
+-- The chips as Roblox lays them out (a ScreenGui under StarterGui is laid out in Edit, after a frame).
+describe("Feed, laid out", function()
+	local gui: ScreenGui?
+
+	afterEach(function()
+		if gui ~= nil then
+			gui:Destroy()
+			gui = nil
+		end
+	end)
+
+	-- A group cuts off the ink that reaches past its edges (#386, the owner's Q257).
+	it("keeps look.groupRoom round a chip's ink inside the group that fades it", function()
+		local layer = Instance.new("ScreenGui")
+		layer.Name = "FeedLaidOutTest"
+		layer.Parent = game:GetService("StarterGui")
+		gui = layer
+		setArea(Vector2.new(1556, 735))
+		local frame = child(Fixtures.mount(feed({ entry(3, "Possession", "Blue", "1") }), layer), "Feed") :: Frame
+		animator:step(config.UI.hud.motion.pop.seconds)
+		task.wait()
+		local group = child(child(frame, "3"), "Group") :: CanvasGroup
+		expect(Fixtures.inkRoom(group)).toEqual({ left = 4, top = 4, right = 4, bottom = 4 })
 	end)
 end)

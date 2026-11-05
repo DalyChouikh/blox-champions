@@ -59,43 +59,30 @@ local function chip(
 			ZIndex = entry.id,
 		}),
 		{
-			Group = React.createElement(
-				"CanvasGroup",
-				Style.holder({
-					AnchorPoint = Style.CENTRE,
-					Position = Style.MIDDLE,
-					Size = Style.FULL,
-					GroupTransparency = slot.leave,
-				}),
-				{
-					Pop = React.createElement("UIScale", { Scale = slot.scale.binding }),
-					Chip = Style.box(
-						config,
-						{
-							Position = UDim2.fromOffset(outline, outline),
-							Size = UDim2.fromOffset(width, sizes.height),
-						},
-						look.box,
-						{
-							Label = React.createElement(
-								"TextLabel",
-								Style.lettering(config, {
-									Size = Style.FULL,
-									RichText = true,
-									Text = props.text:feedMarked(
-										entry,
-										props.names,
-										Style.teamColor(config, entry.team)
-									),
-									TextSize = sizes.textSize,
-								}),
-								{ Ink = Style.inked(config) }
-							),
-						},
-						{ { top = 0, height = 1, corner = sizes.corner } }
-					),
-				}
-			),
+			Group = Style.fadeGroup(config, slot.leave, 0, {
+				Pop = React.createElement("UIScale", { Scale = slot.scale.binding }),
+				Chip = Style.box(
+					config,
+					{
+						Position = UDim2.fromOffset(outline, outline),
+						Size = UDim2.fromOffset(width, sizes.height),
+					},
+					look.box,
+					{
+						Label = React.createElement(
+							"TextLabel",
+							Style.lettering(config, {
+								Size = Style.FULL,
+								RichText = true,
+								Text = props.text:feedMarked(entry, props.names, Style.teamColor(config, entry.team)),
+								TextSize = sizes.textSize,
+							}),
+							{ Ink = Style.inked(config) }
+						),
+					},
+					{ { top = 0, height = 1, corner = sizes.corner } }
+				),
+			}),
 		}
 	)
 end

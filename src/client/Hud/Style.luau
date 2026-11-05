@@ -141,16 +141,18 @@ function Style.holder(props: Props?): Props
 	return over({ BackgroundTransparency = 1, BorderSizePixel = 0 }, props)
 end
 
--- A group that fades `children` as one (`fade`: its GroupTransparency), as big as its parent and `below` pixels more
--- under it, reaching look.groupRoom past that on every side and padded back in by the same: a CanvasGroup cuts off what
--- reaches its edges, and shaves ink touching an edge that falls between the screen's pixels (#355 Q254, #383).
+-- A group that fades `children` as one (`fade`: its GroupTransparency), laid out over its parent and `below` pixels
+-- more under it, reaching look.groupRoom past that on every side: a CanvasGroup cuts off what reaches its edges, and
+-- shaves ink touching an edge that falls between the screen's pixels (#355 Q254, #383, #386). It is centred on its
+-- parent, `below` taller above too, so a UIScale in it (a pop) scales round the parent's middle, and padded back in to
+-- its parent and `below`, in whole pixels.
 function Style.fadeGroup(config: Config.GameConfig, fade: Fade, below: number, children: Children): React.ReactElement
 	local room = config.UI.hud.look.groupRoom
-	local inset = UDim.new(0, room)
+	local side = UDim.new(0, room)
 	local parts: Children = {
 		Room = React.createElement(
 			"UIPadding",
-			{ PaddingLeft = inset, PaddingRight = inset, PaddingTop = inset, PaddingBottom = inset }
+			{ PaddingLeft = side, PaddingRight = side, PaddingTop = UDim.new(0, room + below), PaddingBottom = side }
 		),
 	}
 	for name, child in children do
@@ -159,8 +161,9 @@ function Style.fadeGroup(config: Config.GameConfig, fade: Fade, below: number, c
 	return React.createElement(
 		"CanvasGroup",
 		Style.holder({
-			Position = UDim2.fromOffset(-room, -room),
-			Size = UDim2.new(1, 2 * room, 1, below + 2 * room),
+			AnchorPoint = CENTRE,
+			Position = MIDDLE,
+			Size = UDim2.new(1, 2 * room, 1, 2 * (room + below)),
 			GroupTransparency = fade,
 		}),
 		parts
@@ -447,8 +450,9 @@ function Style.bannerWidth(config: Config.GameConfig, words: string, size: numbe
 	return Style.textWidth(config, words, size, config.UI.hud.look.bannerFont) + 2 * ink
 end
 
--- A banner: its letters (Style.letters) `ink` pixels in from the edges of a CanvasGroup (`props` place it; `children`
--- act on it). The group fades whole (GroupTransparency): see-through layers would darken where they overlap.
+-- A banner: its letters (Style.letters) `ink` pixels in from the edges of a holder (`props` place it), in a group
+-- centred on them that fades them whole by `fade` (Style.fadeGroup, the shadow under them; see-through layers would
+-- darken where they overlap), so a pop among `children` grows round the letters.
 function Style.banner(
 	config: Config.GameConfig,
 	props: Props,
@@ -457,6 +461,7 @@ function Style.banner(
 	color: Color3?,
 	edge: number,
 	ink: number,
+	fade: Fade?,
 	children: Props?
 ): React.ReactElement
 	local look = config.UI.hud.look
@@ -467,13 +472,15 @@ function Style.banner(
 		end
 	end
 	return React.createElement(
-		"CanvasGroup",
-		over({
+		"Frame",
+		Style.holder(over({
 			Size = UDim2.fromOffset(Style.bannerWidth(config, words, size, ink), size + 2 * ink + look.shadow),
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-		}, props),
-		parts
+		}, props)),
+		{
+			Letters = React.createElement("Frame", Style.holder({ Size = UDim2.new(1, 0, 1, -look.shadow) }), {
+				Group = Style.fadeGroup(config, fade or 0, look.shadow, parts),
+			}),
+		}
 	)
 end
 

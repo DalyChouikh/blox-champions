@@ -71,16 +71,7 @@ local function GetUp(props: GetUpProps): React.ReactElement
 		}),
 		{
 			Fit = Style.fit(config, props.area, box),
-			Group = React.createElement(
-				"CanvasGroup",
-				Style.holder({
-					AnchorPoint = Style.CENTRE,
-					Position = Style.MIDDLE,
-					Size = Style.FULL,
-					GroupTransparency = props.leave,
-				}),
-				parts
-			),
+			Group = Style.fadeGroup(config, props.leave, 0, parts),
 		}
 	)
 end

@@ -403,35 +403,6 @@ describe("ScoreTab, laid out", function()
 		end
 	end)
 
-	-- Whether `object` shows anything: a filled frame, words or a picture.
-	local function inked(object: GuiObject): boolean
-		if object:IsA("TextLabel") then
-			return object.Text ~= ""
-		elseif object:IsA("ImageLabel") then
-			return object.Image ~= ""
-		end
-		return object.BackgroundTransparency < 1
-	end
-
-	-- Pixels from each edge of `group` to the nearest ink inside it: every part that shows and its outline's ink
-	-- (a UIStroke's thickness outside it).
-	local function room(group: GuiObject): { [string]: number }
-		local at, size = group.AbsolutePosition, group.AbsoluteSize
-		local sides = { left = math.huge, top = math.huge, right = math.huge, bottom = math.huge }
-		for _, object in group:GetDescendants() do
-			if object:IsA("GuiObject") and object.Visible and inked(object) then
-				local stroke = object:FindFirstChildOfClass("UIStroke")
-				local ink = if stroke ~= nil and stroke.Enabled then stroke.Thickness else 0
-				local from, to = object.AbsolutePosition, object.AbsolutePosition + object.AbsoluteSize
-				sides.left = math.min(sides.left, from.X - ink - at.X)
-				sides.top = math.min(sides.top, from.Y - ink - at.Y)
-				sides.right = math.min(sides.right, at.X + size.X - to.X - ink)
-				sides.bottom = math.min(sides.bottom, at.Y + size.Y - to.Y - ink)
-			end
-		end
-		return sides
-	end
-
 	it("holds Switch team's key cap in its ink inside the row's group and the board's, with room to spare", function()
 		local layer = Instance.new("ScreenGui")
 		layer.Name = "ScoreTabLaidOutTest"
@@ -442,9 +413,10 @@ describe("ScoreTab, laid out", function()
 		local frame = tab({ switchTeam = { open = true, key = { text = "T" }, onActivated = noop } })
 		task.wait()
 		-- The cap (34 px) in its 2.5 px outline, centred in a row as tall as both (34 + 2 x 3), the group 2 px past it.
-		local row = room(find(frame, "SwitchTeam"):FindFirstChild("Row") :: CanvasGroup)
+		local row = Fixtures.inkRoom(find(frame, "SwitchTeam"):FindFirstChild("Row") :: CanvasGroup)
 		expect({ top = row.top, bottom = row.bottom }).toEqual({ top = 2.5, bottom = 2.5 })
 		-- The board's ink to its edges, the group 2 px past it; the cap's outline 0.5 px over its row's bottom.
-		expect(room(find(frame, "Group") :: CanvasGroup)).toEqual({ left = 2, top = 2, right = 2, bottom = 2.5 })
+		local board = Fixtures.inkRoom(find(frame, "Group") :: CanvasGroup)
+		expect(board).toEqual({ left = 2, top = 2, right = 2, bottom = 2.5 })
 	end)
 end)
