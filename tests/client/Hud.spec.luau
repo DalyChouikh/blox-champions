@@ -948,7 +948,7 @@ describe("Hud", function()
 		Hud:step(0)
 		expect(Hud.renders).toBe(renders + 1)
 		local group = part("ScoreTab"):FindFirstChild("Group", true) :: CanvasGroup
-		local pop = group:FindFirstChild("Pop") :: UIScale
+		local pop = part("ScoreTab"):FindFirstChild("Pop", true) :: UIScale
 		-- A UIScale holds its smallest, 1e-7, for 0.
 		expect(pop.Scale).toBeCloseTo(0, 4)
 		Hud:step(config.UI.hud.motion.pop.seconds)

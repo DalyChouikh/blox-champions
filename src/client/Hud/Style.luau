@@ -141,6 +141,32 @@ function Style.holder(props: Props?): Props
 	return over({ BackgroundTransparency = 1, BorderSizePixel = 0 }, props)
 end
 
+-- A group that fades `children` as one (`fade`: its GroupTransparency), as big as its parent and `below` pixels more
+-- under it, reaching look.groupRoom past that on every side and padded back in by the same: a CanvasGroup cuts off what
+-- reaches its edges, and shaves ink touching an edge that falls between the screen's pixels (#355 Q254, #383).
+function Style.fadeGroup(config: Config.GameConfig, fade: Fade, below: number, children: Children): React.ReactElement
+	local room = config.UI.hud.look.groupRoom
+	local inset = UDim.new(0, room)
+	local parts: Children = {
+		Room = React.createElement(
+			"UIPadding",
+			{ PaddingLeft = inset, PaddingRight = inset, PaddingTop = inset, PaddingBottom = inset }
+		),
+	}
+	for name, child in children do
+		parts[name] = child
+	end
+	return React.createElement(
+		"CanvasGroup",
+		Style.holder({
+			Position = UDim2.fromOffset(-room, -room),
+			Size = UDim2.new(1, 2 * room, 1, below + 2 * room),
+			GroupTransparency = fade,
+		}),
+		parts
+	)
+end
+
 -- Lines a frame's parts up one after another in their LayoutOrder, centred, `spacing` apart, with `props` on top.
 function Style.list(config: Config.GameConfig, direction: Enum.FillDirection, props: Props?): React.ReactElement
 	return React.createElement(

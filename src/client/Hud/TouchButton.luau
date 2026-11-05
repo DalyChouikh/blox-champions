@@ -60,8 +60,7 @@ local function TouchButton(props: TouchButtonProps): React.ReactElement
 	local config, moving, corner = props.config, props.moving, props.corner
 	local look = config.UI.hud.look
 	local line = look.outline
-	local room = config.UI.touchStyle.groupRoom
-	-- The fill's size: the button's, inside its outline (not its group's, bigger by the room and the shadow).
+	-- The fill's size: the button's, inside its outline (not its group's, bigger by its room and the shadow).
 	local inner = props.size - Vector2.new(2 * line, 2 * line)
 	local inside: Style.Children = {
 		Pressed = React.createElement("Frame", {
@@ -81,21 +80,16 @@ local function TouchButton(props: TouchButtonProps): React.ReactElement
 		Style.holder({ AnchorPoint = Style.CENTRE, Position = Style.MIDDLE, Size = Style.FULL }),
 		{
 			Pop = React.createElement("UIScale", { Scale = moving.press }),
-			Group = React.createElement(
-				"CanvasGroup",
-				Style.holder({
-					-- Room round the ink and its shadow, which the group would cut where they reach its edges.
-					Position = UDim2.fromOffset(-room, -room),
-					Size = UDim2.new(1, 2 * room, 1, look.shadow + 2 * room),
-					GroupTransparency = props.fade or 0,
-				}),
-				{
-					Box = Style.box(config, {
-						Position = UDim2.fromOffset(room + line, room + line),
-						Size = UDim2.fromOffset(inner.X, inner.Y),
-					}, props.fill, inside, { { top = 0, height = 1, corner = corner } }),
-				}
-			),
+			-- The ink's shadow hangs under the button.
+			Group = Style.fadeGroup(config, props.fade or 0, look.shadow, {
+				Box = Style.box(
+					config,
+					{ Position = UDim2.fromOffset(line, line), Size = UDim2.fromOffset(inner.X, inner.Y) },
+					props.fill,
+					inside,
+					{ { top = 0, height = 1, corner = corner } }
+				),
+			}),
 		}
 	)
 end

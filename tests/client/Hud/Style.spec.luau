@@ -12,7 +12,7 @@ local Style = require(game:GetService("StarterPlayer").StarterPlayerScripts.Clie
 local TextService = game:GetService("TextService")
 
 -- Look C with round numbers of this spec's own: a 2 px outline, a 5 px shadow, 10 px corners, half as bright at the
--- bottom, and team colours of its own.
+-- bottom, team colours of its own, and 3 px of room inside a fading group.
 local config = Fixtures.config({
 	UI = {
 		hud = {
@@ -27,6 +27,7 @@ local config = Fixtures.config({
 				key = Color3.fromRGB(240, 200, 60),
 				pressed = Color3.fromRGB(240, 120, 40),
 				sweepTransparency = 0.3,
+				groupRoom = 3,
 			},
 		},
 	},
@@ -85,6 +86,26 @@ local function capBindings(): any
 end
 
 describe("Style (look C)", function()
+	-- A group fading parts as one (#355 Q254, #383): it reaches look.groupRoom past its parent on every side, and
+	-- `below` pixels more under it, padded back in by the same, so ink drawn to its parent's edges keeps that room.
+	it("fades parts as one in a group reaching its room past its parent, padded back in", function()
+		local fade, setFade = React.createBinding(0.4)
+		local element = Style.fadeGroup(config, fade, 5, { Part = React.createElement("Frame") })
+		local group = mount(element):FindFirstChild("Box") :: CanvasGroup
+		expect(group.ClassName).toBe("CanvasGroup")
+		expect(group.BackgroundTransparency).toBe(1)
+		expect(group.Position).toEqual(UDim2.fromOffset(-3, -3))
+		expect(group.Size).toEqual(UDim2.new(1, 6, 1, 11))
+		local padding = group:FindFirstChildOfClass("UIPadding") :: UIPadding
+		for _, side in { padding.PaddingLeft, padding.PaddingRight, padding.PaddingTop, padding.PaddingBottom } do
+			expect(side).toEqual(UDim.new(0, 3))
+		end
+		expect(group:FindFirstChild("Part") ~= nil).toBe(true)
+		expect(group.GroupTransparency).toBeCloseTo(0.4, 5)
+		setFade(0.6)
+		expect(group.GroupTransparency).toBeCloseTo(0.6, 5)
+	end)
+
 	it("draws a box's ink once, grown by the outline and dropped by the shadow, under its shaded fill", function()
 		local mounted = mount(Style.box(config, { Size = UDim2.fromOffset(80, 40) }, RED, {
 			Label = React.createElement("TextLabel", { Text = "4:32" }),
