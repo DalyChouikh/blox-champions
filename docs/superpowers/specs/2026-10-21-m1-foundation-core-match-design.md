@@ -557,6 +557,7 @@ All strings and colors in `Config/UI` (team colors: Blue and Orange).
 - **Ball:** out of bounds, or stranded on something nobody skates → respawn (§9.3). A carrier leaving the game drops the ball as `Loose` at their last position.
 - **Players leaving mid-match:** their team plays short; the slot reopens for joiners. A leaver's stats go off the score tab until they return (§6.4).
 - **Arena generation failure:** server logs and refuses to start the match (no partial arena).
+- **The client's frame (#392, the owner's Q263):** `FrameController` steps each module in its fixed order inside its own guard (`xpcall`), so one module's error (a HUD binding's update, say) no longer skips the steps after it that frame. A module's first error is reported once, never every frame: `[BloxChampions] FrameController: <module>'s step failed: <error> (<the stack's first line outside FrameController, where it was thrown>)`; the module is still stepped each frame, so one that recovers goes on. Measured: no allocation on the normal path (0-1 KB per 100,000 frames, as for the same steps called directly) and about 1 µs a frame. Inside the HUD, each part also has its own error boundary (#379, §11.1).
 
 ---
 
