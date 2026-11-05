@@ -313,6 +313,28 @@ describe("HudState", function()
 		expect(state.ended).toBeNil()
 	end)
 
+	-- A HUD part hidden after a broken render is tried again in the next match (#379).
+	it("counts the matches it shows from 1, one more as a match follows an ended one", function()
+		local state = HudState.new(config, VIEWER)
+		expect(state.matchNumber).toBe(1)
+		state:applySnapshot(Fixtures.matchSnapshot())
+		local stats = (match(state) :: any).stats
+		state:applyEvents({ { name = "MatchEnded", winner = "Blue", mvp = "1", stats = stats } })
+		state:applySnapshot(Fixtures.matchSnapshot({ state = "Ended", winner = "Blue", mvp = "1" }))
+		expect(state.matchNumber).toBe(1)
+		state:applySnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
+		expect(state.matchNumber).toBe(2)
+		state:applySnapshot(Fixtures.matchSnapshot())
+		expect(state.matchNumber).toBe(2)
+
+		-- Joined after a match ended: the next match is the second this HUD shows.
+		local late = HudState.new(config, VIEWER)
+		late:applySnapshot(Fixtures.matchSnapshot({ state = "Ended", winner = "Orange", mvp = "2" }))
+		expect(late.matchNumber).toBe(1)
+		late:applySnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
+		expect(late.matchNumber).toBe(2)
+	end)
+
 	it("shows the end screen to a player who joins after the match ended", function()
 		local state = HudState.new(config, VIEWER)
 		state:applySnapshot(Fixtures.matchSnapshot({ state = "Ended", winner = "Orange", mvp = "2" }))

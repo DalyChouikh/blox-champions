@@ -39,6 +39,8 @@
 -- Roblox's top bar changes (from start on) and when the device does. The HUD's guis draw over the touch controls'
 -- (UI.hud.displayOrder), so the open board covers their buttons; the end screen's dim draws one under the HUD's and
 -- over the touch controls'. No HUD gui is clipped to the device's safe area: SCORES reaches past it, as the buttons do.
+-- App is behind an error boundary as each of its parts is (Hud/PartBoundary, #379): a throw in App's own render hides
+-- the whole HUD until the next match, and the Hud keeps stepping, instead of the error escaping each render.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -59,6 +61,7 @@ local HudStore = require(script.Parent.HudStore)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local InputController = require(script.Parent.InputController)
 local Motion = require(ReplicatedStorage.Shared.Hud.Motion)
+local PartBoundary = require(script.PartBoundary)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local React = require(ReplicatedStorage.Packages.React)
 local ReactRoblox = require(ReplicatedStorage.Packages.ReactRoblox)
@@ -183,6 +186,8 @@ export type Hud = {
 	-- The Switch team button's handler, made once, and the request it sends (or a fake).
 	_onSwitchTeam: () -> (),
 	_sendSwitchTeam: () -> (),
+	-- Where a part hidden after its render threw is reported (#379): the Output, or a fake.
+	_log: (line: string) -> (),
 	-- The score tab toggled on by its touch button.
 	_touchToggled: boolean,
 	-- Whether the match was over at the last step.
@@ -344,6 +349,10 @@ local function screenGui(name: string, insets: Enum.ScreenInsets, order: number,
 	return gui
 end
 
+local function logLine(line: string)
+	warn(line)
+end
+
 local Hud: Hud = {
 	name = "Hud",
 	dependencies = {
@@ -413,6 +422,7 @@ local Hud: Hud = {
 	_onScoreButton = function() end,
 	_onSwitchTeam = function() end,
 	_sendSwitchTeam = function() end,
+	_log = logLine,
 	_touchToggled = false,
 	_over = false,
 	_fontsLoaded = false,
@@ -431,8 +441,8 @@ local Hud: Hud = {
 	_shownFontsLoaded = false,
 
 	-- deps.Parent keeps the guis out of the local player's PlayerGui in tests; deps.PreferredInput, deps.LocalId,
-	-- deps.KeyString, deps.KeyImage, deps.InsetArea, deps.TopbarInset, deps.SendSwitchTeam and deps.LoadFonts
-	-- replace the live game there.
+	-- deps.KeyString, deps.KeyImage, deps.InsetArea, deps.TopbarInset, deps.SendSwitchTeam, deps.LoadFonts and
+	-- deps.Log replace the live game there.
 	init = function(self: Hud, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
@@ -510,6 +520,7 @@ local Hud: Hud = {
 			or function()
 				Remotes.get(ReplicatedStorage, Remotes.names.SwitchTeam):FireServer({})
 			end
+		self._log = deps.Log or logLine
 
 		self._clock = newShown(self._text:clock(self._store.state:clockSeconds()))
 		self._speed = newShown("")
@@ -668,7 +679,7 @@ local Hud: Hud = {
 			local keys = hintKeys(self, device, hasSkater)
 			self.passKey = markKey(device, hasSkater, keys, PASS, { text = self._config.UI.text.touchPassTarget })
 			self.attachKey = markKey(device, hasSkater, keys, ATTACH, nil)
-			self._root:render(React.createElement(App, {
+			local app = React.createElement(App, {
 				config = self._config,
 				text = self._text,
 				state = state,
@@ -697,7 +708,14 @@ local Hud: Hud = {
 				centre = self.centre,
 				dim = self.dim,
 				top = self.top,
-			}))
+				log = self._log,
+			})
+			self._root:render(
+				React.createElement(
+					PartBoundary,
+					{ name = "App", part = app, match = state.matchNumber, report = self._log }
+				)
+			)
 		end
 
 		show(self._clock, self._text:clock(state:clockSeconds()))

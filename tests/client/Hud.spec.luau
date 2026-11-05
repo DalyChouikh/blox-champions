@@ -39,6 +39,8 @@ local loadingFonts: { Font } = {}
 local fontsLoaded = function() end
 -- The touch controls' hit buttons, which the Hud draws each face into (TouchControls.buttons, #355).
 local touchButtons: { [string]: TextButton }
+-- The lines the Hud logged (deps.Log): a part hidden after its render threw (#379).
+local logged: { string }
 
 -- A gamepad's button, D-pad or stick: Roblox names each by its KeyCode and gives it a glyph (probed).
 local function gamepadKey(name: string): boolean
@@ -143,6 +145,7 @@ beforeEach(function()
 	screen = PHONE
 	switches = 0
 	skaters = {}
+	logged = {}
 	Fixtures.startSkating(folder, config, LOCAL_ID, skaters)
 	touchButtons = {}
 	for _, control: Config.TouchControl in ControlLabels.CONTROLS do
@@ -173,6 +176,9 @@ beforeEach(function()
 		end,
 		LoadFonts = function(fonts: { Font }, loaded: () -> ())
 			loadingFonts, fontsLoaded = fonts, loaded
+		end,
+		Log = function(line: string)
+			table.insert(logged, line)
 		end,
 		-- The whole screen only for the crosshair's aim: a notched phone's reaches past its safe area, where Roblox's
 		-- top bar and our scoreboard are (probed).
@@ -411,6 +417,103 @@ describe("Hud", function()
 		local group = banner:FindFirstChild("Group", true) :: CanvasGroup
 		expect(group.GroupTransparency).toBeCloseTo(0.875, 4)
 		expect((message:FindFirstChild("Group", true) :: CanvasGroup).GroupTransparency).toBe(0)
+	end)
+
+	-- #379 (the owner's Q242): in session 78 a probe's lap event with no streak broke the banner's render, and React
+	-- took the whole HUD down with it until the next Play. Each part is behind its own error boundary now.
+	it("keeps the rest of the HUD when one part's render throws, that part hidden until the next match", function()
+		local function shown(): string
+			local names: { string } = {}
+			for _, name in { "Scoreboard", "Banner", "Message", "Feed", "ControlHints", "Speedometer" } do
+				if part(name) ~= nil then
+					table.insert(names, name)
+				end
+			end
+			return table.concat(names, " ")
+		end
+		Fixtures.spawnSkater(folder, config)
+		Hud:step(0)
+		local noStreak = { name = "LapCompleted", team = "Blue", holder = "1" } :: any
+		local reports = Fixtures.reactReports(function()
+			HudStore:onEvents(Fixtures.ruleEvents({ noStreak }))
+			Hud:step(DT)
+			-- A ball line renders the HUD again: the banner stays hidden and is not tried again.
+			HudStore:onEvents(Fixtures.ruleEvents({ { name = "PossessionChanged", team = "Blue", player = "1" } }, 2))
+			Hud:step(DT)
+			Hud:step(DT)
+		end)
+		expect(#reports).toBe(1)
+		-- Logged once, naming the part, the error and where it was thrown.
+		expect(#logged).toBe(1)
+		local head = "[BloxChampions] Hud: Banner hidden until the next match: invalid argument #2 to 'format'"
+		expect(string.sub(logged[1], 1, #head)).toBe(head)
+		expect(string.find(logged[1], "Hud.HudText", 1, true) ~= nil).toBe(true)
+		expect(shown()).toBe("Scoreboard Message Feed ControlHints Speedometer")
+		expect(Hud.renders).toBe(3)
+		endMatch()
+		Hud:step(0)
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }, 3))
+		Hud:step(0)
+		expect(shown()).toBe("Scoreboard Banner Message Feed ControlHints Speedometer")
+		HudStore:onEvents(
+			Fixtures.ruleEvents({ { name = "LapCompleted", team = "Blue", streak = 1, holder = "1" } }, 4)
+		)
+		Hud:step(0)
+		expect(((part("Banner") :: Frame):FindFirstChild("Front", true) :: TextLabel).Text).toBe("LAP 1 COMPLETED")
+	end)
+
+	-- App's own code is behind one too: there a throw hides the whole HUD, and the Hud keeps stepping.
+	it("hides the whole HUD when its own render throws, still stepping, until the next match", function()
+		preferred = Enum.PreferredInput.Touch
+		-- A touch button TouchControls did not make: its face has nowhere to be drawn.
+		local jump = touchButtons.jump
+		touchButtons.jump = nil :: any
+		local reports = Fixtures.reactReports(function()
+			Hud:step(0)
+			HudStore:onEvents(Fixtures.ruleEvents({ { name = "PossessionChanged", team = "Blue", player = "1" } }))
+			Hud:step(DT)
+		end)
+		expect(#reports).toBe(1)
+		local head = "[BloxChampions] Hud: App hidden until the next match: Target container is not a Roblox Instance."
+		expect(#logged).toBe(1)
+		expect(string.sub(logged[1], 1, #head)).toBe(head)
+		expect(part("Speedometer")).toBeNil()
+		expect(part("Scoreboard")).toBeNil()
+		expect(Hud.renders).toBe(2)
+		-- Mended, it waits for the next match: not over the end screen, but at the next kickoff.
+		touchButtons.jump = jump
+		endMatch()
+		Hud:step(0)
+		expect(part("EndScreen")).toBeNil()
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }, 2))
+		Hud:step(0)
+		expect(part("Scoreboard") ~= nil).toBe(true)
+		expect(face("jump") ~= nil).toBe(true)
+	end)
+
+	-- A part on the screen from one match to the next, the kickoff's count, waits for the next match too.
+	it("tries a broken part that stays on the screen again in the next match, not before", function()
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }))
+		-- The count's text, broken for one render.
+		local banner = HudText.banner
+		HudText.banner = function(): string
+			error("the count's text is broken", 0)
+		end
+		local ok = pcall(Fixtures.reactReports, function()
+			Hud:step(0)
+		end)
+		HudText.banner = banner
+		expect(ok).toBe(true)
+		expect(part("Countdown")).toBeNil()
+		HudStore:onEvents(Fixtures.ruleEvents({ { name = "PossessionChanged", team = "Blue", player = "1" } }))
+		Hud:step(0)
+		expect(part("Countdown")).toBeNil()
+		endMatch()
+		Hud:step(0)
+		expect(part("Countdown")).toBeNil()
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ state = "Kickoff", phaseSecondsLeft = 3 }, 2))
+		Hud:step(0)
+		expect(part("Countdown") ~= nil).toBe(true)
 	end)
 
 	it("counts the clock down on the scoreboard without rendering again", function()

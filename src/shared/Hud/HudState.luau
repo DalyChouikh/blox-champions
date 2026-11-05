@@ -8,8 +8,8 @@
 -- UI.hud.feedMaxEntries, oldest first; Q211), of which one ball line stays: a new carrier's replaces the last, left
 -- only its fade (#373, Q227). The kickoff's count and GO are the viewer's team's. The end of a match shows from
 -- MatchEnded, or from a snapshot of the ended match for a player who joins then, until the next match's first
--- snapshot. `version` grows whenever anything it shows changes, but not as the clocks count, so the HUD redraws
--- only then; stepping allocates nothing.
+-- snapshot, which counts one more match (`matchNumber`). `version` grows whenever anything it shows changes, but not
+-- as the clocks count, so the HUD redraws only then; stepping allocates nothing.
 
 local Config = require(script.Parent.Parent.Config)
 local MatchClock = require(script.Parent.Parent.Rules.MatchClock)
@@ -64,6 +64,9 @@ type Fields = {
 	messageLeft: number,
 	feed: { FeedEntry },
 	ended: Ended?,
+	-- Which match this is, counted from 1 when the HUD began: one more each time a match follows an ended one. A HUD
+	-- part hidden after its render threw is tried again in the next match (Hud/PartBoundary, #379).
+	matchNumber: number,
 	version: number,
 	_config: Config.GameConfig,
 	-- The player this HUD belongs to: the kickoff's count and GO are their team's.
@@ -84,6 +87,7 @@ function HudState.new(config: Config.GameConfig, viewer: PlayerId): HudState
 			messageLeft = 0,
 			feed = {},
 			ended = nil,
+			matchNumber = 1,
 			version = 0,
 			_config = config,
 			_viewer = viewer,
@@ -188,6 +192,9 @@ function HudState.applySnapshot(self: HudState, payload: Payloads.MatchSnapshot)
 	local match = payload.match
 	self.match = match
 	self.names = payload.names
+	if self.ended ~= nil and match.state ~= "Ended" then
+		self.matchNumber += 1
+	end
 	self.ended = if match.state == "Ended" then endedOf(match.winner, match.mvp, match.stats) else nil
 	local banner = self.banner
 	if match.state == "Kickoff" then
