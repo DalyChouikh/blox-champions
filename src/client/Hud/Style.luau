@@ -34,6 +34,9 @@ export type CapBindings = {
 	seconds: React.Binding<string>,
 }
 export type Children = { [string]: React.Node }
+-- A box's fill: one colour that look C shades (darker toward the bottom by look.shade), or a gradient's own two (the
+-- touch buttons', #355).
+export type Fill = Color3 | Config.Gradient
 
 -- A white fill shows its gradient's own colours (a UIGradient multiplies the colour it covers).
 local WHITE = Color3.new(1, 1, 1)
@@ -174,24 +177,32 @@ function Style.inked(config: Config.GameConfig): React.ReactElement
 	return React.createElement("UIStroke", { Color = look.ink, Thickness = look.textOutline })
 end
 
--- Look C's shade down a part in `color`, from `top` to `bottom` (shares of its box's height): the colour at the
--- box's top, darkening to look.shade of the way to black at its bottom. On a white frame (Style.box's fill).
-function Style.shading(config: Config.GameConfig, color: Color3, top: number, bottom: number): React.ReactElement
-	local shade = config.UI.hud.look.shade
+-- `fill`'s colour a `share` of the way down its box: a colour darkens to look.shade of the way to black at the bottom;
+-- a gradient goes from its top colour to its bottom one.
+local function fillAt(config: Config.GameConfig, fill: Fill, share: number): Color3
+	if typeof(fill) == "Color3" then
+		return fill:Lerp(BLACK, config.UI.hud.look.shade * share)
+	end
+	return fill.top:Lerp(fill.bottom, share)
+end
+
+-- `fill` down a part from `top` to `bottom` (shares of its box's height): look C's shade of one colour, or a
+-- gradient's two. On a white frame (Style.box's fill).
+function Style.shading(config: Config.GameConfig, fill: Fill, top: number, bottom: number): React.ReactElement
 	return React.createElement("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(color:Lerp(BLACK, shade * top), color:Lerp(BLACK, shade * bottom)),
+		Color = ColorSequence.new(fillAt(config, fill, top), fillAt(config, fill, bottom)),
 	})
 end
 
--- A look C box in `color`, its frame placed and sized by `props`: `pieces` (one piece with look.corner by default)
--- filled and shaded (Style.shading) over one ink silhouette, each piece grown by look.outline on every side and by
--- look.shadow more below it, so the outline and the drop shadow are one shape with no seam where pieces meet.
--- `children` sit above it all, in its "Content" frame.
+-- A look C box in `fill`, its frame placed and sized by `props`: `pieces` (one piece with look.corner by default)
+-- filled (Style.shading) over one ink silhouette, each piece grown by look.outline on every side and by look.shadow
+-- more below it, so the outline and the drop shadow are one shape with no seam where pieces meet. `children` sit above
+-- it all, in its "Content" frame.
 function Style.box(
 	config: Config.GameConfig,
 	props: Props,
-	color: Color3,
+	fill: Fill,
 	children: Props?,
 	pieces: { Piece }?
 ): React.ReactElement
@@ -217,7 +228,7 @@ function Style.box(
 			ZIndex = 2,
 		}, {
 			Corner = React.createElement("UICorner", { CornerRadius = corner }),
-			Shade = Style.shading(config, color, piece.top, piece.top + piece.height),
+			Shade = Style.shading(config, fill, piece.top, piece.top + piece.height),
 		})
 	end
 	parts.Content = holding(children)

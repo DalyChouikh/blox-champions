@@ -20,8 +20,9 @@ local text = HudText.new(config)
 local NAMES = { ["1"] = "Ana", ["2"] = "Rex", ["3"] = "Kai", ["-4"] = "Bot" }
 
 local folder: Folder
--- The HUD's whole area, and the board's pop and fade, as the Hud's bindings give them.
+-- The HUD's whole area, the whole screen in its pixels, and the board's pop and fade, as the Hud's bindings give them.
 local area: React.Binding<Vector2>, setArea: (Vector2) -> ()
+local screen: React.Binding<Rect>, setScreen: (Rect) -> ()
 local pop: React.Binding<number>, setPop: (number) -> ()
 local leave: React.Binding<number>, setLeave: (number) -> ()
 
@@ -52,6 +53,7 @@ local function tab(options: { [string]: any }?): Frame
 		scale = pop,
 		leave = leave,
 		area = area,
+		screen = screen,
 		boardBottom = 0,
 	}
 	local given: { [string]: any } = options or {}
@@ -85,6 +87,7 @@ beforeEach(function()
 	folder.Name = "ScoreTabTest"
 	folder.Parent = workspace
 	area, setArea = React.createBinding(Vector2.zero)
+	screen, setScreen = React.createBinding(Rect.new(0, 0, 0, 0))
 	pop, setPop = React.createBinding(1)
 	leave, setLeave = React.createBinding(0)
 end)
@@ -293,15 +296,25 @@ describe("ScoreTab", function()
 	end)
 
 	-- On a phone (Q234, Q236): the whole screen under the SCORES button, taking the touches there while open (over the
-	-- touch buttons), its rows scrolling where they do not fit (Q190).
+	-- touch buttons, which reach the screen's corner past the HUD's area, #355), its rows scrolling where they do not
+	-- fit (Q190).
 	it("on touch, sits under the SCORES button, takes the touches there while open, and scrolls its rows", function()
 		setArea(Vector2.new(750, 323))
-		local top = HudScreen.tabTop(config, true, 323, 0)
+		-- A notched phone's whole screen, 62 px past the HUD's area each side and 78 above it.
+		setScreen(Rect.new(-62, -78, 812, 323))
+		local top = HudScreen.tabTop(config, true, 0)
 		local touchSwitch = { open = true, onActivated = noop }
 		local frame = tab({ stats = roster(12), compact = true, touch = true, switchTeam = touchSwitch })
 		expect(frame.Position).toEqual(UDim2.fromOffset(0, top))
 		expect(frame.Size).toEqual(UDim2.new(1, 0, 1, -top))
-		expect(frame.Active).toBe(true)
+		local shield = frame:FindFirstChild("Shield") :: Frame
+		expect(shield.Active).toBe(true)
+		expect(shield.BackgroundTransparency).toBe(1)
+		-- The whole screen's width, from the board's top to the screen's bottom.
+		expect(shield.Position).toEqual(UDim2.fromOffset(-62, 0))
+		expect(shield.Size).toEqual(UDim2.fromOffset(874, 323 - top))
+		-- Under the board, whose Switch team button and rows take their own touches.
+		expect(shield.ZIndex < (find(frame, "Board") :: Frame).ZIndex).toBe(true)
 		local scale, rows = HudScreen.tabFit(config, true, true, Vector2.new(750, 323 - top), 12, "Label")
 		expect(scale).toBe(1)
 		expect((find(frame, "Fit") :: UIScale).Scale).toBe(1)
@@ -327,10 +340,13 @@ describe("ScoreTab", function()
 		expect(whole.Size.Y.Offset).toBe(whole.CanvasSize.Y.Offset)
 		-- Fading out after it closed, it lets touches through to the buttons again.
 		Fixtures.unmountAll()
-		expect(tab({ compact = true, touch = true, open = false }).Active).toBe(false)
+		local closing = tab({ compact = true, touch = true, open = false })
+		expect((closing:FindFirstChild("Shield") :: Frame).Active).toBe(false)
 		-- Off touch it never takes them: clicks keep reaching the game.
 		Fixtures.unmountAll()
-		expect(tab().Active).toBe(false)
+		local desktop = tab()
+		expect((desktop:FindFirstChild("Shield") :: Frame).Active).toBe(false)
+		expect(desktop.Active).toBe(false)
 	end)
 
 	-- It never covers the scoreboard (Q203's rule): its area starts under the scoreboard's ink, its margin clear of it,
@@ -349,7 +365,7 @@ describe("ScoreTab", function()
 			expect(scale < 1).toBe(true)
 			expect((find(frame, "Fit") :: UIScale).Scale).toBeCloseTo(scale, 5)
 			Fixtures.unmountAll()
-			local button = HudScreen.tabTop(config, true, 600, 0)
+			local button = HudScreen.tabTop(config, true, 0)
 			expect(tab({ touch = true, boardBottom = button - 10 }).Position).toEqual(UDim2.fromOffset(0, button))
 			Fixtures.unmountAll()
 			expect(tab({ touch = true, boardBottom = button + 10 }).Position).toEqual(UDim2.fromOffset(0, button + 10))

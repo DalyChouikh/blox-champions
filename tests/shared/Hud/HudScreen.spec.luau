@@ -93,7 +93,7 @@ local config = Fixtures.config({
 						switchSize = 12,
 					},
 				},
-				scoreButton = { position = UDim2.new(1, -10, 0, 10), size = UDim2.fromOffset(80, 30) },
+				scoreButton = { top = 10, size = UDim2.fromOffset(80, 30), corner = UDim.new(0, 5), textSize = 14 },
 				hints = { cap = { height = 30 } },
 				getUp = {
 					sizes = {
@@ -377,22 +377,11 @@ describe("HudScreen", function()
 	-- under the SCORES button too, which stays above it (Q234, Q236).
 	it("puts the TAB board's area under the scoreboard's ink, and on touch under the SCORES button too", function()
 		-- The board's ink 12.5 px into the HUD's area: whole pixels, rounded up; above the area (or none), its top.
-		expect(HudScreen.tabTop(config, false, 300, 12.5)).toBe(13)
-		expect(HudScreen.tabTop(config, false, 300, -20)).toBe(0)
+		expect(HudScreen.tabTop(config, false, 12.5)).toBe(13)
+		expect(HudScreen.tabTop(config, false, -20)).toBe(0)
 		-- The SCORES button 10 px down and 30 tall, unless the board's ink reaches lower.
-		expect(HudScreen.tabTop(config, true, 300, 12.5)).toBe(40)
-		expect(HudScreen.tabTop(config, true, 300, 44.5)).toBe(45)
-		-- A button placed by a share of the HUD's height too: 0.1 x 300 + 5 + 30.
-		local scaled = Fixtures.config({
-			UI = {
-				hud = {
-					layout = {
-						scoreButton = { position = UDim2.new(1, -10, 0.1, 5), size = UDim2.fromOffset(80, 30) },
-					},
-				},
-			},
-		})
-		expect(HudScreen.tabTop(scaled, true, 300, 0)).toBe(65)
+		expect(HudScreen.tabTop(config, true, 12.5)).toBe(40)
+		expect(HudScreen.tabTop(config, true, 44.5)).toBe(45)
 	end)
 
 	it("knows how tall the TAB board's teams and its Switch team row stand", function()
@@ -467,7 +456,7 @@ describe("HudScreen", function()
 	it("fits the default TAB board under a phone's SCORES at 3 a side, scrolling at 6, and whole on desktop", function()
 		local defaults = Fixtures.config()
 		-- The phone emulator's HUD area, 750 x 323, under the SCORES button.
-		local height = 323 - HudScreen.tabTop(defaults, true, 323, 0)
+		local height = 323 - HudScreen.tabTop(defaults, true, 0)
 		local area = Vector2.new(750, height)
 		local scale, rows = HudScreen.tabFit(defaults, true, true, area, 6, "Label")
 		expect(scale).toBe(1)

@@ -222,6 +222,11 @@ function Validate.check(inner: Validator, predicate: (value: any) -> boolean, me
 	end
 end
 
+-- A text size Roblox draws as given: a whole number from 1 to 100 (it clamps any other, measured).
+function Validate.textSize(): Validator
+	return Validate.number({ min = 1, max = 100, integer = true })
+end
+
 -- A size in pixels: a UDim2 whose scales are 0 and whose offsets are above 0, for layouts measured in pixels.
 function Validate.pixels(): Validator
 	return Validate.check(Validate.datatype("UDim2"), function(size: UDim2): boolean

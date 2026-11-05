@@ -21,20 +21,24 @@
 -- speedometer's reading eases toward the skater's speed (UI.hud.motion.speedRate), from the speed itself whenever a
 -- skater appears. Hints name each key as the device shows it: on a gamepad Roblox's glyph, otherwise the name the
 -- player's own keyboard layout gives it, else Config.UI.keyNames, else the KeyCode's name, and the mouse's buttons as a
--- mouse with that button inked (Q207). There are none on touch, where the buttons carry the labels; each render names
--- the pass key for the mark over a pass's target (passKey, #315). The Get Up prompt (a skater knocked down by a strike
--- or a fall: SkateController.promptsGetUp, #242) names the movement keys the same way: the first composite's four keys,
--- the gamepad's stick, or on touch Config.UI.text's name for the stick; it stays until it has faded out (Reveal,
--- #369). The score tab (the TAB board, #357) shows while its key is held; on touch a button toggles it, and the toggle
--- clears once the device is not touch and whenever the end screen appears or goes, so the board never pops open unasked
--- (HudState.tabShows); it pops in as it opens and fades out as it closes, as the prompt does (each a Reveal). While the
+-- mouse with that button inked (Q207). There are none on touch, where the buttons carry the labels: App draws each
+-- touch button's look C face into TouchControls' button from the same bindings as its hint row (Hud/TouchButton, #355),
+-- so they pop, show pressed, cool and grey alike. Each render names the pass key for the mark over a pass's target
+-- (passKey, #315). The Get Up prompt (a skater knocked down by a strike or a fall: SkateController.promptsGetUp, #242)
+-- names the movement keys the same way: the first composite's four keys, the gamepad's stick, or on touch
+-- Config.UI.text's name for the stick; it stays until it has faded out (Reveal, #369). The score tab (the TAB board,
+-- #357) shows while its key is held; on touch a button toggles it, and the toggle clears once the device is not touch
+-- and whenever the end screen appears or goes, so the board never pops open unasked (HudState.tabShows); the button
+-- (SCORES, look C, #355) pops when tapped, and lines up with the touch buttons' right edge (TouchArea.lineUp, a
+-- binding). The board pops in as it opens and fades out as it closes, as the prompt does (each a Reveal). While the
 -- board is open its Switch team button (HudState.switchOffer, #310), the button's key, or a tap on touch, asks the
 -- server for a switch when one works. The banner, the feed and the end screen centre and fit in the HUD's stage, a
--- binding: on touch the part of the HUD's area left of the touch buttons (TouchArea, from the two guis' areas that
--- GuiService gives), elsewhere the whole of it; the board fits the HUD's whole area, another binding. Both are measured
--- again, with the screen's form, when the screen's size or Roblox's top bar changes (from start on) and when the device
--- does. The HUD's guis draw over the touch controls' (UI.hud.displayOrder), so the open board covers their buttons; the
--- end screen's dim draws one under the HUD's and over the touch controls'.
+-- binding: on touch the part of the HUD's area left of the touch buttons (TouchArea, from the HUD's area and the whole
+-- screen's, which GuiService gives: the buttons sit at its physical corner), elsewhere the whole of it; the board fits
+-- the HUD's whole area, another binding. They are measured again, with the screen's form, when the screen's size or
+-- Roblox's top bar changes (from start on) and when the device does. The HUD's guis draw over the touch controls'
+-- (UI.hud.displayOrder), so the open board covers their buttons; the end screen's dim draws one under the HUD's and
+-- over the touch controls'. No HUD gui is clipped to the device's safe area: SCORES reaches past it, as the buttons do.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -113,6 +117,8 @@ export type Hud = {
 	top: ScreenGui,
 	-- How many times App has rendered.
 	renders: number,
+	-- TouchControls' buttons, by control: their faces are drawn into them (#355).
+	_touchButtons: { [string]: GuiButton },
 	-- The pass key as the hints show it on this device, or on touch, where no key shows, UI.text.touchPassTarget: what
 	-- NameTags floats over the teammate a pass would go to (#315; RC Video 34 at 41.6 s). Nil without a skater.
 	passKey: Style.KeyView?,
@@ -154,15 +160,19 @@ export type Hud = {
 	_shownSpeed: number?,
 	_root: ReactRoblox.RootType,
 	_bindings: App.HudBindings,
+	-- SCORES' pop (#355) and whether it shows pressed: while it pops.
+	_scorePress: Animator.Track,
+	_scorePressed: Shown<boolean>,
 	_clock: Shown<string>,
 	_speed: Shown<string>,
 	_rows: { [string]: Row },
 	_charge: Shown<number>,
-	-- The stage and the HUD's whole area last set on their bindings, and the setters.
-	_stage: Vector2,
-	_setStage: (stage: Vector2) -> (),
-	_area: Vector2,
-	_setArea: (area: Vector2) -> (),
+	-- The stage, the HUD's whole area and where the touch buttons' right edge sits across it (TouchArea.lineUp).
+	_stage: Shown<Vector2>,
+	_area: Shown<Vector2>,
+	_lineUp: Shown<number>,
+	-- The whole screen in the HUD's area's pixels: the open board's shield reaches it (#355).
+	_screen: Shown<Rect>,
 	-- The score button's handler, made once.
 	_onScoreButton: () -> (),
 	-- The Switch team button's handler, made once, and the request it sends (or a fake).
@@ -202,29 +212,26 @@ local function show<T>(shown: Shown<T>, value: T)
 	end
 end
 
--- Sets the stage for `device`: on touch the HUD's area left of the touch buttons, elsewhere the whole of it; and the
--- screen's form (HudScreen), from the device's safe area and Roblox's top bar. The safe area, not the whole screen:
--- a notched phone's screen reaches past it, where neither Roblox's top bar nor the touch controls go (probed); only the
--- crosshair's aim is a share of the whole screen, where the 3D view is centred.
+-- Sets the stage for `device`: on touch the HUD's area left of the touch buttons, elsewhere the whole of it; where the
+-- touch buttons' right edge sits; and the screen's form (HudScreen), from the device's safe area and Roblox's top bar.
+-- The safe area, not the whole screen: a notched phone's screen reaches past it, where Roblox's top bar does not go
+-- (probed); the touch buttons sit at the whole screen's corner (#355), and the crosshair's aim is a share of the whole
+-- screen, where the 3D view is centred.
 local function measure(self: Hud, device: Enum.PreferredInput)
 	local hud = self._insetArea(Enum.ScreenInsets.CoreUISafeInsets)
 	local safe = self._insetArea(Enum.ScreenInsets.DeviceSafeInsets)
-	local stage = if device == Enum.PreferredInput.Touch
-		then TouchArea.stage(self._config.Input.touch, hud, safe)
-		else hud.Max - hud.Min
-	if stage ~= self._stage then
-		self._stage = stage
-		self._setStage(stage)
-	end
-	local area = hud.Max - hud.Min
-	if area ~= self._area then
-		self._area = area
-		self._setArea(area)
-	end
+	local whole = self._insetArea(Enum.ScreenInsets.None)
+	local touch = self._config.Input.touch
+	show(
+		self._stage,
+		if device == Enum.PreferredInput.Touch then TouchArea.stage(touch, hud, whole) else hud.Max - hud.Min
+	)
+	show(self._area, hud.Max - hud.Min)
+	show(self._lineUp, TouchArea.lineUp(touch, hud, whole))
+	show(self._screen, Rect.new(whole.Min - hud.Min, whole.Max - hud.Min))
 	local screen = safe.Max - safe.Min
 	self.compact = HudScreen.compact(self._config, screen)
 	self._boardTop = HudScreen.boardTop(self._config, self.compact, screen.X, self._topbar())
-	local whole = self._insetArea(Enum.ScreenInsets.None)
 	self._aim = HudScreen.aim(self._config, whole, safe)
 	self._bannerAt = HudScreen.bannerAt(self._config, whole, safe)
 	self._stageTop = hud.Min.Y - safe.Min.Y
@@ -317,13 +324,15 @@ local function switchTeamView(self: Hud, device: Enum.PreferredInput, carrier: P
 end
 
 -- One of the HUD's ScreenGuis, covering the screen as `insets` says: kept across respawns, its parts drawn in their
--- ZIndex order among siblings, over the touch controls' gui (`order`, UI.hud.displayOrder).
+-- ZIndex order among siblings, over the touch controls' gui (`order`, UI.hud.displayOrder), and not clipped to the
+-- device's safe area: SCORES lines up with the touch buttons past it (#355), and the end screen's dim covers it all.
 local function screenGui(name: string, insets: Enum.ScreenInsets, order: number, parent: Instance): ScreenGui
 	local gui = Instance.new("ScreenGui")
 	gui.Name = name
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.ScreenInsets = insets
+	gui.ClipToDeviceSafeArea = false
 	gui.DisplayOrder = order
 	gui.Parent = parent
 	return gui
@@ -331,13 +340,22 @@ end
 
 local Hud: Hud = {
 	name = "Hud",
-	dependencies = { "Config", "HudStore", "InputController", "SkateController", "ActionController", "BallCarrier" },
+	dependencies = {
+		"Config",
+		"HudStore",
+		"InputController",
+		"SkateController",
+		"ActionController",
+		"BallCarrier",
+		"TouchControls",
+	},
 	gui = nil :: any,
 	centre = nil :: any,
 	dim = nil :: any,
 	top = nil :: any,
 	renders = 0,
 	passKey = nil,
+	_touchButtons = {},
 	_config = nil :: any,
 	_text = nil :: any,
 	_store = nil :: any,
@@ -375,14 +393,16 @@ local Hud: Hud = {
 	_shownSpeed = nil,
 	_root = nil :: any,
 	_bindings = nil :: any,
+	_scorePress = nil :: any,
+	_scorePressed = nil :: any,
 	_clock = nil :: any,
 	_speed = nil :: any,
 	_rows = {},
 	_charge = nil :: any,
-	_stage = Vector2.zero,
-	_setStage = function(_stage: Vector2) end,
-	_area = Vector2.zero,
-	_setArea = function(_area: Vector2) end,
+	_stage = nil :: any,
+	_area = nil :: any,
+	_lineUp = nil :: any,
+	_screen = nil :: any,
 	_onScoreButton = function() end,
 	_onSwitchTeam = function() end,
 	_sendSwitchTeam = function() end,
@@ -415,6 +435,7 @@ local Hud: Hud = {
 		self._input = deps.InputController
 		self._actions = deps.ActionController
 		self._carrier = deps.BallCarrier
+		self._touchButtons = deps.TouchControls.buttons
 		self._localId = deps.LocalId or PlayerIds.of(Players.LocalPlayer :: Player)
 		self._preferredInput = deps.PreferredInput
 			or function(): Enum.PreferredInput
@@ -512,19 +533,27 @@ local Hud: Hud = {
 		end
 		self._rows = rows
 		self._charge = newShown(0)
-		local stage, setStage = React.createBinding(Vector2.zero)
-		self._stage = Vector2.zero
-		self._setStage = setStage
-		local area, setArea = React.createBinding(Vector2.zero)
-		self._area = Vector2.zero
-		self._setArea = setArea
+		self._stage = newShown(Vector2.zero)
+		self._area = newShown(Vector2.zero)
+		self._lineUp = newShown(0)
+		self._screen = newShown(Rect.new(0, 0, 0, 0))
+		self._scorePress = animator:track(1)
+		self._scorePressed = newShown(false)
 		self._bindings = {
 			clock = self._clock.binding,
 			speed = self._speed.binding,
 			hints = hints,
-			stage = stage,
-			area = area,
+			stage = self._stage.binding,
+			area = self._area.binding,
 			charge = self._charge.binding,
+			lineUp = self._lineUp.binding,
+			screen = self._screen.binding,
+			scoreButton = {
+				press = self._scorePress.binding,
+				pressed = self._scorePressed.binding,
+				cooldown = Style.stillCap.cooldown,
+				seconds = Style.stillCap.seconds,
+			},
 		}
 
 		local parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
@@ -549,6 +578,7 @@ local Hud: Hud = {
 
 	toggleScoreTab = function(self: Hud)
 		self._touchToggled = not self._touchToggled
+		self._animator:play(self._scorePress, "Press", 1)
 	end,
 
 	switchTeam = function(self: Hud)
@@ -652,6 +682,7 @@ local Hud: Hud = {
 				tabOpen = tabOpen,
 				tabShown = tabShown,
 				onScoreButton = self._onScoreButton,
+				touchButtons = self._touchButtons,
 				switchTeam = switchTeamView(self, device, carrier),
 				bindings = self._bindings,
 				centre = self.centre,
@@ -698,6 +729,7 @@ local Hud: Hud = {
 			show(row.seconds, if left > 0 then text:cooldown(left) else "")
 		end
 		show(self._charge, actions:chargeSeconds() or 0)
+		show(self._scorePressed, self._scorePress.moving)
 	end,
 }
 

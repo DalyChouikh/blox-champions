@@ -19,15 +19,19 @@ export type ActionKey = "tackle" | "uppercut" | "pass" | "throw"
 export type LookBinding = { key: Enum.KeyCode, degPerUnit: Vector2, responseCurve: number }
 -- Ball Focus while held, or switched on and off by presses.
 export type FocusMode = "Hold" | "Toggle"
+-- One touch button: its centre (`place`, pixels from the whole screen's bottom-right corner, its physical one, as
+-- Roblox places its own jump button), how wide it is across its ink (`size`, pixels), and how tall its words may be
+-- (textSize, pixels; longer words shrink to fit).
+export type TouchButton = { place: UDim2, size: number, textSize: number }
 export type TouchButtons = {
-	jump: UDim2,
-	pump: UDim2,
-	brake: UDim2,
-	attach: UDim2,
-	tackle: UDim2,
-	uppercut: UDim2,
-	pass: UDim2,
-	throw: UDim2,
+	jump: TouchButton,
+	pump: TouchButton,
+	brake: TouchButton,
+	attach: TouchButton,
+	tackle: TouchButton,
+	uppercut: TouchButton,
+	pass: TouchButton,
+	throw: TouchButton,
 }
 export type TouchLayout = {
 	-- Anchored bottom-left: a touch that starts here grows the stick under the thumb.
@@ -43,9 +47,6 @@ export type TouchLayout = {
 	bigScreenSide: number,
 	bigScreenStickScale: number,
 	bigScreenButtonScale: number,
-	-- Pixels: a button's size, kept on every screen, so buttons placed apart never overlap.
-	buttonSize: UDim2,
-	-- Each button's center: pixels from the screen's bottom-right corner, as Roblox places its own jump button.
 	buttons: TouchButtons,
 }
 
@@ -126,8 +127,10 @@ local defaults: InputConfig = {
 		pass = { "Pass", "CallPass" },
 		throw = { "ChargeThrow" },
 	},
-	-- Roblox's own stick area and sizes; the buttons in the owner's arrangement (2026-10-23), 80 pixels apart. Grown
-	-- 1.5 times, the buttons' top (266 px from the bottom) and Roblox's 58 px top bar still fit any big screen.
+	-- Roblox's own stick area and sizes. The buttons in arrangement A, sized by use (#355, the owner's Q245: their Q187
+	-- drawing with Uppercut and Attach added), at the physical corner, as played (Q246, Q249): Jump 22 px from each
+	-- edge. Grown 1.5 times, the buttons' top (254 px from the bottom) and Roblox's 58 px top bar still fit any big
+	-- screen.
 	touch = {
 		stickArea = UDim2.fromScale(0.4, 2 / 3),
 		stickDeadZone = 2,
@@ -137,16 +140,15 @@ local defaults: InputConfig = {
 		bigScreenSide = 500,
 		bigScreenStickScale = 2,
 		bigScreenButtonScale = 1.5,
-		buttonSize = UDim2.fromOffset(72, 72),
 		buttons = {
-			uppercut = UDim2.new(1, -50, 1, -230),
-			tackle = UDim2.new(1, -50, 1, -150),
-			jump = UDim2.new(1, -50, 1, -70),
-			pass = UDim2.new(1, -130, 1, -210),
-			throw = UDim2.new(1, -130, 1, -130),
-			pump = UDim2.new(1, -130, 1, -50),
-			attach = UDim2.new(1, -210, 1, -130),
-			brake = UDim2.new(1, -210, 1, -50),
+			jump = { place = UDim2.new(1, -70, 1, -70), size = 96, textSize = 18 },
+			throw = { place = UDim2.new(1, -163, 1, -53), size = 70, textSize = 16 },
+			tackle = { place = UDim2.new(1, -150, 1, -132), size = 64, textSize = 15 },
+			pump = { place = UDim2.new(1, -72, 1, -160), size = 64, textSize = 15 },
+			pass = { place = UDim2.new(1, -225, 1, -133), size = 64, textSize = 13 },
+			uppercut = { place = UDim2.new(1, -150, 1, -206), size = 64, textSize = 13 },
+			brake = { place = UDim2.new(1, -235, 1, -59), size = 58, textSize = 14 },
+			attach = { place = UDim2.new(1, -77, 1, -229), size = 50, textSize = 12 },
 		},
 	},
 }
@@ -160,6 +162,12 @@ local lookBinding = Validate.record({
 	responseCurve = Validate.number({ min = 1, max = 10 }),
 })
 local focusMode = Validate.string({ oneOf = { "Hold", "Toggle" } })
+-- Whole pixels: a UDim's offset drops a fraction (probed).
+local touchButton = Validate.record({
+	place = udim2,
+	size = Validate.number({ min = 1, integer = true }),
+	textSize = Validate.textSize(),
+})
 local actionList = Validate.check(
 	Validate.list(Validate.check(Validate.string(), function(name: string): boolean
 		return Actions.nameOf(name) ~= nil
@@ -170,16 +178,17 @@ local actionList = Validate.check(
 	"must name at least one action"
 )
 
--- Every touch button's place, one per button: the rules below and the buttons' reach (Input/TouchArea) read them.
-local function buttonPlaces(touch: TouchLayout): { UDim2 }
+-- Every touch button, one each: the rules below and the buttons' reach (Input/TouchArea) read them.
+local function buttonList(touch: TouchLayout): { TouchButton }
 	local b = touch.buttons
 	return { b.jump, b.pump, b.brake, b.attach, b.tackle, b.uppercut, b.pass, b.throw }
 end
 
--- Whether every button sits at the bottom-right corner (scales 1, 1), as TouchLayout documents: the buttons' reach is
+-- Whether every button sits at the bottom-right corner (scales 1, 1), as TouchButton documents: the buttons' reach is
 -- measured from there.
 local function fromCorner(touch: TouchLayout): boolean
-	for _, place in buttonPlaces(touch) do
+	for _, button in buttonList(touch) do
+		local place = button.place
 		if place.X.Scale ~= 1 or place.Y.Scale ~= 1 then
 			return false
 		end
@@ -187,16 +196,19 @@ local function fromCorner(touch: TouchLayout): boolean
 	return true
 end
 
--- Whether two buttons, both placed from the corner, sit nearer than a button's size both across and down: then they
--- would cover each other, whatever their shape.
+-- Whether two buttons, both placed from the corner, have centres nearer than half of both their sizes both across and
+-- down: their hit areas, squares whatever a face's shape, would cover each other.
 local function buttonsOverlap(touch: TouchLayout): boolean
-	local all = buttonPlaces(touch)
-	local width, height = touch.buttonSize.X.Offset, touch.buttonSize.Y.Offset
+	local all = buttonList(touch)
 	for first = 1, #all - 1 do
 		local p = all[first]
 		for second = first + 1, #all do
 			local q = all[second]
-			if math.abs(p.X.Offset - q.X.Offset) < width and math.abs(p.Y.Offset - q.Y.Offset) < height then
+			local apart = (p.size + q.size) / 2
+			if
+				math.abs(p.place.X.Offset - q.place.X.Offset) < apart
+				and math.abs(p.place.Y.Offset - q.place.Y.Offset) < apart
+			then
 				return true
 			end
 		end
@@ -236,17 +248,15 @@ local fields = Validate.record({
 			bigScreenSide = Validate.number({ above = 0 }),
 			bigScreenStickScale = Validate.number({ above = 0 }),
 			bigScreenButtonScale = Validate.number({ above = 0 }),
-			-- The overlap rule measures pixels.
-			buttonSize = Validate.pixels(),
 			buttons = Validate.record({
-				jump = udim2,
-				pump = udim2,
-				brake = udim2,
-				attach = udim2,
-				tackle = udim2,
-				uppercut = udim2,
-				pass = udim2,
-				throw = udim2,
+				jump = touchButton,
+				pump = touchButton,
+				brake = touchButton,
+				attach = touchButton,
+				tackle = touchButton,
+				uppercut = touchButton,
+				pass = touchButton,
+				throw = touchButton,
 			}),
 		}),
 		{
@@ -326,5 +336,5 @@ end
 return {
 	defaults = defaults,
 	schema = schema,
-	buttonPlaces = buttonPlaces,
+	buttonList = buttonList,
 }

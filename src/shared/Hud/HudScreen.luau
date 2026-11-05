@@ -324,18 +324,17 @@ function HudScreen.tabSizes(config: Config.GameConfig, compact: boolean): Config
 	return if compact then tab.compactSizes else tab.sizes
 end
 
--- How far below the top of the HUD's area (`height` pixels tall) the TAB board's area starts: under the scoreboard's
--- ink (`board` pixels below that top; none where it is above it), which the board's margin keeps it clear of (the
--- owner's rule for the HUD's parts, Q203); on touch under the SCORES button too, which stays above it to close it
--- (Q234, Q236). In whole pixels, rounded up: a UDim's offset holds whole pixels, and a share of the height reads back
--- as a float32.
-function HudScreen.tabTop(config: Config.GameConfig, touch: boolean, height: number, board: number): number
+-- How far below the top of the HUD's area the TAB board's area starts: under the scoreboard's ink (`board` pixels
+-- below that top; none where it is above it), which the board's margin keeps it clear of (the owner's rule for the
+-- HUD's parts, Q203); on touch under the SCORES button too, which stays above it to close it (Q234, Q236). In whole
+-- pixels, rounded up: a UDim's offset holds whole pixels.
+function HudScreen.tabTop(config: Config.GameConfig, touch: boolean, board: number): number
 	local top = math.max(0, math.ceil(board))
 	if not touch then
 		return top
 	end
 	local button = config.UI.hud.layout.scoreButton
-	return math.max(top, math.round(height * button.position.Y.Scale) + button.position.Y.Offset + button.size.Y.Offset)
+	return math.max(top, button.top + button.size.Y.Offset)
 end
 
 -- How tall the TAB board's teams stand: both teams' bars, however few play, and `players` rows.

@@ -16,7 +16,9 @@
 -- safe area's, from its top (in Roblox's top bar's free band where it fits, HudScreen). The reticle shows only while
 -- the local player holds the ball (RC's way, the owner's Q185); its rings shrink, and the count moves down, where they
 -- would touch the scoreboard (HudScreen); both hide while the board or the end screen shows. The reticle and the
--- speedometer read in the viewer's team colour. A plain function of its props.
+-- speedometer read in the viewer's team colour. On touch each touch button's look C face (Hud/TouchButton, #355) is
+-- drawn into TouchControls' button for it (portals), from its hint row's bindings: Jump in UI.touchStyle.jumpFill, the
+-- others in its fill; and SCORES lines up with their right edge. A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -25,6 +27,7 @@ local BannerMotion = require(script.Parent.BannerMotion)
 local BoardMotion = require(script.Parent.BoardMotion)
 local Config = require(ReplicatedStorage.Shared.Config)
 local ControlHints = require(script.Parent.ControlHints)
+local ControlLabels = require(script.Parent.Parent.ControlLabels)
 local Countdown = require(script.Parent.Countdown)
 local EndScreen = require(script.Parent.EndScreen)
 local Feed = require(script.Parent.Feed)
@@ -41,6 +44,7 @@ local ScoreTab = require(script.Parent.ScoreTab)
 local Scoreboard = require(script.Parent.Scoreboard)
 local Speedometer = require(script.Parent.Speedometer)
 local Style = require(script.Parent.Style)
+local TouchButton = require(script.Parent.TouchButton)
 local Types = require(ReplicatedStorage.Shared.Rules.Types)
 
 -- What changes every frame, written straight to the instances that show it, without a render.
@@ -55,6 +59,12 @@ export type HudBindings = {
 	area: React.Binding<Vector2>,
 	-- How long the throw key has been held while a throw charges, 0 otherwise: the reticle's ring (#312).
 	charge: React.Binding<number>,
+	-- Where the touch buttons' right edge sits across the HUD's area (TouchArea.lineUp): SCORES' right edge (#355).
+	lineUp: React.Binding<number>,
+	-- The whole screen in the HUD's area's pixels: the open board's shield on touch reaches it (#355).
+	screen: React.Binding<Rect>,
+	-- What moves on SCORES: its pop and whether it shows pressed (never cooling).
+	scoreButton: Style.CapBindings,
 }
 
 -- Everything the HUD shows; the Hud renders App again whenever one of them changes.
@@ -92,6 +102,8 @@ export type AppProps = {
 	tabOpen: boolean,
 	tabShown: boolean,
 	onScoreButton: () -> (),
+	-- TouchControls' buttons, by control, each drawn its face on touch (#355).
+	touchButtons: { [string]: GuiButton },
 	-- The score tab's Switch team button; nil where it has none (#310).
 	switchTeam: ScoreTab.SwitchTeam?,
 	bindings: HudBindings,
@@ -105,6 +117,32 @@ export type AppProps = {
 -- The Stage frame's size: the stage, or the whole Root while the stage is not known.
 local function stageSize(stage: Vector2): UDim2
 	return if stage.X > 0 and stage.Y > 0 then UDim2.fromOffset(stage.X, stage.Y) else UDim2.fromScale(1, 1)
+end
+
+-- Each touch button's face, drawn into its button (`buttons`) from its hint row's bindings (`rows`).
+local function touchFaces(
+	config: Config.GameConfig,
+	buttons: { [string]: GuiButton },
+	rows: ControlHints.HintRows
+): { [string]: React.Node }
+	local touch, style = config.Input.touch, config.UI.touchStyle
+	local faces: { [string]: React.Node } = {}
+	for _, control: Config.TouchControl in ControlLabels.CONTROLS do
+		local button, row = touch.buttons[control], rows[control]
+		faces[control] = ReactRoblox.createPortal({
+			Face = React.createElement(TouchButton, {
+				config = config,
+				size = Vector2.new(button.size, button.size),
+				corner = Style.ROUND,
+				fill = if control == "jump" then style.jumpFill else style.fill,
+				textSize = button.textSize,
+				label = row.label,
+				moving = row.cap,
+				fade = row.fade,
+			}),
+		}, buttons[control])
+	end
+	return faces
 end
 
 local function App(props: AppProps): React.ReactElement
@@ -166,6 +204,9 @@ local function App(props: AppProps): React.ReactElement
 				})
 				else nil,
 		}, props.top),
+		Touch = if touch
+			then React.createElement(React.Fragment, nil, touchFaces(config, props.touchButtons, bindings.hints))
+			else nil,
 		Root = React.createElement("Frame", Style.holder({ Size = UDim2.fromScale(1, 1) }), {
 			ControlHints = if keys ~= nil and ended == nil
 				then React.createElement(ControlHints, {
@@ -183,7 +224,12 @@ local function App(props: AppProps): React.ReactElement
 				visible = props.hasSkater and ended == nil,
 			}),
 			ScoreButton = if touch
-				then React.createElement(ScoreButton, { config = config, onActivated = props.onScoreButton })
+				then React.createElement(ScoreButton, {
+					config = config,
+					left = bindings.lineUp,
+					moving = bindings.scoreButton,
+					onActivated = props.onScoreButton,
+				})
 				else nil,
 			-- Above the other parts.
 			Stage = React.createElement("Frame", Style.holder(Style.above({ Size = bindings.stage:map(stageSize) })), {
@@ -261,6 +307,7 @@ local function App(props: AppProps): React.ReactElement
 					scale = props.tab.scale.binding,
 					leave = props.tab.leave.binding,
 					area = bindings.area,
+					screen = bindings.screen,
 					boardBottom = if scoreboard ~= nil
 						then HudScreen.boardBottom(config, compact, top, period) - props.stageTop
 						else 0,

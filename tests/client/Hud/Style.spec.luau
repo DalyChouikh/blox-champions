@@ -131,6 +131,24 @@ describe("Style (look C)", function()
 		expect((ink:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius).toEqual(UDim.new(0.5, 2))
 	end)
 
+	-- The touch buttons' fills (#355): two colours of their own, not one shaded by the look.
+	it("fills a box from a gradient's top colour to its bottom one, each piece by its share of the height", function()
+		local gradient: Config.Gradient = { top = Color3.fromRGB(200, 100, 40), bottom = Color3.fromRGB(0, 50, 240) }
+		local pieces: { Style.Piece } = {
+			{ top = 0.5, height = 0.5, corner = UDim.new(0, 10) },
+			{ top = 0, height = 1, corner = Style.ROUND },
+		}
+		local mounted = mount(Style.box(config, { Size = UDim2.fromOffset(80, 80) }, gradient, nil, pieces))
+		local box = mounted:FindFirstChild("Box") :: Frame
+		local lower = ((box:FindFirstChild("Fill1") :: Frame):FindFirstChildOfClass("UIGradient") :: UIGradient).Color
+		local whole = ((box:FindFirstChild("Fill2") :: Frame):FindFirstChildOfClass("UIGradient") :: UIGradient).Color
+		-- The lower piece from halfway down, the whole one from the top, both to the bottom colour.
+		expect(near(lower.Keypoints[1].Value, Color3.fromRGB(100, 75, 140))).toBe(true)
+		expect(near(lower.Keypoints[#lower.Keypoints].Value, gradient.bottom)).toBe(true)
+		expect(near(whole.Keypoints[1].Value, gradient.top)).toBe(true)
+		expect(near(whole.Keypoints[#whole.Keypoints].Value, gradient.bottom)).toBe(true)
+	end)
+
 	it("letters text in the look's font, outlined in ink", function()
 		local props = Style.lettering(config, { Text = "+3", TextSize = 22 })
 		expect(props.Font).toBe(config.UI.hud.look.font)

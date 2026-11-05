@@ -1887,6 +1887,55 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   end screen now goes while the board shows, so the board opens in its place, not over it as Q243 said); the dim and the touch buttons
   shared one draw order (the dim now covers them, SCORES stays bright); a pass key on a mouse's button would have broken its tag (it
   now goes by its name). **"Yes, ship it"**. Next: #358's commit and PR, then #355, #376-#379.
+- **Q245 the phone's buttons to try first** (session 82, #355, recommended; the design page version 2, section 'The phone's buttons: today, and
+  two arrangements to try', to scale at 750 x 381, looping 8 s of play with the game's timings): **A, sized by use**: the owner's Q187 drawing with
+  Uppercut and Attach added (that drawing left them out): Jump 96, Throw 70, Tackle, Pump, Pass and Uppercut 64, Brake 58, Attach 50, centres from
+  the bottom right corner Jump (70, 70), Throw (163, 53), Tackle (150, 132), Pump (72, 160), Brake (235, 59), Pass (225, 133), Uppercut (150, 206),
+  Attach (77, 229). Not chosen: B, two even arcs of 64 px buttons; trying both. On the page without RC's >> beside a pressed button (no room, a thumb
+  covers it): the pop and the orange show. Next: a playable trial of A on the phone emulator (Studio copies only).
+- **Q246 trial A, round 1, and the Attach mark** (session 82, #355; the owner's words): "is this just a trial? because the text is not white, and the
+  buttons are not totally on the right, and second, I have a question, the attach feature, I don't want it to be on the right only, I want it to be
+  like the pass button, the F button that appears on the player, I want to also show the attach button next to a teamate when the player is close to
+  other teamate, so it is better for hint and player understand when he can attach". Found: a UIGradient on a TextButton tints its text too (a trial
+  patch's slip, the real build keeps its fill apart from its words); the touch gui sits in the device's safe area, 62 px in from the right edge of the
+  emulated iPhone and 20 px up from the bottom. Corrected to the owner: the F in my #358 tag shots was a stand-in; in the game Magnetic Pass is R and F
+  is Attach. The Attach mark over a teammate gets its own issue, drawn on the page first.
+- **Q247 the Attach mark's look** (session 82, recommended; the design page version 3, section 'Showing when you can attach, right on the teammate', at the tags'
+  real sizes on desktop and phone): **Look 1, the key and the word**: a dark look C box with the F cap and "Attach" over the teammate, the word alone on a
+  phone, with the owner's words: "no need for an attach icon". It shows while the game allows attaching (within attachRange, behind them, off cooldown); the Attach
+  button on the right stays. Not chosen: Look 2, the key alone (a yellow F cap, a yellow ATTACH chip on phones). Its own issue, right after #355.
+- **Q248 the owner's question on the call's hand** (session 82): "the hand icon for the teammate pass, should only show for a brief moment when the other teammate
+  press the call pass button, is that correct? not permanent over a teamamate". Answered: correct: it shows only while their call lasts,
+  Actions.callPassWindow = 3 s from their last press or until they get the ball (measured in the real 2-player test: gone 2.93 s after the last call).
+- **Q249 trial A kept, and SCORES** (session 82, #355, round 2: white words, the touch gui at ScreenInsets.None so the buttons sit in the phone's physical corner, Jump 22 px
+  from each edge): **"feels right build it, but what about the scores button? is it next on the todolist or no, because we should update it too"**. So A is built as
+  played, and SCORES goes to look C inside #355, drawn on the page first (design page section 'The SCORES button in look C').
+- **Q250 where SCORES sits** (session 82, #355, recommended; the owner's /login moved the design page to
+  https://claude.ai/artifact/L7fJyQ7iJax4PGW4H5pn5A, section 'The SCORES button in look C', the whole phone screen 874 x 401): **S2, lined up with Jump**: its
+  right edge 22 px from the screen's edge like Jump's, 96 x 36, top 74 px from the screen's top as today, in look C (box, ink, shadow, white words, the press pop).
+  Not chosen: S1, today's place inside the safe area (78 px in).
+- **Q251 merge the HUD stack** (session 82, the owner's words at the session's end): "for the PRs waiting to merge, yes merge them": the
+  owner's OK to squash-merge the stack #359, #360, #361, #362, #365, #366, #370, #371, #372 (with handoffs/s78/commit-369.txt), #374, #375, #380.
+  The Presentation part's ONE end-of-part review still runs at the part's end, over its whole diff from d409866.
+- **Q252 the merge confirmed** (session 83, recommended; asked again because the auto-mode check could not see Q251 from the
+  session before): **"Yes, merge all 12"**: #359, #360, #361, #362, #365, #366, #370, #371, #372, #374, #375, #380, squashed in
+  order, each later branch rebased onto the new main with its tree checked, CI green before each merge. Then #355 is built on
+  the new main.
+- **Q253 the buttons cut off** (session 84, #355's ship question; the design page
+  https://claude.ai/artifact/L7fJyQ7iJax4PGW4H5pn5A version 2, section '#355 built'): "the buttons looks cut off". Zoomed, every
+  touch button's bottom and SCORES' were cut flat: each face's box took the size of its fading CanvasGroup (4 px taller than the
+  button, for the shadow), so its ink ran past the group's bottom and was clipped. Fixed test-first (the box takes the button's
+  size; a laid-out test measures fill, ink and group); shown on page version 3.
+- **Q254 the sides cut too** (session 84, version 3 shown): "some buttons still cut off from the sides and a little from the
+  bottom like the brake". Zoomed 5x: Call's and Brake's left sides and Jump's right side ran flat for a few pixels. A Studio probe
+  (the same 58 px face in a group ending at its ink, in a group with 2 px of room, and in no group) showed a CanvasGroup shaves a
+  disc's outer pixels where its ink touches the group's edges on the phone emulator; with 2 px of room it matches no group. Fixed
+  test-first: UI.touchStyle.groupRoom 2 (whole px >= 1) of room round each face's ink; shown on page version 4.
+- **Q255 #355 shipped, and two findings** (session 84, recommended): **"Yes Ship it"**, with "fix it now or later, two more
+  things": (1) on desktop, the TAB board's "T Switch Team" button is cut off at its sides too; (2) "Max Lap 3, don't show markers
+  and register laps after that, because maximum is +5 points, so when player reaches +5, don't show markers and count the laps".
+  Today (Match.goalPointsByLap {1, 3, 5}) a goal is worth +1, +3, +5 after 1, 2, 3 laps of a streak and keeps +5 past that, while
+  the streak keeps counting laps. Each finding gets its own issue.
 
 ## Roller Champions
 
