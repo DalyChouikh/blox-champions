@@ -68,6 +68,22 @@ function HudScreen.under(config: Config.GameConfig, clearance: number): number
 	return look.outline + look.shadow + clearance + look.outline
 end
 
+-- How tall a desktop hint row is (Hud/ControlHints): its look C box, the outline round it and the shadow under it.
+function HudScreen.hintRow(config: Config.GameConfig): number
+	local look = config.UI.hud.look
+	return config.UI.hud.layout.hints.rowHeight + 2 * look.outline + look.shadow
+end
+
+-- The desktop hints' column's top, in pixels from the top of an area `height` pixels tall, with `shown` rows: a whole
+-- pixel, the column's middle at its place's (layout.hints.position) or half a pixel above it. Centred by its own height
+-- it sat on half pixels whenever that height and the area's differed by an odd number, and a seam on a half pixel
+-- shows a line (#378, the owner's Q242; #363, Q212).
+function HudScreen.hintsTop(config: Config.GameConfig, height: number, shown: number): number
+	local hints = config.UI.hud.layout.hints
+	local column = shown * HudScreen.hintRow(config) + (shown - 1) * hints.clearance
+	return math.floor(height * hints.position.Y.Scale + hints.position.Y.Offset - column / 2)
+end
+
 -- How far below the safe area's top the scoreboard (`top` its top) reaches at its deepest in play (the period under it
 -- while `period`): what the banner line and the TAB board keep clear of, the deepest at any moment of the period so
 -- neither moves within it.

@@ -8,12 +8,14 @@
 -- the game (Q195b: the box keeps no room for it); a key cooling down shows its seconds left and an ink sweep clearing
 -- clockwise. Each row is as wide as its parts, measured (Style.textWidth, Style.capWidth): an auto-sized row would grow
 -- without end round its box's ink, which reaches past the box. The rows stack right-aligned, clearance pixels of the
--- game between one row's drop shadow and the next one's outline. A plain function of its props.
+-- game between one row's drop shadow and the next one's outline, the column's top on a whole pixel of its area
+-- (HudScreen.hintsTop, #378). A plain function of its props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local ControlLabels = require(script.Parent.Parent.ControlLabels)
+local HudScreen = require(ReplicatedStorage.Shared.Hud.HudScreen)
 local React = require(ReplicatedStorage.Packages.React)
 local Style = require(script.Parent.Style)
 
@@ -31,6 +33,8 @@ export type ControlHintsProps = {
 	config: Config.GameConfig,
 	keys: HintKeys,
 	rows: HintRows,
+	-- The size in pixels of the HUD's area the column is placed in.
+	area: React.Binding<Vector2>,
 }
 
 local function shown(label: string): boolean
@@ -55,7 +59,7 @@ local function hint(config: Config.GameConfig, view: Style.KeyView, moving: Hint
 		+ Style.capWidth(config, view, place.cap)
 		+ place.gap
 		+ place.inset.right
-	local height = place.rowHeight + 2 * outline + shadow
+	local height = HudScreen.hintRow(config)
 	local line: { [string]: React.Node } = {
 		Inset = React.createElement("UIPadding", {
 			PaddingLeft = UDim.new(0, place.inset.left),
@@ -115,14 +119,27 @@ local function ControlHints(props: ControlHintsProps): React.ReactElement
 			Padding = UDim.new(0, place.clearance),
 		}),
 	}
+	-- What places the column: its area's size, and each row's label, as an empty one hides its row.
+	local placing: { [string]: React.Binding<any> } = { area = props.area }
 	for order, control: Config.TouchControl in ControlLabels.CONTROLS do
 		rows[control] = hint(config, props.keys[control], props.rows[control], order)
+		placing[control] = props.rows[control].label
 	end
+	local x = place.position.X
 	return React.createElement(
 		"Frame",
 		Style.holder({
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = place.position,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = React.joinBindings(placing):map(function(now: { [string]: any }): UDim2
+				local count = 0
+				for _, control in ControlLabels.CONTROLS do
+					if shown(now[control]) then
+						count += 1
+					end
+				end
+				local area: Vector2 = now.area
+				return UDim2.new(x.Scale, x.Offset, 0, HudScreen.hintsTop(config, area.Y, count))
+			end),
 			Size = UDim2.new(),
 			AutomaticSize = Enum.AutomaticSize.XY,
 		}),

@@ -213,6 +213,7 @@ local function App(props: AppProps): React.ReactElement
 					config = config,
 					keys = keys,
 					rows = bindings.hints,
+					area = bindings.area,
 				})
 				else nil,
 			Speedometer = React.createElement(Speedometer, {

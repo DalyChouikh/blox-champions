@@ -41,6 +41,8 @@ local config = Fixtures.config({
 })
 local look = config.UI.hud.look
 local GLYPH = "rbxasset://textures/ui/Controls/DefaultController/ButtonX@2x.png"
+-- The HUD's area the column is placed in, unless a test gives its own.
+local AREA = (React.createBinding(Vector2.new(1000, 772)))
 
 -- A row's setters, for what follows the play.
 type Setters = {
@@ -56,8 +58,8 @@ local folder: Folder
 local setters: { [string]: Setters }
 
 -- Hints for every control, each reading its own name, lit and at rest, with `keys` for their keys (an "X" key
--- otherwise).
-local function hints(keys: { [string]: Style.KeyView }): React.ReactElement
+-- otherwise), in `area` (AREA otherwise).
+local function hints(keys: { [string]: Style.KeyView }, area: React.Binding<Vector2>?): React.ReactElement
 	local views: ControlHints.HintKeys = {}
 	local rows: ControlHints.HintRows = {}
 	setters = {}
@@ -84,7 +86,10 @@ local function hints(keys: { [string]: Style.KeyView }): React.ReactElement
 		}
 	end
 	return React.createElement(React.Fragment, nil, {
-		ControlHints = React.createElement(ControlHints, { config = config, keys = views, rows = rows }),
+		ControlHints = React.createElement(
+			ControlHints,
+			{ config = config, keys = views, rows = rows, area = area or AREA }
+		),
 	})
 end
 
@@ -264,5 +269,51 @@ describe("ControlHints, laid out", function()
 		-- Each row's group keeps look.groupRoom round its ink: a group cuts off what reaches its edges (#386, Q257).
 		expect(Fixtures.inkRoom(jump.group)).toEqual({ left = 5, top = 5, right = 5, bottom = 5 })
 		expect(Fixtures.inkRoom(pump.group)).toEqual({ left = 5, top = 5, right = 5, bottom = 5 })
+	end)
+
+	-- #378 (the owner's Q242): each row on whole pixels, the column's middle at its place's or half a pixel above,
+	-- whatever the parity of the area's height and of the rows shown (this spec's rows: 37 px of ink, 2 apart, so 8
+	-- rows are 310 px and 7 are 271), with a keyboard's keys and a gamepad's glyphs.
+	it("puts every row on whole pixels, at either parity of the area's height and of the rows shown", function()
+		local layer = Instance.new("ScreenGui")
+		layer.Name = "ControlHintsLaidOutTest"
+		layer.Parent = game:GetService("StarterGui")
+		gui = layer
+		local place = config.UI.hud.layout.hints.position
+		-- Every key an "X" key, or a gamepad's glyph.
+		local letters: { [string]: Style.KeyView } = {}
+		local glyphs: { [string]: Style.KeyView } = {}
+		for _, control in ControlLabels.CONTROLS do
+			glyphs[control] = { image = GLYPH }
+		end
+		for _, keys in { letters, glyphs } do
+			for _, height in { 771, 772 } do
+				local area = Instance.new("Frame")
+				area.Size = UDim2.fromOffset(1000, height)
+				area.BackgroundTransparency = 1
+				area.Parent = layer
+				local mounted = Fixtures.mount(hints(keys, (React.createBinding(Vector2.new(1000, height)))), area)
+				for _, attach in { "Attach", "" } do
+					setters.attach.label(attach)
+					task.wait()
+					local column = mounted:FindFirstChild("ControlHints") :: Frame
+					for _, control in ControlLabels.CONTROLS do
+						local row = column:FindFirstChild(control) :: Frame
+						if row.Visible then
+							expect(`{control} {row.AbsolutePosition.X % 1} {row.AbsolutePosition.Y % 1}`).toBe(
+								`{control} 0 0`
+							)
+						end
+					end
+					-- Its right edge at its place's; its middle at its place's, or half a pixel above it.
+					local right = column.AbsolutePosition.X + column.AbsoluteSize.X - area.AbsolutePosition.X
+					expect(right).toBe(1000 * place.X.Scale + place.X.Offset)
+					local middle = column.AbsolutePosition.Y - area.AbsolutePosition.Y + column.AbsoluteSize.Y / 2
+					local above = height * place.Y.Scale + place.Y.Offset - middle
+					expect(above).toBeGreaterThanOrEqual(0)
+					expect(above).toBeLessThanOrEqual(0.5)
+				end
+			end
+		end
 	end)
 end)
