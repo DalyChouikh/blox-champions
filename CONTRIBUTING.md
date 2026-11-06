@@ -27,6 +27,8 @@ Keep commits small and focused; a test and the code that makes it pass land toge
 
 Tests live in `tests/`, mirror the `src/` folders, and are named `<Module>.spec.luau`. Import every Jest function from `JestGlobals`. See [Running tests](README.md#running-tests).
 
+A test that times a step asserts its mean with `Fixtures.expectWithinBudget(seconds, budget)`, the budget in seconds as Studio runs it on the owner's PC: a slower machine (a cloud run) stretches it by how much slower it runs a fixed workload, so only a step that is itself slower fails.
+
 ## Zero warnings
 
 Never leave a warning or error unaddressed — from tests, CI, StyLua, selene, luau-lsp, Ruff, Python's unittest, or Studio's Output window during playtests. Find the cause and fix it in the same change; if it comes from outside our code, change our setup so it no longer appears. Code-review findings of every severity are fixed, not deferred.

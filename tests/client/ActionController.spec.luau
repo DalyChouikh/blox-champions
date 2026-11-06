@@ -1061,7 +1061,7 @@ describe("ActionController", function()
 			total += os.clock() - started
 		end
 		expect(#requests).toBe(0)
-		expect(total / 600).toBeLessThan(0.0001)
+		Fixtures.expectWithinBudget(total / 600, 0.0001)
 	end)
 end)
 

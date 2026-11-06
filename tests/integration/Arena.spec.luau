@@ -37,7 +37,7 @@ end
 
 describe("The generated arena", function()
 	it("builds in under a second", function()
-		expect(buildSeconds).toBeLessThan(1)
+		Fixtures.expectWithinBudget(buildSeconds, 1)
 	end)
 
 	-- The heights below are worked out independently of the code: on the top straight u = -z - 20; around the left

@@ -270,6 +270,6 @@ describe("PoseController", function()
 			PoseController:step(1 / 60)
 		end
 		local meanSeconds = (os.clock() - started) / frames
-		expect(meanSeconds).toBeLessThan(0.0003)
+		Fixtures.expectWithinBudget(meanSeconds, 0.0003)
 	end)
 end)

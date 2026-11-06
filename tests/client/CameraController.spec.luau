@@ -468,7 +468,7 @@ describe("CameraController", function()
 			CameraController:step(DT)
 			total += os.clock() - started
 		end
-		expect(total / 600).toBeLessThan(0.0001)
+		Fixtures.expectWithinBudget(total / 600, 0.0001)
 	end)
 
 	it("turns toward the ball while Ball Focus is held", function()

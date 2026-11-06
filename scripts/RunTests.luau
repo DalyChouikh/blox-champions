@@ -54,6 +54,9 @@ local function execute(options: RunOptions?): Summary
 		verbose = false,
 		testNamePattern = runOptions.testNamePattern,
 		testPathPattern = runOptions.testPathPattern,
+		-- The hooks every spec file shares (Tests.Setup: YieldGuard, #404). Given here: the same option in
+		-- Tests' jest.config was not applied (measured: its setup never ran).
+		setupFilesAfterEnv = { tests.Setup },
 	}, { tests }):awaitStatus()
 
 	if status ~= "Resolved" then

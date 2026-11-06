@@ -103,6 +103,61 @@ function Fixtures.expectNear2(actual: Vector2, expected: Vector2, tolerance: num
 	JestGlobals.expect((actual - expected).Magnitude).toBeLessThan(tolerance or 1e-3)
 end
 
+-- Step-time budgets (#404, the owner's Q286): each is set in seconds as Studio runs on the owner's PC; a slower machine
+-- (a slow cloud run: the HUD's 0.1 ms step read 0.144 and 0.166 ms there) scales them by how much slower it runs a
+-- fixed workload, plain Luau maths and a property write as a frame's steps are, timed here (its fastest of
+-- REFERENCE_ROUNDS) against REFERENCE_SECONDS, its time in Studio there (2.6-3.0 ms, measured). A faster machine keeps
+-- the budgets as set, so a step that is itself made slower still fails anywhere.
+Fixtures.REFERENCE_SECONDS = 0.0028
+Fixtures.REFERENCE_ROUNDS = 5
+
+local function workload(part: Part)
+	local sum = Vector3.zero
+	local slots = table.create(64, 0)
+	for i = 1, 20000 do
+		slots[i % 64 + 1] += i
+		sum += Vector3.new(i % 7, i % 11, i % 13) * 0.5
+		if i % 4 == 0 then
+			part.Position = sum
+		end
+	end
+end
+
+-- How many times a budget stretches for a machine that ran the workload in `measured` seconds: never below 1.
+function Fixtures.budgetScale(measured: number): number
+	return math.max(1, measured / Fixtures.REFERENCE_SECONDS)
+end
+
+-- The least of `rounds` calls of `measure` (seconds each): a round the machine was interrupted in reads slow.
+function Fixtures.fastest(rounds: number, measure: () -> number): number
+	local best = math.huge
+	for _ = 1, rounds do
+		best = math.min(best, measure())
+	end
+	return best
+end
+
+local slowness: number? = nil
+
+-- This machine's budgetScale, measured once per spec file.
+function Fixtures.slowness(): number
+	if slowness == nil then
+		local part = Instance.new("Part")
+		slowness = Fixtures.budgetScale(Fixtures.fastest(Fixtures.REFERENCE_ROUNDS, function(): number
+			local started = os.clock()
+			workload(part)
+			return os.clock() - started
+		end))
+		part:Destroy()
+	end
+	return slowness :: number
+end
+
+-- Asserts `seconds`, a time measured here, is within `budget` (seconds in Studio on the owner's PC) on this machine.
+function Fixtures.expectWithinBudget(seconds: number, budget: number)
+	JestGlobals.expect(seconds).toBeLessThan(budget * Fixtures.slowness())
+end
+
 -- Where a gravity-only flight from `from` at `velocity` is once it has covered `across` studs at right angles to
 -- `gravity`: the kinematics alone, to check where a throw comes down apart from how it was aimed (#313).
 function Fixtures.flightAcross(from: Vector3, velocity: Vector3, gravity: Vector3, across: number): Vector3
