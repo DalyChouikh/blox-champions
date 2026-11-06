@@ -25,6 +25,11 @@ def piece(name: str, scale: float = 1.0) -> "meshkit.Piece":
     )
 
 
+def turned(point):
+    """A point turned half round the up axis: how the GLB stores it (Roblox's importer turns it back)."""
+    return (-point[0], point[1], -point[2])
+
+
 def cross(a, b):
     return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
 
@@ -166,7 +171,7 @@ class Glb(unittest.TestCase):
         self.assertEqual([node["mesh"] for node in document["nodes"]], [0, 1])
         self.assertEqual([mesh["name"] for mesh in document["meshes"]], ["Shell", "Lip"])
 
-    def test_positions_normals_and_triangles_read_back_as_given(self):
+    def test_points_and_normals_stored_turned_half_round_up_for_robloxs_import(self):
         document, binary = read_glb(meshkit.glb_bytes([piece("Shell"), piece("Lip", 2.0)]))
         for index, scale in ((0, 1.0), (1, 2.0)):
             primitive = document["meshes"][index]["primitives"][0]
@@ -175,9 +180,9 @@ class Glb(unittest.TestCase):
             normals = accessor_values(document, binary, primitive["attributes"]["NORMAL"])
             indices = accessor_values(document, binary, primitive["indices"])
             for got, want in zip(positions, CORNERS, strict=True):
-                for g, w in zip(got, want, strict=True):
+                for g, w in zip(got, turned(want), strict=True):
                     self.assertAlmostEqual(g, w * scale, places=6)
-            for got, want in zip(normals, NORMALS, strict=True):
+            for got, want in zip(normals, map(turned, NORMALS), strict=True):
                 for g, w in zip(got, want, strict=True):
                     self.assertAlmostEqual(g, w, places=6)
             self.assertEqual([tuple(indices[i : i + 3]) for i in range(0, len(indices), 3)], TETRA)
@@ -185,8 +190,8 @@ class Glb(unittest.TestCase):
     def test_positions_carry_their_bounds(self):
         document, _ = read_glb(meshkit.glb_bytes([piece("Lip", 2.0)]))
         position = document["accessors"][document["meshes"][0]["primitives"][0]["attributes"]["POSITION"]]
-        self.assertEqual(position["min"], [0.0, 0.0, 0.0])
-        self.assertEqual(position["max"], [4.0, 6.0, 8.0])
+        self.assertEqual(position["min"], [-4.0, 0.0, -8.0])
+        self.assertEqual(position["max"], [0.0, 6.0, 0.0])
 
     def test_every_view_starts_on_a_four_byte_boundary_inside_the_one_buffer(self):
         document, binary = read_glb(meshkit.glb_bytes([piece("Shell"), piece("Lip", 2.0)]))

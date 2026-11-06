@@ -125,6 +125,14 @@ class Piece:
     triangles: list[tuple[int, int, int]]
 
 
+def _imported(point: Vector) -> Vector:
+    """A point as the GLB stores it: Roblox's importer turns a glTF half a turn round its up axis (glTF's front is
+    +Z, Roblox's -Z; seen on the goal's first import), so the file holds each point turned the other way and the
+    import lands it where it was given. A turn, not a mirror: faces keep their winding."""
+    x, y, z = point
+    return (-x + 0.0, y, -z + 0.0)
+
+
 def _float32(values: list[float]) -> tuple[float, ...]:
     """The values as the file stores them, so the bounds written beside them match them exactly."""
     return struct.unpack(f"<{len(values)}f", struct.pack(f"<{len(values)}f", *values))
@@ -149,12 +157,12 @@ def glb_bytes(pieces: list[Piece]) -> bytes:
     meshes, nodes = [], []
     for index, piece in enumerate(pieces):
         check_budget(piece.name, len(piece.triangles))
-        points = _float32([c for point in piece.positions for c in point])
+        points = _float32([c for point in piece.positions for c in _imported(point)])
         bounds = {
             "min": [min(points[axis::3]) for axis in range(3)],
             "max": [max(points[axis::3]) for axis in range(3)],
         }
-        normals = [c for normal in piece.normals for c in normal]
+        normals = [c for normal in piece.normals for c in _imported(normal)]
         corners = [corner for triangle in piece.triangles for corner in triangle]
         attributes = {
             "POSITION": add(
