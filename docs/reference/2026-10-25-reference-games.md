@@ -2459,6 +2459,24 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   15,666), its build ~0.21 s (was ~0.27 s); Play shots on the design page, which the owner's /login moved to
   https://claude.ai/artifact/7i4DcQZNXCxbWfNaiD7bM8, section 'The walls look like glass lower down'): **"Yes, ship
   it"**: the PR opens stacked on #416; the owner's 2-player check of the whole stack stays before its merge (Q321).
+- **Q323 the goal opens like doors** (session 97; #410's open look, G15: on the Halo pylon the panel's 16-stud slide
+  up leaves it 2 studs inside the 18-wide opening and rising through the housing; asked A today's 16 / B up 20 / C
+  fade out in place (recommended), with real Play frames on the design page, now
+  https://claude.ai/artifact/5ddsaHeYTvd7w5sKh9zDk6 after the /login to chouikhmohamedali, section 'The Halo pylon
+  goal, on our wall'; asked too whether to judge by a playable trial or the page): **"The page is enough, but I want
+  it to open like either a two sides door like an elevator door opens, from the middle, or a one side that open from
+  the left to the right to the wall"**: none of A/B/C; two new looks to draw on the page first (D elevator doors
+  splitting from the middle, E one door sliding right toward the outer wall, as an oncoming skater sees it), then
+  ask which.
+- **Q324 elevator doors** (session 97, recommended; both drawn on the design page, section 'The goal opens like
+  doors': D two halves parting from the middle into the housing's left side and the pylon, E one door sliding left
+  to right into the pylon; each door drawn as 10 bars that shorten into the housing, so it never shows outside the
+  goal; solid in today's colour, since see-through bars show thin light lines where they meet): **"D elevator
+  doors"**: the centre, where players aim, clears first.
+- **Q325 the strips glow with the lip** (session 97, recommended; the pylon's two neon strips, drawn on the design
+  page in Play close up and from the lane: 1 white neon always / 2 team colour while the goal is open, white neon
+  while shut / 3 dark like the band): **"2 glow with the lip"**: from the lane the lit lip alone is a thin line; the
+  strips make an open goal easy to spot.
 
 ## Roller Champions
 
