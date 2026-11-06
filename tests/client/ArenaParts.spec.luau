@@ -36,7 +36,7 @@ describe("ArenaParts", function()
 		expect(ArenaParts.parts).toBeNil()
 	end)
 
-	it("finds the corner markers by gate index, the goal hoop's parts and the panel once the arena is there", function()
+	it("finds the corner markers by gate index, the goal's glow and its panel once the arena is there", function()
 		expect(ArenaParts.parts).toBeNil()
 		local arena = Fixtures.hudArena(folder)
 		ArenaParts:refresh()
@@ -51,7 +51,9 @@ describe("ArenaParts", function()
 			end
 			Fixtures.expectNear(marker.position, arena.markers[index]:GetPivot().Position)
 		end
-		expect(#parts.hoop).toBe(2)
+		-- The ring's blocks, until the goal's meshes come.
+		expect(#parts.glow).toBe(2)
+		expect(table.find(parts.glow, arena.rim[1]) ~= nil and table.find(parts.glow, arena.rim[2]) ~= nil).toBe(true)
 		expect(parts.panel == arena.panel).toBe(true)
 
 		-- A marker that is a single part (an art pass may tag one): its parts are itself, its position its own.
@@ -88,5 +90,30 @@ describe("ArenaParts", function()
 		arena.panel:Destroy()
 		task.wait()
 		expect(ArenaParts.parts).toBeNil()
+	end)
+
+	-- #410: the goal's meshes reach a client after the arena; the server moves the glow from the ring's blocks to the
+	-- goal's lip (Builder.dressGoal), and the arena's parts follow it.
+	it("follows what glows when the goal opens: the ring's blocks, then the goal's lip once its meshes come", function()
+		ArenaParts:start()
+		local arena = Fixtures.hudArena(folder)
+		task.wait()
+		local before = ArenaParts.parts :: any
+		expect(#before.glow).toBe(2)
+		local lip = Instance.new("Part")
+		lip.Name = "Lip"
+		lip.Anchored = true
+		lip:AddTag(Tags.GoalGlow)
+		lip.Parent = folder
+		arena.hoop:RemoveTag(Tags.GoalGlow)
+		task.wait()
+		local after = ArenaParts.parts :: any
+		expect(after ~= before).toBe(true)
+		expect(#after.glow == 1 and after.glow[1] == lip).toBe(true)
+		-- Nothing glowing is not a broken arena: the goal is still there to aim at.
+		lip:RemoveTag(Tags.GoalGlow)
+		task.wait()
+		local none = ArenaParts.parts :: any
+		expect(none ~= nil and #none.glow == 0).toBe(true)
 	end)
 end)

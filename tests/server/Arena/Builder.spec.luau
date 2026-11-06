@@ -310,4 +310,101 @@ describe("Builder.build", function()
 		end).toThrow("ArenaBuilder: gate panel 3 piece 1 is invalid (size 1, 1, 0)")
 		expect(#parent:GetChildren()).toBe(0)
 	end)
+
+	-- Until the Halo pylon's meshes come (GoalLook), the ring's blocks are the goal's look, as before #410: they show
+	-- in the goal's colour, give the ring its collision, and glow while the goal is open.
+	it("builds the ring's blocks as the goal's look until its meshes come: shown, solid, glowing when open", function()
+		local hoop = folder(Builder.build(Geometry.build(config), config, parent), "Goal"):FindFirstChild("GoalHoop")
+		local model = hoop :: Model
+		expect(model:HasTag(Tags.GoalHoop)).toBe(true)
+		expect(model:HasTag(Tags.GoalGlow)).toBe(true)
+		for _, child in model:GetChildren() do
+			local rim = child :: BasePart
+			if not (rim.Transparency == 0 and rim.Color == config.Arena.colors.goal and rim.CanCollide) then
+				error(`{rim.Name} is not a shown, solid block in the goal's colour`)
+			end
+		end
+	end)
+end)
+
+-- The Halo pylon (#410, the owner's Q314-Q315): four meshes made once in Blender, placed where the build put them.
+describe("Builder.dressGoal", function()
+	local Arena = require(ReplicatedStorage.Shared.Config.Arena)
+
+	-- The goal folder of an arena built from `built`, and stand-ins for the four meshes in the build's order.
+	local function goalAndMeshes(built: Config.GameConfig): (Folder, { MeshPart })
+		local goal = folder(Builder.build(Geometry.build(built), built, parent), "Goal")
+		local meshes: { MeshPart } = {}
+		for _ in Arena.goalPieces do
+			table.insert(meshes, Instance.new("MeshPart"))
+		end
+		return goal, meshes
+	end
+
+	it("places each mesh at its box in the goal's frame, in its look, only drawing, beside the hoop", function()
+		local goal, meshes = goalAndMeshes(config)
+		local hoop = goal:FindFirstChild("GoalHoop") :: Model
+		local frame = hoop:GetPivot()
+		Builder.dressGoal(hoop, meshes, config.Arena)
+		local look = goal:FindFirstChild("GoalLook") :: Model
+		expect(look:IsA("Model")).toBe(true)
+		expect(#look:GetChildren()).toBe(4)
+		for index, name in Arena.goalPieces do
+			local mesh = meshes[index]
+			local box = config.Arena.goal.pieces[name]
+			local wanted = config.Arena.goal.looks[name]
+			expect(mesh.Name).toBe(name)
+			expect(mesh.Parent == look).toBe(true)
+			expect(mesh.Size).toEqual(box.size)
+			Fixtures.expectNear(mesh.Position, (frame * CFrame.new(box.centre)).Position)
+			Fixtures.expectNear(mesh.CFrame.LookVector, frame.LookVector)
+			Fixtures.expectNear(mesh.CFrame.UpVector, frame.UpVector)
+			expect(mesh.Color).toEqual(wanted.color)
+			expect(mesh.Material).toBe(wanted.material)
+			expect(mesh.Anchored).toBe(true)
+			expect(mesh.CanCollide or mesh.CanQuery or mesh.CanTouch).toBe(false)
+		end
+	end)
+
+	-- G4: skaters and the ball meet the ring's shape, not the mesh's every face, and the rules keep their opening.
+	it("hides the ring's blocks, which keep the ring's collision and the rules' opening", function()
+		local goal, meshes = goalAndMeshes(config)
+		local hoop = goal:FindFirstChild("GoalHoop") :: Model
+		local pivot = hoop:GetPivot()
+		Builder.dressGoal(hoop, meshes, config.Arena)
+		expect(#hoop:GetChildren()).toBe(16)
+		for _, child in hoop:GetChildren() do
+			local rim = child :: BasePart
+			if not (rim.Transparency == 1 and rim.CanCollide and rim.CanQuery and rim.CanTouch) then
+				error(`{rim.Name} is not a hidden block that still collides`)
+			end
+		end
+		expect(hoop:HasTag(Tags.GoalHoop)).toBe(true)
+		expect(hoop:GetPivot()).toEqual(pivot)
+		expect(hoop:GetAttribute(Tags.Attribute.OpeningRadius)).toBe(config.Arena.goal.ringRadius)
+	end)
+
+	-- G13: what glows when the goal opens is tagged, so each client finds it whenever the meshes come.
+	it("moves the glow to the pieces whose look glows: the lip by default, any piece by config", function()
+		local goal, meshes = goalAndMeshes(config)
+		local hoop = goal:FindFirstChild("GoalHoop") :: Model
+		Builder.dressGoal(hoop, meshes, config.Arena)
+		expect(hoop:HasTag(Tags.GoalGlow)).toBe(false)
+		local glowing: { string } = {}
+		for _, mesh in meshes do
+			if mesh:HasTag(Tags.GoalGlow) then
+				table.insert(glowing, mesh.Name)
+			end
+		end
+		expect(glowing).toEqual({ "Lip" })
+
+		local strips = { color = Color3.fromRGB(14, 178, 247), material = Enum.Material.Glass, glows = true }
+		local custom = Fixtures.config({ Arena = { goal = { looks = { Strips = strips } } } })
+		local customGoal, customMeshes = goalAndMeshes(custom)
+		Builder.dressGoal(customGoal:FindFirstChild("GoalHoop") :: Model, customMeshes, custom.Arena)
+		local dressed = (customGoal:FindFirstChild("GoalLook") :: Model):FindFirstChild("Strips") :: MeshPart
+		expect(dressed.Color).toEqual(strips.color)
+		expect(dressed.Material).toBe(strips.material)
+		expect(dressed:HasTag(Tags.GoalGlow)).toBe(true)
+	end)
 end)

@@ -13,7 +13,14 @@ local Validate = require(script.Parent.Validate)
 -- own at the opening's centre (Centerline.at), since Roblox centres an imported mesh on its box.
 export type GoalBox = { centre: Vector3, size: Vector3 }
 -- The goal's four meshes by name, as the build names them.
+export type GoalPiece = "Shell" | "Strips" | "Lip" | "Band"
 export type GoalMeshes<T> = { Shell: T, Strips: T, Lip: T, Band: T }
+-- How a piece of the goal looks; one that `glows` takes the team's colour while the goal is open (ArenaGlow).
+export type GoalLook = { color: Color3, material: Enum.Material, glows: boolean }
+
+-- The pieces in the build's order, the one each mesh is asked for in.
+local goalPieces: { GoalPiece } = { "Shell", "Strips", "Lip", "Band" }
+table.freeze(goalPieces)
 
 -- A map's top (Arena spec R14): Closed, a glass roof across the walls' top; Open, an invisible ceiling above it.
 export type TopKind = "Closed" | "Open"
@@ -90,6 +97,7 @@ export type ArenaConfig = {
 		-- The owner's import of the build's goal.glb: one mesh per piece.
 		meshes: GoalMeshes<string>,
 		pieces: GoalMeshes<GoalBox>,
+		looks: GoalMeshes<GoalLook>,
 	},
 	-- The glass panel at each gate (R18): a thin wall across the track, filling its whole cross-section from the
 	-- surface up to the walls' top, `depth` thick along the track (thinner than the goal's parts: a rule below).
@@ -148,6 +156,14 @@ local defaults: ArenaConfig = {
 			Strips = builtBox(GoalPieces.pieces.Strips),
 			Lip = builtBox(GoalPieces.pieces.Lip),
 			Band = builtBox(GoalPieces.pieces.Band),
+		},
+		-- Q315's renders: a warm white body and lip, a dark band. The lip glows in the team's colour while the goal is
+		-- open, as the ring did; the strips are white neon until the owner picks their colour (Q323).
+		looks = {
+			Shell = { color = Color3.fromRGB(245, 242, 236), material = Enum.Material.SmoothPlastic, glows = false },
+			Strips = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.Neon, glows = false },
+			Lip = { color = Color3.fromRGB(245, 242, 236), material = Enum.Material.SmoothPlastic, glows = true },
+			Band = { color = Color3.fromRGB(16, 19, 29), material = Enum.Material.SmoothPlastic, glows = false },
 		},
 	},
 	gatePanel = { depth = 0.2 },
@@ -227,6 +243,9 @@ local fields = Validate.record({
 		pylon = Validate.record({ foot = size, top = size }),
 		meshes = goalMeshes(Validate.assetId()),
 		pieces = goalMeshes(Validate.record({ centre = vector, size = vector })),
+		looks = goalMeshes(
+			Validate.record({ color = color, material = Validate.enumItem(Enum.Material), glows = Validate.boolean() })
+		),
 	}),
 	gatePanel = Validate.record({ depth = partSize }),
 	teamSpawnSpacing = size,
@@ -244,8 +263,8 @@ local function straightFootStart(arena: ArenaConfig): Vector2
 	return Vector2.new(across, straight.riseHeight + (across - straight.riseEnd) * math.tan(incline))
 end
 
--- Checked in order; the first that fails is reported. Whether the goal ring and its arm fit is judged by Arena/Geometry
--- against the arena as built (Features.goal), which config cannot require.
+-- Checked in order; the first that fails is reported. Whether the goal ring and its pylon fit is judged by
+-- Arena/Geometry against the arena as built (Features.goal), which config cannot require.
 local crossFieldRules: { Validate.Rule } = {
 	{
 		message = "trackWidth must fit the straights' pieces in order: the inner bank, the spawn room, the rise, the "
@@ -329,4 +348,5 @@ local schema = Validate.checkAll(fields, crossFieldRules)
 return {
 	defaults = defaults,
 	schema = schema,
+	goalPieces = goalPieces,
 }

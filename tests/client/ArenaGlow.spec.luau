@@ -12,6 +12,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local HudStore = require(Client.HudStore)
 local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
+local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
 local config = Config.defaults()
 local glow = config.UI.arenaGlow
@@ -106,6 +107,28 @@ describe("ArenaGlow", function()
 		for _, rim in arena.rim do
 			expect(glows(rim, nil)).toBe(true)
 		end
+	end)
+
+	-- #410: the goal's meshes come after the arena; the server moves the glow from the ring's blocks to the lip.
+	it("lights the goal's lip once its meshes come, even while the goal is open, and puts it back after", function()
+		snapshot({ possessingTeam = "Orange", goalOpenFor = "Orange" })
+		local lip = Instance.new("Part")
+		lip.Name = "Lip"
+		lip.Anchored = true
+		lip.Color = Color3.fromRGB(245, 242, 236)
+		lip.Material = Enum.Material.SmoothPlastic
+		lip:AddTag(Tags.GoalGlow)
+		lip.Parent = folder
+		arena.hoop:RemoveTag(Tags.GoalGlow)
+		ArenaParts:refresh()
+		ArenaGlow:step(DT)
+		expect(lip.Color).toEqual(colors.Orange)
+		expect(lip.Material).toBe(glow.material)
+		snapshot({ possessingTeam = "Orange" })
+		expect(lip.Color).toEqual(Color3.fromRGB(245, 242, 236))
+		expect(lip.Material).toBe(Enum.Material.SmoothPlastic)
+		-- The panel slid out once, when the goal opened, and back once.
+		expect(#slides).toBe(2)
 	end)
 
 	-- The owner's choices (2026-10-27): only the next gate's panel shows, every other one is invisible, and every

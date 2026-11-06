@@ -1,7 +1,8 @@
 --!strict
 -- Reads an arena's tagged features (spec §9.2) back into what gameplay needs: the rules' ArenaLayout (gates and the
--- goal's scoring disc), the goal panel to open and close, the corner markers, the spawn frames and the surfaces skaters
--- ride, which the server's own rays look for (a diver's touchdown, #221); and what a skater's ground ray found there.
+-- goal's scoring disc), the goal's hoop to dress and its panel to open and close, the corner markers, the spawn frames
+-- and the surfaces skaters ride, which the server's own rays look for (a diver's touchdown, #221); and what a skater's
+-- ground ray found there.
 -- Only tagged instances under `root` count, so a leftover arena or an art model elsewhere in the place is ignored.
 -- Anything malformed fails fast, naming the tag at fault: a mis-tagged arena must never silently miss laps or goals.
 
@@ -20,6 +21,8 @@ type Team = Team.Team
 
 export type TaggedArena = {
 	layout: MatchEngine.ArenaLayout,
+	-- The hoop the layout's goal disc was read from: the server dresses it in the goal's meshes (GoalLook, #410).
+	goalHoop: PVInstance,
 	goalPanel: BasePart,
 	-- Indexed by GateIndex: each a model (the builder's gate panel) or a single part.
 	markers: { PVInstance },
@@ -148,9 +151,12 @@ function TaggedLayout.goalDisc(hoop: Instance): Crossing.Disc?
 	return nil
 end
 
-local function readGoal(root: Instance): Crossing.Disc
-	return TaggedLayout.goalDisc(single(root, Tags.GoalHoop))
+-- The goal's disc and the hoop it was read from (a PVInstance: goalDisc reads nothing else).
+local function readGoal(root: Instance): (Crossing.Disc, PVInstance)
+	local hoop = single(root, Tags.GoalHoop)
+	local disc = TaggedLayout.goalDisc(hoop)
 		or fail(`{Tags.GoalHoop} needs a positive {Tags.Attribute.OpeningRadius} attribute`)
+	return disc, hoop :: PVInstance
 end
 
 local function readMarkers(root: Instance, gateCount: number): { PVInstance }
@@ -190,8 +196,10 @@ end
 
 function TaggedLayout.read(root: Instance): TaggedArena
 	local gates = readGates(root)
+	local goal, hoop = readGoal(root)
 	local arena: TaggedArena = {
-		layout = { gates = gates, goal = readGoal(root) },
+		layout = { gates = gates, goal = goal },
+		goalHoop = hoop,
 		goalPanel = asPart(single(root, Tags.GoalPanel), Tags.GoalPanel),
 		markers = readMarkers(root, #gates),
 		teamSpawns = readTeamSpawns(root),

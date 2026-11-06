@@ -1,9 +1,10 @@
 --!strict
 -- The arena's glow (spec §9.1), stepped before each frame is drawn (FrameController) and acting only when the HUD's
 -- state or the arena's parts change:
--- - while the goal is open for a team, the hoop's parts take that team's colour and Config.UI.arenaGlow.material, and
---   the goal panel slides panelSlide studs up out of the ring over panelSlideSeconds (the server only lets the ball
---   through it); when the goal closes, the hoop looks as before and the panel slides back;
+-- - while the goal is open for a team, what glows then (ArenaParts' `glow`: the goal's lip, or the ring's blocks
+--   before its meshes come) takes that team's colour and Config.UI.arenaGlow.material, and the goal panel slides
+--   panelSlide studs up out of the ring over panelSlideSeconds (the server only lets the ball through it); when the
+--   goal closes, they look as before and the panel slides back;
 -- - only the next gate's corner marker (its glass wall) shows (the owner's choice, 2026-10-27): every part of it glows
 --   in the colour of the team with the ball, at the transparency it had when it reached this client. Every other
 --   marker is hidden from the start, and none shows while nobody has the ball; every streak starts at the goal's gate
@@ -65,7 +66,7 @@ local function remember(self: ArenaGlow, parts: ArenaParts.Parts)
 			}
 		end
 	end
-	for _, part in parts.hoop do
+	for _, part in parts.glow do
 		keep(part)
 	end
 	for _, marker in parts.markers do
@@ -91,7 +92,7 @@ end
 
 local function glowGoal(self: ArenaGlow, parts: ArenaParts.Parts, team: Team?)
 	self._goalTeam = team
-	for _, part in parts.hoop do
+	for _, part in parts.glow do
 		if team ~= nil then
 			light(self, part, team)
 		else

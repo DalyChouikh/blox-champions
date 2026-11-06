@@ -143,6 +143,9 @@ describe("WorldMarkers", function()
 		WorldMarkers:step(DT)
 		expect(line.Enabled).toBe(false)
 		expect(ground.Transparency).toBe(1)
+		-- The disc only draws: it stays put, casts no shadow, and nothing hits, sees or touches it.
+		expect(ground.Anchored).toBe(true)
+		expect(ground.CanCollide or ground.CanQuery or ground.CanTouch or ground.CastShadow).toBe(false)
 	end)
 
 	it("paints a look that comes after its ball, and leaves the unseen ball part alone", function()

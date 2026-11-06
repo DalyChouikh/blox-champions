@@ -12,6 +12,7 @@ local BallCarrier = require(script.Parent.BallCarrier)
 local BallPart = require(script.Parent.BallPart)
 local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
+local DrawOnly = require(ReplicatedStorage.Shared.Util.DrawOnly)
 local HudStore = require(script.Parent.HudStore)
 local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 
@@ -80,12 +81,9 @@ local CarrierBeam: CarrierBeam = {
 		local bottom, top = arena.outerWallHeight, Profile.lipStart(arena)
 		self._lateral = arena.trackWidth - glow.beam.thickness / 2
 		self._height = (bottom + top) / 2
-		local part = Instance.new("Part")
+		local part = DrawOnly(Instance.new("Part"))
 		part.Name = "CarrierBeam"
 		part.Anchored = true
-		part.CanCollide = false
-		part.CanQuery = false
-		part.CanTouch = false
 		part.CastShadow = false
 		part.Material = glow.material
 		-- Across the track, up the glass, along the track.

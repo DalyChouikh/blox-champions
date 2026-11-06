@@ -3,17 +3,17 @@
 -- (Config.Ball.meshId) in a skin's colour with the skin's picture copied on (Skins/BallSkins), goes under the ball
 -- part, and the ball part, which keeps the physics, is hidden. The look only draws: anchored, it never falls, pushes,
 -- touches or meets a ray; each screen moves it to where it draws the ball (Client/BallView).
--- The mesh is asked of Roblox once, in the background: a start held up by the download let Roblox load a joining
--- player's default character before CharacterService turned that off (found in Play). Until it comes, a look is a plain
--- sphere in the skin's colour; when it comes, each ball dressed before it that is still in the game is dressed again.
--- If it does not load, the looks stay plain spheres, and the Output says why once.
+-- The mesh is asked of Roblox once, in the background (Meshes). Until it comes, a look is a plain sphere in the skin's
+-- colour; when it comes, each ball dressed before it that is still in the game is dressed again. If it does not load,
+-- the looks stay plain spheres, and the Output says why once.
 
-local AssetService = game:GetService("AssetService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local Config = require(ReplicatedStorage.Shared.Config)
+local DrawOnly = require(ReplicatedStorage.Shared.Util.DrawOnly)
 local Look = require(ReplicatedStorage.Shared.Ball.Look)
+local Meshes = require(script.Parent.Meshes)
 
 -- A ball dressed before the mesh came, and its skin.
 type Early = { ball: BasePart, skin: string }
@@ -35,26 +35,15 @@ export type BallLook = {
 	_generation: number,
 }
 
-local function makeMesh(id: string): MeshPart
-	-- Box: the look never collides, so its collision shape is never built in full.
-	return AssetService:CreateMeshPartAsync(Content.fromUri(id), {
-		CollisionFidelity = Enum.CollisionFidelity.Box,
-		RenderFidelity = Enum.RenderFidelity.Precise,
-	})
-end
-
 local function logLine(line: string)
 	warn(line)
 end
 
--- A part made ready to be copied as a look: named for Ball/Look, and only drawing.
+-- A part made ready to be copied as a look: named for Ball/Look, anchored and only drawing.
 local function readied(part: BasePart): BasePart
 	part.Name = Look.NAME
 	part.Anchored = true
-	part.CanCollide = false
-	part.CanTouch = false
-	part.CanQuery = false
-	return part
+	return DrawOnly(part)
 end
 
 -- A plain sphere: today's ball, with no band (Roblox's default part is studded Plastic).
@@ -105,7 +94,7 @@ local BallLook: BallLook = {
 	-- deps.MakeMesh replaces Roblox's mesh service (a test never reaches it), deps.Log the Output.
 	init = function(self: BallLook, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
-		local make: (id: string) -> BasePart = deps.MakeMesh or makeMesh
+		local make: Meshes.Make = deps.MakeMesh or Meshes.make
 		local log: (line: string) -> () = deps.Log or logLine
 		local id = config.Ball.meshId
 		self._generation += 1
@@ -113,16 +102,14 @@ local BallLook: BallLook = {
 		self._template = readied(sphere())
 		self._meshed = false
 		self._early = {}
-		task.spawn(function()
-			local ok, made = pcall(make, id)
-			if generation ~= self._generation then
-				return
+		Meshes.fetch({ id }, make, function(meshes: { MeshPart })
+			if generation == self._generation then
+				meshed(self, meshes[1])
 			end
-			if ok then
-				meshed(self, made)
-			else
+		end, function(_id: string, why: string)
+			if generation == self._generation then
 				self._early = nil
-				log(`BallLook: the ball's mesh {id} did not load ({made}); drawing a plain sphere`)
+				log(`BallLook: the ball's mesh {id} did not load ({why}); drawing a plain sphere`)
 			end
 		end)
 	end,

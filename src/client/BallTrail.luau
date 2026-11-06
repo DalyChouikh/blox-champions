@@ -14,6 +14,7 @@ local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallCarrier = require(script.Parent.BallCarrier)
 local BallPart = require(script.Parent.BallPart)
 local Config = require(ReplicatedStorage.Shared.Config)
+local DrawOnly = require(ReplicatedStorage.Shared.Util.DrawOnly)
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
 export type BallTrail = {
@@ -62,12 +63,9 @@ local BallTrail: BallTrail = {
 
 	start = function(self: BallTrail)
 		local settings = self._config.UI.ballTrail
-		local holder = Instance.new("Part")
+		local holder = DrawOnly(Instance.new("Part"))
 		holder.Name = "BallTrail"
 		holder.Anchored = true
-		holder.CanCollide = false
-		holder.CanQuery = false
-		holder.CanTouch = false
 		holder.CastShadow = false
 		holder.Transparency = 1
 		local trail = Instance.new("Trail")

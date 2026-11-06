@@ -914,6 +914,7 @@ describe("Config defaults", function()
 		local pieces = goal.pieces
 		goal = table.clone(goal)
 		goal.pieces = nil
+		local warmWhite, smooth = Color3.fromRGB(245, 242, 236), Enum.Material.SmoothPlastic
 		expect(goal).toEqual({
 			ringRadius = 9,
 			heightAboveFloor = 52,
@@ -929,7 +930,17 @@ describe("Config defaults", function()
 				Lip = "rbxassetid://140570633067423",
 				Band = "rbxassetid://85653016160285",
 			},
+			-- Q315's renders: a warm white body and lip, a dark band; the lip glows in the team's colour while the
+			-- goal is open (as the ring did); the strips white neon until the owner picks their colour (Q323).
+			looks = {
+				Shell = { color = warmWhite, material = smooth, glows = false },
+				Strips = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.Neon, glows = false },
+				Lip = { color = warmWhite, material = smooth, glows = true },
+				Band = { color = Color3.fromRGB(16, 19, 29), material = smooth, glows = false },
+			},
 		})
+		-- The pieces in the build's order, the one each mesh is asked for in.
+		expect(require(ReplicatedStorage.Shared.Config.Arena).goalPieces).toEqual({ "Shell", "Strips", "Lip", "Band" })
 		-- Each piece's box in the goal's frame, as the build wrote it (Roblox centres an imported mesh on its box).
 		local built = require(ReplicatedStorage.Shared.Config.GoalPieces).pieces :: any
 		for _, name in { "Shell", "Strips", "Lip", "Band" } do
@@ -1171,7 +1182,7 @@ describe("Config.forMode", function()
 				overrides = { straightLength = 240, profileBlendLength = 200 },
 				message = "Arena: profileBlendLength must fit within a straight and a curved end",
 			},
-			-- The ring's centre lies between the glass faces, as a fraction of the track's width.
+			-- The opening's centre's distance from the middle glass's face (its fit across is Arena/Geometry's).
 			{ overrides = { goal = { across = 0 } }, message = "Arena.goal.across: must be > 0 (got 0)" },
 			{ overrides = { goal = { pylon = { top = 0 } } }, message = "Arena.goal.pylon.top: must be > 0 (got 0)" },
 			{
@@ -1181,6 +1192,18 @@ describe("Config.forMode", function()
 			{
 				overrides = { goal = { pieces = { Band = { size = 1 } } } },
 				message = "Arena.goal.pieces.Band.size: expected Vector3, got number",
+			},
+			{
+				overrides = { goal = { looks = { Shell = { color = "white" } } } },
+				message = "Arena.goal.looks.Shell.color: expected Color3, got string",
+			},
+			{
+				overrides = { goal = { looks = { Strips = { material = "Neon" } } } },
+				message = 'Arena.goal.looks.Strips.material: must be a Material (got "Neon")',
+			},
+			{
+				overrides = { goal = { looks = { Lip = { glows = 1 } } } },
+				message = "Arena.goal.looks.Lip.glows: expected boolean, got number",
 			},
 			-- Q315: the pylon stands on the solid wall's top, where the outer wall starts looking like glass (#409).
 			{

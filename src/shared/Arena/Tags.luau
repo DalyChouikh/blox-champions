@@ -8,6 +8,9 @@ local Tags = {
 	LapGate = "LapGate",
 	GoalHoop = "GoalHoop",
 	GoalPanel = "GoalPanel",
+	-- On what takes the team's colour while the goal is open (ArenaGlow): a model or a part. The ring's blocks until
+	-- the goal's meshes come, then each piece whose look glows (Config.Arena.goal.looks: the lip, #410).
+	GoalGlow = "GoalGlow",
 	TeamSpawn = "TeamSpawn",
 	CornerMarker = "CornerMarker",
 	-- On the folders of surfaces skaters ride (the floors, the banks, the walls and the glass): the only things their

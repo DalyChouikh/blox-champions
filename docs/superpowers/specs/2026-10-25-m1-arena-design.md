@@ -17,7 +17,7 @@ The generated arena takes Roller Champions' shape (reference: "Video 3"):
 - a **top set per map**: a glass roof (**closed**, like Mexico) or an invisible ceiling (**open**, like Acapulco); our map is closed;
 - a thin glass **wall** across the track at each lap gate, glowing for the possessing team's next gate;
 - a light **beam** on the outer glass travelling beside the ball carrier;
-- the **goal ring** hanging over the track from an arm.
+- the **goal ring** growing out of the outer wall on a slim pylon (the Halo pylon, #410; first: hanging over the track from an arm).
 
 The owner's rule: **players and the ball never get out of the arena.** The top holds both, on either kind of map; a ball or a skater found outside anyway (a fault) is put back, as today.
 
@@ -31,7 +31,7 @@ The owner's rule: **players and the ball never get out of the arena.** The top h
 2. Glass is a ride surface: skaters ride it and their rays find it; the ball bounces off it, and its flight ends there as on any surface.
 3. The top stops skaters and the ball; it is not ridden; every ray looks through it (ground, poses, camera, the ball's ground marker); it casts no shadow.
 4. A skater found past either glass face, under the floor or over the top is placed on their spawn (#181's net); the ball found there is out and respawns.
-5. The gate panels, the carrier's beam and the hanging goal work as §5 says, found by their tags, with no per-frame allocation.
+5. The gate panels, the carrier's beam and the goal work as §5 says, found by their tags, with no per-frame allocation.
 6. Every test passes in Studio and in CI, with zero warnings.
 7. **Measured in Studio:**
    - the part count, under the pre-overhaul arena's 15,666;
@@ -69,7 +69,7 @@ Brainstorm 2026-10-25, the approved spec 2026-10-26, and the revision 2026-10-26
 | R4 | The outer side | The curved solid wall (**28**) rises into **rideable glass up to 120 (R11)**, which curls inward at the top. *(First version: a glass barrier to 85.)* |
 | R5 | Glass | **A ride surface** with a glass look ("the player should be able to skate on them, not just fall"). **The look (2026-10-27): clear plastic, SmoothPlastic at 85% see-through**, so players see through the glass to the other side ("specially the middle glass"): Roblox's Glass material hides every non-opaque part behind it. *(First version: a barrier, not a ride surface. Until 2026-10-27: the Glass material at 70%.)* |
 | R6 | Gate markers | **A thin glass wall across the track at each gate (R18)**, glowing in the possessing team's colour on the next gate; and a **beam** on the outer glass beside the carrier. They replace today's flat corner panels. *(First version: a thin arch.)* |
-| R7 | The goal | The ring **hangs over the track** at gate 2, about **¾ of the way across** toward the outer wall, facing oncoming skaters, on a decorative arm. The rim and the panel work as today. |
+| R7 | The goal | The ring **hangs over the track** at gate 2, about **¾ of the way across** toward the outer wall, facing oncoming skaters, on a decorative arm. The rim and the panel work as today. *(#410, the owner's Q310-Q315: the ring grows out of the outer wall on a pylon, the Halo pylon made in Blender; its opening's centre 67 studs from the middle glass's face and 52 up, radius 9; the arm is gone; §5.3.)* |
 | R8 | The straights' step and the spawns | The step stays, scaled to the wider track; spawns as today, scaled. |
 | R9 | Outside | "Outside" is past either glass face, under the floor, or over the top. The top holds skaters and the ball (R14), so only a fault puts anything outside. *(First version: no ceiling for skaters.)* |
 | R10 | Keeping the ball in | **The top keeps the ball in** (R14, R17). A ball found outside is out and respawns, as today. *(First version: glass at 85, the ball out above it.)* |
@@ -112,7 +112,7 @@ The M1 spec's §9.1 (layout, dimensions, markers, goal placement), §9.2 (folder
 8. **The top's height is one rule** (`Profile.topHeight`): `glass.top` when closed, `glass.top + top.ceilingAbove` when open. Gates are that tall, and `Bounds.inArena` ends there. Cost if wrong: none.
 9. **Every ray looks through the top** (RideSurfaces' `params` holds ride surfaces only, as Task 2's work has it). The camera stops in front of glass, as in front of any wall, but sees through the roof. Cost if wrong: a camera that, near the roof, could rise above it.
 10. **The gate wall follows the cross-section as built** (amended 2026-10-27). It runs from the solid section at the gate (a straight's and a curved end's blended halfway there) up to the walls' top outline (the lips' chords and 120). Its slices break at every point of either outline, so its edges lie on the surface's and the lips' own chords; equal slices would cut across the rise and the foot curves. Breaks closer than Roblox's smallest part (0.001) merge into one. It is `gatePanel.depth` (0.2) thick, behind the gate's plane, and keeps the name "gate panel" in code. The goal hangs in gate 2's plane, centred on it, so the wall must be thinner than half the goal's thinnest part (§3.3, rule 8): at 0.5 the wall's back face lay in the rim's face plane and the rim flickered (seen 2026-10-27; clean at 0.2). Cost if wrong: none. *(2026-10-26: an opening of half an ellipse, `gatePanel.openingHeight` 60, in `gatePanel.segments` 16 slices, 2 deep.)*
-11. **The goal's arm comes from the outer glass.** A post rises from the rim's top up to `goal.arm.height` (51 since #268, was 40), then a beam runs out to the outer glass's face. That works on both kinds of top. Cost if wrong: none.
+11. **The goal's arm comes from the outer glass.** A post rises from the rim's top up to `goal.arm.height` (51 since #268, was 40), then a beam runs out to the outer glass's face. That works on both kinds of top. Cost if wrong: none. *(Removed by #410: the Halo pylon holds the ring, §5.3.)*
 12. **The beam covers the vertical outer glass**, from the solid wall's top (40 since #268, was 28) up to where the lip starts (108). Cost if wrong: none.
 13. **A lap at cruise speed takes about 13 s** (777 studs at 60), past the M1 spec's 10–12 s target. The Feel part tunes speeds. (The Feel part's #265 lowered cruise to 46 studs/s, 55 km/h: 16.9 s, computed. On #268's map a skater holding the stick along the spawn lane, u 27, 695 studs round, laps in 15.0 s, measured in Play; #328's stride of 51: 13.48 s; #329's straights of 260: 15.82 s.) Cost if wrong: longer laps until then.
 14. **The middle** keeps a floor slab (untagged, not rideable) at the lowest floor's height, 38 wide between the inner glass slabs. Cost if wrong: one number.
@@ -177,9 +177,12 @@ Both sections have the same six solid pieces: a curved end's bowl splits where a
 | `barrier` | `{ top = 85, thickness = 1, transparency = 0.7 }` | removed: `glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.85, material = Enum.Material.SmoothPlastic }` (2026-10-27: was 0.7 with the Glass material) |
 | `top` | — | `{ kind = "Closed", ceilingAbove = 20 }` (`kind` is `"Closed"` or `"Open"`; `ceilingAbove` is used by Open) |
 | `marker` | `{ width, height }` | removed: `gatePanel = { depth = 0.2 }` (2026-10-27: was `{ openingHeight = 60, depth = 2, segments = 16 }`) |
-| `goal.wallGap` | 1 | removed: `goal.across = 0.75` (the ring's centre, as a fraction of `trackWidth` from the inner glass) |
-| `goal.heightAboveFloor` | 18 | 18; 29 since #268 (the floor under the ring rose; its rim stands 9.5 over it, was 8) |
-| `goal.arm` | — | `{ thickness = 1, height = 40 }` (where the arm's beam runs, above the lowest floor); height 51 since #268 |
+| `goal.wallGap` | 1 | removed: `goal.across = 0.75` (the ring's centre, as a fraction of `trackWidth` from the inner glass); since #410 a distance in studs from the middle glass's face, 67 |
+| `goal.heightAboveFloor` | 18 | 18; 29 since #268 (the floor under the ring rose; its rim stands 9.5 over it, was 8); 52 since #410 (Q310) |
+| `goal.ringRadius` | 7 | 7; 9 since #410 (Q311: the opening 18 across) |
+| `goal.pylon` (#410) | — | `{ foot = 20, top = 84 }` (the pylon's foot on the outer glass line and its top, above the lowest floor) |
+| `goal.meshes`, `goal.pieces`, `goal.looks` (#410) | — | the owner's import of the four meshes (Shell, Strips, Lip, Band); each piece's box in the goal's frame, from `GoalPieces.json`; each piece's colour, material and whether it glows (§5.3) |
+| `goal.arm` | — | `{ thickness = 1, height = 40 }` (where the arm's beam runs, above the lowest floor); height 51 since #268; removed by #410 |
 | `colors.marker` | (27, 42, 53) | removed (`colors.glass` colours the glass, the roof and the panels) |
 
 `Config.UI.arenaGlow` gains `beam = { width = 2, thickness = 0.5 }`. The beam shines in the carrier's team colour with `arenaGlow.material`, like the glowing goal and gate panel.
@@ -190,7 +193,8 @@ Both sections have the same six solid pieces: a curved end's bowl splits where a
 - sizes are above zero, and part sizes are within Roblox's part limits;
 - `top.kind` is `"Closed"` or `"Open"`; `glass.material` is a `Material`;
 - `glass.lipStrips` is a whole number of at least 1;
-- `goal.across` lies between 0 and 1; every transparency lies between 0 and 1;
+- `goal.across` is above zero (#410: a distance, was a fraction between 0 and 1); every transparency lies between 0 and 1;
+- the goal's `pylon` heights are above zero; its `meshes` are asset ids, its `pieces` boxes of two Vector3s, each of its `looks` a Color3, a Material and whether it glows (#410);
 - `glassLook`'s two heights are above zero (#409);
 - `straight.inclineDeg` is at least 0 and under 90 (a finite slope); `curvedEnd.bowlPower` is above 1, so the bowl leaves the bank's foot flat (#268).
 
@@ -202,11 +206,12 @@ Both sections have the same six solid pieces: a curved end's bowl splits where a
 5. The glass must rise above both solid tops before its lip starts: `glass.top − glass.lipRadius > outerWallHeight` (and `> innerBankHeight`).
 6. The lips must leave the top open between them: `2 · glass.lipRadius < trackWidth`.
 7. `profileBlendLength` must fit within a straight and a curved end (unchanged).
-8. The gate panel must be thinner than half the goal's thinnest part: `gatePanel.depth < min(goal.rimThickness, goal.panelThickness, goal.arm.thickness) / 2`. The goal's parts are centred on gate 2's plane and the wall hangs behind it, so then no face of that wall lies in a face plane of the goal (2026-10-27).
+8. The gate panel must be thinner than half the goal's thinnest part: `gatePanel.depth < min(goal.rimThickness, goal.panelThickness) / 2` (`goal.arm.thickness` until #410). The goal's parts are centred on gate 2's plane and the wall hangs behind it, so then no face of that wall lies in a face plane of the goal (2026-10-27).
+9. The goal's pylon stands on the outer wall's glass line: `goal.pylon.foot = glassLook.outerWall` (#410, Q315).
 
 (2026-10-27: the gate panel's opening and its rule went with R18's amendment; the gate panel's thickness rule, rule 8 since #268 added rule 2, is new.)
 
-**Checked by `Arena/Geometry` against the arena as built:** the goal ring's fit and its arm (§5.3); each glass line on the curve it breaks (§3.1, #409).
+**Checked by `Arena/Geometry` against the arena as built:** the goal ring's fit and its pylon's top (§5.3; its arm until #410); each glass line on the curve it breaks (§3.1, #409).
 
 ---
 
@@ -266,19 +271,21 @@ As today, a gate spans the track at the start of each section, facing the travel
   - ArenaGlow shows only the next gate's panel (R18): every part of it lit in the possessing team's colour, at its own transparency. It hides every other panel (`Transparency` 1) from the moment the arena's parts reach the client, and each panel it leaves.
   - The next-gate arrow (WorldMarkers) points at `position`.
 
-### 5.3 The hanging goal
+### 5.3 The goal: the Halo pylon (#410)
 
-- **Placement:** the ring stands in gate 2's plane (`goalGateIndex`), its centre at u = `goal.across · trackWidth` (60) and `goal.heightAboveFloor` (29 since #268, was 18). Its front faces oncoming skaters, as today.
-- **The rim and the panel** are built, tagged and glow as today. The panel slides up out of the ring when the goal opens.
+*(Until #410: the ring hung over the track at u = `goal.across · trackWidth` (60) from a decorative arm, a post up to `goal.arm.height` and a beam to the outer glass.)*
+
+- **What it is** (the owner's Q300-Q315, RC's goals in Videos 4 and 36): the ring grows out of the outer wall. A slim pylon stands in the outer wall from its glass line (`goal.pylon.foot` = `glassLook.outerWall`, 20) up to `goal.pylon.top` (84), two neon strips down its face, and swells round the ring's wall side, so the ring melts into it: smooth, with no sharp edges. Its front, a thin lip round the opening, faces oncoming skaters.
+- **The mesh:** made once in Blender 5.2 by `scripts/art/build_goal.py` from `src/shared/Config/GoalShape.json` (the one file both Blender and the game read): four meshes in one GLB, each within Roblox's 20,000 triangles: the **Shell** (the housing, the pylon and the swell melted by a signed-distance union and fillet, the opening cut round after), the **Strips**, the **Lip** (a ring round the housing's front) and the **Band** (a dark ring near its back). The script writes each piece's box in the goal's frame to `GoalPieces.json` with the sha256 of the shape file it was built from (a Python test fails when they drift). The Shell is reproducible in shape, not in bytes: Blender 5.2's SDF fillet runs in parallel and moves 337 of 108,294 points by at most 2.2e-6 studs between runs (measured); the other pieces and the file's layout are byte for byte. The owner imported it once; the four mesh ids are `goal.meshes`. A rebuild needs a new import only if the shape file changes.
+- **Placement:** the goal's frame is the track's own (`Centerline.at`) at the opening's centre: gate 2's plane (`goalGateIndex`), `goal.across` (67) from the middle glass's face, `goal.heightAboveFloor` (52) up; it looks the way skaters travel, so its +Z points back at oncoming skaters, where the housing's front is. Each mesh's CFrame is that frame times its box's centre, its size the box's (Roblox centres an imported mesh on its box).
+- **Collision and the rules (unchanged):** the hoop's ring of `goal.rimSegments` blocks round the opening (radius `goal.ringRadius`, 9) still gives the ring its collision, and its pivot and `OpeningRadius` the rules' scoring disc (GoalJudge, saves, the throw's aim). The meshes only draw: anchored, nothing collides with them, touches them or finds them by a ray, so skaters and the ball meet the ring's shape, not the mesh's every face, and pass through the pylon as through the old arm.
+- **Loading (`GoalLook`, server):** the meshes are asked of Roblox in the background (`Meshes.fetch`, shared with the ball's look), never holding up the start; none shows before all four have come. Then `Builder.dressGoal` puts them in a `GoalLook` model beside the hoop and hides the ring's blocks (`Transparency` 1; they still collide). Until then, and if a mesh never loads, the blocks show in `colors.goal` as before #410, and the Output says why once.
+- **Look:** each piece's colour and material are `goal.looks` (the Shell and the Lip a warm white, the Band dark, the Strips the owner's pick).
+- **Opening and closing (as before):** the panel shuts the opening and slides up out of it when the goal opens; what glows then takes the team's colour in `arenaGlow.material`. It is tagged `GoalGlow`: the hoop while its blocks are the look, then each piece whose look `glows` (the Lip). ArenaParts watches the tag, so each client sees the glow move when the meshes arrive.
 - **Fit check** (`Features.goal`, against the profile as built at the gate). Each failure names its rule:
   - the rim's outline must stay inside the two glass faces;
   - it must clear the track's surface everywhere under it;
-  - it must stay under the arm's beam (`goal.arm.height`), which must stay under the lip's start (`glass.top − glass.lipRadius`).
-- **The arm:** two non-colliding, non-querying, non-touching blocks, `goal.arm.thickness` square, with `colors.goal`:
-  - a post from the rim's top up to `goal.arm.height`;
-  - a beam at that height from the post out to the outer glass's face.
-
-  It is decoration: the art pass replaces it.
+  - the pylon's top must stay under the lip's start (`glass.top − glass.lipRadius`).
 
 ### 5.4 The carrier's beam (`client/CarrierBeam`, new)
 
@@ -309,9 +316,9 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 |---|---|
 | `Geometry/Profile` | The solid section as today with the new sizes; new `innerGlass`, `outerGlass` and `top` sections (§3.1), `topHeight`, and `topOutline` (the walls' top across the track, as points; `heightAt` reads a height on it). |
 | `Geometry/Surface` | `build` sweeps the solid section; `rings` and `sweep` sweep the others. `section(arena, distance)` names the solid section at a distance (blended by `Centerline.straightness` there, #268), which the sweep, the goal's fit check, the gate walls and the ball's spawns share. |
-| `Geometry/Features` | `glass` and `top` (swept sections) replace `barriers`; `gatePanels` replaces `markers`; `gates` as tall as the top; the new `goal` with its arm and fit check; the middle behind the inner glass slab. |
+| `Geometry/Features` | `glass` and `top` (swept sections) replace `barriers`; `gatePanels` replaces `markers`; `gates` as tall as the top; the new `goal` with its arm and fit check (#410: the arm went; the fit check keeps the pylon under the lips); the middle behind the inner glass slab. |
 | `Geometry/Reach` | Removed (§2.3, 6). |
-| `Geometry/init` | `build(config)` returns `surface`, `glass`, `top`, `infield`, `gates`, `goal` (with `arm`), `gatePanels`, `teamSpawns` (`ballSpawns` until #321). Gravity is no longer needed. |
+| `Geometry/init` | `build(config)` returns `surface`, `glass`, `top`, `infield`, `gates`, `goal` (with `arm` until #410), `gatePanels`, `teamSpawns` (`ballSpawns` until #321). Gravity is no longer needed. |
 | `Geometry/Bounds` | `inArena` up to `Profile.topHeight`. |
 | `Geometry/Centerline` | `distanceOf(arena, position)`, the inverse of `frameAt`; and `pose(arena, distance, lateral, height)`, the point (a Vector3) and the heading (an angle), on which `frameAt` and `at` build. |
 | `Tags` | `Barrier` now marks the top; `RideSurface` covers the glass. |
@@ -320,7 +327,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 
 ### 6.2 Server
 
-- **`Arena/Builder`:** folders `Surface` and `Glass` (RideSurface), `Top` (Barrier), `Infield` (no tag), `Gates`, `Goal` (hoop, panel, arm), `GatePanels`, `Spawns`; the looks of §4.1, §4.2 and §5.2. `Barriers` and `Markers` are gone.
+- **`Arena/Builder`:** folders `Surface` and `Glass` (RideSurface), `Top` (Barrier), `Infield` (no tag), `Gates`, `Goal` (hoop, panel; #410: the arm went, the goal's meshes join them in a `GoalLook` model, §5.3), `GatePanels`, `Spawns`; the looks of §4.1, §4.2 and §5.2. `Barriers` and `Markers` are gone.
 - **`ArenaService`:** `Geometry.build(config)`, no gravity.
 - **`BallService`** and **`MovementGuard`:** `Bounds.inArena` as today.
 
@@ -346,7 +353,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
   - top: closed at `glass.top` between the lips' ends; open with its strips and ceiling at `glass.top + ceilingAbove`;
   - gates: as tall as the top, of each kind;
   - gate panels: the wall from the surface to the top outline, a break at every point of both outlines, close breaks merged, the pivot at the wall's middle, `GateIndex` order;
-  - the goal: lateral 60, facing oncoming skaters, each fit failure; the arm from the rim to the outer glass;
+  - the goal: lateral 60, facing oncoming skaters, each fit failure; the arm from the rim to the outer glass (#410: 67 from the middle glass, the pylon under the lips, no arm);
   - spawns and the middle.
 - **Bounds:** inside: the floors, the bank, both glass walls, up to the top plus the margin (each kind); outside: past either glass, under the floor, over the top.
 - **Centerline:** `distanceOf` round trip on both straights and both ends, the wrap at gate 1, and `pose` against `frameAt`.
@@ -381,6 +388,6 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 2. The top: `Arena.top`, both kinds, `RideSurfaces.solid` and the sweep; the reach check goes.
 3. Rideable glass with lips, the wider track and the taller walls.
 4. The gate panels: Features, the Builder, ArenaParts, ArenaGlow, WorldMarkers.
-5. The hanging goal and its arm.
+5. The hanging goal and its arm (#410: the Halo pylon, §5.3).
 6. `Centerline.distanceOf` / `pose` and `CarrierBeam`.
 7. The Studio checks, the M1 spec's §9–§10 text, the republish, and the owner's playtest.
