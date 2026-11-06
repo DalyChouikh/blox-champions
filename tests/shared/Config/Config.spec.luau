@@ -862,12 +862,11 @@ describe("Config defaults", function()
 			doorSeconds = 0.4,
 			beam = { width = 2, thickness = 0.5 },
 		})
-		-- The goal's worth in its open middle (#411, Q294), as the design page drew it: the team's colour at 0.82
-		-- alpha over 0.92 of the opening, the number about a radius tall; half a stud behind the door.
+		-- The goal's worth in its open middle (#411, Q294): filling the opening (Q327), the number about a radius
+		-- tall as the design page drew it; half a stud behind the door.
 		expect(ui.goalWorth).toEqual({
-			transparency = 0.2,
 			thickness = 0.2,
-			fill = 0.92,
+			fill = 1,
 			textHeight = 0.55,
 			behind = 0.5,
 		})
@@ -1322,17 +1321,14 @@ describe("Config.forMode", function()
 		end
 	end)
 
+	it("accepts the goal's worth just inside its limits", function()
+		expect(function()
+			Fixtures.config({ UI = { goalWorth = { fill = 1, textHeight = 1, behind = 0 } } })
+		end).never.toThrow()
+	end)
+
 	-- The door's limits the rejections above cross: one bar a half, ending on the opening's edge; and a door that
 	-- opens at once.
-	it("accepts the goal's worth just inside its limits", function()
-		local limits: { { [string]: number } } =
-			{ { transparency = 1, fill = 1, textHeight = 1, behind = 0 }, { transparency = 0 } }
-		for _, goalWorth in limits do
-			expect(function()
-				Fixtures.config({ UI = { goalWorth = goalWorth } })
-			end).never.toThrow()
-		end
-	end)
 
 	it("accepts a goal door just inside its limits", function()
 		expect(function()
@@ -2518,11 +2514,7 @@ describe("Config.forMode", function()
 				overrides = { UI = { arenaGlow = { doorSeconds = -0.1 } } },
 				message = "UI.arenaGlow.doorSeconds: must be >= 0 (got -0.1)",
 			},
-			-- The goal's worth: shares of the opening, a part's thickness, a transparency.
-			{
-				overrides = { UI = { goalWorth = { transparency = 1.5 } } },
-				message = "UI.goalWorth.transparency: must be <= 1 (got 1.5)",
-			},
+			-- The goal's worth: shares of the opening, a part's thickness.
 			{
 				overrides = { UI = { goalWorth = { thickness = 0.0005 } } },
 				message = "UI.goalWorth.thickness: must be >= 0.001 (got 0.0005)",

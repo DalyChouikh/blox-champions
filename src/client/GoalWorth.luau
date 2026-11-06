@@ -1,6 +1,7 @@
 --!strict
 -- The goal's worth in its open middle (#411, the owner's Q294 and Q306; Arena spec §5.3): once the goal's door has
--- opened (arenaGlow.doorSeconds after the goal opens), a see-through disc in the open team's colour fills the opening,
+-- opened (arenaGlow.doorSeconds after the goal opens), a disc in the open team's colour fills the opening, glowing
+-- as the next gate's marker does (arenaGlow.material at the glass's transparency, the owner's Q327),
 -- with the goal's worth (+1, +3 or +5, as the scoreboard's chip says it: HudText.worth) on both its faces in the
 -- banners' lettering, each face read the right way from its own side. The number pops in as it shows and on each
 -- change with the banners' pop (Motion.pop). It all hides at once when the goal shuts. Each client draws its own: the
@@ -102,7 +103,7 @@ end
 local function show(self: GoalWorth, team: Team, worth: string, dt: number)
 	if not self._shown then
 		self._shown = true
-		self._disc.Transparency = self._config.UI.goalWorth.transparency
+		self._disc.Transparency = self._config.Arena.glass.transparency
 		for _, gui in self._guis do
 			gui.Enabled = true
 		end
@@ -173,6 +174,7 @@ local GoalWorth: GoalWorth = {
 		local disc = newPart("Disc", model)
 		-- Before Size, so the cylinder keeps the size it is given.
 		disc.Shape = Enum.PartType.Cylinder
+		disc.Material = self._config.UI.arenaGlow.material
 		local face = newPart("Face", model)
 		local guis, labels, scales = {}, {}, {}
 		for _, side in { Enum.NormalId.Front, Enum.NormalId.Back } do

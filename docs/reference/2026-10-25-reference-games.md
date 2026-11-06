@@ -2487,6 +2487,14 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   lip and strips go white at once and the doors slide shut over 0.4 s during the celebration, so that stays until the
   goal sequence (Presentation items) and the art milestone's effects. The PR opens stacked on #417; the owner's
   2-player check of the whole stack stays before its merge (Q321).
+- **Q327 the worth disc fits the opening and glows like the markers** (session 97; #411 built: a disc in the team
+  colour at 0.2 transparency over 0.92 of the opening, +1/+3/+5 popping; Play shots on the design page section 'The
+  goal shows its worth'; asked to ship): **"make the circle fit more the goal, currently it is not well adjusted on
+  the ends, and second, make it more neon, like the markers color, more see through, and finally one question, did
+  we already make the ball color neon or not yet?"**: the disc fills the whole opening (fill 1), glows in the gate
+  markers' look (UI.arenaGlow.material Neon at the glass's transparency, 0.85, as the next gate's wall shows);
+  answered: the carried ball's glow is #415 (Q319 look B, band black), not built yet; it needs the owner's upload of
+  a glow mask, after #412-#414.
 
 ## Roller Champions
 

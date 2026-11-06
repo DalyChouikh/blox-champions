@@ -466,11 +466,11 @@ export type ArenaGlowSettings = {
 }
 
 -- The goal's worth in its open middle (#411, the owner's Q294; Arena spec §5.3): a disc in the open team's colour,
--- `transparency` see-through, `thickness` studs thick and `fill` of the opening's diameter across, `behind` studs
+-- glowing as the next gate's marker does (arenaGlow.material at Arena.glass.transparency, Q327), `thickness` studs
+-- thick and `fill` of the opening's diameter across, `behind` studs
 -- behind the door's plane so the door's bars and the disc never meet; on both its faces the worth (HudText.worth)
 -- in the banners' lettering, `textHeight` of the disc's diameter tall, popping in with the banners' pop.
 export type GoalWorthSettings = {
-	transparency: number,
 	thickness: number,
 	fill: number,
 	textHeight: number,
@@ -946,9 +946,8 @@ local defaults: UIConfig = {
 		doorSeconds = 0.4,
 		beam = { width = 2, thickness = 0.5 },
 	},
-	-- As the design page drew it (Q294): the team's colour at 0.82 alpha over 0.92 of the opening, the number about
-	-- a radius tall.
-	goalWorth = { transparency = 0.2, thickness = 0.2, fill = 0.92, textHeight = 0.55, behind = 0.5 },
+	-- Filling the opening (Q327), the number about a radius tall as the design page drew it (Q294).
+	goalWorth = { thickness = 0.2, fill = 1, textHeight = 0.55, behind = 0.5 },
 	-- The owner asked for a trail behind the ball (Q98; RC's thrown ball leaves a white streak, Video 4 at
 	-- 366.8-367.0 s and Video 31 at 39.1 s; Illegal Soccer's a white dashed one), white as the crosshair is (Q141)
 	-- and behind a team-coloured ball too, as RC's (Q160), and bolder once a thin faint one was seen from the side
@@ -1484,7 +1483,6 @@ local fields = Validate.record({
 		beam = Validate.record({ width = partSize, thickness = partSize }),
 	}),
 	goalWorth = Validate.record({
-		transparency = transparency,
 		thickness = partSize,
 		fill = Validate.number({ above = 0, max = 1 }),
 		textHeight = Validate.number({ above = 0, max = 1 }),

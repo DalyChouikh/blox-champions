@@ -57,7 +57,9 @@ local function shows(text: string?, team: string?): boolean
 	if text == nil then
 		return disc().Transparency == 1 and not guis[1].Enabled and not guis[2].Enabled
 	end
-	return math.abs(disc().Transparency - worth.transparency) < 1e-4
+	-- Glowing as the next gate's marker does (Q327): the glow's material at the glass's transparency.
+	return math.abs(disc().Transparency - config.Arena.glass.transparency) < 1e-4
+		and disc().Material == config.UI.arenaGlow.material
 		and disc().Color == config.UI.teamColors[team :: any]
 		and guis[1].Enabled
 		and guis[2].Enabled
