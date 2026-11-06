@@ -2115,6 +2115,11 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   built': the limit built as `Ball.lookSpinLimit = 15`, a Roll Ball by Orange up the banked curve, 339 of 339 Play
   frames turned by exactly the limited spin): **"Yes, ship it"**. #401's pull request goes up stacked on #403; the
   owner's 2-player check of #400 + #401 stays open; then #394 (Q285).
+- **Q289 the badge stays as it is** (session 91, #402; the design page version 12, section 'The ball badge follows the
+  roll: two ways': one ball rolling away, across and tumbling, drawn live from its real band; A RC's two lines leaning,
+  B the black band as seen (recommended), at 2x and at 52 / 34 px): neither; the owner's words: "no don't animate the
+  ball hint, keep it like now, you mean the hint of the ball ofscreen right?" (yes: the off-screen ball badge, #376).
+  So the badge keeps RC's two lines at their fixed lean (Q265), and #402 is closed as not planned.
 
 ## Roller Champions
 
