@@ -45,6 +45,69 @@ def canonical_faces(faces: list[list[Corner]]) -> list[list[Corner]]:
     return sorted(started, key=lambda face: [vertex for vertex, _ in face])
 
 
+def _key(point: Vector) -> Vector:
+    """A point rounded to the six decimals the files keep, never with a negative zero."""
+    return tuple(round(c, 6) + 0.0 for c in point)
+
+
+def canonical_mesh(
+    positions: list[Vector], triangles: list[tuple[int, int, int]]
+) -> tuple[list[Vector], list[tuple[int, int, int]]]:
+    """The mesh in one order whatever order Blender built it in (its SDF meshing and decimation reorder points and
+    faces): points rounded to six decimals, those that become one merged, then sorted; each triangle starts at its
+    lowest point, its winding kept, and the triangles are sorted. A triangle a merge flattens is dropped."""
+    keys = [_key(point) for point in positions]
+    order = sorted(set(keys))
+    index = {key: i for i, key in enumerate(order)}
+    kept = set()
+    for triangle in triangles:
+        a, b, c = (index[keys[corner]] for corner in triangle)
+        if len({a, b, c}) == 3:
+            lowest = min(a, b, c)
+            kept.add((a, b, c) if a == lowest else (b, c, a) if b == lowest else (c, a, b))
+    return order, sorted(kept)
+
+
+def _cross(a: Vector, b: Vector) -> Vector:
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+
+def _unit(vector: Vector) -> Vector:
+    length = sum(c * c for c in vector) ** 0.5
+    return tuple(c / length for c in vector) if length > 0 else (0.0, 0.0, 0.0)
+
+
+def _area(positions: list[Vector], triangle: tuple[int, int, int]) -> Vector:
+    """The cross product of the triangle's two edges from its first corner: out of its counter-clockwise winding,
+    twice its area long."""
+    a, b, c = (positions[corner] for corner in triangle)
+    return _cross(tuple(b[i] - a[i] for i in range(3)), tuple(c[i] - a[i] for i in range(3)))
+
+
+def face_normal(positions: list[Vector], triangle: tuple[int, int, int]) -> Vector:
+    """The triangle's unit normal, out of its counter-clockwise winding."""
+    return _unit(_area(positions, triangle))
+
+
+def vertex_normals(positions: list[Vector], triangles: list[tuple[int, int, int]]) -> list[Vector]:
+    """Each point's smooth-shading normal: its triangles' normals weighed by their areas (their cross products), so
+    the file's normals come from its own points and never from Blender's run-to-run float dust."""
+    sums = [[0.0, 0.0, 0.0] for _ in positions]
+    for triangle in triangles:
+        area = _area(positions, triangle)
+        for corner in triangle:
+            for axis in range(3):
+                sums[corner][axis] += area[axis]
+    return [_unit(tuple(total)) for total in sums]
+
+
+def bounds(positions: list[Vector]) -> tuple[Vector, Vector]:
+    """The points' box, as its centre and its size: Roblox centres a mesh on its box, so a piece is placed by it."""
+    lows = [min(point[axis] for point in positions) for axis in range(3)]
+    highs = [max(point[axis] for point in positions) for axis in range(3)]
+    return tuple((lows[i] + highs[i]) / 2 for i in range(3)), tuple(highs[i] - lows[i] for i in range(3))
+
+
 def check_budget(name: str, triangles: int) -> None:
     """Fails a build whose mesh Roblox would refuse."""
     if triangles > TRIANGLE_LIMIT:

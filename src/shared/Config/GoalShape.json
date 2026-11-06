@@ -1,0 +1,10 @@
+{
+	"opening": { "radius": 9, "height": 52, "across": 67 },
+	"housing": { "frontRadius": 10.8, "backRadius": 12.4, "depth": 11, "corner": 0.9 },
+	"pylon": { "foot": 20, "top": 84, "front": 10, "depth": 7, "width": 10, "corner": 2 },
+	"swell": { "across": 9, "radii": { "across": 6, "up": 17, "along": 7 } },
+	"strips": { "apart": 4.8, "width": 0.8, "depth": 0.5, "inset": 3, "corner": 0.24 },
+	"lip": { "radius": 10.25, "thickness": 0.22, "along": -5.55 },
+	"band": { "radius": 9.15, "thickness": 0.32, "along": 3.9 },
+	"melt": { "voxel": 0.2, "fillet": 60 }
+}

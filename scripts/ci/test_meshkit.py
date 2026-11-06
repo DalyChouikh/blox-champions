@@ -99,6 +99,52 @@ class Number(unittest.TestCase):
         self.assertEqual(meshkit.number(-1e-9), "0.000000")
 
 
+class CanonicalMesh(unittest.TestCase):
+    def test_the_same_mesh_in_any_order_comes_out_the_same(self):
+        positions, triangles = meshkit.canonical_mesh(CORNERS, TETRA)
+        order = [2, 0, 3, 1]
+        shuffled = [CORNERS[i] for i in order]
+        where = {old: new for new, old in enumerate(order)}
+        moved = [(where[c], where[a], where[b]) for a, b, c in reversed(TETRA)]
+        self.assertEqual(meshkit.canonical_mesh(shuffled, moved), (positions, triangles))
+
+    def test_points_sorted_and_triangles_keep_their_winding(self):
+        positions, triangles = meshkit.canonical_mesh(CORNERS, TETRA)
+        self.assertEqual(positions, sorted(CORNERS))
+        for triangle in triangles:
+            self.assertEqual(triangle[0], min(triangle))
+        normals = {meshkit.face_normal(CORNERS, t) for t in TETRA}
+        self.assertEqual({meshkit.face_normal(positions, t) for t in triangles}, normals)
+
+    def test_points_a_float_apart_become_one(self):
+        nudged = [*CORNERS, (2.0 + 1e-9, 0.0, 0.0)]
+        positions, triangles = meshkit.canonical_mesh(nudged, [(0, 2, 4), (0, 1, 3), (0, 3, 2), (4, 2, 3)])
+        self.assertEqual(len(positions), 4)
+        self.assertEqual(triangles, meshkit.canonical_mesh(CORNERS, TETRA)[1])
+
+
+class VertexNormals(unittest.TestCase):
+    def test_a_flat_square_points_its_normal_out_of_its_winding(self):
+        square = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 1.0, 0.0), (0.0, 1.0, 0.0)]
+        for normal in meshkit.vertex_normals(square, [(0, 1, 2), (0, 2, 3)]):
+            self.assertEqual(normal, (0.0, 0.0, 1.0))
+
+    def test_each_corner_weighs_its_faces_by_area_and_is_unit(self):
+        normals = meshkit.vertex_normals(CORNERS, TETRA)
+        for normal in normals:
+            self.assertAlmostEqual(sum(c * c for c in normal), 1.0, places=12)
+        # The corner at the origin touches the three faces on the axes' planes, 3, 4 and 6 in area, facing -z, -y, -x.
+        x, y, z = normals[0]
+        self.assertAlmostEqual(x / z, 6 / 3, places=12)
+        self.assertAlmostEqual(y / z, 4 / 3, places=12)
+        self.assertLess(z, 0)
+
+
+class Bounds(unittest.TestCase):
+    def test_the_boxs_centre_and_size(self):
+        self.assertEqual(meshkit.bounds(CORNERS), ((1.0, 1.5, 2.0), (2.0, 3.0, 4.0)))
+
+
 class Budget(unittest.TestCase):
     def test_robloxs_limit_per_mesh(self):
         # Roblox's mesh specifications: "Individual meshes can not exceed 20,000 triangles."
