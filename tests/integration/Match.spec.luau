@@ -783,6 +783,6 @@ describe("A match on the generated arena", function()
 			MatchService:step(FRAME)
 			total += os.clock() - started
 		end
-		expect(total / 600).toBeLessThan(0.001)
+		Fixtures.expectWithinBudget(total / 600, 0.001)
 	end)
 end)

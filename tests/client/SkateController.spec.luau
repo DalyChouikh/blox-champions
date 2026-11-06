@@ -950,7 +950,7 @@ describe("SkateController", function()
 		for _ = 1, 600 do
 			SkateController:step(1 / 60)
 		end
-		expect((os.clock() - started) / 600).toBeLessThan(0.0005)
+		Fixtures.expectWithinBudget((os.clock() - started) / 600, 0.0005)
 	end)
 end)
 
