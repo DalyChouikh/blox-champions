@@ -601,8 +601,6 @@ describe("Config defaults", function()
 				corner = UDim.new(0, 14),
 				box = Color3.fromRGB(42, 51, 80),
 				shade = 0.4,
-				-- The page's brighter pair, the HUD's own (Q201); the world keeps UI.teamColors.
-				teamColors = { Blue = Color3.fromRGB(61, 139, 255), Orange = Color3.fromRGB(255, 154, 60) },
 				-- The page's key caps (#354): yellow, orange while pressed, a 62% black sweep while cooling.
 				key = Color3.fromRGB(255, 210, 63),
 				pressed = Color3.fromRGB(255, 138, 44),
@@ -931,7 +929,8 @@ describe("Config defaults", function()
 
 	it("give each team and each arena part a color", function()
 		local d = Config.defaults()
-		expect(d.UI.teamColors).toEqual({ Blue = Color3.fromRGB(13, 105, 172), Orange = Color3.fromRGB(218, 133, 65) })
+		-- Roller Champions' pair, for the world and the HUD alike (the owner's Q316-Q318, #408).
+		expect(d.UI.teamColors).toEqual({ Blue = Color3.fromRGB(14, 178, 247), Orange = Color3.fromRGB(234, 94, 15) })
 		expect(d.Arena.colors).toEqual({
 			surface = Color3.fromRGB(163, 162, 165),
 			infield = Color3.fromRGB(99, 95, 98),
@@ -2900,10 +2899,6 @@ describe("Config.forMode", function()
 			{ overrides = hud({ look = { shade = 1 } }), message = "UI.hud.look.shade: must be < 1 (got 1)" },
 			{ overrides = hud({ look = { shade = -0.1 } }), message = "UI.hud.look.shade: must be >= 0 (got -0.1)" },
 			{
-				overrides = hud({ look = { teamColors = { Orange = "orange" } } }),
-				message = "UI.hud.look.teamColors.Orange: expected Color3, got string",
-			},
-			{
 				overrides = hud({ motion = { pop = { seconds = 0 } } }),
 				message = "UI.hud.motion.pop.seconds: must be > 0 (got 0)",
 			},
@@ -3311,6 +3306,18 @@ describe("Config.forMode", function()
 		expect(function()
 			Fixtures.config({ UI = { hud = { layout = { speedometer = { size = UDim2.fromOffset(160, 40) } } } } })
 		end).toThrow("UI.hud.layout.speedometer.size: unknown key")
+	end)
+
+	-- #408: one team colour pair for the world and the HUD (the owner's Q318); the HUD's lighter pair (Q201) is gone.
+	it("rejects the HUD's old team colours as unknown, and a team colour that is not a colour", function()
+		expect(function()
+			Fixtures.config({
+				UI = { hud = { look = { teamColors = { Blue = Color3.new(), Orange = Color3.new() } } } },
+			})
+		end).toThrow("UI.hud.look.teamColors: unknown key")
+		expect(function()
+			Fixtures.config({ UI = { teamColors = { Orange = "orange" } } })
+		end).toThrow("UI.teamColors.Orange: expected Color3, got string")
 	end)
 
 	-- #355: each touch button has its own size and words; their font is look C's; SCORES sits by its top and the

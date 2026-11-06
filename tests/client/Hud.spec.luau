@@ -1039,7 +1039,7 @@ describe("Hud", function()
 		Hud:step(0)
 		expect(speedometer.Visible).toBe(true)
 		expect(digits.Text).toBe("120")
-		expect(digits.TextColor3 == config.UI.hud.look.teamColors.Blue).toBe(true)
+		expect(digits.TextColor3 == config.UI.teamColors.Blue).toBe(true)
 		-- Gone, then back at 25 studs/s: read at once again, not eased from the last skater's speed.
 		rig:Destroy()
 		Hud:step(1 / 60)
@@ -1562,7 +1562,7 @@ describe("Hud", function()
 		expect(reticle()).toBe(true)
 		-- In the local player's team colour (Ana plays Blue).
 		local dot = (Hud.centre:FindFirstChild("Reticle") :: any).Dot :: Frame
-		expect(dot.BackgroundColor3 == config.UI.hud.look.teamColors.Blue).toBe(true)
+		expect(dot.BackgroundColor3 == config.UI.teamColors.Blue).toBe(true)
 		BallCarrier:set("2")
 		Hud:step(0)
 		expect(reticle()).toBe(false)

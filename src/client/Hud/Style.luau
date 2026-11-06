@@ -98,11 +98,11 @@ function Style.text(config: Config.GameConfig, props: Props?): Props
 	}, props)
 end
 
--- What the HUD draws in `team`'s colour (the HUD's own, look.teamColors: brighter than the world's, the owner's
--- choice, Q201), or in its own text colour for no team (a draw, overtime, a loose ball).
+-- What is drawn in `team`'s colour, on the HUD and in the world's marks alike (UI.teamColors: one pair, the owner's
+-- Q318), or in the HUD's text colour for no team (a draw, overtime, a loose ball).
 function Style.teamColor(config: Config.GameConfig, team: Team.Team?): Color3
-	local hud = config.UI.hud
-	return if team ~= nil then hud.look.teamColors[team] else hud.textColor
+	local ui = config.UI
+	return if team ~= nil then ui.teamColors[team] else ui.hud.textColor
 end
 
 -- How see-through something greyed is (a control, a hint or a button that would do nothing, an empty pip):

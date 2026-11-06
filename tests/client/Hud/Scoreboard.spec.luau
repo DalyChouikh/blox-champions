@@ -16,8 +16,8 @@ local React = require(ReplicatedStorage.Packages.React)
 local Scoreboard = require(Hud.Scoreboard)
 
 local config = Fixtures.config()
--- The HUD's own team colours (look C, the owner: Q201).
-local colors = config.UI.hud.look.teamColors
+-- One team colour pair for the world and the HUD (the owner's Q318).
+local colors = config.UI.teamColors
 local layout = config.UI.hud.layout
 local text = HudText.new(config)
 

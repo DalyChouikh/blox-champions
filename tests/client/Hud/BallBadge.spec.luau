@@ -16,8 +16,9 @@ local INK = Color3.fromRGB(10, 20, 30)
 local BLUE = Color3.fromRGB(40, 120, 250)
 local config = Fixtures.config({
 	UI = {
+		teamColors = { Blue = BLUE },
 		hud = {
-			look = { ink = INK, outline = 2, shadow = 3, teamColors = { Blue = BLUE } },
+			look = { ink = INK, outline = 2, shadow = 3 },
 			layout = {
 				markers = {
 					badge = { ring = 0.1, band = 0.2, line = 2, lean = 10, gap = 4, pointer = 0.2 },

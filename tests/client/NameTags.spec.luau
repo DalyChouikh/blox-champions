@@ -155,9 +155,9 @@ describe("NameTags", function()
 		local corner = (pill:FindFirstChild("Fill1") :: Frame):FindFirstChildOfClass("UICorner") :: UICorner
 		expect(corner.CornerRadius).toEqual(UDim.new(0.5, 0))
 		local shade = (pill:FindFirstChild("Shade", true) :: UIGradient).Color.Keypoints[1].Value
-		expect(shade == look.teamColors.Blue).toBe(true)
+		expect(shade == config.UI.teamColors.Blue).toBe(true)
 		local other = (part(3, "Pill") :: Frame):FindFirstChild("Shade", true) :: UIGradient
-		expect(other.Color.Keypoints[1].Value == look.teamColors.Orange).toBe(true)
+		expect(other.Color.Keypoints[1].Value == config.UI.teamColors.Orange).toBe(true)
 		expect(part(2, "Badge")).toBeNil()
 		expect(passKey(2)).toBeNil()
 	end)
@@ -198,7 +198,7 @@ describe("NameTags", function()
 		local badge = part(2, "Badge") :: Frame
 		expect(part(3, "Badge")).toBeNil()
 		local disc = badge:FindFirstChild("Disc") :: Frame
-		expect(disc.BackgroundColor3 == look.teamColors.Blue).toBe(true)
+		expect(disc.BackgroundColor3 == config.UI.teamColors.Blue).toBe(true)
 		expect((disc:FindFirstChildOfClass("UIStroke") :: UIStroke).Thickness).toBe(sizes.rim)
 		expect((disc:FindFirstChildOfClass("UIStroke") :: UIStroke).Color == look.ink).toBe(true)
 		expect(badge.Size).toEqual(UDim2.fromOffset(2 * sizes.badge, 2 * sizes.badge))
@@ -627,7 +627,7 @@ describe("NameTags", function()
 		expect(ring.Size).toEqual(UDim2.fromOffset(2 * (sizes.badge + grown), 2 * (sizes.badge + grown)))
 		expect(stroke.Transparency).toBeCloseTo(share, 3)
 		expect(stroke.Thickness).toBe(sizes.rippleLine)
-		expect(stroke.Color == look.teamColors.Blue).toBe(true)
+		expect(stroke.Color == config.UI.teamColors.Blue).toBe(true)
 		-- The ring's sizes follow the screen's form.
 		hud.compact = true
 		NameTags:step(DT)
@@ -759,7 +759,7 @@ describe("NameTags", function()
 		expect(tag(2) == gui).toBe(true)
 		expect(gui.Adornee == Fixtures.root(other.Character)).toBe(true)
 		local shade = (part(2, "Pill") :: Frame):FindFirstChild("Shade", true) :: UIGradient
-		expect(shade.Color.Keypoints[1].Value == look.teamColors.Orange).toBe(true)
+		expect(shade.Color.Keypoints[1].Value == config.UI.teamColors.Orange).toBe(true)
 	end)
 
 	it("steps in under 0.1 ms", function()

@@ -3,7 +3,7 @@
 -- whole screen until the next match starts, its parts down the stage's middle, layout.endScreen.gap apart: the result
 -- in GOAL!'s lettering (Style.banner, the winner's ring; none for a draw), the MVP's card while there is one (a look C
 -- box: their avatar, their name with the MVP chip, their score, goals and steals), each team's total on a chip in its
--- HUD colour, and the TAB board's table of everyone still in the match (Hud/TeamTable, #357), whole. On touch (the
+-- team colour, and the TAB board's table of everyone still in the match (Hud/TeamTable, #357), whole. On touch (the
 -- owner's choice) it leaves the table out, as the touch score button opens the TAB board in its place. It shrinks to
 -- fit the stage and pops in as the match ends (a Reveal's scale, Q194). A plain function of its props.
 
@@ -135,7 +135,7 @@ local function card(props: EndScreenProps, sizes: Config.EndSizes, mvp: Types.Pl
 	})
 end
 
--- `team`'s total on a chip in its HUD colour, as wide as its words with `inset` each side. Returns it and its width
+-- `team`'s total on a chip in its team colour, as wide as its words with `inset` each side. Returns it and its width
 -- (boxed).
 local function total(
 	props: EndScreenProps,

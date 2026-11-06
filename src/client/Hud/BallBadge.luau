@@ -2,7 +2,7 @@
 -- The ball's marker while the ball is off the screen (spec §11.1; #376, the owner's Q242, Q264-Q266): Roller Champions'
 -- ball badge (Video 31 at 21.0 s, Video 34 at 98.2 s) in look C. RC's white ball, crossed by the two lines of its band,
 -- inside a ring; a right-angled pointer outside the ring, turned toward the ball. The ring, the lines and the pointer
--- in the colour of the team that last held the ball (the HUD's, Style.teamColor), look C's ink before a team has, like
+-- in the colour of the team that last held the ball (Style.teamColor), look C's ink before a team has, like
 -- RC's at the kickoff; the ball stays white whoever holds it, as RC's does. Look C's ink rings the ring and the
 -- pointer, its drop shadow under them. The band leans and stays put: the ball in the world has no band yet to follow.
 -- Its place (the badge's centre), turn (degrees, 0 pointing up, clockwise) and showing are bindings the Hud sets each
