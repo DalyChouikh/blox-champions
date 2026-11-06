@@ -286,6 +286,19 @@ function Fixtures.config(overrides: { [string]: any }?): Config.GameConfig
 	return Config.forMode(Fixtures.mode(overrides))
 end
 
+-- The server's BallLook (#400) started with a mesh maker that never reaches Roblox (an empty MeshPart), for the
+-- services that dress each ball they build (BallService). Required here, not at the top: only server specs use it.
+function Fixtures.ballLook(config: Config.GameConfig): any
+	local BallLook = require(game:GetService("ServerScriptService").Server.BallLook) :: any
+	BallLook:init({
+		Config = config,
+		MakeMesh = function(_id: string): MeshPart
+			return Instance.new("MeshPart")
+		end,
+	})
+	return BallLook
+end
+
 -- A player's line in the score tab, with no points yet.
 function Fixtures.playerStats(id: Types.PlayerId, team: Team.Team): Types.PlayerStats
 	return {

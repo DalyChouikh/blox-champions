@@ -1,16 +1,17 @@
 --!strict
 -- The ball in the arena (spec §9.3): one server-owned physics part, in its own model that streams to every client, that
--- BallState says what to do with. It is hidden (in ServerStorage, so its next spawn is never replicated early) until a
--- kickoff ends, then drops in from above (Ball/DropIn, #321). A ball that leaves the arena (the box inside the glass,
--- its top included: Bounds.inArena) drops in again whatever its state, a loose one resting a while on something nobody
--- skates (the goal's rim, #308) too, and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt. Each
--- frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose body it touched.
--- Jumps the server makes (a drop-in's start, the snap into a catcher's hand, a carrier it moves, a drop it places, a
--- roll it puts on the floor) are never reported as movement, so they can never cross a gate or the ring; each screen
--- draws the catch's flight into the hand itself (Client/BallView). A pass flies flat at a steady speed, its weight
--- cancelled, turning toward where its receiver's chest will be (Homing, #315, #346), until it touches anything or
--- anyone (glass between them bounces it off, loose) or the receiver can no longer catch; a drop-in falls steadily the
--- lap's way, its weight cancelled too, until it touches anything or anyone; then either falls like any ball. A roll
+-- BallState says what to do with, unseen: each ball built is dressed in its skin's look (BallLook, #400), which every
+-- screen draws where it draws the ball. It is hidden (in ServerStorage, so its next spawn is never replicated early)
+-- until a kickoff ends, then drops in from above (Ball/DropIn, #321). A ball that leaves the arena (the box inside the
+-- glass, its top included: Bounds.inArena) drops in again whatever its state, a loose one resting a while on something
+-- nobody skates (the goal's rim, #308) too, and one Roblox destroys (fallen past FallenPartsDestroyHeight) is rebuilt.
+-- Each frame `step` reports how it really moved, a throw since the last frame, who caught it, and whose body it
+-- touched. Jumps the server makes (a drop-in's start, the snap into a catcher's hand, a carrier it moves, a drop it
+-- places, a roll it puts on the floor) are never reported as movement, so they can never cross a gate or the ring; each
+-- screen draws the catch's flight into the hand itself (Client/BallView). A pass flies flat at a steady speed, its
+-- weight cancelled, turning toward where its receiver's chest will be (Homing, #315, #346), until it touches anything
+-- or anyone (glass between them bounces it off, loose) or the receiver can no longer catch; a drop-in falls steadily
+-- the lap's way, its weight cancelled too, until it touches anything or anyone; then either falls like any ball. A roll
 -- (Roll Ball, #312) leaves from the floor under the hand, already rolling. A ball let go never starts in the arena:
 -- from a hand in it (a carrier just landed on a slope leans less than it, #345), it leaves from the nearest point
 -- toward the hand that is clear of the arena; a pass from beside the chest (#346), or the nearest clear point toward
@@ -24,6 +25,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
+local BallLook = require(script.Parent.BallLook)
 local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local BallState = require(ReplicatedStorage.Shared.Ball.BallState)
 local Bounds = require(ReplicatedStorage.Shared.Arena.Geometry.Bounds)
@@ -108,6 +110,8 @@ export type BallService = {
 	streamState: (self: BallService, dt: number) -> BallStream?,
 	destroy: (self: BallService) -> (),
 	_config: Config.GameConfig,
+	-- Dresses each ball built in its skin's look (#400).
+	_look: BallLook.BallLook,
 	_random: Random,
 	_reach: number,
 	-- How close a body is to touch the ball: the ball's and the collider's radii, plus the lag tolerance.
@@ -158,9 +162,9 @@ export type BallService = {
 	_serverTime: () -> number,
 }
 
+-- The ball's part: what bounces, rolls and is caught. Unseen: its look draws it (BallLook, #400).
 local function newBallPart(config: Config.GameConfig): Part
 	local ball = config.Ball
-	local skin = BallSkins.get(BallSkins.DEFAULT)
 	local part = Instance.new("Part")
 	part.Name = "Ball"
 	part:AddTag(Tags.Ball)
@@ -168,10 +172,6 @@ local function newBallPart(config: Config.GameConfig): Part
 	part.Shape = Enum.PartType.Ball
 	part.Size = Vector3.one * (2 * ball.radius)
 	part.CustomPhysicalProperties = PhysicalProperties.new(ball.density, ball.friction, ball.elasticity)
-	part.Color = skin.color
-	part.Material = skin.material
-	part.TopSurface = Enum.SurfaceType.Smooth
-	part.BottomSurface = Enum.SurfaceType.Smooth
 	return part
 end
 
@@ -185,6 +185,7 @@ local function build(self: BallService)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 	local part = newBallPart(self._config)
 	part.Parent = model
+	self._look:dress(part, BallSkins.DEFAULT)
 	local grace = Instance.new("NoCollisionConstraint")
 	grace.Part0 = part
 	grace.Enabled = false
@@ -505,11 +506,12 @@ end
 
 local BallService: BallService = {
 	name = "BallService",
-	dependencies = { "Config", "ArenaService" },
+	dependencies = { "Config", "ArenaService", "BallLook" },
 	model = nil :: any,
 	part = nil :: any,
 	state = nil :: any,
 	_config = nil :: any,
+	_look = nil :: any,
 	_random = Random.new(),
 	_reach = 0,
 	_contact = 0,
@@ -546,6 +548,7 @@ local BallService: BallService = {
 	init = function(self: BallService, deps: { [string]: any })
 		local config: Config.GameConfig = deps.Config
 		self._config = config
+		self._look = deps.BallLook
 		self._random = deps.Random or Random.new()
 		local lagTolerance = config.Network.pickupLagToleranceStuds
 		self._reach = config.Ball.pickupRadius + lagTolerance

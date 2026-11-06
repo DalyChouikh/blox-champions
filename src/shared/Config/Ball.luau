@@ -48,6 +48,9 @@ export type BallConfig = {
 	-- How far off the arena a ball let go starts when the hand is in it (#345): on the way out from the carrier's root,
 	-- this far off what it would first touch (BallService.releasePoint).
 	releaseClearance: number,
+	-- The mesh that draws the ball (#400, BallLook): an asset id, rbxassetid://<number>. Its paint map takes each
+	-- skin's picture (Skins/BallSkins).
+	meshId: string,
 }
 
 local defaults: BallConfig = {
@@ -81,6 +84,9 @@ local defaults: BallConfig = {
 	-- A ball placed exactly touching a thin part was dragged through it by Roblox's solver; 0.05 off it bounced cleanly
 	-- (measured for #311).
 	releaseClearance = 0.05,
+	-- The owner (#400, Q275-Q277): a sphere of radius 1 made in Blender by scripts/art/build_ball.py
+	-- (assets/ball/ball.obj), imported once by the owner in Studio, which uploaded it.
+	meshId = "rbxassetid://85389727461936",
 }
 
 local nonNegative = Validate.number({ min = 0 })
@@ -108,6 +114,9 @@ local schema = Validate.checkAll(
 		outOfBoundsMargin = nonNegative,
 		carryOffset = Validate.check(Validate.datatype("Vector3"), Finite.vector, "must be finite"),
 		releaseClearance = positive,
+		meshId = Validate.check(Validate.string(), function(id: string): boolean
+			return string.match(id, "^rbxassetid://%d+$") ~= nil
+		end, "must be an asset id (rbxassetid://<number>)"),
 	}),
 	{
 		{

@@ -2039,6 +2039,56 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   of strikes), built test-first, so any later case shows its cause; #394 stays open meanwhile, and #393 and #392 go on.
   Not chosen: keep hunting now; the owner describing a repro. Also: **"Yes, restart it"** (Rojo serve, the previous
   session's process having exited with that session).
+- **Q272 the stack merged, and two more items** (session 89, recommended; after #384, #394's line, #393 and #392 were
+  built, 13 PRs CI-green: #382 #385 #387 #388 #389 #390 #391 #395 #396 #397 #398 #399): "yes, also in the milestone, in
+  addition, I want to do the ball redesign and the speeding up the player movements a little more". So the stack is
+  squash-merged in order, and M1 gains two items: **the ball's redesign** (the 3D ball with Roller Champions' look, its
+  band across the middle edged by two lines, Q264/Q265; the HUD badge's band can then follow the ball's roll) and
+  **faster player movement, "a little more"** (feel: measured against RC by frames and body heights, decided by a
+  playable trial, coupled rules changed together).
+- **Q273 no faster movement after all** (session 89; asked with the stride at 51 studs/s, 8.7 body lengths a second,
+  a lap ~15.6 s; options stride +10% (recommended), +20%, everything +10%, two trials): "actually, never mind about the
+  speeding the players, we already did it before, it is fine for now". The movement stays as it is (#328's stride, Q161-
+  Q163); Q272's speed item is dropped. The ball's redesign stays.
+- **Q274 published, and the local branches gone** (session 89, both recommended): **"Yes, publish now"**: main 3332f73
+  (both HUD stacks, the phone controls, the screen markers, the lap cap, the guard's line, the frame guard) built to
+  build/game.rbxl and published by the owner into Blox Champions (place 74253300416513; its Updated time 2026-11-02
+  17:50:59Z -> 2026-11-05 21:22:20Z); the publish window closed by me. **"Yes, delete them"**: the 12 merged local
+  branches deleted.
+- **Q275-Q277 the ball's black band, its roll, and Blender** (session 90; the design page
+  https://claude.ai/artifact/2VPvUoeq1YxxQFhw3quNhw version 8, section 'The ball with a black band': Studio renders of
+  the 2-stud ball, nothing uploaded, the band a 2.04-stud shell cut by a slab (IntersectAsync) in look C's ink; white,
+  orange, blue at 0.5; widths 0.3/0.5/0.8 on orange; a slowed roll; the cut band zoomed 3x showing 1-px light specks
+  where its pieces meet). Before it, in the owner's words: "the ball need to be like RC, it needs to have a black band
+  in the middle around the ball", and: "later I want to have ball skins, that players can buy skins with robux, so do
+  we use blender for the ball design or what? I would like to use blender if it is better, but only if necessary and
+  that it would be good". So session 89's three looks (team lines C, white band B, team band A) are replaced by a
+  BLACK band; the ball's own colour keeps Q158/Q159 (white neutral, then the last holder's team). **Q275**: **0.8
+  studs** (40% of the ball's height; not the recommended 0.5; 0.3 not chosen). **Q276** (recommended): **the band
+  turns with the ball's roll and spin** (the HUD badge's band can then follow it: a follow-up issue). Not chosen: a
+  fixed lean. **Q277** (recommended): **a ball made once in Blender**: a ball mesh with a paint map (UVs), the black
+  band painted into the Default skin's picture, the picture see-through elsewhere so the ball's colour shows through
+  (SurfaceAppearance AlphaMode Overlay, Roblox docs read this session), imported once by the owner in Studio (it
+  uploads to their account); a later skin = its picture(s) + one line of data; the round ball part keeps the physics.
+  Not chosen: the band built in Studio by CSG at server start (no owner step, but the specks, and skins limited to
+  colours and materials).
+- **Q278 the ball's issues, and Q279 Rojo** (session 90, both recommended). **Q278 "Yes, file these 3"**, in order, one
+  issue, branch and PR each, milestone M1: (1) the ball made in Blender with its black band (a script builds the mesh
+  and the Default picture; the owner imports it once in Studio; the game draws it, team colours as today, physics
+  unchanged); (2) the band turns with the ball's roll on every screen (blocked by 1); (3) the HUD badge's band follows
+  the roll (blocked by 2). Not chosen: 1 and 2 merged; one issue for all. **Q279 "Yes, restart it"** (Rojo serve,
+  stopped with session 89's CLI; then the owner's Disconnect + Connect).
+- **Q280 the ball imported, the picture uploaded** (session 90, #400, recommended): the owner clicked Rojo's Connect and
+  imported `assets/ball/ball.obj` with Studio's Import 3D (a Model "ball" with a 2 x 2 x 2 MeshPart; the mesh uploaded
+  to their account), then **"Done; you upload it"**: I uploaded `assets/ball/ball_default.png` through Studio's MCP as an
+  image on their account. Not chosen: the owner uploading it through the Asset Manager; stopping there.
+- **Q281 #400's ship question** (session 90; the design page version 9, section 'The ball with a black band, built':
+  Play close-ups, white with the band after the drop-in, orange with the band carried; the band level, its roll being
+  #401): not chosen yet; the owner's words: "the ball is not rolling, the band is on place". So the band's roll is
+  wanted now; #401 (the roll) comes straight after #400.
+- **Q282 ship #400, the roll now** (session 90, recommended): **"Ship #400, build #401 now"**: #400's pull request goes
+  up as built, and #401 (the band turning with the roll) starts at once on a branch stacked on it, shown on the design
+  page (the roll animated) before anything merges. Not chosen: holding #400 until the roll is built.
 
 ## Roller Champions
 

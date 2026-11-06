@@ -9,6 +9,7 @@ local Client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 local BallView = require(Client.BallView)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local Look = require(ReplicatedStorage.Shared.Ball.Look)
 local Pull = require(ReplicatedStorage.Shared.Ball.Pull)
 local Shown = require(ReplicatedStorage.Shared.Ball.Shown)
 
@@ -48,12 +49,24 @@ local function catch(holder: BasePart): Weld
 	return weld
 end
 
+-- The ball's look (#400) under `part`, as the server dresses each ball.
+local function newLook(part: Part): MeshPart
+	local look = Instance.new("MeshPart")
+	look.Name = Look.NAME
+	look.Anchored = true
+	look.Parent = part
+	return look
+end
+
 local function init(overrides: { [string]: any }?)
 	BallView:init({
 		Config = Fixtures.config(overrides),
 		BallPart = {
 			get = function(_self: any): BasePart?
 				return ball
+			end,
+			look = function(_self: any): BasePart?
+				return if ball ~= nil then Look.of(ball) else nil
 			end,
 		},
 		RideSurfaces = { solid = solid },
@@ -305,5 +318,70 @@ describe("BallView: a catch's pull into the hand", function()
 		ball = rebuilt
 		BallView:step(DT)
 		Fixtures.expectNear(rebuilt.Position, Vector3.new(0, 9, 0))
+	end)
+end)
+
+-- #400: the ball part, the one that bounces and rolls, is unseen; its look (the mesh in its skin) is what each screen
+-- shows. The server never moves the look, and this screen's writes to the ball part don't carry a part joined to it
+-- (measured in Play: 19 studs apart), so the look is drawn here, where the ball is.
+describe("BallView: the ball's look", function()
+	it("draws the look where it draws the ball: with no state, loose, pulled into the hand and carried", function()
+		local look = newLook(ball :: Part)
+		local part = ball :: Part
+		part.Position = Vector3.new(30, 3, 4)
+		BallView:step(DT)
+		expect(look.Position).toEqual(part.Position)
+		BallView:receive(Vector3.new(20, 3, 4), Vector3.new(30, 0, 0), true, now)
+		BallView:step(DT)
+		expect(look.Position).toEqual(part.Position)
+		local holder = root("Root", Vector3.new(10, 3, 0), Vector3.new(1, 0, 0))
+		catch(holder)
+		BallView:step(DT)
+		expect(look.Position).toEqual(part.Position)
+		BallView:step(SECONDS)
+		expect(look.Position).toEqual(part.Position)
+		holder.CFrame += Vector3.new(5, 0, 0)
+		BallView:step(DT)
+		expect(look.Position).toEqual(part.Position)
+	end)
+
+	-- Roblox fires no change for a property set to the value it has, so a write is told by moving the look away: while
+	-- the ball is drawn where it was, the look is not written again.
+	it("writes the look only when the ball is drawn somewhere new", function()
+		local look = newLook(ball :: Part)
+		local part = ball :: Part
+		part.Position = Vector3.new(30, 3, 4)
+		BallView:step(DT)
+		local away = Vector3.new(0, 50, 0)
+		look.Position = away
+		BallView:step(DT)
+		BallView:step(DT)
+		expect(look.Position).toEqual(away)
+		part.Position = Vector3.new(31, 3, 4)
+		BallView:step(DT)
+		expect(look.Position).toEqual(part.Position)
+	end)
+
+	it("draws a look that comes after its ball, and a rebuilt ball's", function()
+		local part = ball :: Part
+		part.Position = Vector3.new(30, 3, 4)
+		expect(function()
+			BallView:step(DT)
+		end).never.toThrow()
+		local look = newLook(part)
+		BallView:step(DT)
+		expect(look.Position).toEqual(part.Position)
+		-- A new look on the same ball, which has not moved.
+		look:Destroy()
+		local another = newLook(part)
+		BallView:step(DT)
+		expect(another.Position).toEqual(part.Position)
+		local rebuilt = Instance.new("Part")
+		rebuilt.Position = Vector3.new(0, 9, 0)
+		rebuilt.Parent = folder
+		local rebuiltLook = newLook(rebuilt)
+		ball = rebuilt
+		BallView:step(DT)
+		expect(rebuiltLook.Position).toEqual(rebuilt.Position)
 	end)
 end)

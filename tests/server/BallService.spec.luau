@@ -14,6 +14,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local DropIn = require(ReplicatedStorage.Shared.Ball.DropIn)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local Homing = require(ReplicatedStorage.Shared.Ball.Homing)
+local Look = require(ReplicatedStorage.Shared.Ball.Look)
 local MovementCheck = require(ReplicatedStorage.Shared.Skate.MovementCheck)
 local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
 local SkaterBody = require(game:GetService("ServerScriptService").Server.SkaterBody)
@@ -55,6 +56,7 @@ beforeEach(function()
 	BallService:init({
 		Config = config,
 		ArenaService = { model = arena },
+		BallLook = Fixtures.ballLook(config),
 		Random = Random.new(1),
 		ServerClock = function(): number
 			return serverNow
@@ -156,7 +158,11 @@ describe("BallService", function()
 		expect(physics.Density).toBeCloseTo(0.7, 4)
 		expect(physics.Friction).toBeCloseTo(0.3, 4)
 		expect(physics.Elasticity).toBeCloseTo(0.5, 4)
-		expect(ball.Color).toEqual(BallSkins.get(BallSkins.DEFAULT).color)
+		-- #400: drawn by its look in the Default skin (BallLook); the part itself, which bounces and rolls, unseen.
+		local look = Look.of(ball) :: BasePart
+		expect(look.Color).toEqual(BallSkins.get(BallSkins.DEFAULT).color)
+		expect(look:FindFirstChildOfClass("SurfaceAppearance")).never.toBeNil()
+		expect(ball.Transparency).toBe(1)
 		expect(ballAt()).toBe("ServerStorage")
 		expect(BallService.state.status).toBe("Dead")
 		expect(BallService:step(1 / 60, {}).moved).toBe(false)
@@ -591,6 +597,8 @@ describe("BallService", function()
 		expect(frame.respawned).toBe(true)
 		expect(BallService.part).never.toBe(old)
 		expect(BallService.part.Parent == BallService.model).toBe(true)
+		-- Dressed like the first (#400).
+		expect(Look.of(BallService.part)).never.toBeNil()
 		expect(ballAt()).toBe("Workspace")
 		expect(isDropInStart(BallService.part.Position)).toBe(true)
 		expect(BallService.state.status).toBe("Loose")

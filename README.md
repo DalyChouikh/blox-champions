@@ -93,6 +93,8 @@ ruff check scripts
 | `src/character/` | Scripts every character gets (synced to `StarterPlayer.StarterCharacterScripts`); `Animate` replaces Roblox's default animations |
 | `tests/` | Jest Roblox tests (`*.spec.luau`), mirroring the `src/` folders, plus shared test data in `tests/Fixtures.luau` |
 | `scripts/` | Development scripts, such as the in-Studio test runner; `scripts/ci/` holds the cloud test job |
+| `scripts/art/` | Scripts that build the game's art in Blender, such as the ball (`build_ball.py`) |
+| `assets/` | The art those scripts write, uploaded once to Roblox by the owner (the ball's mesh and its Default skin's picture) |
 | `docs/` | Design specs and implementation plans |
 
 ## Contributing
