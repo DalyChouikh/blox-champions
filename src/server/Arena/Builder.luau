@@ -10,6 +10,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local DrawOnly = require(ReplicatedStorage.Shared.Util.DrawOnly)
 local Finite = require(ReplicatedStorage.Shared.Util.Finite)
 local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
+local GoalDoor = require(ReplicatedStorage.Shared.Arena.Geometry.GoalDoor)
 local PartSize = require(ReplicatedStorage.Shared.Util.PartSize)
 local PartsOf = require(ReplicatedStorage.Shared.Util.PartsOf)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
@@ -19,7 +20,7 @@ local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 type ArenaConfig = Config.ArenaConfig
 type Piece = Types.Piece
 
--- Invisible parts: the tag-only gates, an open map's ceiling, and the goal ring's blocks under its meshes.
+-- Invisible parts: the tag-only gates, an open map's ceiling, and the goal ring's blocks and panel under its meshes.
 local HIDDEN = 1
 
 local Builder = {}
@@ -245,10 +246,11 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 end
 
 -- Puts the goal's meshes (the Halo pylon, #410; in Arena.goalPieces' order) on a built goal: each at its box in the
--- hoop's frame, in its look, only drawing, in a GoalLook model beside the hoop. The ring's blocks then hide, keeping
--- the ring's collision and the rules' opening, and what glows while the goal is open moves from them to the pieces
--- whose look glows.
-function Builder.dressGoal(hoop: PVInstance, meshes: { MeshPart }, arena: ArenaConfig)
+-- hoop's frame, in its look, only drawing, in a GoalLook model beside the hoop, with the door that shuts the
+-- opening (Q324), whose bars' ends the housing hides: solid, in the goal's colour, only drawing, in a model
+-- tagged GoalDoor. The ring's blocks and the panel then hide, keeping the ring's collision, the rules' opening and
+-- the shut goal's wall, and what glows while the goal is open moves from the blocks to the pieces whose look glows.
+function Builder.dressGoal(hoop: PVInstance, panel: BasePart, meshes: { MeshPart }, arena: ArenaConfig)
 	local goal = arena.goal
 	local frame = hoop:GetPivot()
 	local look = Instance.new("Model")
@@ -267,9 +269,24 @@ function Builder.dressGoal(hoop: PVInstance, meshes: { MeshPart }, arena: ArenaC
 		end
 		mesh.Parent = look
 	end
+	local door = Instance.new("Model")
+	door.Name = "GoalDoor"
+	for index, bar in GoalDoor.bars(arena) do
+		DrawOnly(
+			addSolid(
+				{ shape = bar.shape, cframe = frame * bar.cframe, size = bar.size },
+				`Bar{index}`,
+				arena.colors.goal,
+				door
+			)
+		)
+	end
+	door:AddTag(Tags.GoalDoor)
+	door.Parent = look
 	for _, block in PartsOf(hoop) do
 		block.Transparency = HIDDEN
 	end
+	panel.Transparency = HIDDEN
 	hoop:RemoveTag(Tags.GoalGlow)
 	look.Parent = hoop.Parent
 end

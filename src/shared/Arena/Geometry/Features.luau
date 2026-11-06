@@ -7,6 +7,7 @@
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
 local Crossing = require(script.Parent.Parent.Parent.Rules.Crossing)
+local GoalDoor = require(script.Parent.GoalDoor)
 local PartSize = require(script.Parent.Parent.Parent.Util.PartSize)
 local Profile = require(script.Parent.Profile)
 local Surface = require(script.Parent.Surface)
@@ -104,7 +105,8 @@ end
 
 -- The ring must hang inside the track's cross-section at the goal gate, judged by its real outline (its corners)
 -- against the glass faces and the surface as built (the two sections blended halfway there, its curves as strips),
--- and the pylon it grows out of must stay under the lips (Q315).
+-- the pylon it grows out of must stay under the lips (Q315), and the housing round the opening must hide the door's
+-- bars' ends (Q324).
 local function checkFit(arena: ArenaConfig, corners: { Vector2 }, lateral: number, gateDistance: number)
 	if lateral - reach(corners, -Vector2.xAxis) < 0 or lateral + reach(corners, Vector2.xAxis) > arena.trackWidth then
 		fail("the goal ring must stay inside the glass")
@@ -120,6 +122,9 @@ local function checkFit(arena: ArenaConfig, corners: { Vector2 }, lateral: numbe
 	end
 	if arena.goal.pylon.top >= Profile.lipStart(arena) then
 		fail("the goal's pylon must stay under the lips")
+	end
+	if GoalDoor.reach(arena) >= arena.goal.housingRadius then
+		fail("the goal door's bars must end inside the housing")
 	end
 end
 

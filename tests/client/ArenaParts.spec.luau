@@ -116,4 +116,29 @@ describe("ArenaParts", function()
 		local none = ArenaParts.parts :: any
 		expect(none ~= nil and #none.glow == 0).toBe(true)
 	end)
+
+	-- Q324: the goal's door comes with its meshes (Builder.dressGoal), after the arena.
+	it("follows the goal's door: no bars until they come with the goal's meshes", function()
+		ArenaParts:start()
+		Fixtures.hudArena(folder)
+		task.wait()
+		local before = ArenaParts.parts :: any
+		expect(#before.door).toBe(0)
+		local door = Instance.new("Model")
+		local bars: { BasePart } = {}
+		for index = 1, 2 do
+			local bar = Instance.new("Part")
+			bar.Name = `Bar{index}`
+			bar.Anchored = true
+			bar.Parent = door
+			bars[index] = bar
+		end
+		door:AddTag(Tags.GoalDoor)
+		door.Parent = folder
+		task.wait()
+		local after = ArenaParts.parts :: any
+		expect(after ~= before).toBe(true)
+		expect(#after.door).toBe(2)
+		expect(table.find(after.door, bars[1]) ~= nil and table.find(after.door, bars[2]) ~= nil).toBe(true)
+	end)
 end)

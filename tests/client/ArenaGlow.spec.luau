@@ -10,7 +10,9 @@ local ArenaGlow = require(Client.ArenaGlow)
 local ArenaParts = require(Client.ArenaParts)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
+local GoalDoor = require(ReplicatedStorage.Shared.Arena.Geometry.GoalDoor)
 local HudStore = require(Client.HudStore)
+local PartSize = require(ReplicatedStorage.Shared.Util.PartSize)
 local Payloads = require(ReplicatedStorage.Shared.Net.Payloads)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
@@ -28,8 +30,8 @@ local folder: Folder
 local arena: Fixtures.HudArena
 -- How each part looked before anything glowed.
 local plain: { color: Color3, material: Enum.Material, transparency: number }
--- Every slide asked for: the part's name, where to, over how long.
-local slides: { { part: string, to: CFrame, seconds: number } }
+-- A door bar's shut look.
+type Shut = { frame: CFrame, size: Vector3 }
 
 local function show(payload: Payloads.MatchSnapshot)
 	HudStore:onSnapshot(payload)
@@ -38,6 +40,57 @@ end
 
 local function snapshot(overrides: { [string]: any }?)
 	show(Fixtures.matchSnapshot(overrides))
+end
+
+-- Steps for `seconds` (whole frames).
+local function stepFor(seconds: number)
+	for _ = 1, math.round(seconds / DT) do
+		ArenaGlow:step(DT)
+	end
+end
+
+-- The goal's door as Builder.dressGoal makes it, at the hoop's frame, found by the arena's parts: its bars and
+-- their shut looks.
+local function addDoor(): ({ BasePart }, { Shut })
+	local frame = arena.hoop:GetPivot()
+	local door = Instance.new("Model")
+	door.Name = "GoalDoor"
+	local bars: { BasePart }, shut: { Shut } = {}, {}
+	for index, bar in GoalDoor.bars(config.Arena) do
+		local part = Instance.new("Part")
+		part.Name = `Bar{index}`
+		part.Anchored = true
+		part.Size = bar.size
+		part.CFrame = frame * bar.cframe
+		part.Parent = door
+		bars[index], shut[index] = part, { frame = part.CFrame, size = part.Size }
+	end
+	door:AddTag(Tags.GoalDoor)
+	door.Parent = folder
+	ArenaParts:refresh()
+	return bars, shut
+end
+
+-- How far the door's edge travels: its longest bars', the middle rows'.
+local function reachOf(shut: { Shut }): number
+	return shut[config.Arena.goal.door.bars // 2].size.X
+end
+
+-- Every bar shows its length past the door's edge, `edge` studs from the middle, moved that much along its +X, or
+-- is hidden once the edge has passed its end.
+local function expectDoorAt(bars: { BasePart }, shut: { Shut }, edge: number)
+	for index, bar in bars do
+		local look = shut[index]
+		local shown = look.size.X - edge
+		if shown < PartSize.MIN then
+			expect(bar.LocalTransparencyModifier).toBe(1)
+		else
+			expect(bar.LocalTransparencyModifier).toBe(0)
+			Fixtures.expectNear(bar.Size, Vector3.new(shown, look.size.Y, look.size.Z))
+			Fixtures.expectNear(bar.Position, (look.frame * CFrame.new(edge / 2, 0, 0)).Position)
+			Fixtures.expectNear(bar.CFrame.RightVector, look.frame.RightVector)
+		end
+	end
 end
 
 -- Whether `part` glows in `color`, or looks as it did before anything glowed (`color` nil).
@@ -75,16 +128,12 @@ beforeEach(function()
 			(pane :: BasePart).Transparency = config.Arena.glass.transparency
 		end
 	end
-	slides = {}
 	ArenaParts:init({})
 	HudStore:init({ Config = config, LocalId = "1" })
 	ArenaGlow:init({
 		Config = config,
 		HudStore = HudStore,
 		ArenaParts = ArenaParts,
-		Slide = function(part: BasePart, to: CFrame, seconds: number)
-			table.insert(slides, { part = part.Name, to = to, seconds = seconds })
-		end,
 	})
 	snapshot()
 end)
@@ -127,8 +176,6 @@ describe("ArenaGlow", function()
 		snapshot({ possessingTeam = "Orange" })
 		expect(lip.Color).toEqual(Color3.fromRGB(245, 242, 236))
 		expect(lip.Material).toBe(Enum.Material.SmoothPlastic)
-		-- The panel slid out once, when the goal opened, and back once.
-		expect(#slides).toBe(2)
 	end)
 
 	-- The owner's choices (2026-10-27): only the next gate's panel shows, every other one is invisible, and every
@@ -205,19 +252,66 @@ describe("ArenaGlow", function()
 		expect(panelShows(arena.markers[GOAL_GATE], colors.Blue)).toBe(true)
 	end)
 
-	it("slides the panel out of the ring while the goal is open, and back", function()
-		local closed = arena.panel.CFrame
-		local up = arena.hoop:GetPivot().UpVector
-		expect(#slides).toBe(0)
+	-- The panel stays the shut goal's wall on the server; on screen the door shuts the opening once the goal's
+	-- meshes come, and until then the panel does.
+	it("hides the goal's panel while the goal is open, and shows it after", function()
+		expect(arena.panel.LocalTransparencyModifier).toBe(0)
 		snapshot({ possessingTeam = "Blue", goalOpenFor = "Blue" })
-		ArenaGlow:step(DT)
-		expect(#slides).toBe(1)
-		expect(slides[1].part).toBe("GoalPanel")
-		Fixtures.expectNear(slides[1].to.Position, closed.Position + up * glow.panelSlide)
-		expect(slides[1].seconds).toBe(glow.panelSlideSeconds)
+		expect(arena.panel.LocalTransparencyModifier).toBe(1)
+		expect(arena.panel.Transparency).toBe(plain.transparency)
 		snapshot({ possessingTeam = "Blue" })
-		expect(#slides).toBe(2)
-		Fixtures.expectNear(slides[2].to.Position, closed.Position)
-		expect(slides[2].to.LookVector:Dot(closed.LookVector)).toBeCloseTo(1, 5)
+		expect(arena.panel.LocalTransparencyModifier).toBe(0)
+	end)
+
+	-- Q324: elevator doors parting from the middle over doorSeconds, eased as a tween's default (Quad, Out): half
+	-- the time takes the edge three quarters of the way.
+	it("opens the door from the middle while the goal is open, every bar's edge in one line, and shuts it", function()
+		local bars, shut = addDoor()
+		local reach = reachOf(shut)
+		ArenaGlow:step(DT)
+		expectDoorAt(bars, shut, 0)
+		snapshot({ possessingTeam = "Blue", goalOpenFor = "Blue" })
+		stepFor(glow.doorSeconds / 2 - DT)
+		expectDoorAt(bars, shut, reach * 0.75)
+		stepFor(glow.doorSeconds / 2)
+		expectDoorAt(bars, shut, reach)
+		stepFor(glow.doorSeconds)
+		expectDoorAt(bars, shut, reach)
+		snapshot({ possessingTeam = "Blue" })
+		stepFor(glow.doorSeconds / 2 - DT)
+		expectDoorAt(bars, shut, reach * 0.25)
+		stepFor(glow.doorSeconds / 2)
+		expectDoorAt(bars, shut, 0)
+	end)
+
+	it("turns the door back from wherever it is when the goal shuts while it opens", function()
+		local bars, shut = addDoor()
+		ArenaGlow:step(DT)
+		snapshot({ possessingTeam = "Blue", goalOpenFor = "Blue" })
+		stepFor(glow.doorSeconds / 2 - DT)
+		snapshot({ possessingTeam = "Blue" })
+		stepFor(glow.doorSeconds / 2 - DT)
+		-- From three quarters open, three quarters of the way back.
+		expectDoorAt(bars, shut, reachOf(shut) * 0.75 * 0.25)
+	end)
+
+	-- The goal's meshes, and the door with them, may reach a client while the goal is open.
+	it("puts a door that comes while the goal is open open at once", function()
+		snapshot({ possessingTeam = "Orange", goalOpenFor = "Orange" })
+		stepFor(glow.doorSeconds)
+		local bars, shut = addDoor()
+		ArenaGlow:step(DT)
+		expectDoorAt(bars, shut, reachOf(shut))
+	end)
+
+	it("opens and shuts the door at once when it takes no time, even on a frame that took none", function()
+		local instant = Fixtures.config({ UI = { arenaGlow = { doorSeconds = 0 } } })
+		ArenaGlow:init({ Config = instant, HudStore = HudStore, ArenaParts = ArenaParts })
+		local bars, shut = addDoor()
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ possessingTeam = "Blue", goalOpenFor = "Blue" }))
+		ArenaGlow:step(0)
+		expectDoorAt(bars, shut, reachOf(shut))
+		snapshot({ possessingTeam = "Blue" })
+		expectDoorAt(bars, shut, 0)
 	end)
 end)

@@ -859,8 +859,7 @@ describe("Config defaults", function()
 		})
 		expect(ui.arenaGlow).toEqual({
 			material = Enum.Material.Neon,
-			panelSlide = 16,
-			panelSlideSeconds = 0.4,
+			doorSeconds = 0.4,
 			beam = { width = 2, thickness = 0.5 },
 		})
 		-- The ball's trail (#313), bolder after the screenshots (Q146); the thrower's arc went (Q149).
@@ -917,6 +916,7 @@ describe("Config defaults", function()
 		local warmWhite, smooth = Color3.fromRGB(245, 242, 236), Enum.Material.SmoothPlastic
 		expect(goal).toEqual({
 			ringRadius = 9,
+			housingRadius = 10.8,
 			heightAboveFloor = 52,
 			panelThickness = 0.5,
 			panelTransparency = 0.3,
@@ -924,6 +924,8 @@ describe("Config defaults", function()
 			rimSegments = 16,
 			across = 67,
 			pylon = { foot = 20, top = 84 },
+			-- Q324: elevator doors, ten solid bars a half, each 0.25 past the opening into the housing.
+			door = { bars = 10, past = 0.25 },
 			meshes = {
 				Shell = "rbxassetid://84830303766448",
 				Strips = "rbxassetid://118580242013929",
@@ -931,10 +933,10 @@ describe("Config defaults", function()
 				Band = "rbxassetid://85653016160285",
 			},
 			-- Q315's renders: a warm white body and lip, a dark band; the lip glows in the team's colour while the
-			-- goal is open (as the ring did); the strips white neon until the owner picks their colour (Q323).
+			-- goal is open (as the ring did), and so do the strips, white neon while it is shut (Q325).
 			looks = {
 				Shell = { color = warmWhite, material = smooth, glows = false },
-				Strips = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.Neon, glows = false },
+				Strips = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.Neon, glows = true },
 				Lip = { color = warmWhite, material = smooth, glows = true },
 				Band = { color = Color3.fromRGB(16, 19, 29), material = smooth, glows = false },
 			},
@@ -1185,6 +1187,16 @@ describe("Config.forMode", function()
 			-- The opening's centre's distance from the middle glass's face (its fit across is Arena/Geometry's).
 			{ overrides = { goal = { across = 0 } }, message = "Arena.goal.across: must be > 0 (got 0)" },
 			{ overrides = { goal = { pylon = { top = 0 } } }, message = "Arena.goal.pylon.top: must be > 0 (got 0)" },
+			-- The door's bars (their fit in the housing is Arena/Geometry's).
+			{
+				overrides = { goal = { housingRadius = 0 } },
+				message = "Arena.goal.housingRadius: must be > 0 (got 0)",
+			},
+			{ overrides = { goal = { door = { bars = 0 } } }, message = "Arena.goal.door.bars: must be >= 1 (got 0)" },
+			{
+				overrides = { goal = { door = { past = -0.1 } } },
+				message = "Arena.goal.door.past: must be >= 0 (got -0.1)",
+			},
 			{
 				overrides = { goal = { meshes = { Lip = "rbxassetid://" } } },
 				message = "Arena.goal.meshes.Lip: must be an asset id (rbxassetid://<number>)",
@@ -1276,6 +1288,10 @@ describe("Config.forMode", function()
 				message = "Arena.goal.rimSegments: must be an integer (got 16.5)",
 			},
 			{
+				overrides = { goal = { door = { bars = 10.5 } } },
+				message = "Arena.goal.door.bars: must be an integer (got 10.5)",
+			},
+			{
 				overrides = { top = { kind = "Lid" } },
 				message = 'Arena.top.kind: must be one of Closed, Open (got "Lid")',
 			},
@@ -1295,6 +1311,17 @@ describe("Config.forMode", function()
 				Fixtures.config({ Arena = case.overrides })
 			end).toThrow(case.message)
 		end
+	end)
+
+	-- The door's limits the rejections above cross: one bar a half, ending on the opening's edge; and a door that
+	-- opens at once.
+	it("accepts a goal door just inside its limits", function()
+		expect(function()
+			Fixtures.config({
+				Arena = { goal = { door = { bars = 1, past = 0 } } },
+				UI = { arenaGlow = { doorSeconds = 0 } },
+			})
+		end).never.toThrow()
 	end)
 
 	-- Each just inside the limit the rejections above cross: the incline ending at 63.3, before the straights' foot
@@ -2468,6 +2495,10 @@ describe("Config.forMode", function()
 				message = "UI.hud.avatarImage: placeholder count must be 1",
 			},
 			{ overrides = { UI = { hud = { spacing = -1 } } }, message = "UI.hud.spacing: must be >= 0" },
+			{
+				overrides = { UI = { arenaGlow = { doorSeconds = -0.1 } } },
+				message = "UI.arenaGlow.doorSeconds: must be >= 0 (got -0.1)",
+			},
 			-- The carrier's beam is one part, which Roblox would clamp to its size limits.
 			{
 				overrides = { UI = { arenaGlow = { beam = { width = 0.0005 } } } },

@@ -7,6 +7,7 @@ local describe, it, expect = JestGlobals.describe, JestGlobals.it, JestGlobals.e
 local Centerline = require(ReplicatedStorage.Shared.Arena.Geometry.Centerline)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Features = require(ReplicatedStorage.Shared.Arena.Geometry.Features)
+local GoalDoor = require(ReplicatedStorage.Shared.Arena.Geometry.GoalDoor)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local PartSize = require(ReplicatedStorage.Shared.Util.PartSize)
 local Profile = require(ReplicatedStorage.Shared.Arena.Geometry.Profile)
@@ -253,6 +254,20 @@ describe("Features.goal", function()
 		end
 		expect(function()
 			Features.goal(Fixtures.config({ Arena = { goal = { pylon = { top = 107.9 } } } }).Arena)
+		end).never.toThrow()
+	end)
+
+	-- Q324: the housing round the opening hides the door's bars' ends, so they must end inside it.
+	it("keeps the door's bars inside the housing", function()
+		local reach = GoalDoor.reach(Config.defaults().Arena)
+		local tooFar: { { [string]: any } } = { { housingRadius = reach }, { door = { bars = 4 } } }
+		for _, goal in tooFar do
+			expect(function()
+				Features.goal(Fixtures.config({ Arena = { goal = goal } }).Arena)
+			end).toThrow("Arena: the goal door's bars must end inside the housing")
+		end
+		expect(function()
+			Features.goal(Fixtures.config({ Arena = { goal = { housingRadius = reach + 0.01 } } }).Arena)
 		end).never.toThrow()
 	end)
 end)

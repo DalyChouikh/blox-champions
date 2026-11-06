@@ -82,10 +82,14 @@ export type ArenaConfig = {
 		-- The Halo pylon (#410, the owner's Q310-Q315): its numbers are GoalShape.json's, the ones its mesh was built
 		-- from, so the mesh and the rules never disagree. The opening's radius, which is also the scoring disc's.
 		ringRadius: number,
+		-- The housing's outer radius round the opening at its narrowest (its front): the door's bars end inside it.
+		housingRadius: number,
 		-- The opening's centre above the lowest floor.
 		heightAboveFloor: number,
+		-- The panel's and the door's bars' thickness.
 		panelThickness: number,
-		-- The panel starts closed: see-through enough to show the ring is shut.
+		-- The panel starts closed: see-through enough to show the ring is shut. It is the goal's look until the
+		-- meshes come; then the door is.
 		panelTransparency: number,
 		rimThickness: number,
 		rimSegments: number,
@@ -94,6 +98,10 @@ export type ArenaConfig = {
 		-- The pylon the ring grows out of, set in the outer wall: from its foot at the outer glass line to its top,
 		-- both above the lowest floor.
 		pylon: { foot: number, top: number },
+		-- The door that shuts the opening once the meshes come (Q324: elevator doors parting from the middle):
+		-- `bars` horizontal bars a half, each reaching `past` studs beyond the opening into the housing
+		-- (Arena/Geometry/GoalDoor).
+		door: { bars: number, past: number },
 		-- The owner's import of the build's goal.glb: one mesh per piece.
 		meshes: GoalMeshes<string>,
 		pieces: GoalMeshes<GoalBox>,
@@ -138,6 +146,7 @@ local defaults: ArenaConfig = {
 	goalGateIndex = 2,
 	goal = {
 		ringRadius = GoalShape.opening.radius,
+		housingRadius = GoalShape.housing.frontRadius,
 		heightAboveFloor = GoalShape.opening.height,
 		panelThickness = 0.5,
 		panelTransparency = 0.3,
@@ -145,6 +154,8 @@ local defaults: ArenaConfig = {
 		rimSegments = 16,
 		across = GoalShape.opening.across,
 		pylon = { foot = GoalShape.pylon.foot, top = GoalShape.pylon.top },
+		-- Solid, in colors.goal: see-through bars showed thin lines where they meet (session 97's probe).
+		door = { bars = 10, past = 0.25 },
 		meshes = {
 			Shell = "rbxassetid://84830303766448",
 			Strips = "rbxassetid://118580242013929",
@@ -158,10 +169,10 @@ local defaults: ArenaConfig = {
 			Band = builtBox(GoalPieces.pieces.Band),
 		},
 		-- Q315's renders: a warm white body and lip, a dark band. The lip glows in the team's colour while the goal is
-		-- open, as the ring did; the strips are white neon until the owner picks their colour (Q323).
+		-- open, as the ring did, and so do the strips, white neon while it is shut (Q325).
 		looks = {
 			Shell = { color = Color3.fromRGB(245, 242, 236), material = Enum.Material.SmoothPlastic, glows = false },
-			Strips = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.Neon, glows = false },
+			Strips = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.Neon, glows = true },
 			Lip = { color = Color3.fromRGB(245, 242, 236), material = Enum.Material.SmoothPlastic, glows = true },
 			Band = { color = Color3.fromRGB(16, 19, 29), material = Enum.Material.SmoothPlastic, glows = false },
 		},
@@ -233,6 +244,7 @@ local fields = Validate.record({
 	goalGateIndex = Validate.number({ min = 1, max = 4, integer = true }),
 	goal = Validate.record({
 		ringRadius = size,
+		housingRadius = size,
 		heightAboveFloor = size,
 		panelThickness = partSize,
 		panelTransparency = transparency,
@@ -241,6 +253,11 @@ local fields = Validate.record({
 		-- Its fit across the track and under the lips is judged by Arena/Geometry.
 		across = size,
 		pylon = Validate.record({ foot = size, top = size }),
+		-- Its fit in the housing is judged by Arena/Geometry.
+		door = Validate.record({
+			bars = Validate.number({ min = 1, integer = true }),
+			past = Validate.number({ min = 0 }),
+		}),
 		meshes = goalMeshes(Validate.assetId()),
 		pieces = goalMeshes(Validate.record({ centre = vector, size = vector })),
 		looks = goalMeshes(

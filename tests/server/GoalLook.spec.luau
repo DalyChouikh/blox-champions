@@ -75,6 +75,9 @@ describe("GoalLook", function()
 			expect(((look :: Model):FindFirstChild(name) :: MeshPart):IsA("MeshPart")).toBe(true)
 		end
 		expect(blocksShow(goal)).toBe(false)
+		-- The door shuts the opening in the panel's place (Q324).
+		expect((look :: Model):FindFirstChild("GoalDoor") ~= nil).toBe(true)
+		expect((goal:FindFirstChild("GoalPanel") :: BasePart).Transparency).toBe(1)
 		expect(logged).toEqual({})
 	end)
 

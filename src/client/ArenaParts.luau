@@ -1,11 +1,11 @@
 --!strict
 -- The arena's parts the HUD points at and lights (spec §9.1): the corner markers (the gates' glass panels) by gate
--- index, what glows while the goal is open, the goal hoop's up (its pivot's) and its opening, and the goal panel, found
--- by their tags (Arena/Tags); a throw aims at the opening's centre through it (#313). The arena model is Persistent,
--- so it reaches every client whole, soon after the player joins, and stays; until it has, `parts` is nil. The goal's
--- meshes come later (GoalLook, #410), and the glow moves to them then, which the GoalGlow tag's signals show. One
--- cache every client module reads, refreshed by the tags' signals from start on. Each refresh makes a new record, so
--- a reader sees that it changed.
+-- index, what glows while the goal is open, the goal's opening, its panel and its door, found by their tags
+-- (Arena/Tags); a throw aims at the opening's centre through it (#313). The arena model is Persistent, so it reaches
+-- every client whole, soon after the player joins, and stays; until it has, `parts` is nil. The goal's meshes come
+-- later (GoalLook, #410), and the glow moves to them then, with the door, which the GoalGlow and GoalDoor tags'
+-- signals show. One cache every client module reads, refreshed by the tags' signals from start on. Each refresh
+-- makes a new record, so a reader sees that it changed.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,11 +25,11 @@ export type Parts = {
 	-- What takes the team's colour while the goal is open: every part of everything tagged GoalGlow (the ring's
 	-- blocks until the goal's meshes come, then its lip). It may be empty.
 	glow: { BasePart },
-	-- Up in the ring's own plane: the panel slides along it, out of the ring.
-	hoopUp: Vector3,
 	-- The scoring disc (TaggedLayout.goalDisc).
 	goal: Crossing.Disc,
 	panel: BasePart,
+	-- The door's bars (Q324): every part of everything tagged GoalDoor, none until the goal's meshes come.
+	door: { BasePart },
 }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its members.
@@ -46,7 +46,7 @@ export type ArenaParts = {
 }
 
 -- Every tag `refresh` reads.
-local WATCHED = { Tags.CornerMarker, Tags.GoalHoop, Tags.GoalGlow, Tags.GoalPanel }
+local WATCHED = { Tags.CornerMarker, Tags.GoalHoop, Tags.GoalGlow, Tags.GoalPanel, Tags.GoalDoor }
 
 local function firstPart(tag: string): BasePart?
 	for _, instance in CollectionService:GetTagged(tag) do
@@ -109,9 +109,9 @@ local ArenaParts: ArenaParts = {
 		self.parts = {
 			markers = markers,
 			glow = partsTagged(Tags.GoalGlow),
-			hoopUp = goal.frame.UpVector,
 			goal = goal,
 			panel = panel,
+			door = partsTagged(Tags.GoalDoor),
 		}
 	end,
 
