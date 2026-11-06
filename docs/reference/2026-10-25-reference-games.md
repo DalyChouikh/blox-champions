@@ -2499,6 +2499,20 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   the gate markers, +1/+3/+5 popping, readable from both sides; 1482/1482; the design page section 'The goal shows
   its worth'): **"Yes, ship it"**: the PR opens stacked on #418; the owner's 2-player check of the whole stack stays
   before its merge (Q321).
+- **Q329 the fire lines at the glass line** (session 98, recommended; #412's height, asked as Q302 said with a Studio
+  shot; the design page's new link https://claude.ai/artifact/9dRwv9axwdautRDx8CisAz, section 'Where the fire lines
+  sit on our wall': Play shots on the real arena of laps 1-2 full and lap 3 two markers on, orange, 0.8 studs thick,
+  2 apart, at A 20/22/24, B 40/42/44 (Q302's numbers, now on the glass, through the bottom of the goal's housing),
+  C 30/32/34 (crossing the pylon); found: since #409 the wall looks like glass from 20, and it stands upright only
+  from 34 on the straights and 30 on the curved ends): **"A 20/22/24"**: the lines trace the wall's visible top edge
+  where the solid look ends, like RC's, and pass under the goal at the pylon's foot; they lie on the slope skaters
+  climb (they only draw). A per-map setting like the glass lines (Q312).
+- **Q330 #412 shipped** (session 98, recommended; #412 built: each gate the team with the ball passes sends a fireball
+  in its colour along the outer wall to the next gate, its line staying, lap 1's at the glass line (20) and each next
+  lap's 2 higher, fading in 0.3 s when the streak ends; the carrier's beam gone; 1497/1497; the design page's new link
+  after the owner's /login, https://claude.ai/artifact/SU9P5UNkzZXXNJAR6MgQi8, section 'Fire lines from marker to
+  marker'): **"Yes, ship it"**: the PR opens stacked on #419; the owner's 2-player check of the whole stack stays
+  before its merge (Q321).
 
 ## Roller Champions
 
