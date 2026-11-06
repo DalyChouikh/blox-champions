@@ -2449,6 +2449,16 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   by 2; 4 the goal's worth disc (Q294, Q306), blocked by 3; 5 fire lines marker to marker replacing the carrier's beam
   (Q300-Q303; their height asked with a Studio shot when built), blocked by 2; 6 skate fire (Q298), none; 7 the bottom
   line's lap counts (Q299), none; 8 the carried ball's glow, band black (Q319), blocked by 1. Each one PR, test-first.
+- **Q321 #408's PR now, the 2-player check later** (session 94, recommended; #408 built: RC's pair everywhere,
+  1438/1438, mutations 7/7, Play as Blue and Orange, the design page's 'RC's blue and orange, everywhere' section):
+  **"Open the PR, I'll 2-player later"**: the PR opens with CI green; the owner checks the whole stack in one 2-player
+  Play (one player per team) before its merge, as with #400/#401 (Q290).
+- **Q322 #409 shipped** (session 95, recommended; #409 built: the outer wall looks like glass from 20 and the middle
+  bank from 6, each line a clean edge on the straights, the corners and the curved ends, riding and climbing
+  unchanged (to 40 and 16); 1446/1446, 27/27 mutations, 0 warnings; the arena 13,652 parts (12,752 before; limit
+  15,666), its build ~0.21 s (was ~0.27 s); Play shots on the design page, which the owner's /login moved to
+  https://claude.ai/artifact/7i4DcQZNXCxbWfNaiD7bM8, section 'The walls look like glass lower down'): **"Yes, ship
+  it"**: the PR opens stacked on #416; the owner's 2-player check of the whole stack stays before its merge (Q321).
 
 ## Roller Champions
 
