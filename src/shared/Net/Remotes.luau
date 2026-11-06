@@ -9,10 +9,11 @@
 --   GetUp          client → server   {} once per knockdown, when the knocked-down player moves (Net/Schemas)
 --   SwitchTeam     client → server   {} when a player asks to switch to the other team (#310; Net/Schemas)
 -- Streams are UnreliableRemoteEvents: each message soon makes the last one stale, so a lost one is not resent.
---   BallState      server → clients  position, velocity, supported, serverTime: the loose ball each frame it moves
---                                    and every Network.ballStream.restSeconds at rest, and whether a lift or the
---                                    ground bears its weight (#316, #337; Client/BallView draws it); four values,
---                                    not a record, which every client would receive as a new table each message
+--   BallState      server → clients  position, velocity, supported, serverTime, spin: the loose ball each frame it
+--                                    moves and every Network.ballStream.restSeconds at rest, whether a lift or the
+--                                    ground bears its weight, and how Roblox's physics spins it (#316, #337, #401;
+--                                    Client/BallView draws it and turns its look); five values, not a record, which
+--                                    every client would receive as a new table each message
 
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 

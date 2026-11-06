@@ -102,6 +102,7 @@ describe("Config defaults", function()
 			carryOffset = Vector3.new(1.7, -0.8, -0.3),
 			releaseClearance = 0.05,
 			meshId = "rbxassetid://85389727461936",
+			lookSpinLimit = 15,
 		})
 		expect(d.Network).toEqual({
 			pickupLagToleranceStuds = 2,
@@ -1376,6 +1377,22 @@ describe("Config.forMode", function()
 			end).toThrow(case.message)
 		end
 		expect(Fixtures.config({ Ball = { meshId = "rbxassetid://1" } }).Ball.meshId).toBe("rbxassetid://1")
+	end)
+
+	-- #401 (the owner's Q287): each screen turns the ball's band by the server's spin, up to a rate.
+	it("rejects a look spin limit that is not a positive finite rate, and accepts a small one", function()
+		local cases: { { limit: any, message: string } } = {
+			{ limit = 0, message = "Ball.lookSpinLimit: must be > 0 (got 0)" },
+			{ limit = -15, message = "Ball.lookSpinLimit: must be > 0 (got -15)" },
+			{ limit = math.huge, message = "Ball.lookSpinLimit: must be finite" },
+			{ limit = "15", message = "Ball.lookSpinLimit: expected number, got string" },
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config({ Ball = { lookSpinLimit = case.limit } })
+			end).toThrow(case.message)
+		end
+		expect(Fixtures.config({ Ball = { lookSpinLimit = 0.01 } }).Ball.lookSpinLimit).toBe(0.01)
 	end)
 
 	-- The owner (Q91, Q132, Q139, #311, #316): a caught ball flies into the hand over 0.2 s on every screen.

@@ -15,7 +15,12 @@
 --   C0 is written here (a client's write stays on its client, and the server never writes it again) from where this
 --   screen last drew the ball, in the carrier's root frame, to the server's carry spot over Ball.pickupPullSeconds
 --   (Ball/Pull); then the server's C0 again. A weld places its part at once.
--- - Its look (#400: the ball mesh in its skin, Ball/Look) goes wherever the ball is drawn, loose or carried.
+-- - Its look (#400: the ball mesh in its skin, Ball/Look) goes wherever the ball is drawn, loose or carried, and turns
+--   as the ball turns (#401, the owner's Q276: the band rolls with it). This screen's ball part never turns once it is
+--   drawn here (measured in Play), so each state carries the server's physics spin and the look is turned by it, up to
+--   Ball.lookSpinLimit (Q287: a fast ball's ~40 turns a second could not be followed), while the ball is drawn loose,
+--   until its state is older than the stream carries on; carried, the look takes the ball part's turn (welded at the
+--   carrier's root, it turns with the skater), and a ball let go turns on from there.
 -- Idle and carried it allocates nothing; drawing a loose ball casts one ray a frame.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,6 +30,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Pull = require(ReplicatedStorage.Shared.Ball.Pull)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Shown = require(ReplicatedStorage.Shared.Ball.Shown)
+local Spin = require(ReplicatedStorage.Shared.Ball.Spin)
 
 -- The arena's solid parts, as RideSurfaces keeps them.
 type Surfaces = { solid: RaycastParams }
@@ -36,7 +42,14 @@ export type BallView = {
 	init: (self: BallView, deps: { [string]: any }) -> (),
 	start: (self: BallView) -> (),
 	-- The server's state of the loose ball (#316), kept when it is the newest and from after the last catch.
-	receive: (self: BallView, position: Vector3, velocity: Vector3, supported: boolean, time: number) -> (),
+	receive: (
+		self: BallView,
+		position: Vector3,
+		velocity: Vector3,
+		supported: boolean,
+		time: number,
+		spin: Vector3
+	) -> (),
 	step: (self: BallView, dt: number) -> (),
 	_ballPart: BallPart.BallPart,
 	_surfaces: Surfaces,
@@ -47,6 +60,7 @@ export type BallView = {
 	_maxAge: number,
 	_gravity: Vector3,
 	_radius: number,
+	_spinLimit: number,
 	-- The ball part and the weld holding it at the last step: a new one of either starts over.
 	_part: BasePart?,
 	_weld: Weld?,
@@ -64,11 +78,15 @@ export type BallView = {
 	_stateVelocity: Vector3,
 	_stateSupported: boolean,
 	_stateTime: number,
+	_stateSpin: Vector3,
 	-- The server's time when this screen last saw a catch.
 	_caughtAt: number,
-	-- The ball's look last drawn and where (#400).
+	-- The ball's look last drawn, where, and turned how (#400, #401).
 	_look: BasePart?,
 	_lookAt: Vector3,
+	_turnedAt: Vector3,
+	-- The look's turn, changed in place (Ball/Spin).
+	_turn: Spin.Quat,
 }
 
 -- A new weld holds the ball: its pull starts from where this screen last drew the ball, if it has drawn it (a pull
@@ -115,15 +133,43 @@ local function draw(self: BallView, part: BasePart, dt: number)
 	part.Position = drawn
 end
 
--- The ball's look where this screen drew the ball (#400). The ball part is unseen, and nothing else puts its look
--- there: the server never moves the look, and this screen's writes to the ball part carry no part joined to it (19
--- studs apart, measured in Play). Written only when the look or the spot is new.
-local function place(self: BallView, shown: Vector3)
+-- How the look is turned now (#401): with the ball part while carried, kept so a ball let go turns on from the hand;
+-- loose, by the latest state's spin (up to the limit) over `dt` while the stream still carries that state on.
+local function turned(self: BallView, part: BasePart, dt: number): Vector3
+	if self._weld ~= nil then
+		local held = part.Orientation
+		Spin.setOrientation(self._turn, held)
+		return held
+	end
+	if self._hasState and self._serverTime() - self._stateTime <= self._maxAge then
+		Spin.turn(self._turn, self._stateSpin, dt, self._spinLimit)
+	end
+	return Spin.orientation(self._turn)
+end
+
+-- The ball's look where this screen drew the ball (#400), turned as the ball turns (#401). The ball part is unseen, and
+-- nothing else puts its look there: the server never moves the look, and this screen's writes to the ball part carry
+-- no part joined to it (19 studs apart, measured in Play). A new look starts from the turn it was built with. Each of
+-- its spot and its turn is written only when it changed, or for a new look; Orientation, a Vector3, is written rather
+-- than a CFrame, which would be a new object each frame.
+local function place(self: BallView, part: BasePart, shown: Vector3, dt: number)
 	local look = self._ballPart:look()
-	if look ~= nil and (look ~= self._look or shown ~= self._lookAt) then
-		look.Position = shown
+	if look == nil then
+		return
+	end
+	local fresh = look ~= self._look
+	if fresh then
 		self._look = look
+		Spin.setOrientation(self._turn, look.Orientation)
+	end
+	if fresh or shown ~= self._lookAt then
+		look.Position = shown
 		self._lookAt = shown
+	end
+	local orientation = turned(self, part, dt)
+	if fresh or orientation ~= self._turnedAt then
+		look.Orientation = orientation
+		self._turnedAt = orientation
 	end
 end
 
@@ -141,6 +187,7 @@ local BallView: BallView = {
 	_maxAge = 0,
 	_gravity = Vector3.zero,
 	_radius = 0,
+	_spinLimit = 0,
 	_part = nil,
 	_weld = nil,
 	_shown = nil,
@@ -154,9 +201,12 @@ local BallView: BallView = {
 	_stateVelocity = Vector3.zero,
 	_stateSupported = false,
 	_stateTime = 0,
+	_stateSpin = Vector3.zero,
 	_caughtAt = -math.huge,
 	_look = nil,
 	_lookAt = Vector3.zero,
+	_turnedAt = Vector3.zero,
+	_turn = Spin.new(),
 
 	-- deps.ServerClock replaces workspace:GetServerTimeNow in tests.
 	init = function(self: BallView, deps: { [string]: any })
@@ -173,6 +223,7 @@ local BallView: BallView = {
 		self._maxAge = stream.maxAgeSeconds
 		self._gravity = Config.gravity(config)
 		self._radius = config.Ball.radius
+		self._spinLimit = config.Ball.lookSpinLimit
 		self._part = nil
 		self._weld = nil
 		self._shown = nil
@@ -183,12 +234,19 @@ local BallView: BallView = {
 
 	start = function(self: BallView)
 		Remotes.getStream(ReplicatedStorage, Remotes.streams.BallState).OnClientEvent
-			:Connect(function(position: Vector3, velocity: Vector3, supported: boolean, time: number)
-				self:receive(position, velocity, supported, time)
+			:Connect(function(position: Vector3, velocity: Vector3, supported: boolean, time: number, spin: Vector3)
+				self:receive(position, velocity, supported, time, spin)
 			end)
 	end,
 
-	receive = function(self: BallView, position: Vector3, velocity: Vector3, supported: boolean, time: number)
+	receive = function(
+		self: BallView,
+		position: Vector3,
+		velocity: Vector3,
+		supported: boolean,
+		time: number,
+		spin: Vector3
+	)
 		if time < self._caughtAt or (self._hasState and time <= self._stateTime) then
 			return
 		end
@@ -197,6 +255,7 @@ local BallView: BallView = {
 		self._stateVelocity = velocity
 		self._stateSupported = supported
 		self._stateTime = time
+		self._stateSpin = spin
 	end,
 
 	step = function(self: BallView, dt: number)
@@ -230,7 +289,7 @@ local BallView: BallView = {
 		else
 			self._shown = part.Position
 		end
-		place(self, self._shown :: Vector3)
+		place(self, part, self._shown :: Vector3, dt)
 	end,
 }
 

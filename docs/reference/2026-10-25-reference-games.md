@@ -2089,6 +2089,32 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
 - **Q282 ship #400, the roll now** (session 90, recommended): **"Ship #400, build #401 now"**: #400's pull request goes
   up as built, and #401 (the band turning with the roll) starts at once on a branch stacked on it, shown on the design
   page (the roll animated) before anything merges. Not chosen: holding #400 until the roll is built.
+- **Q283 the spin too fast** (session 91, #401's ship question; the design page
+  https://claude.ai/artifact/2VPvUoeq1YxxQFhw3quNhw version 10, section 'The band turns with the roll, built': a Roll
+  Ball filmed in Play with a camera following the ball; each drawn frame turned by exactly the server's physics spin,
+  76 of 76 frames checked): not shipped yet; the owner's words: "can you make the ball spin a little slower, it is fast
+  now". Measured: right after a Roll Ball the server's ball spins about 250 rad/s (40 turns a second, two thirds of a
+  turn between frames at 60 frames a second), so the band flickers until the ball slows.
+- **Q284 a limited spin, tried by playing** (session 91): **"Try a limited spin"** (not the recommended "keep the true
+  spin"): a playable Studio trial in which the band's drawn turn is capped, so a fast ball's band reads as rolling,
+  slower than the real spin; the cap chosen by playing it.
+- **Q285 #394 next** (session 91, recommended): **"Next, before #402"**. The caught case (a character loaded by
+  Roblox itself mid-match at about (0, 103.6, 0), returned by the guard, the skater stuck; evidence on #394) is
+  reproduced on purpose first (a slow server start), then fixed test-first on its own branch; the leading fix is
+  Roblox's own character loading switched off in the place file. Not chosen: after #402.
+- **Q286 the CI flake gets an issue** (session 91, recommended): **"Yes, file it"**: #403's first cloud run failed once
+  (the HUD's step-time test read 0.144 ms against 0.1 ms, then the match spec ran past the 5-minute limit) and passed on
+  a rerun; the issue finds the hang and makes the cloud speed test steady without hiding a real slowdown.
+- **Q287 the spin trial: at most 2.5 turns a second** (session 91, #401; a playable Studio trial patched into Studio's
+  copy only: keys 1-4 switched the drawn spin's limit while playing, 1 the true spin (up to 40 turns a second), 2 at
+  most 10, 3 at most 5 (recommended), 4 at most 2.5; a slow ball spun the same in all four; checked in Play first: 249
+  of 249 frames turned by exactly the capped spin): **"4: at most 2.5 turns/s"** (15 rad/s). So each screen turns the
+  band by the server's spin up to 15 rad/s about the spin's own axis; a faster ball's band turns at that rate. Not
+  chosen: 1, 2, 3.
+- **Q288 #401 shipped** (session 91, recommended; the design page version 11, section 'The band turns with the roll,
+  built': the limit built as `Ball.lookSpinLimit = 15`, a Roll Ball by Orange up the banked curve, 339 of 339 Play
+  frames turned by exactly the limited spin): **"Yes, ship it"**. #401's pull request goes up stacked on #403; the
+  owner's 2-player check of #400 + #401 stays open; then #394 (Q285).
 
 ## Roller Champions
 

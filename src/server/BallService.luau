@@ -64,8 +64,9 @@ export type BallFrame = {
 
 -- The loose ball as every screen needs it (#316): where it is and how fast, whether something bears its weight (a
 -- lift: a pass or a drop-in flying flat; or the ground it lies or rolls on, #337), and the server's time then
--- (workspace:GetServerTimeNow), so each screen carries it on to its own now, falling only while nothing bears it.
-export type BallStream = { position: Vector3, velocity: Vector3, supported: boolean, time: number }
+-- (workspace:GetServerTimeNow), so each screen carries it on to its own now, falling only while nothing bears it; and
+-- how Roblox's physics spins it, so each screen turns its look (#401).
+export type BallStream = { position: Vector3, velocity: Vector3, supported: boolean, time: number, spin: Vector3 }
 
 -- Spelled out so the module is a Loader.LoadableModule (whose start is optional) and callers see its methods.
 export type BallService = {
@@ -566,7 +567,8 @@ local BallService: BallService = {
 		self._groundReach = Vector3.new(0, -2 * config.Ball.radius, 0)
 		self._grounded = false
 		self._strandedSeconds = 0
-		self._stream = { position = Vector3.zero, velocity = Vector3.zero, supported = false, time = 0 }
+		self._stream =
+			{ position = Vector3.zero, velocity = Vector3.zero, supported = false, time = 0, spin = Vector3.zero }
 		self._sinceStreamed = math.huge
 		self._serverTime = deps.ServerClock or function(): number
 			return workspace:GetServerTimeNow()
@@ -785,6 +787,8 @@ local BallService: BallService = {
 		stream.velocity = velocity
 		stream.supported = self._lift.Enabled or self._grounded
 		stream.time = self._serverTime()
+		-- Roblox's physics spins the ball; each screen turns its look by this (#401, Q276).
+		stream.spin = part.AssemblyAngularVelocity
 		return stream
 	end,
 

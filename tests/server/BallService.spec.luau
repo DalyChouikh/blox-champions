@@ -1056,15 +1056,18 @@ describe("BallService: the loose ball's state for every screen", function()
 	local FRAME = 1 / 60
 	local REST = config.Network.ballStream.restSeconds
 
-	it("gives the loose ball's state each frame it moves: where, how fast, whether borne, and when", function()
+	it("gives the loose ball's state each frame it moves: where, how fast, its spin, whether borne, when", function()
 		-- Parked until it spawns: nothing to draw.
 		expect(BallService:streamState(FRAME)).toBeNil()
 		BallService:spawn()
 		BallService:step(FRAME, {})
 		serverNow = 42.5
+		-- Its spin, from Roblox's physics, turns its look on every screen (#401, Q276).
+		BallService.part.AssemblyAngularVelocity = Vector3.new(0, 3, -4)
 		local state = BallService:streamState(FRAME) :: BallService.BallStream
 		Fixtures.expectNear(state.position, BallService.part.Position)
 		Fixtures.expectNear(state.velocity, BallService.part.AssemblyLinearVelocity)
+		Fixtures.expectNear(state.spin, Vector3.new(0, 3, -4))
 		-- A drop-in falls with its weight cancelled by its lift (#321).
 		expect(state.supported).toBe(true)
 		expect(state.time).toBe(42.5)
