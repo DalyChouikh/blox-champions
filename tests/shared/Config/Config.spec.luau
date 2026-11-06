@@ -862,6 +862,15 @@ describe("Config defaults", function()
 			doorSeconds = 0.4,
 			beam = { width = 2, thickness = 0.5 },
 		})
+		-- The goal's worth in its open middle (#411, Q294), as the design page drew it: the team's colour at 0.82
+		-- alpha over 0.92 of the opening, the number about a radius tall; half a stud behind the door.
+		expect(ui.goalWorth).toEqual({
+			transparency = 0.2,
+			thickness = 0.2,
+			fill = 0.92,
+			textHeight = 0.55,
+			behind = 0.5,
+		})
 		-- The ball's trail (#313), bolder after the screenshots (Q146); the thrower's arc went (Q149).
 		expect(ui.ballTrail).toEqual({ lifetime = 0.4, width = 2, color = Color3.new(1, 1, 1), transparency = 0 })
 	end)
@@ -1315,6 +1324,16 @@ describe("Config.forMode", function()
 
 	-- The door's limits the rejections above cross: one bar a half, ending on the opening's edge; and a door that
 	-- opens at once.
+	it("accepts the goal's worth just inside its limits", function()
+		local limits: { { [string]: number } } =
+			{ { transparency = 1, fill = 1, textHeight = 1, behind = 0 }, { transparency = 0 } }
+		for _, goalWorth in limits do
+			expect(function()
+				Fixtures.config({ UI = { goalWorth = goalWorth } })
+			end).never.toThrow()
+		end
+	end)
+
 	it("accepts a goal door just inside its limits", function()
 		expect(function()
 			Fixtures.config({
@@ -2498,6 +2517,32 @@ describe("Config.forMode", function()
 			{
 				overrides = { UI = { arenaGlow = { doorSeconds = -0.1 } } },
 				message = "UI.arenaGlow.doorSeconds: must be >= 0 (got -0.1)",
+			},
+			-- The goal's worth: shares of the opening, a part's thickness, a transparency.
+			{
+				overrides = { UI = { goalWorth = { transparency = 1.5 } } },
+				message = "UI.goalWorth.transparency: must be <= 1 (got 1.5)",
+			},
+			{
+				overrides = { UI = { goalWorth = { thickness = 0.0005 } } },
+				message = "UI.goalWorth.thickness: must be >= 0.001 (got 0.0005)",
+			},
+			{ overrides = { UI = { goalWorth = { fill = 0 } } }, message = "UI.goalWorth.fill: must be > 0 (got 0)" },
+			{
+				overrides = { UI = { goalWorth = { fill = 1.1 } } },
+				message = "UI.goalWorth.fill: must be <= 1 (got 1.1)",
+			},
+			{
+				overrides = { UI = { goalWorth = { textHeight = 0 } } },
+				message = "UI.goalWorth.textHeight: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { goalWorth = { textHeight = 1.1 } } },
+				message = "UI.goalWorth.textHeight: must be <= 1 (got 1.1)",
+			},
+			{
+				overrides = { UI = { goalWorth = { behind = -0.1 } } },
+				message = "UI.goalWorth.behind: must be >= 0 (got -0.1)",
 			},
 			-- The carrier's beam is one part, which Roblox would clamp to its size limits.
 			{

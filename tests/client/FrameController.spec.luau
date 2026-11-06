@@ -51,6 +51,7 @@ local function deps(overrides: { [string]: Stepped }?): { [string]: any }
 		Hud = recorder("hud"),
 		WorldMarkers = recorder("worldMarkers"),
 		ArenaGlow = recorder("arenaGlow"),
+		GoalWorth = recorder("goalWorth"),
 		CarrierBeam = recorder("carrierBeam"),
 		BallTrail = recorder("ballTrail"),
 		NameTags = recorder("nameTags"),
@@ -85,6 +86,7 @@ describe("FrameController", function()
 			"Hud",
 			"WorldMarkers",
 			"ArenaGlow",
+			"GoalWorth",
 			"CarrierBeam",
 			"BallTrail",
 			"NameTags",
@@ -98,7 +100,7 @@ describe("FrameController", function()
 
 	it(
 		"checks Roblox's overlays, then draws the ball, then renders the camera, touch controls, HUD state, HUD, "
-			.. "world markers, arena glow, carrier's beam, ball's trail and name tags before each frame",
+			.. "world markers, arena glow, goal's worth, carrier's beam, ball's trail and name tags before each frame",
 		function()
 			FrameController:render(0.25)
 			expect(order).toEqual({
@@ -110,6 +112,7 @@ describe("FrameController", function()
 				"hud 0.25",
 				"worldMarkers 0.25",
 				"arenaGlow 0.25",
+				"goalWorth 0.25",
 				"carrierBeam 0.25",
 				"ballTrail 0.25",
 				"nameTags 0.25",
@@ -133,6 +136,7 @@ describe("FrameController", function()
 			"hud 0.25",
 			"worldMarkers 0.25",
 			"arenaGlow 0.25",
+			"goalWorth 0.25",
 			"carrierBeam 0.25",
 			"ballTrail 0.25",
 			"nameTags 0.25",
