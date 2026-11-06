@@ -2495,6 +2495,10 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   markers' look (UI.arenaGlow.material Neon at the glass's transparency, 0.85, as the next gate's wall shows);
   answered: the carried ball's glow is #415 (Q319 look B, band black), not built yet; it needs the owner's upload of
   a glow mask, after #412-#414.
+- **Q328 #411 shipped** (session 97, recommended; #411 built after Q327: the disc fills the opening and glows like
+  the gate markers, +1/+3/+5 popping, readable from both sides; 1482/1482; the design page section 'The goal shows
+  its worth'): **"Yes, ship it"**: the PR opens stacked on #418; the owner's 2-player check of the whole stack stays
+  before its merge (Q321).
 
 ## Roller Champions
 
