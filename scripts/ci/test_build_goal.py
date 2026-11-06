@@ -1,10 +1,12 @@
 """Unit tests for scripts/art/build_goal.py's pure parts (#410): the goal's shape numbers, read from the one file the
-game's config reads too (src/shared/Config/GoalShape.json), and the rules they must keep. The Blender build itself is
-checked by running the script there twice and comparing the files. Run: python -m unittest discover -s scripts/ci -p
-"test_*.py"."""
+game's config reads too (src/shared/Config/GoalShape.json), the rules they must keep, and the boxes file that ties
+the committed mesh to those numbers (ruling G7). The Blender build itself is checked by running it there. Run:
+python -m unittest discover -s scripts/ci -p "test_*.py"."""
 
 import copy
+import hashlib
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 
@@ -66,6 +68,24 @@ class Shape(unittest.TestCase):
         for path, (value, message) in cases.items():
             with self.subTest(path), self.assertRaisesRegex(ValueError, f"GoalShape: {message}"):
                 build_goal.check_shape(changed(path, value))
+
+
+class Pieces(unittest.TestCase):
+    def test_each_box_and_the_shape_it_was_built_from(self):
+        square = build_goal.meshkit.Piece(
+            "Lip", [(-1.0, -2.0, 0.5), (3.0, 2.0, 0.5), (3.0, -2.0, -0.5)], [(0.0, 0.0, 1.0)] * 3, [(0, 1, 2)]
+        )
+        boxes = json.loads(build_goal.pieces_json([square], "abc123"))
+        self.assertEqual(
+            boxes, {"shape": "abc123", "pieces": {"Lip": {"centre": [1.0, 0.0, 0.0], "size": [4.0, 4.0, 1.0]}}}
+        )
+
+    def test_the_committed_boxes_come_from_the_committed_shape(self):
+        # G7: Blender's melt is not byte-reproducible, so the mesh's boxes carry the shape file's hash instead, and a
+        # shape edited without a rebuild (and the owner's import) fails here.
+        committed = json.loads(build_goal.PIECES_FILE.read_text(encoding="utf-8"))
+        self.assertEqual(committed["shape"], hashlib.sha256(build_goal.SHAPE_FILE.read_bytes()).hexdigest())
+        self.assertEqual(list(committed["pieces"]), ["Shell", "Strips", "Lip", "Band"])
 
 
 if __name__ == "__main__":
