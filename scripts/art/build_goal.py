@@ -5,10 +5,11 @@ Run with Blender 5.2 LTS:
     blender --background --factory-startup --python scripts/art/build_goal.py -- <out dir>
 
 Its numbers are the game's own: src/shared/Config/GoalShape.json, which Config.Arena reads too, so the mesh and the
-rules that judge goals never disagree. They are in the goal's frame: the origin at the opening's centre, X across the
-track toward the outer wall, Y up, Z along the track the way skaters lap (the housing's front faces oncoming skaters,
-at -Z). The opening's height and the pylon's foot and top are heights above the lowest floor; `opening.across` is the
-centre's distance from the middle glass's face.
+rules that judge goals never disagree. They are in the goal's frame, the track's own (Centerline.at): the origin at
+the opening's centre, X across the track toward the outer wall, Y up, and Z back toward oncoming skaters (a track
+frame looks the way skaters travel). Each `along` is a place the way skaters travel, so the housing's front, facing
+oncoming skaters, has a negative along and lies at +Z. The opening's height and the pylon's foot and top are heights
+above the lowest floor; `opening.across` is the centre's distance from the middle glass's face.
 """
 
 import hashlib
@@ -111,9 +112,9 @@ CUTTER_LENGTH = 60.0
 
 
 def _blender_point(across: float, up: float, along: float) -> tuple[float, float, float]:
-    """A goal-frame point in Blender's axes: meshkit.to_roblox turns Blender's +Y into Roblox's -Z, so the lap's
-    along runs down Blender's Y."""
-    return (across, -along, up)
+    """A goal-frame point in Blender's axes: meshkit.to_roblox turns Blender's +Y into Roblox's -Z, the way skaters
+    travel, so `along` runs up Blender's Y."""
+    return (across, along, up)
 
 
 def _link(name: str, verts: list, faces: list):
@@ -176,9 +177,8 @@ def _housing(shape: dict):
         for r, a in section:
             verts.append(_blender_point(r * math.cos(angle), r * math.sin(angle), a))
     n = len(section)
-    # Wound for Blender's mirrored Y (along runs down it), so the faces still point out.
     faces = [
-        (step * n + j, ((step + 1) % AROUND) * n + j, ((step + 1) % AROUND) * n + (j + 1) % n, step * n + (j + 1) % n)
+        (step * n + j, step * n + (j + 1) % n, ((step + 1) % AROUND) * n + (j + 1) % n, ((step + 1) % AROUND) * n + j)
         for step in range(AROUND)
         for j in range(n)
     ]
