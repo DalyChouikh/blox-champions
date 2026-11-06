@@ -68,12 +68,13 @@ local fakeNet = {
 		position: Vector3,
 		velocity: Vector3,
 		supported: boolean,
-		time: number
+		time: number,
+		spin: Vector3
 	)
-		table.insert(
-			fired,
-			{ name = name, payload = { position = position, velocity = velocity, supported = supported, time = time } }
-		)
+		table.insert(fired, {
+			name = name,
+			payload = { position = position, velocity = velocity, supported = supported, time = time, spin = spin },
+		})
 	end,
 }
 
@@ -748,6 +749,7 @@ describe("A match on the generated arena", function()
 		frames(FRAME)
 		local state = lastFired(Remotes.streams.BallState).payload
 		Fixtures.expectNear(state.position, BallService.part.Position)
+		Fixtures.expectNear(state.spin, BallService.part.AssemblyAngularVelocity)
 		-- It drops in with its weight cancelled by its lift (#321).
 		expect(state.supported).toBe(true)
 		local sent = #firedNamed(Remotes.streams.BallState)

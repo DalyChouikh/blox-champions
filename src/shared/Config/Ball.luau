@@ -51,6 +51,9 @@ export type BallConfig = {
 	-- The mesh that draws the ball (#400, BallLook): an asset id, rbxassetid://<number>. Its paint map takes each
 	-- skin's picture (Skins/BallSkins).
 	meshId: string,
+	-- The fastest each screen turns the ball's look (radians a second; #401, Client/BallView): the server's spin, up to
+	-- this, about the spin's own axis.
+	lookSpinLimit: number,
 }
 
 local defaults: BallConfig = {
@@ -87,6 +90,9 @@ local defaults: BallConfig = {
 	-- The owner (#400, Q275-Q277): a sphere of radius 1 made in Blender by scripts/art/build_ball.py
 	-- (assets/ball/ball.obj), imported once by the owner in Studio, which uploaded it.
 	meshId = "rbxassetid://85389727461936",
+	-- The owner (#401, Q283, Q287): right after a Roll Ball the ball spins ~250 rad/s, too fast to follow ("it is fast
+	-- now"); of four limits tried by playing (none, 10, 5 and 2.5 turns a second), 2.5 turns a second.
+	lookSpinLimit = 15,
 }
 
 local nonNegative = Validate.number({ min = 0 })
@@ -117,6 +123,7 @@ local schema = Validate.checkAll(
 		meshId = Validate.check(Validate.string(), function(id: string): boolean
 			return string.match(id, "^rbxassetid://%d+$") ~= nil
 		end, "must be an asset id (rbxassetid://<number>)"),
+		lookSpinLimit = positive,
 	}),
 	{
 		{

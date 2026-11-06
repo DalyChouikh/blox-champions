@@ -315,7 +315,8 @@ local MatchService: MatchService = {
 				stream.position,
 				stream.velocity,
 				stream.supported,
-				stream.time
+				stream.time,
+				stream.spin
 			)
 		end
 
