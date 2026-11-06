@@ -24,7 +24,10 @@ SETTINGS = {
         "StreamOutBehavior": "2",  # Opportunistic
         "PlayerCharacterDestroyBehavior": "2",  # Enabled
     },
-    "Players": {"RespawnTime": "3"},
+    # CharacterAutoLoads off in the place itself (#394, the owner's Q285), unlike the dev place's saved default: a
+    # player who joined while the server was still starting got a character Roblox loaded on its own, with no skater
+    # body, at its own spot ~104 studs over the arena's centre.
+    "Players": {"RespawnTime": "3", "CharacterAutoLoads": "false"},
     "StarterPlayer": {
         "EnableMouseLockOption": "false",
         "CharacterBreakJointsOnDeath": "false",

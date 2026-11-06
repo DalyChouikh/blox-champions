@@ -14,7 +14,8 @@
 		},
 		"Players": {
 			"$properties": {
-				"RespawnTime": 3
+				"RespawnTime": 3,
+				"CharacterAutoLoads": false
 			}
 		},
 		"StarterGui": {
