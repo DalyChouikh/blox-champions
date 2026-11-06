@@ -120,9 +120,7 @@ local schema = Validate.checkAll(
 		outOfBoundsMargin = nonNegative,
 		carryOffset = Validate.check(Validate.datatype("Vector3"), Finite.vector, "must be finite"),
 		releaseClearance = positive,
-		meshId = Validate.check(Validate.string(), function(id: string): boolean
-			return string.match(id, "^rbxassetid://%d+$") ~= nil
-		end, "must be an asset id (rbxassetid://<number>)"),
+		meshId = Validate.assetId(),
 		lookSpinLimit = positive,
 	}),
 	{

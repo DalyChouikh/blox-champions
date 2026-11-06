@@ -22,6 +22,7 @@ describe("Geometry.build", function()
 		expect((geometry :: any).markers).toBeNil()
 		expect(#geometry.teamSpawns.Blue).toBe(2)
 		expect(#geometry.teamSpawns.Orange).toBe(2)
-		expect(geometry.goal.openingRadius).toBe(7)
+		-- The Halo pylon's opening (#410, Q311).
+		expect(geometry.goal.openingRadius).toBe(9)
 	end)
 end)

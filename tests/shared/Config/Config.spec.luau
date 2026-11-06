@@ -907,18 +907,42 @@ describe("Config defaults", function()
 		})
 		expect(a.top).toEqual({ kind = "Closed", ceilingAbove = 20 })
 		expect(a.goalGateIndex).toBe(2)
-		expect(a.goal).toEqual({
-			ringRadius = 7,
-			-- Trial 6's: the floor under the ring rose with #268's sections; the arm's post stays 14 long.
-			heightAboveFloor = 29,
+		-- The Halo pylon (#410): the opening's radius 9 (Q311), its centre 52 up (Q310) and 67 out from the middle
+		-- glass's face, the pylon from the outer glass line at 20 up to 84 (Q312, Q315): GoalShape.json's numbers, the
+		-- ones its mesh was built from (scripts/art/build_goal.py); the mesh ids are the owner's import's.
+		local goal = a.goal :: any
+		local pieces = goal.pieces
+		goal = table.clone(goal)
+		goal.pieces = nil
+		expect(goal).toEqual({
+			ringRadius = 9,
+			heightAboveFloor = 52,
 			panelThickness = 0.5,
 			panelTransparency = 0.3,
 			rimThickness = 1,
 			rimSegments = 16,
-			across = 0.75,
-			arm = { thickness = 1, height = 51 },
+			across = 67,
+			pylon = { foot = 20, top = 84 },
+			meshes = {
+				Shell = "rbxassetid://84830303766448",
+				Strips = "rbxassetid://118580242013929",
+				Lip = "rbxassetid://140570633067423",
+				Band = "rbxassetid://85653016160285",
+			},
 		})
+		-- Each piece's box in the goal's frame, as the build wrote it (Roblox centres an imported mesh on its box).
+		local built = require(ReplicatedStorage.Shared.Config.GoalPieces).pieces :: any
+		for _, name in { "Shell", "Strips", "Lip", "Band" } do
+			local box = built[name]
+			expect(pieces[name]).toEqual({
+				centre = Vector3.new(box.centre[1], box.centre[2], box.centre[3]),
+				size = Vector3.new(box.size[1], box.size[2], box.size[3]),
+			})
+		end
+		-- The Lip, round the housing's front, faces oncoming skaters: a track frame's +Z.
+		expect(pieces.Lip.centre.Z).toBeCloseTo(5.55, 4)
 		expect((a.goal :: any).wallGap).toBeNil()
+		expect((a.goal :: any).arm).toBeNil()
 		expect(a.gatePanel).toEqual({ depth = 0.2 })
 		expect((a :: any).marker).toBeNil()
 		expect(a.teamSpawnSpacing).toBe(10)
@@ -1148,9 +1172,27 @@ describe("Config.forMode", function()
 				message = "Arena: profileBlendLength must fit within a straight and a curved end",
 			},
 			-- The ring's centre lies between the glass faces, as a fraction of the track's width.
-			{ overrides = { goal = { across = 1.2 } }, message = "Arena.goal.across: must be <= 1 (got 1.2)" },
-			{ overrides = { goal = { across = -0.1 } }, message = "Arena.goal.across: must be >= 0 (got -0.1)" },
-			{ overrides = { goal = { arm = { height = 0 } } }, message = "Arena.goal.arm.height: must be > 0 (got 0)" },
+			{ overrides = { goal = { across = 0 } }, message = "Arena.goal.across: must be > 0 (got 0)" },
+			{ overrides = { goal = { pylon = { top = 0 } } }, message = "Arena.goal.pylon.top: must be > 0 (got 0)" },
+			{
+				overrides = { goal = { meshes = { Lip = "rbxassetid://" } } },
+				message = "Arena.goal.meshes.Lip: must be an asset id (rbxassetid://<number>)",
+			},
+			{
+				overrides = { goal = { pieces = { Band = { size = 1 } } } },
+				message = "Arena.goal.pieces.Band.size: expected Vector3, got number",
+			},
+			-- Q315: the pylon stands on the solid wall's top, where the outer wall starts looking like glass (#409).
+			{
+				overrides = { goal = { pylon = { foot = 24 } } },
+				message = "Arena: the goal's pylon must stand on the outer wall's glass line (goal.pylon.foot = "
+					.. "glassLook.outerWall)",
+			},
+			{
+				overrides = { glassLook = { outerWall = 24 } },
+				message = "Arena: the goal's pylon must stand on the outer wall's glass line (goal.pylon.foot = "
+					.. "glassLook.outerWall)",
+			},
 			{ overrides = { stripsPerSection = 5 }, message = "Arena.stripsPerSection: must be >= 6 (got 5)" },
 			{
 				overrides = { glassLook = { innerBank = 0 } },
@@ -1224,7 +1266,6 @@ describe("Config.forMode", function()
 			{ overrides = { gatePanel = { depth = 0.25 } }, message = WALL_THICKNESS },
 			{ overrides = { goal = { rimThickness = 0.3 } }, message = WALL_THICKNESS },
 			{ overrides = { goal = { panelThickness = 0.3 } }, message = WALL_THICKNESS },
-			{ overrides = { goal = { arm = { thickness = 0.3 } } }, message = WALL_THICKNESS },
 		}
 		for _, case in cases do
 			expect(function()
@@ -1269,10 +1310,6 @@ describe("Config.forMode", function()
 				overrides = { gatePanel = { depth = 2500 } },
 				message = "Arena.gatePanel.depth: must be <= 2048 (got 2500)",
 			},
-			{
-				overrides = { goal = { arm = { thickness = 2500 } } },
-				message = "Arena.goal.arm.thickness: must be <= 2048 (got 2500)",
-			},
 			{ overrides = { glass = { top = 3000 } }, message = "Arena.glass.top: must be <= 2048 (got 3000)" },
 			{
 				overrides = { top = { ceilingAbove = 3000 } },
@@ -1300,8 +1337,8 @@ describe("Config.forMode", function()
 				message = "Network.pickupLagToleranceStuds: must be >= 0 (got -1)",
 			},
 			{
-				-- Its drop-in lines clear of so wide a ball (#321).
-				overrides = { Ball = { radius = 7, dropIn = { innerIn = 8 } } },
+				-- As wide as the Halo pylon's opening (#410, Q311), its drop-in lines clear of so wide a ball (#321).
+				overrides = { Ball = { radius = 9, dropIn = { innerIn = 10, outerIn = 70 } } },
 				message = "Ball: radius must be smaller than the goal ring's opening (Arena.goal.ringRadius)",
 			},
 		}

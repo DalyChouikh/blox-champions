@@ -77,7 +77,10 @@ describe("Profile", function()
 	it("refuses an outer glass line that misses the foot curve on a straight or at a curved end", function()
 		-- The straights' foot curve rises from 12.82 to 34.16, the curved ends' from 14 to 30.00.
 		for _, line in { 13, 31 } do
-			local custom = Fixtures.config({ Arena = { glassLook = { outerWall = line } } }).Arena
+			-- The goal's pylon stands on the line (Config.Arena's rule), so it moves with it.
+			local custom = Fixtures.config({
+				Arena = { glassLook = { outerWall = line }, goal = { pylon = { foot = line } } },
+			}).Arena
 			expect(function()
 				Profile.points(custom, 1)
 			end).toThrow("Arena.glassLook.outerWall: the line must cross the outer wall's foot curve")
@@ -93,7 +96,8 @@ describe("Profile", function()
 	-- the inner one on the bank (0 to 16).
 	it("breaks the section at lines set just inside the curves they cross", function()
 		for _, look in { { outerWall = 14.01, innerBank = 15.99 }, { outerWall = 29.99, innerBank = 0.01 } } do
-			local custom = Fixtures.config({ Arena = { glassLook = look } }).Arena
+			local custom =
+				Fixtures.config({ Arena = { glassLook = look, goal = { pylon = { foot = look.outerWall } } } }).Arena
 			local counts = Profile.stripCounts(custom)
 			-- Each break ends the part before it: the bank's above its line (the first of the eight), the foot curve's
 			-- below its own (the sixth).
