@@ -15,6 +15,7 @@
 --   C0 is written here (a client's write stays on its client, and the server never writes it again) from where this
 --   screen last drew the ball, in the carrier's root frame, to the server's carry spot over Ball.pickupPullSeconds
 --   (Ball/Pull); then the server's C0 again. A weld places its part at once.
+-- - Its look (#400: the ball mesh in its skin, Ball/Look) goes wherever the ball is drawn, loose or carried.
 -- Idle and carried it allocates nothing; drawing a loose ball casts one ray a frame.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -65,6 +66,9 @@ export type BallView = {
 	_stateTime: number,
 	-- The server's time when this screen last saw a catch.
 	_caughtAt: number,
+	-- The ball's look last drawn and where (#400).
+	_look: BasePart?,
+	_lookAt: Vector3,
 }
 
 -- A new weld holds the ball: its pull starts from where this screen last drew the ball, if it has drawn it (a pull
@@ -111,6 +115,18 @@ local function draw(self: BallView, part: BasePart, dt: number)
 	part.Position = drawn
 end
 
+-- The ball's look where this screen drew the ball (#400). The ball part is unseen, and nothing else puts its look
+-- there: the server never moves the look, and this screen's writes to the ball part carry no part joined to it (19
+-- studs apart, measured in Play). Written only when the look or the spot is new.
+local function place(self: BallView, shown: Vector3)
+	local look = self._ballPart:look()
+	if look ~= nil and (look ~= self._look or shown ~= self._lookAt) then
+		look.Position = shown
+		self._look = look
+		self._lookAt = shown
+	end
+end
+
 local BallView: BallView = {
 	name = "BallView",
 	dependencies = { "Config", "BallPart", "RideSurfaces" },
@@ -139,6 +155,8 @@ local BallView: BallView = {
 	_stateSupported = false,
 	_stateTime = 0,
 	_caughtAt = -math.huge,
+	_look = nil,
+	_lookAt = Vector3.zero,
 
 	-- deps.ServerClock replaces workspace:GetServerTimeNow in tests.
 	init = function(self: BallView, deps: { [string]: any })
@@ -212,6 +230,7 @@ local BallView: BallView = {
 		else
 			self._shown = part.Position
 		end
+		place(self, self._shown :: Vector3)
 	end,
 }
 

@@ -2,8 +2,9 @@
 -- The ball's team colour and the ball's marks in the world (spec §9.4, §11.1), stepped before each frame is drawn
 -- (FrameController):
 -- - the ball itself in the colour of the team that last held it, carried, flying or loose, and in its skin's own colour
---   until a team has since the kickoff (the owner, #327, Q158, Q159: Roller Champions', Video 31). A client's write
---   stays on its client and the server never writes the colour again, so it is written when the ball or the colour
+--   until a team has since the kickoff (the owner, #327, Q158, Q159: Roller Champions', Video 31), painted on its look
+--   (#400: what draws the unseen ball part, Ball/Look; the skin's picture lies over that colour). A client's write
+--   stays on its client and the server never writes the colour again, so it is written when the look or the colour
 --   changes (a respawn's new ball arrives in its skin's);
 -- - a ring around the ball, seen through walls (a BillboardGui, AlwaysOnTop), as wide as the ball plus ringSize pixels;
 -- - a line from the ball down to a disc on the ground below it (one ray through the ride surfaces), both hidden when
@@ -46,7 +47,7 @@ export type WorldMarkers = {
 	_stroke: UIStroke,
 	-- The ball's colour until a team holds it: its skin's.
 	_neutral: Color3,
-	-- What was last written: the marks' colour, and the ball given a colour and that colour.
+	-- What was last written: the marks' colour, and the ball's look given a colour and that colour.
 	_color: Color3?,
 	_worn: BasePart?,
 	_wornColor: Color3?,
@@ -74,12 +75,12 @@ local function worldColor(config: Config.GameConfig, team: Team?): Color3
 	return if team ~= nil then config.UI.teamColors[team] else config.UI.hud.textColor
 end
 
--- The ball in `team`'s colour, or its skin's with no team, written when the ball or the colour changes.
-local function wear(self: WorldMarkers, ball: BasePart?, team: Team?)
+-- The ball's look in `team`'s colour, or its skin's with no team, written when the look or the colour changes.
+local function wear(self: WorldMarkers, look: BasePart?, team: Team?)
 	local color = if team ~= nil then self._config.UI.teamColors[team] else self._neutral
-	if ball ~= nil and (ball ~= self._worn or color ~= self._wornColor) then
-		ball.Color = color
-		self._worn = ball
+	if look ~= nil and (look ~= self._worn or color ~= self._wornColor) then
+		look.Color = color
+		self._worn = look
 		self._wornColor = color
 	end
 end
@@ -229,7 +230,7 @@ local WorldMarkers: WorldMarkers = {
 		local team: Team? = if match ~= nil then match.possessingTeam else nil
 		local ball = self._ballPart:get()
 		paint(self, worldColor(self._config, team))
-		wear(self, ball, team)
+		wear(self, self._ballPart:look(), team)
 		placeBall(self, ball)
 	end,
 }

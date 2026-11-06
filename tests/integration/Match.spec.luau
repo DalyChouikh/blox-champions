@@ -100,7 +100,12 @@ local function setup(match: { [string]: any }?)
 	folder = Instance.new("Folder")
 	folder.Name = "MatchTest"
 	folder.Parent = workspace
-	BallService:init({ Config = config, ArenaService = ArenaService, Random = Random.new(1) })
+	BallService:init({
+		Config = config,
+		ArenaService = ArenaService,
+		BallLook = Fixtures.ballLook(config),
+		Random = Random.new(1),
+	})
 	TeamService:init({ Config = config })
 	CharacterService:init({
 		Config = config,

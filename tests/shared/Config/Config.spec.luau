@@ -101,6 +101,7 @@ describe("Config defaults", function()
 			outOfBoundsMargin = 2,
 			carryOffset = Vector3.new(1.7, -0.8, -0.3),
 			releaseClearance = 0.05,
+			meshId = "rbxassetid://85389727461936",
 		})
 		expect(d.Network).toEqual({
 			pickupLagToleranceStuds = 2,
@@ -1357,6 +1358,24 @@ describe("Config.forMode", function()
 	it("accepts a release clearance just inside its limits", function()
 		expect(Fixtures.config({ Ball = { releaseClearance = 0.01 } }).Ball.releaseClearance).toBe(0.01)
 		expect(Fixtures.config({ Ball = { releaseClearance = 1.49 } }).Ball.releaseClearance).toBe(1.49)
+	end)
+
+	-- #400 (the owner's Q277): the ball's mesh, made in Blender and uploaded once, named by its asset id.
+	it("rejects a ball mesh that is not an asset id, and accepts any asset id", function()
+		local cases: { { meshId: any, message: string } } = {
+			{ meshId = 85389727461936, message = "Ball.meshId: expected string, got number" },
+			{ meshId = "", message = "Ball.meshId: must be an asset id (rbxassetid://<number>)" },
+			{ meshId = "rbxassetid://", message = "Ball.meshId: must be an asset id (rbxassetid://<number>)" },
+			{ meshId = "https://x/1", message = "Ball.meshId: must be an asset id (rbxassetid://<number>)" },
+			{ meshId = "rbxassetid://12a", message = "Ball.meshId: must be an asset id (rbxassetid://<number>)" },
+			{ meshId = " rbxassetid://1", message = "Ball.meshId: must be an asset id (rbxassetid://<number>)" },
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config({ Ball = { meshId = case.meshId } })
+			end).toThrow(case.message)
+		end
+		expect(Fixtures.config({ Ball = { meshId = "rbxassetid://1" } }).Ball.meshId).toBe("rbxassetid://1")
 	end)
 
 	-- The owner (Q91, Q132, Q139, #311, #316): a caught ball flies into the hand over 0.2 s on every screen.

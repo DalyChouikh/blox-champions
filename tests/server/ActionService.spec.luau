@@ -104,7 +104,7 @@ beforeEach(function()
 	floor.Parent = folder
 	fakeArena.model = floor
 	fakeArena.arena.rideSurfaces = { floor }
-	BallService:init({ Config = config, ArenaService = fakeArena })
+	BallService:init({ Config = config, ArenaService = fakeArena, BallLook = Fixtures.ballLook(config) })
 	TeamService:init({ Config = config })
 	CharacterService:init({
 		Config = config,
