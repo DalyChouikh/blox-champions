@@ -6,7 +6,10 @@
 -- the load has returned. Each loaded character gets its skater body (SkaterBody) and is stood with its root at
 -- Movement.hoverHeight above its spawn, where its own client's skating takes over. It lists every seated living
 -- character, marking who can catch (not while knocked down), for the ball, the actions and the movement guard, and
--- announces any that goes away so a carrier's ball drops.
+-- announces any that goes away so a carrier's ball drops. Only this module loads characters: the place itself turns
+-- Roblox's own loading off (Players.CharacterAutoLoads in place.project.json), before anyone can join. Turned off here
+-- at start, it let a player who joined during a slow start get a character Roblox loaded on its own, with no skater
+-- body, at its own spot ~104 studs over the arena's centre (#394).
 
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
@@ -143,7 +146,6 @@ local CharacterService: CharacterService = {
 
 	start = function(self: CharacterService)
 		SkaterBody.registerGroups(PhysicsService)
-		Players.CharacterAutoLoads = false
 		self._teams.seated:Connect(function(id: PlayerId)
 			self:requestLoad(id)
 		end)
