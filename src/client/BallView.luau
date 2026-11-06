@@ -1,6 +1,6 @@
 --!strict
 -- Where this screen draws the ball (spec §9.3, #311, #316), first each frame before anything that reads it (the
--- markers, the carrier's beam).
+-- markers, the ball's trail).
 -- - Loose: where the server's last state (the BallState stream) says it is now. Roblox's own replication drew it 0.19 s
 --   late and unevenly (46-248 studs/s a frame for a steady 90, measured in a 2-player test), and other screens drew a
 --   thrown ball still for 0.29 s. A state is carried on to now (Ball/Shown), falling only while nothing bears its

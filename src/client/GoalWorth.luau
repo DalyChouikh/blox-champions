@@ -14,7 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ArenaParts = require(script.Parent.ArenaParts)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
-local DrawOnly = require(ReplicatedStorage.Shared.Util.DrawOnly)
+local DrawnPart = require(ReplicatedStorage.Shared.Util.DrawnPart)
 local HudStore = require(script.Parent.HudStore)
 local HudText = require(ReplicatedStorage.Shared.Hud.HudText)
 local Motion = require(ReplicatedStorage.Shared.Hud.Motion)
@@ -59,18 +59,6 @@ export type GoalWorth = {
 	_worth: string?,
 	_popped: number?,
 }
-
-local function newPart(name: string, parent: Instance): Part
-	local part = Instance.new("Part")
-	DrawOnly(part)
-	part.Name = name
-	part.Anchored = true
-	part.CastShadow = false
-	part.Material = Enum.Material.SmoothPlastic
-	part.Transparency = HIDDEN
-	part.Parent = parent
-	return part
-end
 
 -- Puts the disc and the faces in `goal`'s opening, behind its door, sized by it.
 local function place(self: GoalWorth, goal: Crossing.Disc)
@@ -171,11 +159,12 @@ local GoalWorth: GoalWorth = {
 		local look, settings = self._config.UI.hud.look, self._config.UI.goalWorth
 		local model = Instance.new("Model")
 		model.Name = "GoalWorth"
-		local disc = newPart("Disc", model)
-		-- Before Size, so the cylinder keeps the size it is given.
-		disc.Shape = Enum.PartType.Cylinder
+		local disc = DrawnPart("Disc", Enum.PartType.Cylinder)
 		disc.Material = self._config.UI.arenaGlow.material
-		local face = newPart("Face", model)
+		disc.Parent = model
+		-- Always see-through: it only holds the two faces.
+		local face = DrawnPart("Face", Enum.PartType.Block)
+		face.Parent = model
 		local guis, labels, scales = {}, {}, {}
 		for _, side in { Enum.NormalId.Front, Enum.NormalId.Back } do
 			local gui = Instance.new("SurfaceGui")

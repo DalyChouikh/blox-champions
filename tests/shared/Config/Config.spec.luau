@@ -860,7 +860,17 @@ describe("Config defaults", function()
 		expect(ui.arenaGlow).toEqual({
 			material = Enum.Material.Neon,
 			doorSeconds = 0.4,
-			beam = { width = 2, thickness = 0.5 },
+			-- The fire lines (#412, Q300-Q303, Q329): 0.8 studs thick, each lap's 2 above the last; the fireball
+			-- leaves a quarter second after the gate (RC Video 36) and flies to the next in a second, as the page
+			-- drew it; the lines fade in 0.3 s when the streak ends.
+			fireLines = {
+				thickness = 0.8,
+				spacing = 2,
+				fireball = 2.4,
+				delaySeconds = 0.25,
+				flightSeconds = 1,
+				fadeSeconds = 0.3,
+			},
 		})
 		-- The goal's worth in its open middle (#411, Q294): filling the opening (Q327), the number about a radius
 		-- tall as the design page drew it; half a stud behind the door.
@@ -2536,14 +2546,32 @@ describe("Config.forMode", function()
 				overrides = { UI = { goalWorth = { behind = -0.1 } } },
 				message = "UI.goalWorth.behind: must be >= 0 (got -0.1)",
 			},
-			-- The carrier's beam is one part, which Roblox would clamp to its size limits.
+			-- The fire lines' pieces and fireballs are parts, which Roblox would clamp to its size limits; their
+			-- times may be none, never less.
 			{
-				overrides = { UI = { arenaGlow = { beam = { width = 0.0005 } } } },
-				message = "UI.arenaGlow.beam.width: must be >= 0.001 (got 0.0005)",
+				overrides = { UI = { arenaGlow = { fireLines = { thickness = 0.0005 } } } },
+				message = "UI.arenaGlow.fireLines.thickness: must be >= 0.001 (got 0.0005)",
 			},
 			{
-				overrides = { UI = { arenaGlow = { beam = { thickness = 3000 } } } },
-				message = "UI.arenaGlow.beam.thickness: must be <= 2048 (got 3000)",
+				overrides = { UI = { arenaGlow = { fireLines = { fireball = 3000 } } } },
+				message = "UI.arenaGlow.fireLines.fireball: must be <= 2048 (got 3000)",
+			},
+			{
+				overrides = { UI = { arenaGlow = { fireLines = { delaySeconds = -0.1 } } } },
+				message = "UI.arenaGlow.fireLines.delaySeconds: must be >= 0 (got -0.1)",
+			},
+			{
+				overrides = { UI = { arenaGlow = { fireLines = { flightSeconds = -0.1 } } } },
+				message = "UI.arenaGlow.fireLines.flightSeconds: must be >= 0 (got -0.1)",
+			},
+			{
+				overrides = { UI = { arenaGlow = { fireLines = { fadeSeconds = -0.1 } } } },
+				message = "UI.arenaGlow.fireLines.fadeSeconds: must be >= 0 (got -0.1)",
+			},
+			-- Each lap's line stands apart from the last (Q302's stack): 0.8 thick needs more than 0.8 between.
+			{
+				overrides = { UI = { arenaGlow = { fireLines = { spacing = 0.8 } } } },
+				message = "UI: the fire lines must not overlap (arenaGlow.fireLines.spacing > thickness)",
 			},
 			-- The ball's trail (#313): some time long, some width, seen.
 			{

@@ -322,4 +322,38 @@ describe("Profile", function()
 		near(section[4], Vector2.new(12, 120))
 		expect(Profile.topHeight(open)).toBe(140)
 	end)
+
+	-- A line along the outer wall at a height (the fire lines, #412, Q329) rests on the strips as built: between
+	-- strip ends by straight lines, its normal the shape's own there, toward the track. On a straight the foot
+	-- curve r 22 round (58, 34.1641) holds the glass line's point (74.8338, 20) at -40.078°, its normal toward the
+	-- centre (-0.76516, 0.64382); its first strip above, a third of the arc up to upright, ends at -26.719°,
+	-- (77.6509, 24.2725), so 22 lies 0.46808 along it, at 76.1525, and its normal mixes the strip's ends'
+	-- tangents (0.64382, 0.76516) and (0.44962, 0.89322), made unit and turned a quarter: (-0.83073, 0.55668).
+	-- At a curved end the foot curve r 18 round (62, 29.9955) holds (76.9696, 20), its normal (-0.83165,
+	-- 0.55531). Back on a straight, the foot curve's third strip runs from -13.359°, (79.4047, 29.0809), up to
+	-- upright, (80, 34.1641): 30 lies 0.18081 along it, at 79.5123, its normal (-0.98178, 0.19004). From the solid top
+	-- (40) up to the lip's start (108) the wall is the upright outer glass.
+	it("finds the outer wall at a height on the strips as built, with its normal toward the track", function()
+		local function expectWall(straightness: number, height: number, across: number, normal: Vector2)
+			local u, toward = Profile.outerWallAt(arena, straightness, height)
+			expect(u).toBeCloseTo(across, 3)
+			near(toward, normal, 1e-3)
+		end
+		expectWall(1, 20, 74.8338, Vector2.new(-0.76516, 0.64382))
+		expectWall(1, 22, 76.1525, Vector2.new(-0.83073, 0.55668))
+		expectWall(1, 30, 79.5123, Vector2.new(-0.98178, 0.19004))
+		expectWall(0, 20, 76.9696, Vector2.new(-0.83165, 0.55531))
+		expectWall(1, 40, 80, Vector2.new(-1, 0))
+		expectWall(0.5, 108, 80, Vector2.new(-1, 0))
+	end)
+
+	it("refuses a height off the outer wall: under the floor, or above the lip's start", function()
+		for _, height in { -1, 108.5 } do
+			expect(function()
+				Profile.outerWallAt(arena, 1, height)
+			end).toThrow(
+				`Arena: a line on the outer wall must stay on it, from the floor to the lip's start (108; got {height})`
+			)
+		end
+	end)
 end)
