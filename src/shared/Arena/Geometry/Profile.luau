@@ -4,7 +4,9 @@
 -- across and up the outer wall to its top, in six pieces laid out two ways (#268, Config.Arena): a straight's (the
 -- inner bank, the spawn room, the rise, the incline, the outer wall's foot curve, the wall) and a curved end's (the
 -- inner bank, the bowl in three shares, the foot curve, the wall). Both have the same point layout, so a section blends
--- from one to the other point by point around each corner. Rideable glass rises from the two solid tops and curls
+-- from one to the other point by point around each corner. Each wall looks like the glass from its line up
+-- (Config.Arena.glassLook, #409): the inner bank and the foot curve break exactly there in both layouts, so every blend
+-- has a strip edge at the line's height. Rideable glass rises from the two solid tops and curls
 -- inward into its lips (R15), and the top section closes the arena between the lips' ends (R14). Every section runs the
 -- same way around the track's "O" (down the inner side, across, up the outer side, back across the top), so every slab
 -- hangs outside the track.
@@ -19,6 +21,10 @@ type Piece = (t: number) -> Vector2
 local TURN_SEGMENTS = 64
 -- Halvings of a quarter turn that pin the angle a curved end's bowl arrives at, past the points' float precision.
 local ANGLE_HALVINGS = 50
+-- Halvings of a piece's t that pin where it passes a glass line, past the points' float precision.
+local LINE_HALVINGS = 50
+-- The six pieces' places, the same in both layouts.
+local BANK, FOOT, WALL = 1, 5, 6
 -- The step (in a piece's t) its direction is read over: the second-order differences' error stays under 0.03° on
 -- every piece, while Vector2's float32 points read over 1e-4 put the bowl's arrival 0.08° off (measured, #294).
 local DIRECTION_STEP = 1e-3
@@ -160,27 +166,34 @@ local function turning(piece: Piece): number
 	return total
 end
 
--- Strips per piece, summing to stripsPerSection. Every piece gets one; the rest are shared by how far each piece
--- turns in the layout where it turns more, so every crease between two strips bends about as much, leftovers going to
--- the largest remainders (ties to the earlier piece). The bank turns a quarter in both, so some piece always turns.
-local function stripCountsOf(arena: ArenaConfig, straight: { Piece }, curvedEnd: { Piece }): { number }
+-- How far each piece turns in the layout where it turns more.
+local function turnsOf(straight: { Piece }, curvedEnd: { Piece }): { number }
 	local turns: { number } = {}
-	local total = 0
 	for index, piece in straight do
 		turns[index] = math.max(turning(piece), turning(curvedEnd[index]))
-		total += turns[index]
+	end
+	return turns
+end
+
+-- `strips` shared over pieces that turn `turns`. Every piece gets one; the rest are shared by how far each turns, so
+-- every crease between two strips bends about as much, leftovers going to the largest remainders (ties to the earlier
+-- piece). Some piece always turns: the six's bank a quarter in both layouts, each part of a split arc.
+local function share(strips: number, turns: { number }): { number }
+	local total = 0
+	for _, turn in turns do
+		total += turn
 	end
 
-	local counts = table.create(#straight, 1)
-	local spare = arena.stripsPerSection - #straight
+	local counts = table.create(#turns, 1)
+	local spare = strips - #turns
 	local remainders: { number } = {}
 	local given = 0
 	for index, turn in turns do
-		local share = spare * turn / total
-		local whole = math.floor(share)
+		local part = spare * turn / total
+		local whole = math.floor(part)
 		counts[index] += whole
 		given += whole
-		remainders[index] = share - whole
+		remainders[index] = part - whole
 	end
 
 	local order: { number } = {}
@@ -199,10 +212,104 @@ local function stripCountsOf(arena: ArenaConfig, straight: { Piece }, curvedEnd:
 	return counts
 end
 
--- Strips per piece (stripCountsOf). They never depend on the blend.
-function Profile.stripCounts(arena: ArenaConfig): { number }
+-- `piece` split where it passes `height` into its part before and its part after, each a piece of its own (t from 0 to
+-- 1). The piece must rise or fall through `height` steadily (the bank falls, the foot curve rises), or `message` fails
+-- the build.
+local function splitAt(piece: Piece, height: number, message: string): (Piece, Piece)
+	local first, last = piece(0).Y, piece(1).Y
+	if not (math.min(first, last) < height and height < math.max(first, last)) then
+		error(`Arena: {message}`, 0)
+	end
+	local rising = last > first
+	local low, high = 0, 1
+	for _ = 1, LINE_HALVINGS do
+		local t = (low + high) / 2
+		if (piece(t).Y < height) == rising then
+			low = t
+		else
+			high = t
+		end
+	end
+	local at = (low + high) / 2
+	return function(t: number): Vector2
+		return piece(t * at)
+	end, function(t: number): Vector2
+		return piece(at + t * (1 - at))
+	end
+end
+
+-- The pieces strips are laid on, in running order, the same in both layouts: the six, with the inner bank and the
+-- foot curve each split at its glass line; how many strips each holds; and whether it looks like the glass.
+type Layout = { straight: { Piece }, curvedEnd: { Piece }, counts: { number }, glass: { boolean } }
+
+-- The last arena's layout, kept: every station's section reads it (Surface.build, SmoothNormals), a game builds one
+-- arena, and its config is frozen, so a config table's layout never changes. Only one is held, so nothing piles up.
+local cachedArena: ArenaConfig? = nil
+local cachedLayout: Layout? = nil
+
+-- The six pieces get stripsPerSection strips by turning (share). A glass line's break adds one strip to the piece it
+-- splits, shared between its two parts the same way, so every other piece keeps the points it had without the lines.
+-- The bank's part above its line, the foot curve's part above its own and the wall look like the glass (Q312, Q313).
+local function layoutOf(arena: ArenaConfig): Layout
+	if arena == cachedArena then
+		return cachedLayout :: Layout
+	end
 	local straight, shares = straightPieces(arena)
-	return stripCountsOf(arena, straight, curvedEndPieces(arena, shares))
+	local curvedEnd = curvedEndPieces(arena, shares)
+	local counts = share(arena.stripsPerSection, turnsOf(straight, curvedEnd))
+	local lines: { [number]: { height: number, message: string } } = {
+		[BANK] = {
+			height = arena.glassLook.innerBank,
+			message = "Arena.glassLook.innerBank: the line must cross the inner bank",
+		},
+		[FOOT] = {
+			height = arena.glassLook.outerWall,
+			message = "Arena.glassLook.outerWall: the line must cross the outer wall's foot curve on the straights "
+				.. "and the curved ends",
+		},
+	}
+	local layout: Layout = { straight = {}, curvedEnd = {}, counts = {}, glass = {} }
+	local function add(straightPiece: Piece, curvedPiece: Piece, count: number, glass: boolean)
+		table.insert(layout.straight, straightPiece)
+		table.insert(layout.curvedEnd, curvedPiece)
+		table.insert(layout.counts, count)
+		table.insert(layout.glass, glass)
+	end
+	for index, piece in straight do
+		local glassLine = lines[index]
+		if glassLine == nil then
+			add(piece, curvedEnd[index], counts[index], index == WALL)
+		else
+			local straightBefore, straightAfter = splitAt(piece, glassLine.height, glassLine.message)
+			local curvedBefore, curvedAfter = splitAt(curvedEnd[index], glassLine.height, glassLine.message)
+			local parts =
+				share(counts[index] + 1, turnsOf({ straightBefore, straightAfter }, { curvedBefore, curvedAfter }))
+			-- The bank runs down from its top, so its part before the line is the one above it; the foot curve rises.
+			add(straightBefore, curvedBefore, parts[1], index == BANK)
+			add(straightAfter, curvedAfter, parts[2], index == FOOT)
+		end
+	end
+	-- Profile.stripCounts hands its counts out: frozen, so no caller can change the cached layout.
+	table.freeze(layout.counts)
+	cachedArena, cachedLayout = arena, layout
+	return layout
+end
+
+-- Strips per piece (layoutOf), the glass lines' parts as pieces of their own. They never depend on the blend.
+function Profile.stripCounts(arena: ArenaConfig): { number }
+	return layoutOf(arena).counts
+end
+
+-- Whether each strip, in running order, looks like the glass (Q309: the look only; ridden and climbed as the rest).
+function Profile.glassStrips(arena: ArenaConfig): { boolean }
+	local layout = layoutOf(arena)
+	local glass: { boolean } = {}
+	for index, count in layout.counts do
+		for _ = 1, count do
+			table.insert(glass, layout.glass[index])
+		end
+	end
+	return glass
 end
 
 -- The way a piece runs at `t` (unit): its derivative, read over steps that stay inside it (second-order differences,
@@ -225,9 +332,9 @@ local function eachStrip(
 	straightness: number,
 	visit: (piece: Piece, from: number, to: number) -> ()
 )
-	local straight, shares = straightPieces(arena)
-	local curvedEnd = curvedEndPieces(arena, shares)
-	for index, count in stripCountsOf(arena, straight, curvedEnd) do
+	local layout = layoutOf(arena)
+	local straight, curvedEnd = layout.straight, layout.curvedEnd
+	for index, count in layout.counts do
 		local function piece(t: number): Vector2
 			return curvedEnd[index](t):Lerp(straight[index](t), straightness)
 		end
@@ -237,7 +344,7 @@ local function eachStrip(
 	end
 end
 
--- stripsPerSection + 1 points: the strips' ends (eachStrip), shared where pieces meet.
+-- The strips' ends (eachStrip), one more than the strips, shared where pieces meet.
 function Profile.points(arena: ArenaConfig, straightness: number): { Vector2 }
 	local points: { Vector2 } = {}
 	eachStrip(arena, straightness, function(piece: Piece, from: number, to: number)

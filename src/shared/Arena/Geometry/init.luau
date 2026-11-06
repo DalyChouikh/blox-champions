@@ -12,8 +12,11 @@ local Types = require(script.Types)
 type Piece = Types.Piece
 
 export type ArenaGeometry = {
-	-- The solid surface: the floors, the inner bank and the outer wall.
+	-- The solid surface: the floors, the inner bank and the outer wall, below each wall's glass line.
 	surface: { Piece },
+	-- The rest of the solid surface, from each wall's glass line up: ridden and climbed like the rest, it only looks
+	-- like the glass (Q309, Q312, Q313).
+	surfaceGlass: { Piece },
 	-- The rideable glass on the inner bank's and the outer wall's tops, with its lips.
 	glass: { Piece },
 	-- What closes the arena between the lips' ends: a roof, or an open map's ceiling and the strips up to it.
@@ -30,8 +33,10 @@ local Geometry = {}
 
 function Geometry.build(config: Config.GameConfig): ArenaGeometry
 	local arena = config.Arena
+	local surface, surfaceGlass = Surface.build(arena)
 	return {
-		surface = Surface.build(arena),
+		surface = surface,
+		surfaceGlass = surfaceGlass,
 		glass = Features.glass(arena),
 		top = Features.top(arena),
 		infield = Features.infield(arena),

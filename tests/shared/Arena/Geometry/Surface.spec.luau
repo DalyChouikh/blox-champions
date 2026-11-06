@@ -64,23 +64,82 @@ describe("Surface.section", function()
 	end)
 end)
 
-describe("Surface.build", function()
-	it("sweeps the profile around the whole loop: blocks on flat rectangles, wedges everywhere else", function()
-		local blocks, wedges = 0, 0
-		for _, piece in Surface.build(Config.defaults().Arena) do
-			if piece.shape == "Block" then
-				blocks += 1
-			elseif piece.shape == "Wedge" then
-				wedges += 1
+-- Blocks and wedges among `pieces`.
+local function countShapes(pieces: { Types.Piece }): (number, number)
+	local blocks, wedges = 0, 0
+	for _, piece in pieces do
+		if piece.shape == "Block" then
+			blocks += 1
+		elseif piece.shape == "Wedge" then
+			wedges += 1
+		end
+	end
+	return blocks, wedges
+end
+
+describe("Surface.sweep", function()
+	-- Surface.build sweeps the strips that look solid and those that look like the glass from one set of rings.
+	it("sweeps only the strips `include` lets through, each as the whole sweep does", function()
+		local arena = Config.defaults().Arena
+		local rings = Surface.rings(arena, function(distance: number): { Vector2 }
+			return Surface.section(arena, distance)
+		end)
+		local whole = Surface.sweep(rings, arena.surfaceThickness)
+		local swept = 0
+		for strip = 1, #rings[1] - 1 do
+			local alone = Surface.sweep(rings, arena.surfaceThickness, function(included: number): boolean
+				return included == strip
+			end)
+			expect(#alone).toBeGreaterThan(0)
+			for _, piece in alone do
+				swept += 1
+				local same = whole[swept]
+				if
+					same == nil
+					or piece.shape ~= same.shape
+					or piece.cframe ~= same.cframe
+					or piece.size ~= same.size
+				then
+					error(`strip {strip}'s piece {swept} is not the whole sweep's`)
+				end
 			end
 		end
-		-- 226 station steps (65 along each straight, 48 around each end) by 20 strips. No strip but the wall's is a
-		-- rectangle around an end, and none is in the 20-stud blends (3 steps either side of each corner), so: each
-		-- straight's 59 steps between the blends make one block per strip (40, however long the straights), each end's
-		-- 42 steps past the blends one block for the wall (84), and the other quads four wedges each:
-		-- (2 · 42 · 19 + 24 · 20) · 4 = 8304.
-		expect(blocks).toBe(124)
-		expect(wedges).toBe(8304)
+		expect(swept).toBe(#whole)
+	end)
+end)
+
+describe("Surface.build", function()
+	it("sweeps the profile around the whole loop: blocks on flat rectangles, wedges everywhere else", function()
+		local solid, glassLook = Surface.build(Config.defaults().Arena)
+		local solidBlocks, solidWedges = countShapes(solid)
+		local glassBlocks, glassWedges = countShapes(glassLook)
+		-- 226 station steps (65 along each straight, 48 around each end) by 22 strips (Profile). No strip but the
+		-- wall's is a rectangle around an end, and none is in the 20-stud blends (3 steps either side of each corner),
+		-- so: each straight's 59 steps between the blends make one block per strip, however long the straights, each
+		-- end's 42 steps past the blends one block for the wall, and the other quads four wedges each. The 15 strips
+		-- below the glass lines: 2 · 15 = 30 blocks and (2 · 42 · 15 + 24 · 15) · 4 = 6480 wedges; the 7 that look
+		-- like the glass (the bank's 3 above 6, the foot curve's 3 above 20 and the wall): 2 · 7 + 2 · 42 = 98 blocks
+		-- and (2 · 42 · 6 + 24 · 7) · 4 = 2688 wedges.
+		expect({ solidBlocks, solidWedges }).toEqual({ 30, 6480 })
+		expect({ glassBlocks, glassWedges }).toEqual({ 98, 2688 })
+	end)
+
+	-- Q309: the look only; each edge between the two sits at its line exactly (Profile).
+	it("keeps what looks like the glass above the bank's line, and what looks solid below the outer wall's", function()
+		local arena = Config.defaults().Arena
+		local solid, glassLook = Surface.build(arena)
+		-- A slab's centre sits within its thickness of its strip.
+		local slab = arena.surfaceThickness
+		for index, piece in glassLook do
+			if piece.cframe.Position.Y < arena.glassLook.innerBank - slab then
+				error(`glass-look piece {index} is below the inner bank's line`)
+			end
+		end
+		for index, piece in solid do
+			if piece.cframe.Position.Y > arena.glassLook.outerWall + slab then
+				error(`solid piece {index} is above the outer wall's line`)
+			end
+		end
 	end)
 
 	-- Fewer parts, and no seams across a straight for a rolling ball to bump on.
@@ -93,20 +152,23 @@ describe("Surface.build", function()
 		local run = arena.straightLength - 2 * 12
 		local whole, between = 0, 0
 		local room: Types.Piece? = nil
-		for _, piece in Surface.build(arena) do
-			if piece.shape == "Block" then
-				if math.abs(piece.size.Z - arena.straightLength) < 1e-3 then
-					whole += 1
-				elseif math.abs(piece.size.Z - run) < 1e-3 then
-					between += 1
-					if (piece.cframe.Position - Vector3.new(0, -0.5, -47)).Magnitude < 1e-3 then
-						room = piece
+		local solid, glassLook = Surface.build(arena)
+		for _, pieces in { solid, glassLook } do
+			for _, piece in pieces do
+				if piece.shape == "Block" then
+					if math.abs(piece.size.Z - arena.straightLength) < 1e-3 then
+						whole += 1
+					elseif math.abs(piece.size.Z - run) < 1e-3 then
+						between += 1
+						if (piece.cframe.Position - Vector3.new(0, -0.5, -47)).Magnitude < 1e-3 then
+							room = piece
+						end
 					end
 				end
 			end
 		end
 		expect(whole).toBe(0)
-		expect(between).toBe(2 * 20)
+		expect(between).toBe(2 * 22)
 		expect(room).never.toBeNil()
 		expect(((room :: Types.Piece).size - Vector3.new(6, 1, run)).Magnitude).toBeLessThan(1e-3)
 	end)

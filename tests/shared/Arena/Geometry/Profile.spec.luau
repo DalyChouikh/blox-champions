@@ -15,7 +15,10 @@ local near = Fixtures.expectNear2
 -- code. On a straight: the bank a quarter ellipse (0, 16) → (24, 0), the spawn room to 30, the rise to (44, 8) arriving
 -- at tan 14°, the incline to (63.322, 12.818), the foot curve r 22 to (80, 34.164) and the wall to 40. At a curved end:
 -- the bank a quarter circle to (16, 0), the bowl y = 14 s² to (70.255, 14), arriving at 27.297°, the foot curve r 18
--- from there to (80, 29.996) and the wall to 40.
+-- from there to (80, 29.996) and the wall to 40. Each wall looks like the glass from a line up (#409, the owner's
+-- Q312, Q313): the bank breaks at 6, at (5.265, 6) on a straight and (3.51, 6) at a curved end (its parameter angle
+-- 180° + asin(10 / 16) in both), and the foot curve at 20, at (74.8338, 20) and (76.9696, 20) (its angle asin((20 −
+-- 34.1641) / 22) and asin((20 − 29.9955) / 18)).
 describe("Profile", function()
 	local straight = Profile.points(arena, 1)
 	local curvedEnd = Profile.points(arena, 0)
@@ -24,21 +27,99 @@ describe("Profile", function()
 		-- 14 spare strips by turning, over 64 chords a piece: the bank 88.59° (a quarter turn), the room 4.43° (the
 		-- curved ends' bowl), the rise 61.04° (the straights' S), the incline 12.39° (the bowl), the foot curve 74.81°
 		-- (the straights' r 22 from 14°) and the wall 0, of 241.27°, give 5.14, 0.26, 3.54, 0.72, 4.34 and 0: 5, 0, 3,
-		-- 0, 4 and 0, and the two left over to the largest remainders, the incline's and the rise's.
-		expect(Profile.stripCounts(arena)).toEqual({ 6, 1, 5, 2, 5, 1 })
+		-- 0, 4 and 0, and the two left over to the largest remainders, the incline's and the rise's: 6, 1, 5, 2, 5, 1.
+		-- Each glass line's break adds a strip to the piece it splits, shared between its two parts the same way: the
+		-- bank's 7 by 49.46° above 6 and 50.52° below (the straights' ellipse) give 3 and 4; the foot curve's 6 by
+		-- 35.36° below 20 and 39.45° above (the straights' r 22) give 3 and 3.
+		expect(Profile.stripCounts(arena)).toEqual({ 3, 4, 1, 5, 2, 3, 3, 1 })
+	end)
+
+	-- Every station's section reads the layout (Surface.build): the last arena's is kept, worked out once, and handed
+	-- out frozen so no caller can change it; another arena gets its own.
+	it("keeps the last arena's strips, worked out once, and hands them out frozen", function()
+		local counts = Profile.stripCounts(arena)
+		expect(Profile.stripCounts(arena)).toBe(counts)
+		expect(table.isfrozen(counts)).toBe(true)
+		local fewer = Fixtures.config({ Arena = { stripsPerSection = 19 } }).Arena
+		local total = 0
+		for _, count in Profile.stripCounts(fewer) do
+			total += count
+		end
+		-- Its own 19 strips and the two breaks'.
+		expect(total).toBe(21)
+		expect(Profile.stripCounts(arena)).toEqual(counts)
+	end)
+
+	it("looks like the glass on every strip from each wall's line up, and nowhere else", function()
+		local expected = {}
+		for strip = 1, 22 do
+			-- The bank's 3 strips above 6, then the foot curve's 3 above 20 and the wall.
+			expected[strip] = strip <= 3 or strip >= 19
+		end
+		expect(Profile.glassStrips(arena)).toEqual(expected)
+	end)
+
+	it(
+		"breaks each wall exactly at its glass line on a straight, at a curved end and at every blend between",
+		function()
+			for _, straightness in { 0, 0.25, 0.5, 0.75, 1 } do
+				local points = Profile.points(arena, straightness)
+				expect(points[4].Y).toBeCloseTo(6, 4)
+				expect(points[19].Y).toBeCloseTo(20, 4)
+			end
+			near(straight[4], Vector2.new(5.265, 6))
+			near(curvedEnd[4], Vector2.new(3.51, 6))
+			near(straight[19], Vector2.new(74.8338, 20))
+			near(curvedEnd[19], Vector2.new(76.9696, 20))
+		end
+	)
+
+	it("refuses an outer glass line that misses the foot curve on a straight or at a curved end", function()
+		-- The straights' foot curve rises from 12.82 to 34.16, the curved ends' from 14 to 30.00.
+		for _, line in { 13, 31 } do
+			local custom = Fixtures.config({ Arena = { glassLook = { outerWall = line } } }).Arena
+			expect(function()
+				Profile.points(custom, 1)
+			end).toThrow("Arena.glassLook.outerWall: the line must cross the outer wall's foot curve")
+		end
+		-- The bank runs from its top at 16 down to the floor.
+		local custom = Fixtures.config({ Arena = { glassLook = { innerBank = 16 } } }).Arena
+		expect(function()
+			Profile.points(custom, 0)
+		end).toThrow("Arena.glassLook.innerBank: the line must cross the inner bank")
+	end)
+
+	-- Each just inside the limits the refusals above cross: the outer line on both layouts' foot curves (14 to 29.996),
+	-- the inner one on the bank (0 to 16).
+	it("breaks the section at lines set just inside the curves they cross", function()
+		for _, look in { { outerWall = 14.01, innerBank = 15.99 }, { outerWall = 29.99, innerBank = 0.01 } } do
+			local custom = Fixtures.config({ Arena = { glassLook = look } }).Arena
+			local counts = Profile.stripCounts(custom)
+			-- Each break ends the part before it: the bank's above its line (the first of the eight), the foot curve's
+			-- below its own (the sixth).
+			local bankBreak, footBreak = counts[1] + 1, 1
+			for index = 1, 6 do
+				footBreak += counts[index]
+			end
+			for _, straightness in { 0, 1 } do
+				local points = Profile.points(custom, straightness)
+				expect(points[bankBreak].Y).toBeCloseTo(look.innerBank, 4)
+				expect(points[footBreak].Y).toBeCloseTo(look.outerWall, 4)
+			end
+		end
 	end)
 
 	it("runs a straight's section from the bank's top down, across the room, up the rise and the incline", function()
-		expect(#straight).toBe(21)
+		expect(#straight).toBe(23)
 		local expected = {
 			[1] = Vector2.new(0, 16),
-			[7] = Vector2.new(24, 0),
-			[8] = Vector2.new(30, 0),
-			[13] = Vector2.new(44, 8),
-			[14] = Vector2.new(53.6611, 10.4088),
-			[15] = Vector2.new(63.3223, 12.8176),
-			[20] = Vector2.new(80, 34.1641),
-			[21] = Vector2.new(80, 40),
+			[8] = Vector2.new(24, 0),
+			[9] = Vector2.new(30, 0),
+			[14] = Vector2.new(44, 8),
+			[15] = Vector2.new(53.6611, 10.4088),
+			[16] = Vector2.new(63.3223, 12.8176),
+			[22] = Vector2.new(80, 34.1641),
+			[23] = Vector2.new(80, 40),
 		}
 		for index, point in expected do
 			near(straight[index], point)
@@ -52,57 +133,57 @@ describe("Profile", function()
 	it(
 		"rounds a straight's bank as a quarter ellipse and its foot as a circle that leaves the incline along it",
 		function()
-			for index = 1, 7 do
+			for index = 1, 8 do
 				local onBank = (straight[index] - Vector2.new(24, 16)) / Vector2.new(24, 16)
 				expect(onBank.Magnitude).toBeCloseTo(1, 3)
 			end
-			for index = 15, 20 do
+			for index = 16, 22 do
 				expect((straight[index] - Vector2.new(58, 34.1641)).Magnitude).toBeCloseTo(22, 3)
 			end
-			local incline = straight[15] - straight[13]
+			local incline = straight[16] - straight[14]
 			expect(math.deg(math.atan2(incline.Y, incline.X))).toBeCloseTo(14, 3)
 		end
 	)
 
 	it("rises from the room's flat floor onto the incline in one smooth S", function()
 		-- Five strips across 30 to 44, on y = (3 − 2t) t² · 8 + (t − 1) t² · 14 tan 14°.
-		near(straight[9], Vector2.new(32.8, 0.7203))
-		near(straight[10], Vector2.new(35.6, 2.4809))
-		near(straight[11], Vector2.new(38.4, 4.6814))
-		near(straight[12], Vector2.new(41.2, 6.7212))
+		near(straight[10], Vector2.new(32.8, 0.7203))
+		near(straight[11], Vector2.new(35.6, 2.4809))
+		near(straight[12], Vector2.new(38.4, 4.6814))
+		near(straight[13], Vector2.new(41.2, 6.7212))
 	end)
 
 	it("bowls a curved end's floor up from the bank's foot to the foot curve, steeper toward the wall", function()
-		expect(#curvedEnd).toBe(21)
+		expect(#curvedEnd).toBe(23)
 		near(curvedEnd[1], Vector2.new(0, 16))
-		for index = 1, 7 do
+		for index = 1, 8 do
 			expect((curvedEnd[index] - Vector2.new(16, 16)).Magnitude).toBeCloseTo(16, 3)
 		end
-		near(curvedEnd[7], Vector2.new(16, 0))
+		near(curvedEnd[8], Vector2.new(16, 0))
 		-- Split where the straights' room and rise end, by their shares of its floor (6 and 20 of 39.32): 0.153 and
 		-- 0.509 of the way across, 0.326 and 3.622 high.
-		near(curvedEnd[8], Vector2.new(24.2785, 0.326))
-		near(curvedEnd[13], Vector2.new(43.595, 3.6217))
-		near(curvedEnd[15], Vector2.new(70.255, 14))
-		for index = 8, 15 do
+		near(curvedEnd[9], Vector2.new(24.2785, 0.326))
+		near(curvedEnd[14], Vector2.new(43.595, 3.6217))
+		near(curvedEnd[16], Vector2.new(70.255, 14))
+		for index = 9, 16 do
 			local share = (curvedEnd[index].X - 16) / 54.255
 			expect(curvedEnd[index].Y).toBeCloseTo(14 * share * share, 3)
 		end
-		for index = 15, 20 do
+		for index = 16, 22 do
 			expect((curvedEnd[index] - Vector2.new(62, 29.9955)).Magnitude).toBeCloseTo(18, 3)
 		end
-		near(curvedEnd[20], Vector2.new(80, 29.9955))
-		near(curvedEnd[21], Vector2.new(80, 40))
+		near(curvedEnd[22], Vector2.new(80, 29.9955))
+		near(curvedEnd[23], Vector2.new(80, 40))
 	end)
 
 	it("blends a curved end's section into a straight's point by point", function()
 		local corner = Profile.points(arena, 0.5)
-		expect(#corner).toBe(21)
-		near(corner[7], Vector2.new(20, 0))
-		near(corner[8], Vector2.new(27.1393, 0.163))
-		near(corner[13], Vector2.new(43.7975, 5.8108))
-		near(corner[15], Vector2.new(66.7886, 13.4088))
-		near(corner[20], Vector2.new(80, 32.0798))
+		expect(#corner).toBe(23)
+		near(corner[8], Vector2.new(20, 0))
+		near(corner[9], Vector2.new(27.1393, 0.163))
+		near(corner[14], Vector2.new(43.7975, 5.8108))
+		near(corner[16], Vector2.new(66.7886, 13.4088))
+		near(corner[22], Vector2.new(80, 32.0798))
 	end)
 
 	-- Each glass section runs the profile's way (down the inner side, up the outer one), its lip a quarter circle of
@@ -119,21 +200,23 @@ describe("Profile", function()
 		local expected: { [string]: { [number]: Vector2 } } = {
 			starts = {
 				[1] = Vector2.new(0, -1),
-				[7] = Vector2.xAxis,
+				[4] = Vector2.new(0.7685, -0.6399),
 				[8] = Vector2.xAxis,
-				[13] = incline,
-				[15] = incline,
-				[20] = Vector2.yAxis,
+				[9] = Vector2.xAxis,
+				[14] = incline,
+				[16] = incline,
+				[19] = Vector2.new(0.6438, 0.7652),
+				[22] = Vector2.yAxis,
 			},
 			ends = {
-				[3] = Vector2.new(0.8321, -0.5547),
-				[6] = Vector2.xAxis,
-				[8] = Vector2.new(0.902, 0.4318),
-				[9] = Vector2.new(0.8027, 0.5964),
-				[12] = incline,
-				[14] = incline,
-				[15] = Vector2.new(0.8729, 0.4879),
-				[19] = Vector2.yAxis,
+				[3] = Vector2.new(0.7685, -0.6399),
+				[7] = Vector2.xAxis,
+				[9] = Vector2.new(0.902, 0.4318),
+				[10] = Vector2.new(0.8027, 0.5964),
+				[13] = incline,
+				[15] = incline,
+				[18] = Vector2.new(0.6438, 0.7652),
+				[21] = Vector2.yAxis,
 			},
 		}
 		for index, direction in expected.starts do

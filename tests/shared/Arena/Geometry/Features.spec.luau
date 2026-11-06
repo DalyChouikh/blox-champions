@@ -419,8 +419,8 @@ describe("Features.gatePanels", function()
 		expect(#panels).toBe(Centerline.gateCount)
 		local half = arena.trackWidth / 2
 		for gate, panel in panels do
-			-- 28 breaks (the surface's 21 points and the top's 10, three of them at a glass face twice or thrice), so
-			-- 27 slices. None is a rectangle: the halfway blend at a gate is flat nowhere. Each is four wedges.
+			-- 30 breaks (the surface's 23 points and the top's 10, three of them at a glass face twice or thrice), so
+			-- 29 slices. None is a rectangle: the halfway blend at a gate is flat nowhere. Each is four wedges.
 			local blocks = 0
 			for _, piece in panel.pieces do
 				if piece.shape == "Block" then
@@ -428,7 +428,7 @@ describe("Features.gatePanels", function()
 				end
 			end
 			expect(blocks).toBe(0)
-			expect(#panel.pieces).toBe(27 * 4)
+			expect(#panel.pieces).toBe(29 * 4)
 			-- Its pivot is the wall's middle, halfway between the surface and the roof, facing the travel direction.
 			local distance = Centerline.gateDistance(arena, gate)
 			local floor = Profile.heightAt(Surface.section(arena, distance), half) :: number

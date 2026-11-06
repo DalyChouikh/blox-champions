@@ -895,6 +895,9 @@ describe("Config defaults", function()
 		expect(a.segmentLength).toBe(4)
 		expect(a.stripsPerSection).toBe(20)
 		expect(a.surfaceThickness).toBe(1)
+		-- The owner (#409): the outer wall looks like glass from 20 up (Q312), the inner bank from 6 (Q313), the look
+		-- only (Q309).
+		expect(a.glassLook).toEqual({ outerWall = 20, innerBank = 6 })
 		expect(a.glass).toEqual({
 			top = 120,
 			lipRadius = 12,
@@ -1149,6 +1152,14 @@ describe("Config.forMode", function()
 			{ overrides = { goal = { across = -0.1 } }, message = "Arena.goal.across: must be >= 0 (got -0.1)" },
 			{ overrides = { goal = { arm = { height = 0 } } }, message = "Arena.goal.arm.height: must be > 0 (got 0)" },
 			{ overrides = { stripsPerSection = 5 }, message = "Arena.stripsPerSection: must be >= 6 (got 5)" },
+			{
+				overrides = { glassLook = { innerBank = 0 } },
+				message = "Arena.glassLook.innerBank: must be > 0 (got 0)",
+			},
+			{
+				overrides = { glassLook = { outerWall = -1 } },
+				message = "Arena.glassLook.outerWall: must be > 0 (got -1)",
+			},
 			{
 				overrides = { straight = { bankWidth = 0 } },
 				message = "Arena.straight.bankWidth: must be > 0 (got 0)",
