@@ -2513,6 +2513,25 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   after the owner's /login, https://claude.ai/artifact/SU9P5UNkzZXXNJAR6MgQi8, section 'Fire lines from marker to
   marker'): **"Yes, ship it"**: the PR opens stacked on #419; the owner's 2-player check of the whole stack stays
   before its merge (Q321).
+- **Q331 the skates' fire glows, lifted off the floor** (session 99, recommended; #413 built and tested, then shot in
+  Studio Play on the real skater, the design page's new link https://claude.ai/artifact/XKRHYqFiG8CUGEyndQ7myj,
+  section 'How the skates' fire looks on our floor': A as first built, glow added onto the floor (pale peach on our
+  light floor, short, broken); F two streaks in the exact team colour, 0.4 s of travel long (about 6 body heights at
+  top speed), nearly solid for the first half, lifted 0.3 studs off the sole (measured: the soles dip as far as 0.26
+  below the floor while skating, which hid parts of a streak at the sole); G = F at three times the brightness,
+  orange glowing amber-orange like RC's fire core, blue a neon cyan): **"G brighter glow, and should be on top of the
+  floor like F"**, with two more things the owner noticed: "the player don't have collision when going into the
+  goal, he should collide with its wall, and also something to note, when a player go into the goal with the ball in
+  hand to score, if he somehow get stuck in the middle of the goal, we should throw him out and don't let him get
+  stuck there". So: #413 builds G (F's shape, lifted, at brightness 3); and two goal findings for their own issues:
+  skaters should collide with the goal's walls (the housing and pylon; #410's ruling G4 made them decoration you pass
+  through, only the invisible rim collides), and a carrier who gets stuck inside the goal while scoring is pushed out.
+- **Q332 #413 shipped** (session 99, recommended; #413 built as look G after Q331: every skater with a team, the
+  local one too, trails two streaks of fire in the team's colour while moving, at three times its brightness, 0.3
+  studs over each sole, 0.4 s of travel long, nearly solid for the first half; none while still; repainted on a team
+  switch; 1505/1505; six skaters about 1 us a frame; the design page https://claude.ai/artifact/XKRHYqFiG8CUGEyndQ7myj,
+  section 'The skates' fire, built as look G'): **"Yes, ship it"**: the PR opens stacked on #420; the owner's
+  2-player check of the whole stack stays before its merge (Q321).
 
 ## Roller Champions
 
