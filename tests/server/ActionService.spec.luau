@@ -142,8 +142,7 @@ end)
 -- Stands the player `offset` from a spot on the track, facing -Z: a server placement, as CharacterService announces
 -- one, so no fall.
 local function stand(id: string, offset: Vector3)
-	rigs[id]:PivotTo(CFrame.new(ON_TRACK + offset))
-	CharacterService.placed:Fire(id)
+	Fixtures.announcePlacement(CharacterService.placed, id, rigs[id], CFrame.new(ON_TRACK + offset))
 end
 
 -- A pane of the arena (one of its ride surfaces, as the middle glass is) standing on the floor `offset` from the track
@@ -316,8 +315,12 @@ describe("ActionService", function()
 	-- comes down on the spot, under the world's pull rather than the floor's.
 	it("lands a tilted, turned carrier's throw on the crosshair's spot", function()
 		local a = blue[1]
-		rigs[a]:PivotTo(CFrame.new(ON_TRACK) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(0, 0, math.rad(30)))
-		CharacterService.placed:Fire(a)
+		Fixtures.announcePlacement(
+			CharacterService.placed,
+			a,
+			rigs[a],
+			CFrame.new(ON_TRACK) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(0, 0, math.rad(30))
+		)
 		giveBall(a)
 		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
 		local hand = BallService.part.Position
@@ -383,8 +386,12 @@ describe("ActionService", function()
 	it("rolls along the carrier's facing on their own floor when aimed straight off it", function()
 		local a = blue[1]
 		local bank = math.rad(30)
-		rigs[a]:PivotTo(CFrame.new(ON_TRACK) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(0, 0, bank))
-		CharacterService.placed:Fire(a)
+		Fixtures.announcePlacement(
+			CharacterService.placed,
+			a,
+			rigs[a],
+			CFrame.new(ON_TRACK) * CFrame.Angles(0, math.rad(90), 0) * CFrame.Angles(0, 0, bank)
+		)
 		giveBall(a)
 		BallService:step(throwSettings.chargeMaxSeconds, CharacterService:holders())
 		local up = Vector3.new(0, math.cos(bank), math.sin(bank))

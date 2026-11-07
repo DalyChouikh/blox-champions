@@ -520,6 +520,20 @@ function Fixtures.placed(rig: Model)
 	rig:SetAttribute(Attributes.Placed, (count or 0) + 1)
 end
 
+-- A server placement as CharacterService announces it (#424): the rig stood at `cframe`, then `placed` fired with where
+-- its root stood before and after.
+function Fixtures.announcePlacement(
+	placed: Signal.Signal<Types.PlayerId, Vector3, Vector3>,
+	id: Types.PlayerId,
+	rig: Model,
+	cframe: CFrame
+)
+	local root = Fixtures.root(rig)
+	local from = root.Position
+	rig:PivotTo(cframe)
+	placed:Fire(id, from, root.Position)
+end
+
 -- A rig's root part, found by the name Roblox gives it in every character.
 function Fixtures.root(rig: Model): BasePart
 	return rig:FindFirstChild(SkaterRig.root) :: BasePart

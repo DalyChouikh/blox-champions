@@ -34,6 +34,10 @@ export type NetworkConfig = {
 	-- How far outside the arena (past either glass, under the floor or over the top: Bounds.inArena) a skater's root
 	-- may be before the guard puts them back on their team's spawn.
 	guardOutsideMargin: number,
+	-- How long after the server places a skater (a load, a respawn, a kickoff) a report of theirs near where they stood
+	-- before is taken as one their client sent before it saw the placement (#424): the guard puts them back where the
+	-- server placed them, without a strike or a word.
+	guardPlacementSeconds: number,
 	-- How many action requests a client may send (a burst of this many, refilled per second).
 	maxActionsPerSecond: number,
 	-- Extra reach for strikes judged on the server, which sees each player slightly behind their own screen.
@@ -61,6 +65,10 @@ local defaults: NetworkConfig = {
 	guardStrikes = 3,
 	guardTeleportFactor = 2,
 	guardOutsideMargin = 2,
+	-- #424, measured at Play starts: the server places a new character while it still owns its physics, and its client
+	-- takes them over a frame later, its copy at times still at Roblox's own spot over the arena's centre. A second
+	-- covers the round trip of a slow connection; a report from the old spot after it is judged as any move.
+	guardPlacementSeconds = 1,
 	maxActionsPerSecond = 15,
 	hitLagToleranceStuds = 3,
 	actionTimingTolerance = 0.1,
@@ -85,6 +93,7 @@ local schema = Validate.record({
 	guardStrikes = Validate.number({ min = 1, integer = true }),
 	guardTeleportFactor = Validate.number({ above = 0 }),
 	guardOutsideMargin = Validate.number({ min = 0 }),
+	guardPlacementSeconds = Validate.number({ above = 0 }),
 	maxActionsPerSecond = Validate.number({ above = 0 }),
 	hitLagToleranceStuds = Validate.number({ min = 0 }),
 	actionTimingTolerance = Validate.number({ min = 0 }),

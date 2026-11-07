@@ -119,6 +119,68 @@ describe("MovementCheck", function()
 		expect(check:sample("A", Vector3.new(500, 0, 0), 0.25)).toBe("Ok")
 	end)
 
+	-- #424: at a Play start a client takes its new character's physics a frame after the server placed it, its copy at
+	-- times still where the character stood before. A second (guardPlacementSeconds) at the 145.2 limit reaches 145.2.
+	describe("after a server placement", function()
+		local FROM = Vector3.new(0, 100, 0)
+		local TO = Vector3.new(0, 0, -500)
+
+		local function placed(net: Config.NetworkConfig?): MovementCheck.MovementCheck
+			local check = MovementCheck.new(movement, net or network)
+			check:place("A", FROM, TO, 0)
+			return check
+		end
+
+		it("judges the next sample from where the server put the player, a first placement too", function()
+			local check = placed()
+			expect(check:sample("A", TO + Vector3.new(30, 0, 0), 0.25)).toBe("Ok")
+			expect(placed():sample("A", TO + Vector3.new(100, 0, 0), 0.25)).toBe("Return")
+		end)
+
+		it("takes a report from where the player stood before as Stale, starting them over at the placement", function()
+			local check = placed()
+			expect(check:sample("A", FROM, 0.25)).toBe("Stale")
+			expect(check:lastValid("A")).toEqual(TO)
+			expect(check:sample("A", TO, 0.26)).toBe("Ok")
+		end)
+
+		it("forgives the strikes a Stale report finds, as the player is put back", function()
+			local check = placed()
+			expect(check:sample("A", TO + Vector3.new(0, 0, 50), 0.25)).toBe("Strike")
+			expect(check:sample("A", FROM, 0.5)).toBe("Stale")
+			expect(check:sample("A", TO, 0.55)).toBe("Ok")
+		end)
+
+		it("goes on taking the old spot as Stale through guardPlacementSeconds, then judges it as any move", function()
+			local check = placed()
+			expect(check:sample("A", FROM, 0.25)).toBe("Stale")
+			expect(check:sample("A", FROM, 1)).toBe("Stale")
+			expect(check:sample("A", FROM, 1.25)).toBe("Return")
+		end)
+
+		it("judges a move the allowance covers as Ok, even near the old spot", function()
+			local check = MovementCheck.new(movement, network)
+			check:place("A", Vector3.new(10, 0, 0), Vector3.zero, 0)
+			expect(check:sample("A", Vector3.new(5, 0, 0), 0.25)).toBe("Ok")
+			expect(check:lastValid("A")).toEqual(Vector3.new(5, 0, 0))
+		end)
+
+		it("reaches as far from the old spot as guardPlacementSeconds of skating, counting only the rise", function()
+			local half = Fixtures.config({ Network = { guardPlacementSeconds = 0.5 } }).Network
+			-- Half a second at the 145.2 limit: 72.6 studs.
+			expect(placed(half):sample("A", FROM + Vector3.new(72, 0, 0), 0.25)).toBe("Stale")
+			expect(placed(half):sample("A", FROM + Vector3.new(73, 0, 0), 0.25)).toBe("Return")
+			-- Exactly as far, 121 × 1.25 × 0.5 = 75.625 studs, which floats hold exactly.
+			local exact = Fixtures.config({ Network = { guardPlacementSeconds = 0.5, speedTolerance = 1.25 } }).Network
+			expect(placed(exact):sample("A", FROM + Vector3.new(75.625, 0, 0), 0.25)).toBe("Stale")
+			-- A client's copy falling from where the character stood: falling is legal.
+			expect(placed(half):sample("A", FROM + Vector3.new(0, -100, 50), 0.25)).toBe("Stale")
+			local check = placed(half)
+			expect(check:sample("A", FROM, 0.5)).toBe("Stale")
+			expect(check:sample("A", FROM, 0.75)).toBe("Return")
+		end)
+	end)
+
 	-- The dive (#241) speeds up down the fall line to hardCap, never past it.
 	it("accepts a whole dive down the fall line, sampled as the server samples it", function()
 		local dt = 1 / 60
