@@ -49,7 +49,8 @@ describe("Centerline", function()
 		Fixtures.expectNear(Centerline.at(arena, 130, 0, 20).Position, Vector3.new(0, 20, -20))
 	end)
 
-	-- The carrier's beam follows the ball with it: the inverse of `at` for any point across the track.
+	-- The ball's drop-in and the surface's normals look a point up by it: the inverse of `at` for any point
+	-- across the track.
 	it("finds how far along the track a point is, on both straights and around both ends", function()
 		-- 0 and 50 on the top straight, 290 around the left end, 520 on the bottom straight, 760 and 860 around the
 		-- right end.

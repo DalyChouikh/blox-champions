@@ -16,7 +16,7 @@ The generated arena takes Roller Champions' shape (reference: "Video 3"):
 - a wide track inside **tall rideable glass walls**, which curl inward at the top (the **lips**);
 - a **top set per map**: a glass roof (**closed**, like Mexico) or an invisible ceiling (**open**, like Acapulco); our map is closed;
 - a thin glass **wall** across the track at each lap gate, glowing for the possessing team's next gate;
-- a light **beam** on the outer glass travelling beside the ball carrier;
+- a light **beam** on the outer glass travelling beside the ball carrier *(replaced by #412's fire lines, §5.4)*;
 - the **goal ring** growing out of the outer wall on a slim pylon (the Halo pylon, #410; first: hanging over the track from an arm).
 
 The owner's rule: **players and the ball never get out of the arena.** The top holds both, on either kind of map; a ball or a skater found outside anyway (a fault) is put back, as today.
@@ -31,13 +31,13 @@ The owner's rule: **players and the ball never get out of the arena.** The top h
 2. Glass is a ride surface: skaters ride it and their rays find it; the ball bounces off it, and its flight ends there as on any surface.
 3. The top stops skaters and the ball; it is not ridden; every ray looks through it (ground, poses, camera, the ball's ground marker); it casts no shadow.
 4. A skater found past either glass face, under the floor or over the top is placed on their spawn (#181's net); the ball found there is out and respawns.
-5. The gate panels, the carrier's beam and the goal work as §5 says, found by their tags, with no per-frame allocation.
+5. The gate panels, the carrier's beam (since #412 the fire lines) and the goal work as §5 says, found by their tags, with no per-frame allocation.
 6. Every test passes in Studio and in CI, with zero warnings.
 7. **Measured in Studio:**
    - the part count, under the pre-overhaul arena's 15,666;
    - a lap at cruise speed (about 13 s expected);
    - #176's launches into the walls and up to the top: nobody gets out;
-   - the client's frame cost, and that the beam allocates nothing per frame;
+   - the client's frame cost, and that the beam allocates nothing per frame (#412: the fire lines', §5.4);
    - only the two ready lines in the console.
 8. The owner plays the republished game.
 
@@ -113,7 +113,7 @@ The M1 spec's §9.1 (layout, dimensions, markers, goal placement), §9.2 (folder
 9. **Every ray looks through the top** (RideSurfaces' `params` holds ride surfaces only, as Task 2's work has it). The camera stops in front of glass, as in front of any wall, but sees through the roof. Cost if wrong: a camera that, near the roof, could rise above it.
 10. **The gate wall follows the cross-section as built** (amended 2026-10-27). It runs from the solid section at the gate (a straight's and a curved end's blended halfway there) up to the walls' top outline (the lips' chords and 120). Its slices break at every point of either outline, so its edges lie on the surface's and the lips' own chords; equal slices would cut across the rise and the foot curves. Breaks closer than Roblox's smallest part (0.001) merge into one. It is `gatePanel.depth` (0.2) thick, behind the gate's plane, and keeps the name "gate panel" in code. The goal hangs in gate 2's plane, centred on it, so the wall must be thinner than half the goal's thinnest part (§3.3, rule 8): at 0.5 the wall's back face lay in the rim's face plane and the rim flickered (seen 2026-10-27; clean at 0.2). Cost if wrong: none. *(2026-10-26: an opening of half an ellipse, `gatePanel.openingHeight` 60, in `gatePanel.segments` 16 slices, 2 deep.)*
 11. **The goal's arm comes from the outer glass.** A post rises from the rim's top up to `goal.arm.height` (51 since #268, was 40), then a beam runs out to the outer glass's face. That works on both kinds of top. Cost if wrong: none. *(Removed by #410: the Halo pylon holds the ring, §5.3.)*
-12. **The beam covers the vertical outer glass**, from the solid wall's top (40 since #268, was 28) up to where the lip starts (108). Cost if wrong: none.
+12. **The beam covers the vertical outer glass**, from the solid wall's top (40 since #268, was 28) up to where the lip starts (108). Cost if wrong: none. *(Removed by #412: the fire lines replace the beam, the owner's Q301.)*
 13. **A lap at cruise speed takes about 13 s** (777 studs at 60), past the M1 spec's 10–12 s target. The Feel part tunes speeds. (The Feel part's #265 lowered cruise to 46 studs/s, 55 km/h: 16.9 s, computed. On #268's map a skater holding the stick along the spawn lane, u 27, 695 studs round, laps in 15.0 s, measured in Play; #328's stride of 51: 13.48 s; #329's straights of 260: 15.82 s.) Cost if wrong: longer laps until then.
 14. **The middle** keeps a floor slab (untagged, not rideable) at the lowest floor's height, 38 wide between the inner glass slabs. Cost if wrong: one number.
 
@@ -185,7 +185,7 @@ Both sections have the same six solid pieces: a curved end's bowl splits where a
 | `goal.arm` | — | `{ thickness = 1, height = 40 }` (where the arm's beam runs, above the lowest floor); height 51 since #268; removed by #410 |
 | `colors.marker` | (27, 42, 53) | removed (`colors.glass` colours the glass, the roof and the panels) |
 
-`Config.UI.arenaGlow` gains `beam = { width = 2, thickness = 0.5 }`. The beam shines in the carrier's team colour with `arenaGlow.material`, like the glowing goal and gate panel.
+`Config.UI.arenaGlow` gains `beam = { width = 2, thickness = 0.5 }`. The beam shines in the carrier's team colour with `arenaGlow.material`, like the glowing goal and gate panel. *(Removed by #412: `arenaGlow.fireLines`, §5.4.)*
 
 ### 3.3 Validation
 
@@ -290,16 +290,16 @@ As today, a gate spans the track at the start of each section, facing the travel
   - the pylon's top must stay under the lip's start (`glass.top − glass.lipRadius`);
   - the door's bars must end inside the housing: their farthest corner nearer the opening's centre than `goal.housingRadius` (`GoalShape.json`'s `housing.frontRadius`, 10.8, its narrowest).
 
-### 5.4 The carrier's beam (`client/CarrierBeam`, new)
+### 5.4 The fire lines (`client/FireLines`; #412, the owner's Q300-Q303 and Q329)
 
-- **What it is:** a tall thin glowing strip on the outer glass's inner face, from the solid wall's top (40 since #268, was 28) up to where the lip starts (108), beside the ball while someone carries it. It takes the possessing team's colour, which is the carrier's, and hides when no one carries the ball.
-- **Where it is:** at the carried ball's distance along the track (`Centerline.distanceOf`), on the outer glass. It is placed with `Centerline.pose`, which gives the point (a Vector3) and the heading (an angle), neither of which allocates.
-- **The part:** client-only (each client draws its own), built at `start`, Neon, with `CanCollide`, `CanQuery` and `CanTouch` false and no shadow: a skater riding the glass passes through it, and no ray sees it.
-- **Each frame,** stepped by FrameController after ArenaGlow:
-  - it reads `BallCarrier`, `BallPart` and the HUD's state;
-  - it moves the part through `Position` and `Orientation`;
-  - it writes `Color` and `Transparency` only when they change;
-  - it allocates nothing.
+- **What they are:** each gate the team with the ball passes sends a fireball in its colour forward along the outer wall to the next gate, and the line it draws stays (Q300, Q301; RC Video 36 at 40-90 s). Each lap of the streak adds a line above the last, one a lap the streak counts (`Match.goalPointsByLap`: three). When the streak ends (a goal, a steal, a kickoff) the lines fade out over `arenaGlow.fireLines.fadeSeconds` (0.3, Q303), and the next streak's start again from its first gate. They do nothing to play; the ball badge and the name tags show who carries.
+- **Where they are:** lap n's line at the outer wall's glass line (`glassLook.outerWall`, 20) and (n − 1) · `fireLines.spacing` (2) above it: 20, 22 and 24 (Q329), so a map that moves its glass line moves them. Each rests on the wall as built (`Arena/Geometry/WallLine`): at each of its section's stations the wall's point at that height (`Profile.outerWallAt`: the strips as built under the solid top, straight between their ends, the upright glass above it), lifted `fireLines.thickness` / 2 + 0.05 off it along its normal, so each chord between two stations lies along the surface's facet. Chords that keep one direction join into one piece (a straight's middle is one): 110 pieces a lap. A height off the wall (above the lip's start) fails the client's start.
+- **Which gates:** every streak starts at the goal's gate (§4.2), so the k-th gate a streak passes is the k-th from it, its line from that gate to the next on lap ⌈k / 4⌉. The snapshot's `streak`, `lapProgress` and `nextGate` say how many it has passed (once a streak has counted its last lap, that lap stays full and is counted once).
+- **The flight:** `fireLines.delaySeconds` (0.25) after its gate is passed, a fireball `fireLines.fireball` (2.4) across flies to the next gate in `fireLines.flightSeconds` (1), evenly along the track, its line growing behind it. Gates already passed when a client first sees the match show at once (a player joining mid-streak). A gate passed while the last streak's lines still fade ends the fade at once.
+- **The parts:** client-only (each client draws its own), built at `start` (342 parts in about 10 ms, measured): Neon (`arenaGlow.material`) cylinders, and a ball for each line's fireball, in the team's colour, draw-only (`Util/DrawnPart`), no shadow, hidden until lit.
+- **Each frame,** stepped by FrameController after GoalWorth: it acts when the HUD's state changes, and writes each frame only while a fireball flies or the lines fade (Size, Position and Transparency; no new CFrame).
+
+*(Until #412 the carrier's beam stood here: a tall thin glowing strip on the outer glass's face beside the carried ball, `arenaGlow.beam`, `client/CarrierBeam`. The owner's Q301 replaced it with the fire lines.)*
 
 ### 5.5 Spawns and the middle
 
@@ -341,8 +341,8 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 - **`ArenaParts`:** panel markers.
 - **`ArenaGlow`:** lights every part of a panel.
 - **`WorldMarkers`:** the arrow aims at the panel's position.
-- **`CarrierBeam`:** new, in `Modules` after ArenaGlow, so the client starts 18 modules.
-- **`FrameController`:** steps the beam after the arena's glow.
+- **`CarrierBeam`:** new, in `Modules` after ArenaGlow, so the client starts 18 modules. *(#412: `FireLines` in its place, after GoalWorth.)*
+- **`FrameController`:** steps the beam after the arena's glow *(#412: the fire lines after the goal's worth)*.
 
 ---
 
@@ -369,7 +369,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 - **SkateController:** the sweep stops at the top (real parts in Edit, like the seam test), and the ground ray ignores it.
 - **CameraController:** the top between the camera and the skater does not pull the camera in.
 - **ArenaParts, ArenaGlow, WorldMarkers:** the panel markers; ArenaGlow hides every panel but the lit one, and never the goal.
-- **CarrierBeam:** hidden without a carrier, beside the ball on the outer glass in the team's colour, writes only on change.
+- **CarrierBeam:** hidden without a carrier, beside the ball on the outer glass in the team's colour, writes only on change. *(#412: **FireLines**: every lap's lines built hidden and draw-only, each at its height on the wall; a gate passed flies its fireball and leaves its line; lines a streak already has show at once; the fade at a goal, a steal and a kickoff; a fade ended by the next streak's gate; nothing while no team has the ball; a flight that takes no time. **WallLine** and **Profile.outerWallAt**: worked values on a straight and a curved end, the joined pieces, the upright glass, the refused heights.)*
 - **MovementGuard and BallService:** in and out by `inArena`.
 - **Integration:** the arena built from the shipped config, every tag present, the ground found on the glass.
 
@@ -379,7 +379,7 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 - **Launches:** #176's runs into the walls and toward the top at 120–140 studs/s; nobody gets out; record the highest point.
 - **A lap at cruise:** its time.
 - **The part count:** under 15,666.
-- **The client's frame:** the beam's step, and allocations in a plain probe (expected 0 per frame).
+- **The client's frame:** the beam's step, and allocations in a plain probe (expected 0 per frame). *(#412: the fire lines' start, measured, and their steps, which write only while a fireball flies or the lines fade.)*
 - **The console:** only the two ready lines (`modules=8` / `modules=18`).
 - **The owner's playtest** after a republish of `build/game.rbxl`.
 
@@ -392,5 +392,5 @@ Task 1 (PR #192) built the first version's shape. The revision changes:
 3. Rideable glass with lips, the wider track and the taller walls.
 4. The gate panels: Features, the Builder, ArenaParts, ArenaGlow, WorldMarkers.
 5. The hanging goal and its arm (#410: the Halo pylon, §5.3).
-6. `Centerline.distanceOf` / `pose` and `CarrierBeam`.
+6. `Centerline.distanceOf` / `pose` and `CarrierBeam` (#412: the fire lines).
 7. The Studio checks, the M1 spec's §9–§10 text, the republish, and the owner's playtest.

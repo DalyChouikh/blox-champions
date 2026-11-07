@@ -20,7 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BallPart = require(script.Parent.BallPart)
 local BallSkins = require(ReplicatedStorage.Shared.Skins.BallSkins)
 local Config = require(ReplicatedStorage.Shared.Config)
-local DrawOnly = require(ReplicatedStorage.Shared.Util.DrawOnly)
+local DrawnPart = require(ReplicatedStorage.Shared.Util.DrawnPart)
 local HudStore = require(script.Parent.HudStore)
 local RideSurfaces = require(script.Parent.RideSurfaces)
 local Style = require(script.Parent.Hud.Style)
@@ -187,14 +187,8 @@ local WorldMarkers: WorldMarkers = {
 		self._stroke = stroke
 
 		-- The disc touches nothing and no ray finds it.
-		local ground = Instance.new("Part")
-		DrawOnly(ground)
-		ground.Name = "BallGround"
-		ground.Shape = Enum.PartType.Cylinder
+		local ground = DrawnPart("BallGround", Enum.PartType.Cylinder)
 		ground.Size = Vector3.new(markers.groundMarkerThickness, markers.groundMarkerSize, markers.groundMarkerSize)
-		ground.Anchored = true
-		ground.CastShadow = false
-		ground.Transparency = 1
 		local top = Instance.new("Attachment")
 		top.Name = "Top"
 		top.Parent = ground

@@ -28,6 +28,8 @@ local BANK, FOOT, WALL = 1, 5, 6
 -- The step (in a piece's t) its direction is read over: the second-order differences' error stays under 0.03° on
 -- every piece, while Vector2's float32 points read over 1e-4 put the bowl's arrival 0.08° off (measured, #294).
 local DIRECTION_STEP = 1e-3
+-- The upright outer glass's normal toward the track.
+local TOWARD_TRACK = Vector2.new(-1, 0)
 
 local Profile = {}
 
@@ -324,8 +326,17 @@ local function heading(piece: Piece, t: number): Vector2
 	return (piece(t + step) - piece(t - step)).Unit
 end
 
--- Each strip of a curved end's section blended toward a straight's by `straightness` (0 at a curved end, 1 on a
--- straight), in running order: `visit` gets the strip's blended piece and the piece's t at the strip's two ends.
+-- The layout's piece `index`, a curved end's blended toward a straight's by `straightness` (0 at a curved end, 1 on a
+-- straight).
+local function blended(layout: Layout, index: number, straightness: number): Piece
+	local straight, curvedEnd = layout.straight[index], layout.curvedEnd[index]
+	return function(t: number): Vector2
+		return curvedEnd(t):Lerp(straight(t), straightness)
+	end
+end
+
+-- Each strip of the section blended by `straightness`, in running order: `visit` gets the strip's blended piece and
+-- the piece's t at the strip's two ends.
 -- Each piece's strips are spaced evenly within it (by angle on the arcs, across the floors).
 local function eachStrip(
 	arena: ArenaConfig,
@@ -333,11 +344,8 @@ local function eachStrip(
 	visit: (piece: Piece, from: number, to: number) -> ()
 )
 	local layout = layoutOf(arena)
-	local straight, curvedEnd = layout.straight, layout.curvedEnd
 	for index, count in layout.counts do
-		local function piece(t: number): Vector2
-			return curvedEnd[index](t):Lerp(straight[index](t), straightness)
-		end
+		local piece = blended(layout, index, straightness)
 		for strip = 1, count do
 			visit(piece, (strip - 1) / count, strip / count)
 		end
@@ -367,13 +375,47 @@ function Profile.directions(arena: ArenaConfig, straightness: number): ({ Vector
 	return starts, ends
 end
 
+-- The outer wall at `height` on the section blended by `straightness` (a line along it: the fire lines, #412):
+-- how far across the track from the inner glass's face it stands, and its normal there toward the track (unit).
+-- Under the solid top it is the strips as built, straight between their ends, so a line through such points
+-- lies on the swept surface's facets; its normal is the shape's own, mixed between the strip's two ends
+-- (Profile.directions). From the solid top up to the lip's start it is the upright outer glass. Anywhere else
+-- fails the build.
+function Profile.outerWallAt(arena: ArenaConfig, straightness: number, height: number): (number, Vector2)
+	local lip = Profile.lipStart(arena)
+	if height >= arena.outerWallHeight then
+		if height <= lip then
+			return arena.trackWidth, TOWARD_TRACK
+		end
+	else
+		-- Back down from the solid top, strip by strip (eachStrip's, the other way): the outer side rises all the way
+		-- from the floor, so the first strip whose lower end is at or under `height` holds it.
+		local layout = layoutOf(arena)
+		for index = #layout.counts, 1, -1 do
+			local count = layout.counts[index]
+			local piece = blended(layout, index, straightness)
+			for strip = count, 1, -1 do
+				local from, to = (strip - 1) / count, strip / count
+				local low = piece(from)
+				if low.Y <= height then
+					local high = piece(to)
+					local t = (height - low.Y) / (high.Y - low.Y)
+					local along = heading(piece, from):Lerp(heading(piece, to), t).Unit
+					return low.X + (high.X - low.X) * t, Vector2.new(-along.Y, along.X)
+				end
+			end
+		end
+	end
+	error(`Arena: a line on the outer wall must stay on it, from the floor to the lip's start ({lip}; got {height})`, 0)
+end
+
 -- The middle of a straight's spawn room: the lane the team spawns line up on.
 function Profile.spawnLane(arena: ArenaConfig): number
 	return (arena.straight.bankWidth + arena.straight.roomEnd) / 2
 end
 
--- Where the glass stops being vertical and its lip starts curling inward (R15): the goal's arm stays under it, and
--- the carrier's beam ends there.
+-- Where the glass stops being vertical and its lip starts curling inward (R15): the goal's pylon, the ball's drop-in
+-- and a line along the outer wall (outerWallAt) stay under it.
 function Profile.lipStart(arena: ArenaConfig): number
 	return arena.glass.top - arena.glass.lipRadius
 end

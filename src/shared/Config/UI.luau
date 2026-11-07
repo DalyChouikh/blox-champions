@@ -456,13 +456,26 @@ export type NameTagSettings = {
 	glove: { ink: number, parts: { GlovePart }, seams: { GlovePart } },
 }
 
--- The goal's lip and strips (the ring's blocks before its meshes come), the next gate's panel and the carrier's beam
--- glow in `material`; the goal's door opens and shuts over doorSeconds (Arena spec §5.3). The beam (Arena spec §5.4) is
--- `width` studs along the track and `thickness` across it, on the outer glass's face, as tall as the vertical glass.
+-- The fire lines (#412, the owner's Q300-Q303 and Q329; Arena spec §5.4): one line a lap of the streak, along the
+-- outer wall from each gate passed to the next, `thickness` studs across, lap 1's at the wall's glass line
+-- (Arena.glassLook.outerWall) and each next lap's `spacing` higher. A gate passed sends a fireball `fireball` studs
+-- across after `delaySeconds`, flying on to the next gate in `flightSeconds` with its line growing behind it; the
+-- lines fade out over `fadeSeconds` when the streak ends.
+export type FireLineSettings = {
+	thickness: number,
+	spacing: number,
+	fireball: number,
+	delaySeconds: number,
+	flightSeconds: number,
+	fadeSeconds: number,
+}
+
+-- The goal's lip and strips (the ring's blocks before its meshes come), the next gate's panel and the fire lines
+-- glow in `material`; the goal's door opens and shuts over doorSeconds (Arena spec §5.3).
 export type ArenaGlowSettings = {
 	material: Enum.Material,
 	doorSeconds: number,
-	beam: { width: number, thickness: number },
+	fireLines: FireLineSettings,
 }
 
 -- The goal's worth in its open middle (#411, the owner's Q294; Arena spec §5.3): a disc in the open team's colour,
@@ -483,8 +496,8 @@ export type BallTrailSettings = { lifetime: number, width: number, color: Color3
 
 export type UIConfig = {
 	clockWarnings: { number },
-	-- The team colours, one pair for the world and the HUD: the arena's glow and pads, the carrier's beam, the ball,
-	-- the markers, the name tags and every HUD part in a team's colour (Hud/Style.teamColor).
+	-- The team colours, one pair for the world and the HUD: the arena's glow and pads, the fire lines, the ball, the
+	-- markers, the name tags and every HUD part in a team's colour (Hud/Style.teamColor).
 	teamColors: TeamColors,
 	teamNames: { Blue: string, Orange: string },
 	controlLabels: ControlLabels,
@@ -944,7 +957,16 @@ local defaults: UIConfig = {
 	arenaGlow = {
 		material = Enum.Material.Neon,
 		doorSeconds = 0.4,
-		beam = { width = 2, thickness = 0.5 },
+		-- The fireball leaves a quarter second after the gate (RC Video 36 at 43.75-44.0 s) and reaches the next in a
+		-- second, as the design page drew it (Q301); the lines fade in 0.3 s (Q303).
+		fireLines = {
+			thickness = 0.8,
+			spacing = 2,
+			fireball = 2.4,
+			delaySeconds = 0.25,
+			flightSeconds = 1,
+			fadeSeconds = 0.3,
+		},
 	},
 	-- Filling the opening (Q327), the number about a radius tall as the design page drew it (Q294).
 	goalWorth = { thickness = 0.2, fill = 1, textHeight = 0.55, behind = 0.5 },
@@ -1479,8 +1501,16 @@ local fields = Validate.record({
 	arenaGlow = Validate.record({
 		material = Validate.enumItem(Enum.Material),
 		doorSeconds = nonNegative,
-		-- The beam is one part: Roblox would silently clamp a size outside its part limits.
-		beam = Validate.record({ width = partSize, thickness = partSize }),
+		-- Each piece and fireball is a part: Roblox would silently clamp a size outside its part limits. The
+		-- spacing's rule is below.
+		fireLines = Validate.record({
+			thickness = partSize,
+			spacing = Validate.number(),
+			fireball = partSize,
+			delaySeconds = nonNegative,
+			flightSeconds = nonNegative,
+			fadeSeconds = nonNegative,
+		}),
 	}),
 	goalWorth = Validate.record({
 		thickness = partSize,
@@ -1610,6 +1640,15 @@ local schema = Validate.checkAll(fields, {
 		holds = function(ui: UIConfig): boolean
 			local board = ui.hud.layout.compactScoreboard
 			return textsFit(board.textSizes, board.score, board.clock, board.worth)
+		end,
+	},
+	-- Each lap's fire line stands apart from the last (Q302's stack): `spacing` apart up the upright glass, farther
+	-- along a slope.
+	{
+		message = "the fire lines must not overlap (arenaGlow.fireLines.spacing > thickness)",
+		holds = function(ui: UIConfig): boolean
+			local lines = ui.arenaGlow.fireLines
+			return lines.spacing > lines.thickness
 		end,
 	},
 })
