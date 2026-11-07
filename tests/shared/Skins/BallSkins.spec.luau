@@ -30,6 +30,17 @@ describe("BallSkins", function()
 		end
 	end)
 
+	-- #415 (the owner's Q319, Q345): the ball glows in the colour of the team that last held it where its skin's glow
+	-- mask is white (the Default's is black on the band, scripts/art/build_ball.py), and each screen lights it; the
+	-- look itself starts unlit, so a neutral ball, or a screen that has not lit it yet, never glows white.
+	it("gives every skin's look a glow mask, unlit until a screen lights it", function()
+		for _, id in BallSkins.ids() do
+			local look = BallSkins.look(id)
+			expect(string.match(look.EmissiveMaskContent.Uri or "", "^rbxassetid://%d+$")).never.toBeNil()
+			expect(look.EmissiveStrength).toBe(0)
+		end
+	end)
+
 	it("lists every skin, Default among them", function()
 		expect(table.find(BallSkins.ids(), BallSkins.DEFAULT)).never.toBeNil()
 		expect(table.isfrozen(BallSkins.ids())).toBe(true)

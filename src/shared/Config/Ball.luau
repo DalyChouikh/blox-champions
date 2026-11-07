@@ -54,6 +54,10 @@ export type BallConfig = {
 	-- The fastest each screen turns the ball's look (radians a second; #401, Client/BallView): the server's spin, up to
 	-- this, about the spin's own axis.
 	lookSpinLimit: number,
+	-- How brightly the ball glows in the colour of the team that last held it, where its skin's glow mask is white
+	-- (#415, Q319: the band stays black): its look's EmissiveStrength from the first catch to the next kickoff, carried
+	-- or not (Client/WorldMarkers). A neutral ball is unlit.
+	teamGlow: number,
 }
 
 local defaults: BallConfig = {
@@ -93,6 +97,10 @@ local defaults: BallConfig = {
 	-- The owner (#401, Q283, Q287): right after a Roll Ball the ball spins ~250 rad/s, too fast to follow ("it is fast
 	-- now"); of four limits tried by playing (none, 10, 5 and 2.5 turns a second), 2.5 turns a second.
 	lookSpinLimit = 15,
+	-- The owner's Q345, after a Studio trial of 1, 2, 4 and 8 on both teams: "Glow 8, but also when the ball is not
+	-- being carried, it should glow the same too when a team carried it and got dropped". At 8 Orange glows yellow
+	-- and Blue's halo spills over the band's edges.
+	teamGlow = 8,
 }
 
 local nonNegative = Validate.number({ min = 0 })
@@ -122,6 +130,7 @@ local schema = Validate.checkAll(
 		releaseClearance = positive,
 		meshId = Validate.assetId(),
 		lookSpinLimit = positive,
+		teamGlow = positive,
 	}),
 	{
 		{

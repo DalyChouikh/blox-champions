@@ -2617,6 +2617,23 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   back and logged, then 5 Play starts and 4 respawns with clean consoles; not shown: the real start race after the
   fix, not seen in 7 starts before it either): **"Yes, ship it"**: the PR opens stacked on #427; the owner's 2-player
   check of the whole stack stays before its merge (Q321).
+- **Q345 the ball glows at 8 whenever a team has it** (session 102, recommended 4; #415 built as Q319 look B: while
+  carried, the ball's coloured parts glow in the team's colour through the glow mask, uploaded this session
+  (rbxassetid://115574465797681: white off the band, black on it), the band black, a loose ball unlit; the design
+  page's new link https://claude.ai/artifact/GVijdK1fgyKKPFXr9cc7c8, section 'How brightly the carried ball glows':
+  Play shots close up of both teams at 0 / 1 / 2 / 4 / 8 (Orange turns yellow-orange from 4, like RC's Video 35; from
+  4 up the halo spills over the band's edges); a playable trial in Studio, G to take the ball, keys 1-4 for 1 / 2 / 4
+  / 8): **"Glow 8, but also when the ball is not being carried, it should glow the same too when a team carried it
+  and got dropped"**: Ball glow strength 8, and the glow follows the ball's team colour (Q158): from the first catch
+  until the next kickoff, carried, thrown or dropped, the ball glows in the colour of the team that last held it;
+  unlit only while it is neutral (white) after a kickoff. Replaces Q319's "the loose ball, no glow".
+- **Q346 #415 shipped** (session 102, recommended; #415 built as Q345 said: the ball glows at 8 (Ball.teamGlow) in
+  the colour of the team that last held it, from the first catch until the next kickoff, carried, thrown or dropped,
+  through the glow mask, the band black; unlit only while neutral after a kickoff; 1538/1538; every mutation caught
+  but one line of dead code (removed); consoles clean; the design page section 'The ball glows in its team's colour,
+  carried or dropped': Play shots of the neutral ball at kickoff, Blue and Orange carried and dropped; not checked: a
+  second screen): **"Yes, ship it"**: the PR opens stacked on #428; the owner's 2-player check of the whole stack
+  stays before its merge (Q321).
 
 ## Roller Champions
 

@@ -33,13 +33,20 @@ local function stroke(): UIStroke
 	return WorldMarkers.ring:FindFirstChild("Stroke", true) :: UIStroke
 end
 
--- The ball's look (#400) under `part`, as the server dresses each ball: what each screen shows of the ball.
+-- The ball's look (#400) under `part`, as the server dresses each ball once its mesh has come, the skin's picture
+-- and glow mask on it: what each screen shows of the ball.
 local function newLook(part: Part): MeshPart
 	local look = Instance.new("MeshPart")
 	look.Name = Look.NAME
 	look.Anchored = true
+	BallSkins.look(BallSkins.DEFAULT):Clone().Parent = look
 	look.Parent = part
 	return look
+end
+
+-- The paint on the ball's look, where its glow is set.
+local function appearance(): SurfaceAppearance
+	return (Look.of(ball :: Part) :: BasePart):FindFirstChildOfClass("SurfaceAppearance") :: SurfaceAppearance
 end
 
 beforeEach(function()
@@ -96,33 +103,41 @@ describe("WorldMarkers", function()
 
 	-- The owner (#327, Q158, Q159): RC's ball wears the colour of the team that last held it, carried, flying and
 	-- loose (Video 31 at 27.8, 39.1-39.5 and 47.4-48.8 s), and its own neutral colour from GO until a team holds it.
-	-- The match keeps the possessing team through throws, passes, drops and respawns until a kickoff.
-	it("wears the colour of the team that last held the ball, its skin's own until a team has", function()
-		-- On the ball's look (#400): the ball part itself is unseen.
+	-- It glows in that colour, through its skin's glow mask, the band staying black (#415, Q319, Q345: "it should
+	-- glow the same too when a team carried it and got dropped"), and is unlit while neutral. The match keeps the
+	-- possessing team through throws, passes, drops and respawns until a kickoff.
+	it("wears and glows the colour of the team that last held the ball, its skin's own and unlit until then", function()
+		-- On the ball's look (#400): the ball part itself is unseen. Its colour, then its glow's strength and tint.
 		local function worn(): string
-			return (Look.of(ball :: Part) :: BasePart).Color:ToHex()
+			local look = Look.of(ball :: Part) :: BasePart
+			local paint = look:FindFirstChildOfClass("SurfaceAppearance") :: SurfaceAppearance
+			return `{look.Color:ToHex()} {paint.EmissiveStrength} {paint.EmissiveTint:ToHex()}`
+		end
+		local function glowing(color: Color3): string
+			return `{color:ToHex()} {config.Ball.teamGlow} {color:ToHex()}`
 		end
 		local neutral = BallSkins.get(BallSkins.DEFAULT).color:ToHex()
+		local unlit = `{neutral} 0 {neutral}`
 		WorldMarkers:step(DT)
-		expect(worn()).toBe(neutral)
+		expect(worn()).toBe(unlit)
 		snapshot({ possessingTeam = "Orange" })
 		WorldMarkers:step(DT)
-		expect(worn()).toBe(colors.Orange:ToHex())
+		expect(worn()).toBe(glowing(colors.Orange))
 		-- Stolen.
 		snapshot({ possessingTeam = "Blue" })
 		WorldMarkers:step(DT)
-		expect(worn()).toBe(colors.Blue:ToHex())
+		expect(worn()).toBe(glowing(colors.Blue))
 		-- A new ball (the server rebuilds it for a respawn) while Blue still has possession.
 		local rebuilt = Instance.new("Part")
 		rebuilt.Parent = folder
 		newLook(rebuilt)
 		ball = rebuilt
 		WorldMarkers:step(DT)
-		expect(worn()).toBe(colors.Blue:ToHex())
+		expect(worn()).toBe(glowing(colors.Blue))
 		-- A kickoff: nobody has held the new ball yet.
 		snapshot()
 		WorldMarkers:step(DT)
-		expect(worn()).toBe(neutral)
+		expect(worn()).toBe(unlit)
 	end)
 
 	it("sizes the ring to the ball at any distance: its width in studs, ringSize pixels wider", function()
@@ -161,6 +176,41 @@ describe("WorldMarkers", function()
 		WorldMarkers:step(DT)
 		expect(look.Color:ToHex()).toBe(colors.Orange:ToHex())
 		expect(part.Color:ToHex()).toBe("00ff00")
+	end)
+
+	it("glows a look dressed again while the ball has a team, and leaves a plain one unlit", function()
+		snapshot({ possessingTeam = "Orange" })
+		WorldMarkers:step(DT)
+		-- Until the mesh comes the look is a plain sphere, with no paint to light.
+		local part = ball :: Part
+		(Look.of(part) :: BasePart):Destroy()
+		local plain = Instance.new("Part")
+		plain.Name = Look.NAME
+		plain.Parent = part
+		expect(function()
+			WorldMarkers:step(DT)
+		end).never.toThrow()
+		expect(plain.Color:ToHex()).toBe(colors.Orange:ToHex())
+		-- The mesh came: the server dresses the ball again, its paint unlit by the skin's data.
+		plain:Destroy()
+		newLook(part)
+		expect(appearance().EmissiveStrength).toBe(0)
+		WorldMarkers:step(DT)
+		expect(appearance().EmissiveStrength).toBe(config.Ball.teamGlow)
+		expect(appearance().EmissiveTint:ToHex()).toBe(colors.Orange:ToHex())
+	end)
+
+	it("writes the ball's look only when the look or the team changes", function()
+		snapshot({ possessingTeam = "Orange" })
+		WorldMarkers:step(DT)
+		local look = Look.of(ball :: Part) :: BasePart
+		look.Color = Color3.new(0, 1, 0)
+		appearance().EmissiveStrength = 3
+		appearance().EmissiveTint = Color3.new(0, 1, 0)
+		WorldMarkers:step(DT)
+		expect(look.Color:ToHex()).toBe("00ff00")
+		expect(appearance().EmissiveStrength).toBe(3)
+		expect(appearance().EmissiveTint:ToHex()).toBe("00ff00")
 	end)
 
 	it("hides every ball marker while there is no ball", function()

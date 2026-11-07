@@ -5,8 +5,10 @@
 --   team that last held it (the owner, #327, Q158: Client/WorldMarkers);
 -- - its look names a SurfaceAppearance in the BallLooks folder beside this module (one data file each): the skin's
 --   picture over the ball mesh's paint map, laid over the ball's colour wherever the picture is see-through (Overlay,
---   #400, Q277), so a team's colour shows through any skin. Roblox lets no script set a picture at run time, so each
---   skin's look is made ahead, as data, and copied onto the ball (BallLook).
+--   #400, Q277), so a team's colour shows through any skin. Its glow mask (EmissiveMaskContent, white where it glows)
+--   is where the ball glows in the colour of the team that last held it (#415, Q319, Q345; Client/WorldMarkers
+--   lights it), its EmissiveStrength 0 so a neutral ball is unlit. Roblox lets no script set a picture at run time,
+--   so each skin's look is made ahead, as data, and copied onto the ball (BallLook).
 
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 

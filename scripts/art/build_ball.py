@@ -1,4 +1,5 @@
-"""Builds the match ball's mesh and its Default skin's picture (#400; the owner's Q275-Q277).
+"""Builds the match ball's mesh, its Default skin's picture (#400; the owner's Q275-Q277) and that skin's glow mask
+(#415, Q319).
 
 Run with Blender 5.2 LTS:
     blender --background --factory-startup --python scripts/art/build_ball.py -- <out dir>
@@ -9,6 +10,9 @@ Writes, the same bytes on every run:
 - <out>/ball_default.png: the Default skin's picture over that paint map, see-through except the black band round the
   middle (Q275: 0.8 studs on the 2-stud ball). Roblox lays a picture's opaque pixels over the part's own colour, so
   the ball still shows white or its team's colour everywhere else (Q158, Q159).
+- <out>/ball_default_glow.png: the Default skin's glow mask over the same paint map, white where the carried ball
+  glows in its team's colour and black over the band, so the band stays fully black (Q319). Roblox scales the glow by
+  the mask's brightness.
 
 The paint map is Blender's: longitude across, latitude up (0 at the bottom pole, 1 at the top), evenly spaced, so the
 band is the picture's rows within BAND_WIDTH / 2 of the middle. A later skin is another picture over the same map.
@@ -18,6 +22,7 @@ import math
 import struct
 import sys
 import zlib
+from collections.abc import Callable
 from pathlib import Path
 
 # Blender runs a --python script without its folder on sys.path.
@@ -58,13 +63,20 @@ def png_rgba(width: int, height: int, rows: list[bytes]) -> bytes:
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
 
 
+def banded_picture(pixel: Callable[[float], bytes]) -> bytes:
+    """A picture over the paint map whose every row is one RGBA pixel, chosen by how much of that row is band."""
+    rows = [pixel(band_coverage(row)) * PICTURE_WIDTH for row in range(PICTURE_HEIGHT)]
+    return png_rgba(PICTURE_WIDTH, PICTURE_HEIGHT, rows)
+
+
 def default_picture() -> bytes:
     """Ink everywhere (so filtering at the band's edges never brings in a light fringe), opaque only over the band."""
-    rows = []
-    for row in range(PICTURE_HEIGHT):
-        alpha = round(255 * band_coverage(row))
-        rows.append(bytes((*INK, alpha)) * PICTURE_WIDTH)
-    return png_rgba(PICTURE_WIDTH, PICTURE_HEIGHT, rows)
+    return banded_picture(lambda covered: bytes((*INK, round(255 * covered))))
+
+
+def default_glow_mask() -> bytes:
+    """White off the band, black over it, an edge row grey by the share of it outside the band. Opaque."""
+    return banded_picture(lambda covered: bytes((round(255 * (1 - covered)),) * 3 + (255,)))
 
 
 # A triangle's three corners, each (vertex index, paint map index), counted from 0.
@@ -120,7 +132,8 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     (out / "ball.obj").write_text(ball_mesh(), encoding="utf-8", newline="\n")
     (out / "ball_default.png").write_bytes(default_picture())
-    print(f"build_ball: wrote {out / 'ball.obj'} and {out / 'ball_default.png'}")
+    (out / "ball_default_glow.png").write_bytes(default_glow_mask())
+    print(f"build_ball: wrote ball.obj, ball_default.png and ball_default_glow.png in {out}")
 
 
 if __name__ == "__main__":
