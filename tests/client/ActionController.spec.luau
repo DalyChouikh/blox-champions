@@ -8,10 +8,10 @@ local beforeEach, afterEach = JestGlobals.beforeEach, JestGlobals.afterEach
 
 local Client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 local ActionController = require(Client.ActionController)
+local ArenaParts = require(Client.ArenaParts)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallCarrier = require(Client.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
-local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local Fixtures = require(ReplicatedStorage.Tests.Fixtures)
 local InputController = require(Client.InputController)
 local RideSurfaces = require(Client.RideSurfaces)
@@ -40,9 +40,9 @@ local CAMERA = Fixtures.camera(CFrame.lookAt(Vector3.new(0, 5, 10), Vector3.new(
 local LOCAL_ID = "1"
 -- The other skaters the skating sees (SkateController's views), reset before each test.
 local others: { any } = {}
--- The arena's parts as ArenaParts holds them: only the goal ring's opening matters here (#313), none until a test
--- hangs one.
-local arenaParts: { parts: { goal: Crossing.Disc }? } = { parts = nil }
+-- The arena's parts as ArenaParts holds them: only the goal ring's opening matters here (#313; the skating's goal
+-- tunnel too, #423), none until a test hangs one.
+local arenaParts: ArenaParts.Goal = { parts = nil }
 
 local folder: Folder
 -- Roblox's menu: opening it pauses the controls.
@@ -129,6 +129,7 @@ local function setup(surfaces: { BasePart }?)
 		Team = function(): string?
 			return "Blue"
 		end,
+		ArenaParts = arenaParts,
 	})
 	rig = Fixtures.rig(folder, "Skater", CFrame.new(0, movement.hoverHeight, 0))
 	SkaterBody.build(rig, movement)

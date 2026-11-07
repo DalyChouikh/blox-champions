@@ -105,6 +105,8 @@ local function setup(overrides: { [string]: any }?, arenaNormals: boolean?)
 		Team = function(): string?
 			return "Blue"
 		end,
+		-- No goal until a test gives one: the arena's parts have not reached this client.
+		ArenaParts = { parts = nil },
 	}
 	local extra: { [string]: any } = overrides or {}
 	for key, value in extra do
@@ -146,6 +148,11 @@ afterEach(function()
 end)
 
 describe("SkateController", function()
+	-- The Loader hands a module only what it declares (#423: the goal's disc, from ArenaParts).
+	it("depends on the config, the keys, the ride surfaces and the arena's parts", function()
+		expect(SkateController.dependencies).toEqual({ "Config", "InputController", "RideSurfaces", "ArenaParts" })
+	end)
+
 	it("hands out the other skaters it sees, the one list it skates beside, for the strikes' targets", function()
 		others = { { player = "Other", team = "Orange", root = rig.PrimaryPart :: BasePart } }
 		local seen = SkateController:others()
@@ -932,6 +939,9 @@ describe("SkateController", function()
 	end)
 
 	it("steps in under half a millisecond", function()
+		-- With the goal here, the skater outside its tunnel (#423).
+		setup({ ArenaParts = { parts = { goal = { frame = CFrame.new(0, 52, 0), radius = 9 } } } })
+		SkateController:bind(rig)
 		local spots: { { any } } = {
 			{ Vector3.new(0, 0, -5), "Blue" },
 			{ Vector3.new(3, 0, -6), "Blue" },
@@ -951,6 +961,108 @@ describe("SkateController", function()
 			SkateController:step(1 / 60)
 		end
 		Fixtures.expectWithinBudget((os.clock() - started) / 600, 0.0005)
+	end)
+end)
+
+-- #423, the owner's Q339-Q340: anyone resting in the goal's tunnel is pushed back out the way they came.
+describe("SkateController in the goal's tunnel", function()
+	-- The scoring disc 20 up, facing along Z, its radius 9: the tunnel's floor (a barrier, as the goal's shell is) at
+	-- y 11, the skater's collider resting on it; the housing 11 deep round the disc (Arena.goal.housingDepth).
+	local DISC = { frame = CFrame.new(0, 20, 0), radius = 9 }
+	local RESTING = 12
+	local DT = 1 / 60
+	local escape = movement.goalEscape
+
+	-- Steps the skater `steps` times; its velocity after.
+	local function stepFor(steps: number): Vector3
+		for _ = 1, steps do
+			SkateController:step(DT)
+		end
+		return (SkateController.skater :: SkateMath.Skater).velocity
+	end
+
+	beforeEach(function()
+		addBarrier(CFrame.new(0, 10.5, 0), Vector3.new(20, 1, 40))
+		setup({ ArenaParts = { parts = { goal = DISC } } })
+		SkateController:bind(rig)
+	end)
+
+	it("pushes a skater resting inside out of the face they are on once still for the time", function()
+		flying(Vector3.new(0, RESTING, 2), Vector3.zero)
+		-- 0.4 s: still waiting.
+		Fixtures.expectNear(stepFor(24), Vector3.zero, CAST_TOLERANCE)
+		-- By 0.6 s: pushed along the disc's normal toward their side (+Z), never across the disc.
+		Fixtures.expectNear(stepFor(12), Vector3.new(0, 0, escape.push), 0.1)
+	end)
+
+	it("pushes a skater on the back side out of the back", function()
+		flying(Vector3.new(0, RESTING, -2), Vector3.zero)
+		Fixtures.expectNear(stepFor(36), Vector3.new(0, 0, -escape.push), 0.1)
+	end)
+
+	it("leaves a skater resting outside the tunnel be", function()
+		-- Past half the housing's depth (5.5) from the disc.
+		flying(Vector3.new(0, RESTING, 7), Vector3.zero)
+		Fixtures.expectNear(stepFor(60), Vector3.zero, CAST_TOLERANCE)
+	end)
+
+	it("takes the tunnel's depth from the arena's goal", function()
+		-- A housing 20 deep reaches 10 from the disc: a skater 8 from it is inside.
+		setup({
+			Config = Fixtures.config({ Arena = { goal = { housingDepth = 20 } } }),
+			ArenaParts = { parts = { goal = DISC } },
+		})
+		SkateController:bind(rig)
+		flying(Vector3.new(0, RESTING, 8), Vector3.zero)
+		Fixtures.expectNear(stepFor(36), Vector3.new(0, 0, escape.push), 0.1)
+	end)
+
+	it("reads a skater resting on the tunnel's floor as still, after the floor stops the fall", function()
+		-- Still only under 1 stud/s: before the collider's contacts a step's gravity alone (130.8 / 60, ~2.2 studs/s)
+		-- reads as moving.
+		setup({
+			Config = Fixtures.config({ Movement = { goalEscape = { speed = 1 } } }),
+			ArenaParts = { parts = { goal = DISC } },
+		})
+		SkateController:bind(rig)
+		flying(Vector3.new(0, RESTING, 2), Vector3.zero)
+		Fixtures.expectNear(stepFor(36), Vector3.new(0, 0, escape.push), 0.1)
+	end)
+
+	it("leaves the tunnel be until the goal reaches this client", function()
+		setup({ ArenaParts = { parts = nil } })
+		SkateController:bind(rig)
+		flying(Vector3.new(0, RESTING, 2), Vector3.zero)
+		Fixtures.expectNear(stepFor(60), Vector3.zero, CAST_TOLERANCE)
+	end)
+
+	it("lifts a skater standing on ground in the tunnel off it, as a leap does", function()
+		-- A ride surface hoverHeight under the root, below the tunnel's floor: the skater stands on it.
+		addSlab(CFrame.new(0, 10, 0), Vector3.new(20, 1, 40))
+		rig:PivotTo(CFrame.new(0, RESTING + 1, 2))
+		local skater = SkateController.skater :: SkateMath.Skater
+		SkateController:step(DT)
+		expect(skater.mode).toBe("Grounded")
+		local steps = 1
+		while skater.velocity.Z < escape.push / 2 and steps < 60 do
+			SkateController:step(DT)
+			steps += 1
+		end
+		expect(skater.velocity.Z >= escape.push / 2).toBe(true)
+		expect(skater.mode).toBe("Airborne")
+	end)
+
+	it("slides along what the push meets at once, as any push does", function()
+		-- A pane across the tunnel a quarter stud ahead of the collider (its front at z 3): in the pushed step's reach.
+		addBarrier(CFrame.new(0, 15, 3.75), Vector3.new(20, 10, 1))
+		flying(Vector3.new(0, RESTING, 2), Vector3.zero)
+		-- No step writes a push into the pane to the skater body, which would press the collider through it (#176).
+		local fastest = 0
+		for _ = 1, 36 do
+			SkateController:step(DT)
+			fastest = math.max(fastest, velocityOf(rig).Z)
+		end
+		expect(fastest < CAST_TOLERANCE).toBe(true)
 	end)
 end)
 

@@ -615,6 +615,8 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 	local ActionController = require(Client.ActionController) :: any
 	local camera = Fixtures.camera(CFrame.new())
 	local views = others or {}
+	-- No goal: the arena's parts have not reached this client.
+	local arenaParts = { parts = nil }
 	InputController:init({ Config = config, Parent = folder })
 	BallCarrier:init({})
 	RideSurfaces:init({})
@@ -632,6 +634,7 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 		Team = function(): string?
 			return "Blue"
 		end,
+		ArenaParts = arenaParts,
 	})
 	ActionController:init({
 		Config = config,
@@ -640,6 +643,7 @@ function Fixtures.startSkating(folder: Instance, config: Config.GameConfig, loca
 		SkateController = SkateController,
 		-- What hides a pass's receiver (#315 Q155).
 		RideSurfaces = RideSurfaces,
+		ArenaParts = arenaParts,
 		Camera = camera,
 		SendRequest = function() end,
 		LocalId = localId,

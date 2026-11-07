@@ -84,6 +84,9 @@ export type ArenaConfig = {
 		ringRadius: number,
 		-- The housing's outer radius round the opening at its narrowest (its front): the door's bars end inside it.
 		housingRadius: number,
+		-- The housing's depth along the opening's axis, centred on the scoring disc: the goal's tunnel, where a skater
+		-- can come to rest and is pushed out (#423).
+		housingDepth: number,
 		-- The opening's centre above the lowest floor.
 		heightAboveFloor: number,
 		-- The panel's and the door's bars' thickness.
@@ -150,6 +153,7 @@ local defaults: ArenaConfig = {
 	goal = {
 		ringRadius = GoalShape.opening.radius,
 		housingRadius = GoalShape.housing.frontRadius,
+		housingDepth = GoalShape.housing.depth,
 		heightAboveFloor = GoalShape.opening.height,
 		panelThickness = 0.5,
 		panelTransparency = 0.3,
@@ -252,6 +256,7 @@ local fields = Validate.record({
 	goal = Validate.record({
 		ringRadius = size,
 		housingRadius = size,
+		housingDepth = size,
 		heightAboveFloor = size,
 		panelThickness = partSize,
 		panelTransparency = transparency,

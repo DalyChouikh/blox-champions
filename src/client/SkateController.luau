@@ -16,16 +16,19 @@
 -- (`charging`, #312). Pump, brake and the Air Pose go to the server (SkateState); a pose held into the ground is a fall
 -- the server judges from that report, so it is still reported for Network.posedLandingTolerance after the touchdown,
 -- or until the knockdown (#245).
+-- Anyone resting in the goal's tunnel is pushed back out the way they came (Skate/GoalEscape, #423).
 -- This client owns its character's physics, so what it writes moves the character for everyone. It turns the
 -- humanoid's state machine off here, on the owning client only: the server keeps it on so deaths still fire Died.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ArenaParts = require(script.Parent.ArenaParts)
 local Attach = require(ReplicatedStorage.Shared.Skate.Attach)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Draft = require(ReplicatedStorage.Shared.Skate.Draft)
+local GoalEscape = require(ReplicatedStorage.Shared.Skate.GoalEscape)
 local InputController = require(script.Parent.InputController)
 local PlayerIds = require(ReplicatedStorage.Shared.Net.PlayerIds)
 local PlayerList = require(ReplicatedStorage.Shared.Util.PlayerList)
@@ -134,6 +137,10 @@ export type SkateController = {
 	_attach: Attach.Attach,
 	-- The ride surfaces every ray goes through.
 	_surfaces: RideSurfaces.RideSurfaces,
+	-- The goal's scoring disc, round which the tunnel lies, once the arena is here.
+	_arena: ArenaParts.Goal,
+	-- How long the skater has rested in the goal's tunnel.
+	_escape: GoalEscape.State,
 	-- The last physics step's length: an action's push comes during a step and holds until the next.
 	_stepSeconds: number,
 	-- Records reused every step, so a step allocates nothing.
@@ -333,6 +340,28 @@ local function collide(self: SkateController, root: BasePart, skater: SkateMath.
 	end
 end
 
+-- Anyone resting in the goal's tunnel long enough is pushed back out the way they came (the owner, Q339-Q340), as
+-- an action's push is: at once, sliding along whatever it meets.
+local function escapeGoal(self: SkateController, root: BasePart, skater: SkateMath.Skater, dt: number)
+	local parts = self._arena.parts
+	if parts == nil then
+		return
+	end
+	local config = self._config
+	local change = GoalEscape.step(
+		self._escape,
+		parts.goal,
+		config.Arena.goal.housingDepth,
+		root.Position,
+		skater.velocity,
+		dt,
+		config.Movement.goalEscape
+	)
+	if change ~= nil then
+		self:push(change, true)
+	end
+end
+
 -- A touchdown still posing (by the ground ray, or onto a surface the collider met) is reported for
 -- Network.posedLandingTolerance, or until the knockdown (#245, #258).
 local function notePosedLanding(self: SkateController, skater: SkateMath.Skater, dt: number)
@@ -419,7 +448,7 @@ end
 
 local SkateController: SkateController = {
 	name = "SkateController",
-	dependencies = { "Config", "InputController", "RideSurfaces" },
+	dependencies = { "Config", "InputController", "RideSurfaces", "ArenaParts" },
 	skater = nil,
 	pumping = false,
 	braking = false,
@@ -472,6 +501,8 @@ local SkateController: SkateController = {
 	_shownUp = Vector3.yAxis,
 	_attach = nil :: any,
 	_surfaces = nil :: any,
+	_arena = nil :: any,
+	_escape = nil :: any,
 	_stepSeconds = 0,
 	_keys = nil :: any,
 	_input = nil :: any,
@@ -522,6 +553,8 @@ local SkateController: SkateController = {
 		self._smoothNormal = deps.SmoothNormal or SmoothNormals.reader(config.Arena, config.Movement.cornerDeg)
 		self._attach = Attach.new(config.Movement)
 		self._surfaces = deps.RideSurfaces
+		self._arena = deps.ArenaParts
+		self._escape = GoalEscape.new()
 		self._stepSeconds = 0
 		self._keys = InputController.newKeys()
 		self._input = {
@@ -647,6 +680,7 @@ local SkateController: SkateController = {
 		moveSkater(self, root, skater, dt)
 		self._stepSeconds = dt
 		collide(self, root, skater, dt)
+		escapeGoal(self, root, skater, dt)
 		notePosedLanding(self, skater, dt)
 		easeBody(self, skater, dt)
 		apply(self, skater)
