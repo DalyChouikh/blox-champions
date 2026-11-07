@@ -33,7 +33,7 @@ export type BannerKind =
 	| "Lap"
 	| "GoalOpen"
 -- `team`: whose colour it shows (the viewer's for the kickoff's count and GO); `value`: the count's digit, the
--- seconds a clock warning marks, or a completed lap's streak.
+-- seconds a clock warning marks, a completed lap's streak, or the laps of the streak the goal message is for.
 export type Banner = { kind: BannerKind, team: Team?, value: number? }
 export type FeedKind = "Possession" | "Goal"
 -- `id`: a running number, the entry's stable key. `replaced`: a ball line a newer one replaced, fading out.
@@ -107,6 +107,12 @@ local function showBanner(self: HudState, kind: BannerKind, team: Team?, value: 
 	local seconds = self._config.UI.hud.bannerSeconds
 	self.banner = { kind = kind, team = team, value = value }
 	self.bannerLeft = if kind == "Lap" then seconds.lap else seconds.headline
+end
+
+-- The goal message for `laps` laps of `team`'s streak, shown anew (it pops in again).
+local function showMessage(self: HudState, team: Team, laps: number)
+	self.message = { kind = "GoalOpen", team = team, value = laps }
+	self.messageLeft = self._config.UI.hud.bannerSeconds.message
 end
 
 local function addEntry(self: HudState, kind: FeedKind, team: Team, player: PlayerId)
@@ -235,9 +241,15 @@ function HudState.applyEvents(self: HudState, events: { Types.Event })
 			addEntry(self, "Possession", event.team, event.player)
 		elseif event.name == "LapCompleted" then
 			showBanner(self, "Lap", event.team, event.streak)
+			-- Each lap after the one that opened the goal shows its line anew (the owner's Q299). Events count only
+			-- while newer than the last snapshot (HudStore), which by a later lap has the goal open for the team.
+			local match = self.match
+			if match ~= nil and match.goalOpenFor == event.team then
+				showMessage(self, event.team, event.streak)
+			end
 		elseif event.name == "GoalOpened" then
-			self.message = { kind = "GoalOpen", team = event.team }
-			self.messageLeft = self._config.UI.hud.bannerSeconds.message
+			-- The goal opens on its streak's first lap (GoalJudge.lapCompleted).
+			showMessage(self, event.team, 1)
 		elseif event.name == "GoalScored" then
 			showBanner(self, "Goal", event.team, nil)
 			self.message = nil

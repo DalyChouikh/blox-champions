@@ -70,8 +70,9 @@ export type UIText = {
 	possession: string,
 	-- The streak (one value).
 	lapCompleted: string,
-	-- The team's name (one value).
-	goalOpen: string,
+	-- The goal message for each lap of the streak, the team's name (one value): as the goal opens on the first,
+	-- then each lap after; past the list's end its last (#414).
+	goalOpenByLap: { string },
 	-- The scorer's name (one value).
 	scored: string,
 	-- The winning team's name (one value).
@@ -325,8 +326,9 @@ export type HudLayout = {
 -- an ink shadow dropping `shadow` pixels below it; it is its colour at the top and that colour times (1 - shade) at the
 -- bottom. `box` colours a box that is no team's (the clock's, an empty lap chip); a team's parts take UI.teamColors
 -- (Style.teamColor). bannerFont draws a digit's middle bannerDigitRise of its text size above its line's middle; a
--- digit centred in a shape moves down by that (Hud/Countdown). A key's cap is `key` with its name in ink, `pressed`
--- while it pops (the press's mark too); a cooling key's sweep is ink, sweepTransparency see-through.
+-- digit centred in a shape moves down by that (Hud/Countdown, the scoreboard's worth chip). A key's cap is `key` with
+-- its name in ink, `pressed` while it pops (the press's mark too); a cooling key's sweep is ink, sweepTransparency
+-- see-through.
 export type LookSettings = {
 	font: Enum.Font,
 	bannerFont: Enum.Font,
@@ -593,7 +595,8 @@ local defaults: UIConfig = {
 		possession = "%s has the ball",
 		-- Banners now (#356, the owner's Q210-Q211), in capitals like the others; the team's name capitalised as in GO.
 		lapCompleted = "LAP %d COMPLETED",
-		goalOpen = "%s GOAL IS ACTIVE!",
+		-- RC's words as the goal opens (the owner's Q191, Video 4), then Video 35's lap counts (Q299, #414).
+		goalOpenByLap = { "%s GOAL IS ACTIVE!", "2 LAPS FOR %s!", "3 LAPS FOR %s!" },
 		scored = "%s scored!",
 		-- In the banners' capitals (#358, the owner's Q243: the result in GOAL!'s lettering).
 		wins = "%s WINS!",
@@ -1314,7 +1317,14 @@ local fields = Validate.record({
 		speedUnit = label,
 		possession = template(1),
 		lapCompleted = template(1),
-		goalOpen = template(1),
+		goalOpenByLap = Validate.checkAll(Validate.list(template(1)), {
+			{
+				message = "must not be empty",
+				holds = function(lines: { string }): boolean
+					return #lines > 0
+				end,
+			},
+		}),
 		scored = template(1),
 		wins = template(1),
 		mvpLine = template(3),

@@ -121,7 +121,10 @@ function HudText.banner(self: HudText, banner: HudState.Banner): string
 	elseif kind == "Lap" then
 		return string.format(text.lapCompleted, banner.value :: number)
 	elseif kind == "GoalOpen" then
-		return string.format(text.goalOpen, string.upper(self:team(banner.team :: Team.Team)))
+		-- The line for the streak's laps so far, past the list's end its last (#414, the owner's Q299).
+		local lines = text.goalOpenByLap
+		local line = lines[math.min(banner.value :: number, #lines)]
+		return string.format(line, string.upper(self:team(banner.team :: Team.Team)))
 	end
 	-- HudState.BannerKind has only the kinds above: any other is a wiring bug.
 	error(`HudText: no banner text for kind "{kind}"`, 0)

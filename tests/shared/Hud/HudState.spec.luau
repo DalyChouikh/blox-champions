@@ -267,15 +267,52 @@ describe("HudState", function()
 			{ name = "LapCompleted", team = "Blue", streak = 1, holder = "1" },
 			{ name = "GoalOpened", team = "Blue" },
 		})
-		expect(state.message).toEqual({ kind = "GoalOpen", team = "Blue" })
+		expect(state.message).toEqual({ kind = "GoalOpen", team = "Blue", value = 1 })
 		expect(state.banner).toEqual({ kind = "Lap", team = "Blue", value = 1 })
 		expect(state.messageLeft).toBe(seconds)
 		local version = state.version
 		state:step(seconds - 0.01)
-		expect(state.message).toEqual({ kind = "GoalOpen", team = "Blue" })
+		expect(state.message).toEqual({ kind = "GoalOpen", team = "Blue", value = 1 })
 		state:step(0.02)
 		expect(state.message).toBeNil()
 		expect(state.version).toBe(version + 2)
+	end)
+
+	-- RC's "2 laps for Orange!" (Video 35; the owner's Q299, #414): each lap after the goal opened shows its line
+	-- anew, for the team the goal is open for.
+	it("shows each later lap's goal message anew while the goal is open for that team", function()
+		local seconds = config.UI.hud.bannerSeconds.message
+		for _, team: any in { "Blue", "Orange" } do
+			local state = liveState({ goalOpenFor = team })
+			state:applyEvents({ { name = "GoalOpened", team = team } })
+			state:step(seconds - 1)
+			local opened = state.message
+			for lap = 2, 3 do
+				local version = state.version
+				state:applyEvents({ { name = "LapCompleted", team = team, streak = lap, holder = "1" } })
+				expect(state.message).toEqual({ kind = "GoalOpen", team = team, value = lap })
+				expect(state.message == opened).toBe(false)
+				expect(state.messageLeft).toBe(seconds)
+				expect(state.version).toBe(version + 1)
+				opened = state.message
+			end
+		end
+	end)
+
+	it("shows no lap's goal message for a team the goal is not open for", function()
+		-- The goal open for Blue: Orange's lap (its ball taken) leaves Blue's line; no goal open: no line.
+		local state = liveState({ goalOpenFor = "Blue" })
+		state:applyEvents({ { name = "GoalOpened", team = "Blue" } })
+		local blue = state.message
+		state:applyEvents({ { name = "LapCompleted", team = "Orange", streak = 2, holder = "2" } })
+		expect(state.message).toBe(blue)
+		local closed = liveState()
+		closed:applyEvents({ { name = "LapCompleted", team = "Blue", streak = 2, holder = "1" } })
+		expect(closed.message).toBeNil()
+		-- Before the first snapshot, no match is known yet.
+		local fresh = HudState.new(config, VIEWER)
+		fresh:applyEvents({ { name = "LapCompleted", team = "Blue", streak = 2, holder = "1" } })
+		expect(fresh.message).toBeNil()
 	end)
 
 	it("drops the goal message as the goal closes: a goal, a snapshot of it closed or the match's end", function()
@@ -289,7 +326,7 @@ describe("HudState", function()
 		expect(scored.message).toBeNil()
 		local kept = opened()
 		kept:applySnapshot(Fixtures.matchSnapshot({ goalOpenFor = "Blue" }))
-		expect(kept.message).toEqual({ kind = "GoalOpen", team = "Blue" })
+		expect(kept.message).toEqual({ kind = "GoalOpen", team = "Blue", value = 1 })
 		local closed = opened()
 		closed:applySnapshot(Fixtures.matchSnapshot())
 		expect(closed.message).toBeNil()

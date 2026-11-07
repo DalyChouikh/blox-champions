@@ -454,6 +454,15 @@ describe("Hud", function()
 		local group = banner:FindFirstChild("Group", true) :: CanvasGroup
 		expect(group.GroupTransparency).toBeCloseTo(0.875, 4)
 		expect((message:FindFirstChild("Group", true) :: CanvasGroup).GroupTransparency).toBe(0)
+		-- The next lap, the goal still open for Blue: its line replaces the message and pops in again (#414, Q299).
+		HudStore:onSnapshot(Fixtures.matchSnapshot({ goalOpenFor = "Blue" }, 3))
+		HudStore:onEvents(
+			Fixtures.ruleEvents({ { name = "LapCompleted", team = "Blue", streak = 2, holder = "1" } }, 4)
+		)
+		Hud:step(0)
+		message = part("Message") :: Frame
+		expect((message:FindFirstChild("Front", true) :: TextLabel).Text).toBe("2 LAPS FOR BLUE!")
+		expect((message:FindFirstChild("Pop", true) :: UIScale).Scale < 0.01).toBe(true)
 	end)
 
 	-- #379 (the owner's Q242): in session 78 a probe's lap event with no streak broke the banner's render, and React

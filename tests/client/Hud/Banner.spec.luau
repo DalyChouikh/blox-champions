@@ -115,7 +115,7 @@ describe("Banner", function()
 
 	-- The goal message where the feed was, RC's bottom centre (Video 4 at 7:23; Q211).
 	it("puts the goal message's text messageBottom above the stage's bottom", function()
-		local mounted = Fixtures.mount(banner({ kind = "GoalOpen", team = "Orange" }), folder)
+		local mounted = Fixtures.mount(banner({ kind = "GoalOpen", team = "Orange", value = 1 }), folder)
 		local holder = mounted:FindFirstChild("Banner") :: Frame
 		local front = (holder:FindFirstChild("Group", true) :: CanvasGroup):FindFirstChild("Front") :: TextLabel
 		expect(front.Text).toBe("ORANGE GOAL IS ACTIVE!")
@@ -177,7 +177,10 @@ describe("Banner's settings", function()
 		}
 		for _, team: any in { "Blue", "Orange" } do
 			table.insert(banners, { kind = "Go", team = team })
-			table.insert(banners, { kind = "GoalOpen", team = team })
+			-- Each lap's goal message (#414).
+			for lap = 1, #game.UI.text.goalOpenByLap do
+				table.insert(banners, { kind = "GoalOpen", team = team, value = lap })
+			end
 		end
 		for _, seconds in game.UI.clockWarnings do
 			table.insert(banners, { kind = "ClockWarning", value = seconds })
