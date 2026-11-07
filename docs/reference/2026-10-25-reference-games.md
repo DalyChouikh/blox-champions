@@ -2477,6 +2477,28 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   page in Play close up and from the lane: 1 white neon always / 2 team colour while the goal is open, white neon
   while shut / 3 dark like the band): **"2 glow with the lip"**: from the lane the lit lip alone is a thin line; the
   strips make an open goal easy to spot.
+- **Q326 #410 shipped** (session 97, recommended; #410 built: the Halo pylon dressing the goal, its door opening like
+  elevator doors (Q324) and its strips glowing with the lip (Q325); 1474/1474, 36/36 mutations + 1 cost-only guard
+  measured, 0 warnings; the real build in Play on the design page https://claude.ai/artifact/5ddsaHeYTvd7w5sKh9zDk6,
+  section 'The goal opens like elevator doors'): **"just two questions are the goal worth hint later in the todo?,
+  and the goal score effects that later in the art milestone, is it fine if we insta close the goal after a goal
+  score now?, otherwise just ship it yes"**: answered: the worth is #411, next (+1/+3/+5 on a disc in the team's
+  colour); the rules already close the goal the moment the ball goes in (MatchEngine.pointScored -> closeGoal), the
+  lip and strips go white at once and the doors slide shut over 0.4 s during the celebration, so that stays until the
+  goal sequence (Presentation items) and the art milestone's effects. The PR opens stacked on #417; the owner's
+  2-player check of the whole stack stays before its merge (Q321).
+- **Q327 the worth disc fits the opening and glows like the markers** (session 97; #411 built: a disc in the team
+  colour at 0.2 transparency over 0.92 of the opening, +1/+3/+5 popping; Play shots on the design page section 'The
+  goal shows its worth'; asked to ship): **"make the circle fit more the goal, currently it is not well adjusted on
+  the ends, and second, make it more neon, like the markers color, more see through, and finally one question, did
+  we already make the ball color neon or not yet?"**: the disc fills the whole opening (fill 1), glows in the gate
+  markers' look (UI.arenaGlow.material Neon at the glass's transparency, 0.85, as the next gate's wall shows);
+  answered: the carried ball's glow is #415 (Q319 look B, band black), not built yet; it needs the owner's upload of
+  a glow mask, after #412-#414.
+- **Q328 #411 shipped** (session 97, recommended; #411 built after Q327: the disc fills the opening and glows like
+  the gate markers, +1/+3/+5 popping, readable from both sides; 1482/1482; the design page section 'The goal shows
+  its worth'): **"Yes, ship it"**: the PR opens stacked on #418; the owner's 2-player check of the whole stack stays
+  before its merge (Q321).
 
 ## Roller Champions
 

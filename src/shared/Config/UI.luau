@@ -465,6 +465,18 @@ export type ArenaGlowSettings = {
 	beam: { width: number, thickness: number },
 }
 
+-- The goal's worth in its open middle (#411, the owner's Q294; Arena spec §5.3): a disc in the open team's colour,
+-- glowing as the next gate's marker does (arenaGlow.material at Arena.glass.transparency, Q327), `thickness` studs
+-- thick and `fill` of the opening's diameter across, `behind` studs
+-- behind the door's plane so the door's bars and the disc never meet; on both its faces the worth (HudText.worth)
+-- in the banners' lettering, `textHeight` of the disc's diameter tall, popping in with the banners' pop.
+export type GoalWorthSettings = {
+	thickness: number,
+	fill: number,
+	textHeight: number,
+	behind: number,
+}
+
 -- The trail behind a thrown, passed or rolled ball on every screen (§9.4, #313): `lifetime` seconds long and `width`
 -- studs wide in `color`, `transparency` see-through behind the ball, fading to nothing at its end.
 export type BallTrailSettings = { lifetime: number, width: number, color: Color3, transparency: number }
@@ -484,6 +496,7 @@ export type UIConfig = {
 	markers: MarkerSettings,
 	nameTag: NameTagSettings,
 	arenaGlow: ArenaGlowSettings,
+	goalWorth: GoalWorthSettings,
 	ballTrail: BallTrailSettings,
 }
 
@@ -933,6 +946,8 @@ local defaults: UIConfig = {
 		doorSeconds = 0.4,
 		beam = { width = 2, thickness = 0.5 },
 	},
+	-- Filling the opening (Q327), the number about a radius tall as the design page drew it (Q294).
+	goalWorth = { thickness = 0.2, fill = 1, textHeight = 0.55, behind = 0.5 },
 	-- The owner asked for a trail behind the ball (Q98; RC's thrown ball leaves a white streak, Video 4 at
 	-- 366.8-367.0 s and Video 31 at 39.1 s; Illegal Soccer's a white dashed one), white as the crosshair is (Q141)
 	-- and behind a team-coloured ball too, as RC's (Q160), and bolder once a thin faint one was seen from the side
@@ -1466,6 +1481,12 @@ local fields = Validate.record({
 		doorSeconds = nonNegative,
 		-- The beam is one part: Roblox would silently clamp a size outside its part limits.
 		beam = Validate.record({ width = partSize, thickness = partSize }),
+	}),
+	goalWorth = Validate.record({
+		thickness = partSize,
+		fill = Validate.number({ above = 0, max = 1 }),
+		textHeight = Validate.number({ above = 0, max = 1 }),
+		behind = nonNegative,
 	}),
 	ballTrail = Validate.record({
 		lifetime = positive,

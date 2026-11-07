@@ -30,6 +30,7 @@ local DRAWN: { string } = {
 	"Hud",
 	"WorldMarkers",
 	"ArenaGlow",
+	"GoalWorth",
 	"CarrierBeam",
 	"BallTrail",
 	"NameTags",
