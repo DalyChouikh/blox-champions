@@ -1,15 +1,17 @@
 --!strict
 -- The arena's parts the HUD points at and lights (spec §9.1): the corner markers (the gates' glass panels) by gate
--- index, the goal hoop's parts, its up (its pivot's) and its opening, and the goal panel, found by their tags
+-- index, what glows while the goal is open, the goal's opening, its panel and its door, found by their tags
 -- (Arena/Tags); a throw aims at the opening's centre through it (#313). The arena model is Persistent, so it reaches
--- every client whole, soon after the player joins, and stays; until it has, `parts` is nil. One cache every client
--- module reads, refreshed by the tags' signals from start on. Each refresh makes a new record, so a reader sees that it
--- changed.
+-- every client whole, soon after the player joins, and stays; until it has, `parts` is nil. The goal's meshes come
+-- later (GoalLook, #410), and the glow moves to them then, with the door, which the GoalGlow and GoalDoor tags'
+-- signals show. One cache every client module reads, refreshed by the tags' signals from start on. Each refresh
+-- makes a new record, so a reader sees that it changed.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
+local PartsOf = require(ReplicatedStorage.Shared.Util.PartsOf)
 local TaggedLayout = require(ReplicatedStorage.Shared.Arena.TaggedLayout)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 
@@ -20,12 +22,14 @@ export type Marker = { parts: { BasePart }, position: Vector3 }
 export type Parts = {
 	-- By GateIndex.
 	markers: { [number]: Marker },
-	hoop: { BasePart },
-	-- Up in the ring's own plane: the panel slides along it, out of the ring.
-	hoopUp: Vector3,
+	-- What takes the team's colour while the goal is open: every part of everything tagged GoalGlow (the ring's
+	-- blocks until the goal's meshes come, then its lip). It may be empty.
+	glow: { BasePart },
 	-- The scoring disc (TaggedLayout.goalDisc).
 	goal: Crossing.Disc,
 	panel: BasePart,
+	-- The door's bars (Q324): every part of everything tagged GoalDoor, none until the goal's meshes come.
+	door: { BasePart },
 }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its members.
@@ -42,21 +46,7 @@ export type ArenaParts = {
 }
 
 -- Every tag `refresh` reads.
-local WATCHED = { Tags.CornerMarker, Tags.GoalHoop, Tags.GoalPanel }
-
--- Every part of `instance`: its descendants that are parts, and itself when it is one.
-local function partsOf(instance: Instance): { BasePart }
-	local parts: { BasePart } = {}
-	if instance:IsA("BasePart") then
-		table.insert(parts, instance)
-	end
-	for _, descendant in instance:GetDescendants() do
-		if descendant:IsA("BasePart") then
-			table.insert(parts, descendant)
-		end
-	end
-	return parts
-end
+local WATCHED = { Tags.CornerMarker, Tags.GoalHoop, Tags.GoalGlow, Tags.GoalPanel, Tags.GoalDoor }
 
 local function firstPart(tag: string): BasePart?
 	for _, instance in CollectionService:GetTagged(tag) do
@@ -65,6 +55,17 @@ local function firstPart(tag: string): BasePart?
 		end
 	end
 	return nil
+end
+
+-- Every part of everything tagged `tag`.
+local function partsTagged(tag: string): { BasePart }
+	local parts: { BasePart } = {}
+	for _, instance in CollectionService:GetTagged(tag) do
+		for _, part in PartsOf(instance) do
+			table.insert(parts, part)
+		end
+	end
+	return parts
 end
 
 local ArenaParts: ArenaParts = {
@@ -94,23 +95,23 @@ local ArenaParts: ArenaParts = {
 		for _, instance in CollectionService:GetTagged(Tags.CornerMarker) do
 			local index = instance:GetAttribute(Tags.Attribute.GateIndex)
 			if (instance:IsA("Model") or instance:IsA("BasePart")) and type(index) == "number" then
-				markers[index] = { parts = partsOf(instance), position = (instance :: PVInstance):GetPivot().Position }
+				markers[index] = { parts = PartsOf(instance), position = (instance :: PVInstance):GetPivot().Position }
 				count += 1
 			end
 		end
 		local hoopModel = CollectionService:GetTagged(Tags.GoalHoop)[1]
 		local goal = if hoopModel ~= nil then TaggedLayout.goalDisc(hoopModel) else nil
 		local panel = firstPart(Tags.GoalPanel)
-		if count == 0 or hoopModel == nil or goal == nil or panel == nil then
+		if count == 0 or goal == nil or panel == nil then
 			self.parts = nil
 			return
 		end
 		self.parts = {
 			markers = markers,
-			hoop = partsOf(hoopModel),
-			hoopUp = goal.frame.UpVector,
+			glow = partsTagged(Tags.GoalGlow),
 			goal = goal,
 			panel = panel,
+			door = partsTagged(Tags.GoalDoor),
 		}
 	end,
 

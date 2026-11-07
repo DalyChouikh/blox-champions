@@ -529,8 +529,9 @@ export type HudArena = { hoop: Model, rim: { BasePart }, panel: BasePart, marker
 
 -- The arena parts the HUD lights and points at, tagged as the arena builder tags them: a goal hoop of two rim parts,
 -- pivoted at its opening's centre between them, facing along z, with the builder's opening radius (Arena.goal
--- .ringRadius); its panel; and four corner markers 100 studs apart along x, by gate index, each a model of two panes
--- pivoted between them (as a gate panel is at its wall's middle). Anchored, in `folder`.
+-- .ringRadius), glowing while the goal is open as before its meshes come; its panel; and four corner markers 100
+-- studs apart along x, by gate index, each a model of two panes pivoted between them (as a gate panel is at its
+-- wall's middle). Anchored, in `folder`.
 function Fixtures.hudArena(folder: Instance): HudArena
 	local function part(name: string, position: Vector3, parent: Instance): Part
 		local made = Instance.new("Part")
@@ -549,6 +550,7 @@ function Fixtures.hudArena(folder: Instance): HudArena
 	hoop:SetAttribute(Tags.Attribute.OpeningRadius, Config.defaults().Arena.goal.ringRadius)
 	hoop.Parent = folder
 	hoop:AddTag(Tags.GoalHoop)
+	hoop:AddTag(Tags.GoalGlow)
 	local panel = part("GoalPanel", Vector3.new(2, 20, -40), folder)
 	panel:AddTag(Tags.GoalPanel)
 	local markers: { Model } = {}

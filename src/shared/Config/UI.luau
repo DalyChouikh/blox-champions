@@ -456,13 +456,12 @@ export type NameTagSettings = {
 	glove: { ink: number, parts: { GlovePart }, seams: { GlovePart } },
 }
 
--- The goal ring, the next gate's panel and the carrier's beam glow in `material`; the goal panel slides panelSlide
--- studs up out of the ring over panelSlideSeconds. The beam (Arena spec §5.4) is `width` studs along the track and
--- `thickness` across it, on the outer glass's face, as tall as the vertical glass.
+-- The goal's lip and strips (the ring's blocks before its meshes come), the next gate's panel and the carrier's beam
+-- glow in `material`; the goal's door opens and shuts over doorSeconds (Arena spec §5.3). The beam (Arena spec §5.4) is
+-- `width` studs along the track and `thickness` across it, on the outer glass's face, as tall as the vertical glass.
 export type ArenaGlowSettings = {
 	material: Enum.Material,
-	panelSlide: number,
-	panelSlideSeconds: number,
+	doorSeconds: number,
 	beam: { width: number, thickness: number },
 }
 
@@ -931,8 +930,7 @@ local defaults: UIConfig = {
 	},
 	arenaGlow = {
 		material = Enum.Material.Neon,
-		panelSlide = 16,
-		panelSlideSeconds = 0.4,
+		doorSeconds = 0.4,
 		beam = { width = 2, thickness = 0.5 },
 	},
 	-- The owner asked for a trail behind the ball (Q98; RC's thrown ball leaves a white streak, Video 4 at
@@ -1465,8 +1463,7 @@ local fields = Validate.record({
 	}),
 	arenaGlow = Validate.record({
 		material = Validate.enumItem(Enum.Material),
-		panelSlide = positive,
-		panelSlideSeconds = Validate.number({ min = 0 }),
+		doorSeconds = nonNegative,
 		-- The beam is one part: Roblox would silently clamp a size outside its part limits.
 		beam = Validate.record({ width = partSize, thickness = partSize }),
 	}),

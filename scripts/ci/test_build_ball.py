@@ -116,43 +116,5 @@ class ObjText(unittest.TestCase):
         self.assertIn("v 0.000000 0.000000 0.000000\n", text)
 
 
-class CanonicalFaces(unittest.TestCase):
-    QUAD = [(4, (0.75, 0.5)), (9, (0.75, 0.6)), (2, (0.7, 0.6)), (3, (0.7, 0.5))]
-    TRIANGLE = [(16, (0.1, 0.9)), (15, (0.2, 0.9)), (47, (0.15, 1.0))]
-
-    def test_each_face_starts_at_its_lowest_vertex_keeping_its_winding(self):
-        self.assertEqual(
-            build_ball.canonical_faces([self.QUAD]),
-            [[(2, (0.7, 0.6)), (3, (0.7, 0.5)), (4, (0.75, 0.5)), (9, (0.75, 0.6))]],
-        )
-
-    def test_the_same_faces_in_any_order_or_start_come_out_the_same(self):
-        rotated = self.TRIANGLE[1:] + self.TRIANGLE[:1]
-        self.assertEqual(
-            build_ball.canonical_faces([self.TRIANGLE, self.QUAD]),
-            build_ball.canonical_faces([self.QUAD, rotated]),
-        )
-
-    def test_faces_sorted_by_their_vertices(self):
-        faces = build_ball.canonical_faces([self.TRIANGLE, self.QUAD])
-        self.assertEqual([[vertex for vertex, _ in face] for face in faces], [[2, 3, 4, 9], [15, 47, 16]])
-
-
-class ToRoblox(unittest.TestCase):
-    def test_blenders_up_is_robloxs_up(self):
-        self.assertEqual(build_ball.to_roblox((0, 0, 1)), (0, 1, 0))
-
-    def test_blenders_forward_is_robloxs_minus_z(self):
-        self.assertEqual(build_ball.to_roblox((0, 1, 0)), (0, 0, -1))
-        self.assertEqual(build_ball.to_roblox((1, 0, 0)), (1, 0, 0))
-
-    def test_a_turn_not_a_mirror_so_faces_keep_their_winding(self):
-        def cross(a, b):
-            return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
-
-        a, b = (1, 2, 3), (-2, 0.5, 4)
-        self.assertEqual(build_ball.to_roblox(cross(a, b)), cross(build_ball.to_roblox(a), build_ball.to_roblox(b)))
-
-
 if __name__ == "__main__":
     unittest.main()

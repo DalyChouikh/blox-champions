@@ -234,6 +234,14 @@ function Validate.pixels(): Validator
 	end, "must be in pixels (scales 0, offsets > 0)")
 end
 
+-- A Roblox asset id, rbxassetid://<number>: a mesh made in Blender and imported once by the owner (the ball's, the
+-- goal's pieces).
+function Validate.assetId(): Validator
+	return Validate.check(Validate.string(), function(id: string): boolean
+		return string.match(id, "^rbxassetid://%d+$") ~= nil
+	end, "must be an asset id (rbxassetid://<number>)")
+end
+
 export type Rule = { message: string, holds: (value: any) -> boolean }
 
 -- Rules checked in order once the inner validator passes; only the first that fails is reported.

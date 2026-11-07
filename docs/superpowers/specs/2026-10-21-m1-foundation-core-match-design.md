@@ -395,7 +395,7 @@ The arena follows the M1 overhaul's Arena spec (`docs/superpowers/specs/2026-10-
 - **The goal (R7):** `goalGateIndex = 2`. The upright ring hangs over the track in Gate 2's plane:
   - its centre is `goal.across` (0.75) of the way from the inner glass to the outer glass, `goal.heightAboveFloor` (29; 18 until #268) up, and its front faces oncoming skaters;
   - it hangs from a decorative arm: a post from the rim's top up to `goal.arm.height` (51; 40 until #268), then a beam out to the outer glass;
-  - when open, its panel slides away and the ring glows in the possessing team's color.
+  - when open, its door parts from the middle (the owner's Q324, #410) and the ring glows in the possessing team's color.
 - **Gate panels (R6, R18, amended after the playtest):** they replace the flat corner markers.
   - At every gate a thin glass wall (`gatePanel.depth` 0.2) fills the track's whole cross-section, from the surface up to the walls' top, and skaters pass through it.
   - Nothing hits, sees or touches a wall. Only the next gate's wall shows, glowing in the possessing team's color; every other wall is invisible. Every streak starts at the goal's gate (§4.2), so its wall shows from the pickup. The ball carrier sees an on-screen arrow to its middle. Once the streak has counted its last lap, no wall shows (§4.2, #384).

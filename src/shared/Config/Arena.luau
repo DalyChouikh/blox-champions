@@ -4,8 +4,23 @@
 -- turns these numbers into parts; the cross-field checks here, and the goal ring's fit checked in Arena/Geometry,
 -- reject sizes that could not be built without overlaps or gaps.
 
+local GoalPieces = require(script.Parent.GoalPieces)
+local GoalShape = require(script.Parent.GoalShape)
 local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
+
+-- A piece of the goal's mesh as the build left it (scripts/art/build_goal.py): its box in the goal's frame, the track's
+-- own at the opening's centre (Centerline.at), since Roblox centres an imported mesh on its box.
+export type GoalBox = { centre: Vector3, size: Vector3 }
+-- The goal's four meshes by name, as the build names them.
+export type GoalPiece = "Shell" | "Strips" | "Lip" | "Band"
+export type GoalMeshes<T> = { Shell: T, Strips: T, Lip: T, Band: T }
+-- How a piece of the goal looks; one that `glows` takes the team's colour while the goal is open (ArenaGlow).
+export type GoalLook = { color: Color3, material: Enum.Material, glows: boolean }
+
+-- The pieces in the build's order, the one each mesh is asked for in.
+local goalPieces: { GoalPiece } = { "Shell", "Strips", "Lip", "Band" }
+table.freeze(goalPieces)
 
 -- A map's top (Arena spec R14): Closed, a glass roof across the walls' top; Open, an invisible ceiling above it.
 export type TopKind = "Closed" | "Open"
@@ -64,20 +79,33 @@ export type ArenaConfig = {
 	top: { kind: TopKind, ceilingAbove: number },
 	goalGateIndex: number,
 	goal: {
-		-- The opening's radius, which is also the scoring disc's.
+		-- The Halo pylon (#410, the owner's Q310-Q315): its numbers are GoalShape.json's, the ones its mesh was built
+		-- from, so the mesh and the rules never disagree. The opening's radius, which is also the scoring disc's.
 		ringRadius: number,
-		-- The ring's centre above the lowest floor: 29 since #268 (was 18), trial 6's, as the floor under it rose.
+		-- The housing's outer radius round the opening at its narrowest (its front): the door's bars end inside it.
+		housingRadius: number,
+		-- The opening's centre above the lowest floor.
 		heightAboveFloor: number,
+		-- The panel's and the door's bars' thickness.
 		panelThickness: number,
-		-- The panel starts closed: see-through enough to show the ring is shut.
+		-- The panel starts closed: see-through enough to show the ring is shut. It is the goal's look until the
+		-- meshes come; then the door is.
 		panelTransparency: number,
 		rimThickness: number,
 		rimSegments: number,
-		-- Where the ring's centre hangs across the track (R7): a fraction of trackWidth from the inner glass's face.
+		-- The opening's centre's distance from the middle glass's face (Q315: the whole opening in front of the pylon).
 		across: number,
-		-- The decorative arm the ring hangs from (Arena spec §5.3): a post from the rim's top up to `height` above the
-		-- lowest floor, then a beam at that height out to the outer glass's face, both `thickness` square.
-		arm: { thickness: number, height: number },
+		-- The pylon the ring grows out of, set in the outer wall: from its foot at the outer glass line to its top,
+		-- both above the lowest floor.
+		pylon: { foot: number, top: number },
+		-- The door that shuts the opening once the meshes come (Q324: elevator doors parting from the middle):
+		-- `bars` horizontal bars a half, each reaching `past` studs beyond the opening into the housing
+		-- (Arena/Geometry/GoalDoor).
+		door: { bars: number, past: number },
+		-- The owner's import of the build's goal.glb: one mesh per piece.
+		meshes: GoalMeshes<string>,
+		pieces: GoalMeshes<GoalBox>,
+		looks: GoalMeshes<GoalLook>,
 	},
 	-- The glass panel at each gate (R18): a thin wall across the track, filling its whole cross-section from the
 	-- surface up to the walls' top, `depth` thick along the track (thinner than the goal's parts: a rule below).
@@ -91,6 +119,14 @@ export type ArenaConfig = {
 	-- glass: the glass walls', a closed map's roof and the gate walls.
 	colors: { surface: Color3, infield: Color3, goal: Color3, glass: Color3 },
 }
+
+-- A piece's box as GoalPieces.json holds it ({ x, y, z } lists), as Vector3s.
+local function builtBox(box: { centre: { number }, size: { number } }): GoalBox
+	return {
+		centre = Vector3.new(box.centre[1], box.centre[2], box.centre[3]),
+		size = Vector3.new(box.size[1], box.size[2], box.size[3]),
+	}
+end
 
 local defaults: ArenaConfig = {
 	straightLength = 260,
@@ -109,14 +145,37 @@ local defaults: ArenaConfig = {
 	top = { kind = "Closed", ceilingAbove = 20 },
 	goalGateIndex = 2,
 	goal = {
-		ringRadius = 7,
-		heightAboveFloor = 29,
+		ringRadius = GoalShape.opening.radius,
+		housingRadius = GoalShape.housing.frontRadius,
+		heightAboveFloor = GoalShape.opening.height,
 		panelThickness = 0.5,
 		panelTransparency = 0.3,
 		rimThickness = 1,
 		rimSegments = 16,
-		across = 0.75,
-		arm = { thickness = 1, height = 51 },
+		across = GoalShape.opening.across,
+		pylon = { foot = GoalShape.pylon.foot, top = GoalShape.pylon.top },
+		-- Solid, in colors.goal: see-through bars showed thin lines where they meet (session 97's probe).
+		door = { bars = 10, past = 0.25 },
+		meshes = {
+			Shell = "rbxassetid://84830303766448",
+			Strips = "rbxassetid://118580242013929",
+			Lip = "rbxassetid://140570633067423",
+			Band = "rbxassetid://85653016160285",
+		},
+		pieces = {
+			Shell = builtBox(GoalPieces.pieces.Shell),
+			Strips = builtBox(GoalPieces.pieces.Strips),
+			Lip = builtBox(GoalPieces.pieces.Lip),
+			Band = builtBox(GoalPieces.pieces.Band),
+		},
+		-- Q315's renders: a warm white body and lip, a dark band. The lip glows in the team's colour while the goal is
+		-- open, as the ring did, and so do the strips, white neon while it is shut (Q325).
+		looks = {
+			Shell = { color = Color3.fromRGB(245, 242, 236), material = Enum.Material.SmoothPlastic, glows = false },
+			Strips = { color = Color3.fromRGB(255, 255, 255), material = Enum.Material.Neon, glows = true },
+			Lip = { color = Color3.fromRGB(245, 242, 236), material = Enum.Material.SmoothPlastic, glows = true },
+			Band = { color = Color3.fromRGB(16, 19, 29), material = Enum.Material.SmoothPlastic, glows = false },
+		},
 	},
 	gatePanel = { depth = 0.2 },
 	teamSpawnSpacing = 10,
@@ -131,12 +190,17 @@ local defaults: ArenaConfig = {
 }
 
 local size = Validate.number({ above = 0 })
--- Sizes one part directly (the infield, a gate, a wall slab, a glass slab, a gate panel, the goal's panel and arm), so
--- it must be a size Roblox builds as given instead of clamping.
+-- Sizes one part directly (the infield, a gate, a wall slab, a glass slab, a gate panel, the goal's panel and rim),
+-- so it must be a size Roblox builds as given instead of clamping.
 local partSize = Validate.number({ min = PartSize.MIN, max = PartSize.MAX })
-local fraction = Validate.number({ min = 0, max = 1 })
-local transparency = fraction
+local transparency = Validate.number({ min = 0, max = 1 })
 local color = Validate.datatype("Color3")
+local vector = Validate.datatype("Vector3")
+
+-- One `item` for each of the goal's four meshes.
+local function goalMeshes(item: Validate.Validator): Validate.Validator
+	return Validate.record({ Shell = item, Strips = item, Lip = item, Band = item })
+end
 
 local fields = Validate.record({
 	straightLength = partSize,
@@ -180,14 +244,25 @@ local fields = Validate.record({
 	goalGateIndex = Validate.number({ min = 1, max = 4, integer = true }),
 	goal = Validate.record({
 		ringRadius = size,
+		housingRadius = size,
 		heightAboveFloor = size,
 		panelThickness = partSize,
 		panelTransparency = transparency,
 		rimThickness = partSize,
 		rimSegments = Validate.number({ min = 3, integer = true }),
-		across = fraction,
-		-- Its height is judged against the ring and the lips by Arena/Geometry.
-		arm = Validate.record({ thickness = partSize, height = size }),
+		-- Its fit across the track and under the lips is judged by Arena/Geometry.
+		across = size,
+		pylon = Validate.record({ foot = size, top = size }),
+		-- Its fit in the housing is judged by Arena/Geometry.
+		door = Validate.record({
+			bars = Validate.number({ min = 1, integer = true }),
+			past = Validate.number({ min = 0 }),
+		}),
+		meshes = goalMeshes(Validate.assetId()),
+		pieces = goalMeshes(Validate.record({ centre = vector, size = vector })),
+		looks = goalMeshes(
+			Validate.record({ color = color, material = Validate.enumItem(Enum.Material), glows = Validate.boolean() })
+		),
 	}),
 	gatePanel = Validate.record({ depth = partSize }),
 	teamSpawnSpacing = size,
@@ -205,8 +280,8 @@ local function straightFootStart(arena: ArenaConfig): Vector2
 	return Vector2.new(across, straight.riseHeight + (across - straight.riseEnd) * math.tan(incline))
 end
 
--- Checked in order; the first that fails is reported. Whether the goal ring and its arm fit is judged by Arena/Geometry
--- against the arena as built (Features.goal), which config cannot require.
+-- Checked in order; the first that fails is reported. Whether the goal ring and its pylon fit is judged by
+-- Arena/Geometry against the arena as built (Features.goal), which config cannot require.
 local crossFieldRules: { Validate.Rule } = {
 	{
 		message = "trackWidth must fit the straights' pieces in order: the inner bank, the spawn room, the rise, the "
@@ -273,7 +348,14 @@ local crossFieldRules: { Validate.Rule } = {
 			.. "goal's",
 		holds = function(arena: ArenaConfig): boolean
 			local goal = arena.goal
-			return arena.gatePanel.depth < math.min(goal.rimThickness, goal.panelThickness, goal.arm.thickness) / 2
+			return arena.gatePanel.depth < math.min(goal.rimThickness, goal.panelThickness) / 2
+		end,
+	},
+	{
+		-- Q315: the pylon rises from the solid wall's top, where the outer wall starts looking like glass (#409).
+		message = "the goal's pylon must stand on the outer wall's glass line (goal.pylon.foot = glassLook.outerWall)",
+		holds = function(arena: ArenaConfig): boolean
+			return arena.goal.pylon.foot == arena.glassLook.outerWall
 		end,
 	},
 }
@@ -283,4 +365,5 @@ local schema = Validate.checkAll(fields, crossFieldRules)
 return {
 	defaults = defaults,
 	schema = schema,
+	goalPieces = goalPieces,
 }

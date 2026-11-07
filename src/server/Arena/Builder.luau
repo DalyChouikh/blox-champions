@@ -1,14 +1,18 @@
 --!strict
 -- Turns the pure arena geometry into anchored, tagged parts (spec §9.2). Every piece is checked before any part
 -- is created, and the model is assembled unparented and parented last, so a failed build leaves nothing in the
--- place (spec §13).
+-- place (spec §13). The goal's meshes come later (GoalLook): dressGoal puts them on the built goal.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Arena = require(ReplicatedStorage.Shared.Config.Arena)
 local Config = require(ReplicatedStorage.Shared.Config)
+local DrawOnly = require(ReplicatedStorage.Shared.Util.DrawOnly)
 local Finite = require(ReplicatedStorage.Shared.Util.Finite)
 local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
+local GoalDoor = require(ReplicatedStorage.Shared.Arena.Geometry.GoalDoor)
 local PartSize = require(ReplicatedStorage.Shared.Util.PartSize)
+local PartsOf = require(ReplicatedStorage.Shared.Util.PartsOf)
 local Tags = require(ReplicatedStorage.Shared.Arena.Tags)
 local Team = require(ReplicatedStorage.Shared.Rules.Team)
 local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
@@ -16,7 +20,7 @@ local Types = require(ReplicatedStorage.Shared.Arena.Geometry.Types)
 type ArenaConfig = Config.ArenaConfig
 type Piece = Types.Piece
 
--- Invisible parts: the tag-only gates and an open map's ceiling.
+-- Invisible parts: the tag-only gates, an open map's ceiling, and the goal ring's blocks and panel under its meshes.
 local HIDDEN = 1
 
 local Builder = {}
@@ -43,7 +47,6 @@ local function validate(geometry: Geometry.ArenaGeometry)
 		{ name = "infield", pieces = geometry.infield },
 		{ name = "goal rim", pieces = geometry.goal.rim },
 		{ name = "goal panel", pieces = { geometry.goal.panel } },
-		{ name = "goal arm", pieces = geometry.goal.arm },
 	}
 	for index, panel in geometry.gatePanels do
 		table.insert(groups, { name = `gate panel {index}`, pieces = panel.pieces })
@@ -88,17 +91,9 @@ local function addSolid(piece: Piece, name: string, color: Color3, parent: Insta
 	return part
 end
 
--- Takes no part in collisions, touches or raycasts.
-local function ghost(part: BasePart): BasePart
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	return part
-end
-
 -- Carries a tag for gameplay code but takes no part in collisions, touches or raycasts.
 local function addGhost(name: string, cframe: CFrame, size: Vector3, transparency: number, parent: Instance): BasePart
-	local part = ghost(newPart("Block", name, cframe, size))
+	local part = DrawOnly(newPart("Block", name, cframe, size))
 	part.Transparency = transparency
 	part.Parent = parent
 	return part
@@ -173,7 +168,7 @@ local function addGatePanels(panels: { Types.GatePanel }, arena: ArenaConfig, pa
 		local model = Instance.new("Model")
 		model.Name = `GatePanel{gate}`
 		for index, piece in panel.pieces do
-			lookLikeGlass(ghost(addSolid(piece, `Pane{index}`, arena.colors.glass, model)), arena)
+			lookLikeGlass(DrawOnly(addSolid(piece, `Pane{index}`, arena.colors.glass, model)), arena)
 		end
 		model.WorldPivot = panel.pivot
 		model:SetAttribute(Tags.Attribute.GateIndex, gate)
@@ -182,6 +177,9 @@ local function addGatePanels(panels: { Types.GatePanel }, arena: ArenaConfig, pa
 	end
 end
 
+-- The goal (Arena spec §5.3): the hoop, a ring of blocks that gives the ring its collision and the rules its opening
+-- (its pivot and OpeningRadius), and the panel that shuts it. Until the goal's meshes come (dressGoal) the blocks are
+-- its look too, glowing while the goal is open.
 local function buildGoal(goal: Types.Goal, arena: ArenaConfig, parent: Instance)
 	local color = arena.colors.goal
 	local hoop = Instance.new("Model")
@@ -190,16 +188,12 @@ local function buildGoal(goal: Types.Goal, arena: ArenaConfig, parent: Instance)
 	hoop.WorldPivot = goal.frame
 	hoop:SetAttribute(Tags.Attribute.OpeningRadius, goal.openingRadius)
 	hoop:AddTag(Tags.GoalHoop)
+	hoop:AddTag(Tags.GoalGlow)
 	hoop.Parent = parent
 
 	local panel = addSolid(goal.panel, "GoalPanel", color, parent)
 	panel.Transparency = arena.goal.panelTransparency
 	panel:AddTag(Tags.GoalPanel)
-
-	-- The arm the ring hangs from is decoration: skaters and the ball pass through it, and no ray sees it.
-	for index, piece in goal.arm do
-		ghost(addSolid(piece, `Arm{index}`, color, parent))
-	end
 end
 
 local function buildSpawns(geometry: Geometry.ArenaGeometry, config: Config.GameConfig, parent: Instance)
@@ -249,6 +243,52 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 
 	model.Parent = parent
 	return model
+end
+
+-- Puts the goal's meshes (the Halo pylon, #410; in Arena.goalPieces' order) on a built goal: each at its box in the
+-- hoop's frame, in its look, only drawing, in a GoalLook model beside the hoop, with the door that shuts the
+-- opening (Q324), whose bars' ends the housing hides: solid, in the goal's colour, only drawing, in a model
+-- tagged GoalDoor. The ring's blocks and the panel then hide, keeping the ring's collision, the rules' opening and
+-- the shut goal's wall, and what glows while the goal is open moves from the blocks to the pieces whose look glows.
+function Builder.dressGoal(hoop: PVInstance, panel: BasePart, meshes: { MeshPart }, arena: ArenaConfig)
+	local goal = arena.goal
+	local frame = hoop:GetPivot()
+	local look = Instance.new("Model")
+	look.Name = "GoalLook"
+	for index, name in Arena.goalPieces do
+		local mesh = DrawOnly(meshes[index])
+		local box, wanted = goal.pieces[name], goal.looks[name]
+		mesh.Name = name
+		mesh.Anchored = true
+		mesh.Size = box.size
+		mesh.CFrame = frame * CFrame.new(box.centre)
+		mesh.Color = wanted.color
+		mesh.Material = wanted.material
+		if wanted.glows then
+			mesh:AddTag(Tags.GoalGlow)
+		end
+		mesh.Parent = look
+	end
+	local door = Instance.new("Model")
+	door.Name = "GoalDoor"
+	for index, bar in GoalDoor.bars(arena) do
+		DrawOnly(
+			addSolid(
+				{ shape = bar.shape, cframe = frame * bar.cframe, size = bar.size },
+				`Bar{index}`,
+				arena.colors.goal,
+				door
+			)
+		)
+	end
+	door:AddTag(Tags.GoalDoor)
+	door.Parent = look
+	for _, block in PartsOf(hoop) do
+		block.Transparency = HIDDEN
+	end
+	panel.Transparency = HIDDEN
+	hoop:RemoveTag(Tags.GoalGlow)
+	look.Parent = hoop.Parent
 end
 
 return Builder

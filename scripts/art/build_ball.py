@@ -20,6 +20,11 @@ import sys
 import zlib
 from pathlib import Path
 
+# Blender runs a --python script without its folder on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from meshkit import Vector, canonical_faces, number, to_roblox
+
 RADIUS = 1.0
 SEGMENTS = 64
 RINGS = 32
@@ -62,24 +67,8 @@ def default_picture() -> bytes:
     return png_rgba(PICTURE_WIDTH, PICTURE_HEIGHT, rows)
 
 
-Vector = tuple[float, float, float]
 # A triangle's three corners, each (vertex index, paint map index), counted from 0.
 Triangle = tuple[tuple[int, int], tuple[int, int], tuple[int, int]]
-# A face's corner as Blender gives it: (vertex index, its point on the paint map).
-Corner = tuple[int, tuple[float, float]]
-
-
-def to_roblox(point: Vector) -> Vector:
-    """Blender's Z-up axes to Roblox's Y-up ones: a quarter turn about X (a turn, not a mirror, so faces keep their
-    winding), Blender's forward (+Y) becoming Roblox's -Z."""
-    x, y, z = point
-    return (x, z, -y)
-
-
-def number(value: float) -> str:
-    """Six decimals, never "-0.000000" (Blender's -0.0 and float dust would otherwise change bytes between builds)."""
-    text = f"{value:.6f}"
-    return "0.000000" if text == "-0.000000" else text
 
 
 def obj_text(
@@ -93,17 +82,6 @@ def obj_text(
     lines += ["vn " + " ".join(map(number, normal)) for normal in normals]
     lines += ["f " + " ".join(f"{v + 1}/{t + 1}/{v + 1}" for v, t in triangle) for triangle in triangles]
     return "\n".join(lines) + "\n"
-
-
-def canonical_faces(faces: list[list[Corner]]) -> list[list[Corner]]:
-    """The faces in one order whatever order Blender lists them in (its UV sphere's faces come out in a different
-    order on every run; the vertices do not): each starts at its lowest vertex, its winding kept, and they are sorted
-    by their vertices."""
-    started = []
-    for face in faces:
-        lowest = min(range(len(face)), key=lambda corner: face[corner][0])
-        started.append(face[lowest:] + face[:lowest])
-    return sorted(started, key=lambda face: [vertex for vertex, _ in face])
 
 
 def ball_mesh() -> str:

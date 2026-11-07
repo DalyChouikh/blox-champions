@@ -96,6 +96,8 @@ describe("TaggedLayout.read", function()
 		local arena = TaggedLayout.read(root)
 		expect(arena.layout.goal.frame.Position).toEqual(Vector3.new(0, 18, -73))
 		expect(arena.layout.goal.radius).toBe(7)
+		-- The hoop itself too: the server dresses it in the goal's meshes once they come (#410, GoalLook).
+		expect(arena.goalHoop == child(root, "GoalHoop")).toBe(true)
 		expect(arena.goalPanel.Name).toBe("GoalPanel")
 		expect(#arena.markers).toBe(4)
 		expect(arena.markers[2].Name).toBe("Marker2")
