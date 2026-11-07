@@ -88,6 +88,33 @@ class DefaultPicture(unittest.TestCase):
         self.assertEqual(build_ball.INK, (11, 14, 24))
 
 
+class GlowMask(unittest.TestCase):
+    """#415 (Q319): the carried ball glows in its team's colour, its band staying fully black."""
+
+    def test_white_where_it_glows_black_over_the_band_opaque(self):
+        width, height, rows = pixels(build_ball.default_glow_mask())
+        self.assertEqual((width, height), (build_ball.PICTURE_WIDTH, HEIGHT))
+        for index, row in enumerate(rows):
+            level = round(255 * (1 - build_ball.band_coverage(index)))
+            self.assertEqual(row, bytes((level, level, level, 255)) * width, index)
+
+    def test_the_poles_glow_fully_and_the_bands_middle_not_at_all(self):
+        _, _, rows = pixels(build_ball.default_glow_mask())
+        self.assertEqual(rows[0][:4], b"\xff\xff\xff\xff")
+        self.assertEqual(rows[HEIGHT // 2][:4], b"\x00\x00\x00\xff")
+
+    def test_glows_exactly_where_the_band_picture_is_see_through(self):
+        _, _, glow = pixels(build_ball.default_glow_mask())
+        _, _, band = pixels(build_ball.default_picture())
+        self.assertEqual([row[0] + band[index][3] for index, row in enumerate(glow)], [255] * HEIGHT)
+
+    def test_only_the_three_needed_chunks(self):
+        self.assertEqual([kind for kind, _ in chunks(build_ball.default_glow_mask())], [b"IHDR", b"IDAT", b"IEND"])
+
+    def test_the_same_bytes_every_time(self):
+        self.assertEqual(build_ball.default_glow_mask(), build_ball.default_glow_mask())
+
+
 class ObjText(unittest.TestCase):
     def test_positions_paint_map_normals_and_triangles_counted_from_one(self):
         text = build_ball.obj_text(

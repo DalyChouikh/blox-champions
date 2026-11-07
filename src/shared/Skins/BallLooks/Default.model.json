@@ -2,6 +2,8 @@
 	"className": "SurfaceAppearance",
 	"properties": {
 		"AlphaMode": "Overlay",
-		"ColorMap": "rbxassetid://116153101881100"
+		"ColorMap": "rbxassetid://116153101881100",
+		"EmissiveMaskContent": "rbxassetid://115574465797681",
+		"EmissiveStrength": 0
 	}
 }

@@ -5,7 +5,9 @@
 --   until a team has since the kickoff (the owner, #327, Q158, Q159: Roller Champions', Video 31), painted on its look
 --   (#400: what draws the unseen ball part, Ball/Look; the skin's picture lies over that colour). A client's write
 --   stays on its client and the server never writes the colour again, so it is written when the look or the colour
---   changes (a respawn's new ball arrives in its skin's);
+--   changes (a respawn's new ball arrives in its skin's); with a team's colour it also glows in it, carried or not,
+--   where its skin's glow mask is white, its band staying black (#415, Q319, Q345: RC's carried ball, Videos 4, 35 and
+--   36), and is unlit while neutral;
 -- - a ring around the ball, seen through walls (a BillboardGui, AlwaysOnTop), as wide as the ball plus ringSize pixels;
 -- - a line from the ball down to a disc on the ground below it (one ray through the ride surfaces), both hidden when
 --   nothing lies within groundProbe studs.
@@ -49,10 +51,10 @@ export type WorldMarkers = {
 	_stroke: UIStroke,
 	-- The ball's colour until a team holds it: its skin's.
 	_neutral: Color3,
-	-- What was last written: the marks' colour, and the ball's look given a colour and that colour.
+	-- What was last written: the marks' colour, and the ball's look given a team's colour and glow, and that team.
 	_color: Color3?,
 	_worn: BasePart?,
-	_wornColor: Color3?,
+	_wornTeam: Team?,
 	_hasBall: boolean,
 	_grounded: boolean,
 }
@@ -71,13 +73,21 @@ local function paint(self: WorldMarkers, color: Color3)
 	self.line.Color = ColorSequence.new(color)
 end
 
--- The ball's look in `team`'s colour, or its skin's with no team, written when the look or the colour changes.
+-- The ball's look in `team`'s colour and glowing in it, or in its skin's colour and unlit with no team, written when
+-- the look or the team changes.
 local function wear(self: WorldMarkers, look: BasePart?, team: Team?)
+	if look == nil or (look == self._worn and team == self._wornTeam) then
+		return
+	end
+	self._worn = look
+	self._wornTeam = team
 	local color = if team ~= nil then self._config.UI.teamColors[team] else self._neutral
-	if look ~= nil and (look ~= self._worn or color ~= self._wornColor) then
-		look.Color = color
-		self._worn = look
-		self._wornColor = color
+	look.Color = color
+	-- A plain sphere, before the mesh comes, has no paint to light.
+	local appearance = look:FindFirstChildOfClass("SurfaceAppearance")
+	if appearance ~= nil then
+		appearance.EmissiveStrength = if team ~= nil then self._config.Ball.teamGlow else 0
+		appearance.EmissiveTint = color
 	end
 end
 
@@ -136,7 +146,7 @@ local WorldMarkers: WorldMarkers = {
 	_neutral = Color3.new(),
 	_color = nil,
 	_worn = nil,
-	_wornColor = nil,
+	_wornTeam = nil,
 	_hasBall = false,
 	_grounded = false,
 
@@ -156,7 +166,6 @@ local WorldMarkers: WorldMarkers = {
 		self._neutral = BallSkins.get(BallSkins.DEFAULT).color
 		self._color = nil
 		self._worn = nil
-		self._wornColor = nil
 		self._hasBall = false
 		self._grounded = false
 		local parent = deps.Parent or (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")

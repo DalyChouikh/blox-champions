@@ -103,6 +103,7 @@ describe("Config defaults", function()
 			releaseClearance = 0.05,
 			meshId = "rbxassetid://85389727461936",
 			lookSpinLimit = 15,
+			teamGlow = 8,
 		})
 		expect(d.Network).toEqual({
 			pickupLagToleranceStuds = 2,
@@ -1554,6 +1555,20 @@ describe("Config.forMode", function()
 			end).toThrow(case.message)
 		end
 		expect(Fixtures.config({ Ball = { lookSpinLimit = 0.01 } }).Ball.lookSpinLimit).toBe(0.01)
+	end)
+
+	-- #415 (the owner's Q319, Q345): the ball glows in the colour of the team that last held it; a glow of nothing
+	-- would not show it.
+	it("rejects a ball's team glow that is not a positive finite strength", function()
+		local cases: { { glow: any, message: string } } = {
+			{ glow = 0, message = "Ball.teamGlow: must be > 0 (got 0)" },
+			{ glow = math.huge, message = "Ball.teamGlow: must be finite" },
+		}
+		for _, case in cases do
+			expect(function()
+				Fixtures.config({ Ball = { teamGlow = case.glow } })
+			end).toThrow(case.message)
+		end
 	end)
 
 	-- The owner (Q91, Q132, Q139, #311, #316): a caught ball flies into the hand over 0.2 s on every screen.
