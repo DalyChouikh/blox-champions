@@ -2607,6 +2607,16 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   whole pixels, as the countdown's digit already did (Luckiest Guy draws digits high): 4 px on desktop (26 px text)
   and on the phone (22 px); Play shots on both show it in the chip's middle. The PR opens stacked on #426; the
   owner's 2-player check of the whole stack stays before its merge (Q321).
+- **Q344 #424 shipped** (session 102, recommended; #424 built after diagnosing it in Studio: at a Play start the
+  server places the new skater on its spawn while it still owns its physics, and the client takes them over 6 ms
+  later, at times still reporting Roblox's own spot over the arena's centre, which the guard returned and logged; for
+  Network.guardPlacementSeconds (1 s) after any placement a report within that time's skating of the spot before is
+  the client's from before it saw the placement: the skater is still put back on the spawn, without a strike or a
+  log line, and a real teleport elsewhere is still returned and logged; 1534/1534; 28 mutations, 27 caught, 1
+  equivalent; Play: stand-in reports 0.1 and 0.3 s after a respawn put back silently, the same jump 2.5 s after put
+  back and logged, then 5 Play starts and 4 respawns with clean consoles; not shown: the real start race after the
+  fix, not seen in 7 starts before it either): **"Yes, ship it"**: the PR opens stacked on #427; the owner's 2-player
+  check of the whole stack stays before its merge (Q321).
 
 ## Roller Champions
 

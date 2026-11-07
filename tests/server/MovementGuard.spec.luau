@@ -158,7 +158,7 @@ describe("MovementGuard", function()
 		function()
 			moveTo(START_X + 20)
 			tick()
-			characterService.placed:Fire("1")
+			Fixtures.announcePlacement(characterService.placed, "1", rig, rig:GetPivot())
 			ball.state.carrier = "1"
 			rig:PivotTo(CFrame.new(START_X, -10, LANE_Z))
 			tick()
@@ -188,11 +188,40 @@ describe("MovementGuard", function()
 
 	it("trusts the server's placements", function()
 		tick()
-		characterService.placed:Fire("1")
 		-- On the other straight: far, but inside the arena.
-		rig:PivotTo(CFrame.new(0, 3, -LANE_Z))
+		Fixtures.announcePlacement(characterService.placed, "1", rig, CFrame.new(0, 3, -LANE_Z))
 		tick()
 		expect(#logs).toBe(0)
+	end)
+
+	-- #424, measured at a Play start: Roblox's loader stands a new character over the arena's centre, the server places
+	-- it on its spawn and hands its physics to the client a frame later, and the client, its copy still at Roblox's
+	-- spot, reports that spot back.
+	it("quietly puts back a skater whose client reports where they were before the server placed them", function()
+		-- Two seconds in: the report's time is judged from the placement, by the guard's clock.
+		for _ = 1, 8 do
+			tick()
+		end
+		rig:PivotTo(CFrame.new(0, 103.9, 0))
+		Fixtures.announcePlacement(characterService.placed, "1", rig, CFrame.new(START_X, 3, LANE_Z))
+		local root = Fixtures.root(rig)
+		local spot = root.Position
+		tick()
+		rig:PivotTo(CFrame.new(0, 103.6, 0))
+		tick()
+		expect(logs).toEqual({})
+		Fixtures.expectNear(root.Position, spot)
+		expect(#placements).toBe(0)
+	end)
+
+	it("still returns and logs a skater who jumps elsewhere right after a placement", function()
+		Fixtures.announcePlacement(characterService.placed, "1", rig, CFrame.new(START_X + 10, 3, LANE_Z))
+		tick()
+		moveTo(START_X + 180)
+		tick()
+		expect(Fixtures.root(rig).Position.X).toBeCloseTo(START_X + 10, 3)
+		expect(#logs).toBe(1)
+		expect(string.find(logs[1], "MovementGuard: returned 1: one move of", 1, true) ~= nil).toBe(true)
 	end)
 
 	it("forgets a character that is gone", function()

@@ -112,6 +112,7 @@ describe("Config defaults", function()
 			guardStrikes = 3,
 			guardTeleportFactor = 2,
 			guardOutsideMargin = 2,
+			guardPlacementSeconds = 1,
 			maxActionsPerSecond = 15,
 			hitLagToleranceStuds = 3,
 			actionTimingTolerance = 0.1,
@@ -1065,6 +1066,15 @@ describe("Config.forMode", function()
 			Fixtures.config({ Network = { guardOutsideMargin = -1 } })
 		end).toThrow("Network.guardOutsideMargin: must be >= 0 (got -1)")
 	end)
+
+	it(
+		"rejects a placement window of no time, which would judge a client's report from before its placement",
+		function()
+			expect(function()
+				Fixtures.config({ Network = { guardPlacementSeconds = 0 } })
+			end).toThrow("Network.guardPlacementSeconds: must be > 0 (got 0)")
+		end
+	)
 
 	it("rejects an override with the wrong type", function()
 		expect(function()

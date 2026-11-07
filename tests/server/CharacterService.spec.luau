@@ -200,14 +200,20 @@ describe("CharacterService", function()
 		expect((rig:FindFirstChildOfClass("Humanoid") :: Humanoid).EvaluateStateMachine).toBe(true)
 	end)
 
-	it("announces each placement, so the movement guard trusts the server's own jumps", function()
-		local placed: { string } = {}
-		CharacterService.placed:Connect(function(id: string)
-			table.insert(placed, id)
+	-- The movement guard trusts the server's own jumps, and for a moment a report from the spot before (#424).
+	it("announces each placement with where the root stood before and after it", function()
+		local placed: { { id: string, from: Vector3, to: Vector3 } } = {}
+		CharacterService.placed:Connect(function(id: string, from: Vector3, to: Vector3)
+			table.insert(placed, { id = id, from = from, to = to })
 		end)
-		CharacterService:adopt("A", Fixtures.rig(folder, "A", CFrame.new(0, 50, 0)))
+		local rig = Fixtures.rig(folder, "A", CFrame.new(0, 50, 0))
+		CharacterService:adopt("A", rig)
+		local before = Fixtures.root(rig).Position
 		CharacterService:place("A")
-		expect(placed).toEqual({ "A" })
+		expect(#placed).toBe(1)
+		expect(placed[1].id).toBe("A")
+		Fixtures.expectNear(placed[1].from, before)
+		Fixtures.expectNear(placed[1].to, Vector3.new(0, 2.5, -53))
 	end)
 
 	it("skips a character missing its Humanoid or root when placing everyone", function()
@@ -216,7 +222,13 @@ describe("CharacterService", function()
 		local torso = Instance.new("Part")
 		torso.Parent = broken
 		broken.Parent = folder
+		-- A Humanoid but no root: the placement reads the root's spot before it moves it (#424).
+		local rootless = Instance.new("Model")
+		rootless.Name = "Rootless"
+		Instance.new("Humanoid").Parent = rootless
+		rootless.Parent = folder
 		CharacterService:adopt("A", broken)
+		CharacterService:adopt("C", rootless)
 		expect(function()
 			CharacterService:placeAll()
 		end).never.toThrow()

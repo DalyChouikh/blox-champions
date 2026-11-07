@@ -6,8 +6,10 @@
 -- arena (Bounds.inArena, by more than guardOutsideMargin) is put back on its team's spawn: nothing else would ever
 -- bring it back (#177, #181). A carrier first lets go of the ball where they were last inside the arena (owner,
 -- 2026-10-25), so leaving the arena never takes the ball home. The ball is told of every move of a carrier, so none
--- counts as the ball crossing a gate. Every server placement starts the skater over, so the server's own jumps
--- never count.
+-- counts as the ball crossing a gate. Every server placement starts the skater over where it put them, so the
+-- server's own jumps never count, and for Network.guardPlacementSeconds a report from where they stood before is their
+-- client's from before it saw the placement (#424: at a Play start the client takes its new character's physics a
+-- frame after the server placed it, its copy at times still at Roblox's own spot): they are put back without a word.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -61,11 +63,6 @@ local function measured(move: MovementCheck.Move): string
 	)
 end
 
-local function forget(self: MovementGuard, player: string)
-	self._check:forget(player)
-	self._inside[player] = nil
-end
-
 -- Moves a character back to its skater's last valid place, keeping the way it faces.
 local function returnToValid(self: MovementGuard, holder: BallService.Holder)
 	local valid = self._check:lastValid(holder.player)
@@ -77,8 +74,6 @@ local function returnToValid(self: MovementGuard, holder: BallService.Holder)
 	if self._ball.state.carrier == holder.player then
 		self._ball:jumped()
 	end
-	local move = self._check:lastMove(holder.player) :: MovementCheck.Move
-	self._log(`[BloxChampions] MovementGuard: returned {holder.player}: {measured(move)}`)
 end
 
 -- Puts a skater found outside the arena on their spawn, their ball left where they were last inside (or, with no
@@ -129,11 +124,13 @@ local MovementGuard: MovementGuard = {
 		end
 		self._clock = deps.Clock or os.clock
 		self._log = deps.Log or logLine
-		characters.placed:Connect(function(player: string)
-			forget(self, player)
+		characters.placed:Connect(function(player: string, from: Vector3, to: Vector3)
+			self._check:place(player, from, to, self._clock())
+			self._inside[player] = nil
 		end)
 		characters.characterRemoved:Connect(function(player: string)
-			forget(self, player)
+			self._check:forget(player)
+			self._inside[player] = nil
 		end)
 	end,
 
@@ -147,7 +144,12 @@ local MovementGuard: MovementGuard = {
 		for _, holder in self._holders() do
 			local player = holder.player
 			local position = holder.root.Position
-			if self._check:sample(player, position, now) == "Return" then
+			local verdict = self._check:sample(player, position, now)
+			if verdict == "Return" then
+				returnToValid(self, holder)
+				local move = self._check:lastMove(player) :: MovementCheck.Move
+				self._log(`[BloxChampions] MovementGuard: returned {player}: {measured(move)}`)
+			elseif verdict == "Stale" then
 				returnToValid(self, holder)
 			elseif not Bounds.inArena(self._arena, position, self._outsideMargin) then
 				placeOutside(self, holder)

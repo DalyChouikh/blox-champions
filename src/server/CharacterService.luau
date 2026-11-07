@@ -48,8 +48,9 @@ export type CharacterService = {
 	setSkateState: (self: CharacterService, player: PlayerId, state: Schemas.SkateState) -> (),
 	-- A registered character that died or was destroyed.
 	characterRemoved: Signal.Signal<PlayerId>,
-	-- The server moved a character to its spawn: a jump the movement guard must not judge.
-	placed: Signal.Signal<PlayerId>,
+	-- The server moved a character's root from one spot to another (its spawn): a jump the movement guard must not
+	-- judge, from a spot its client may still report for a moment (#424).
+	placed: Signal.Signal<PlayerId, Vector3, Vector3>,
 	_config: Config.GameConfig,
 	_teamSpawns: { [string]: { CFrame } },
 	_teams: TeamService.TeamService,
@@ -224,21 +225,23 @@ local CharacterService: CharacterService = {
 	place = function(self: CharacterService, player: PlayerId)
 		local character: Model? = self._characters[player]
 		local team, slot = self._teams:slotOf(player)
+		local root = if character ~= nil then rootOf(character) else nil
 		if
 			character == nil
 			or team == nil
 			or slot == nil
 			or character:FindFirstChildOfClass("Humanoid") == nil
-			or rootOf(character) == nil
+			or root == nil
 		then
 			return
 		end
+		local from = root.Position
 		local spawn = self._teamSpawns[team][slot]
 		character:PivotTo(spawn * CFrame.new(0, self._config.Movement.hoverHeight, 0))
 		-- After the move, so a client that sees the new count already has its character on the spawn.
 		local placed: number? = character:GetAttribute(Attributes.Placed) :: number?
 		character:SetAttribute(Attributes.Placed, (placed or 0) + 1)
-		self.placed:Fire(player)
+		self.placed:Fire(player, from, root.Position)
 	end,
 
 	placeAll = function(self: CharacterService)
