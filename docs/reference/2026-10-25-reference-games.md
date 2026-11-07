@@ -2567,6 +2567,35 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   the shut goal's panel a barrier too; 1508/1508; in Play the tunnel wall at 9.0 and the pylon at 10.1, the opening
   clear; not checked by me: a thrown ball hitting the housing, covered by the owner's trial throws): **"Yes, ship
   it"**: the PR opens stacked on #421; the owner's 2-player check of the whole stack stays before its merge (Q321).
+- **Q339 anyone stuck in the goal** (session 99, recommended; #423's first question, who counts as stuck: the goal's
+  tunnel is 18 studs across and 11 deep, its walls stop skaters but aren't ground they skate on, so a skater at rest
+  inside has nothing to push off; when the ball scores the door shuts at once, solid to skaters since #422, and the
+  kickoff puts everyone on their spawns 3 s later): **"Anyone inside, barely moving"**: any skater, with or without
+  the ball, goal open or shut, who stays inside the tunnel barely moving (about 2 studs/s) for about half a second is
+  pushed out; the numbers tuned in a Studio trial. Not chosen: only the carrier; only after a goal.
+- **Q340 pushed back out the way they came** (session 99, recommended; #423's second question, where a stuck skater
+  goes; the scoring disc sits in the tunnel's middle and a skater stuck inside hasn't crossed it): **"Back out the way
+  they came"**: a push along the goal's axis out of the face they entered by, never through the disc, so a push never
+  scores; they fall to the track below and keep the ball if they carry it. Not chosen: moved down onto the track;
+  out through the far side.
+- **Q341 the escape's numbers: 30, 0.5 s, under 6** (session 101, recommended; #423's trial in Studio Play on the
+  real build: G or B dropped the owner's skater at rest in the goal's tunnel, front or back, the way the server's own
+  placement does; keys 1-3 the push 20 / 30 / 40 studs/s, 4-6 the wait 0.3 / 0.5 / 0.8 s, 7-9 "still" as slower
+  than 2 / 4 / 6 studs/s; measured: the tunnel's floor is a smooth bowl a barrier gives no grip on, so a skater who
+  lands in it rocks side to side, up to ~9 studs/s, before settling; from landing to the push ~2.0 s with "under 2",
+  ~1.75 s with "under 4", ~1.25 s with "under 6"; pushed out along the goal's axis at ~30 studs/s, then falling to
+  the track; no movement-guard warning in 5 tries): **"30 / 0.5 s / under 6"**: Movement.goalEscape = { speed 6,
+  seconds 0.5, push 30 }: anyone in the tunnel slower than 6 studs/s for half a second is pushed out at 30 (nobody
+  that slow in there is crossing on purpose: there is no ground to skate on). Not chosen: under 4 (~1.75 s); under 2
+  as built (~2.0 s).
+- **Q342 #423 shipped** (session 101, recommended; #423 built with Q341's numbers: anyone in the goal's tunnel, with
+  the ball or not, goal open or shut, slower than 6 studs/s for half a second is pushed back out the way they came at
+  30 studs/s, never through the scoring disc, so it never scores; they fall to the track and keep the ball; each
+  player's own game pushes their own skater; 1522/1522; 34 mutation runs all caught (the question said 36: a
+  miscount, corrected to the owner); Play with the built numbers: front and back pushed 1.27 s after landing, console
+  clean; no guard warning over 24 placements; not checked: getting stuck by skating in, two players at once):
+  **"Yes, ship it"**: the PR opens stacked on #425; the owner's 2-player check of the whole stack stays before its
+  merge (Q321).
 
 ## Roller Champions
 
