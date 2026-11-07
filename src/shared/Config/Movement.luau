@@ -1,12 +1,17 @@
 --!strict
 -- Skating (spec §7.2): the skater's body, momentum, steering, wall riding, pump, brake, jump, draft and attach, the
--- slide of a knocked-down skater, a hard landing and a belly landing, and the speedometer's scale.
+-- slide of a knocked-down skater, a hard landing and a belly landing, getting out of the goal, and the speedometer's
+-- scale.
 -- Speeds are in studs/s, accelerations in studs/s², turn rates in rad/s, angles in degrees. The values the spec
 -- doesn't give (hoverSpring, airTurnRate, airUprightRate, pumpFlatSlopeDeg, bodyUpSmoothing, attachSpring) are starting
 -- points for tuning, like the spec's own.
 
 local PartSize = require(script.Parent.Parent.Util.PartSize)
 local Validate = require(script.Parent.Validate)
+
+-- Anyone inside the goal's tunnel moving slower than `speed` for `seconds` is stuck, and is pushed out at `push`
+-- (Skate/GoalEscape).
+export type GoalEscapeSettings = { speed: number, seconds: number, push: number }
 
 export type MovementConfig = {
 	-- The one collider every skater gets, whatever their avatar: a ball this wide around the root.
@@ -130,6 +135,13 @@ export type MovementConfig = {
 	-- flatter than wallAngle knocks them down for knockdownSeconds, sliding. The owner (#222): 40, above an uppercut's
 	-- leap with an Air Pose at its top (~35); an Air Pose's hop starts a fall over.
 	hardLanding: { drop: number, knockdownSeconds: number },
+	-- The goal's housing and pylon stop skaters (#422) but are no ground to skate on, so a skater who comes to rest in
+	-- its tunnel has nothing to push off. The owner (#423, Q339-Q341): anyone there, with the ball or not, goal open or
+	-- shut, slower than 6 studs/s for half a second is pushed back out the way they came at 30 studs/s, out of the
+	-- 11-stud-deep housing in under a quarter second. Still is 6, not Q339's 2: the tunnel's floor is a bowl a barrier
+	-- gives no grip on, so a skater who lands in it rocks side to side (up to ~9 studs/s, measured) and was pushed
+	-- ~2 s after landing at 2, ~1.25 s at 6 (the owner's Studio trial, Q341).
+	goalEscape: GoalEscapeSettings,
 	-- The speedometer reads a skater's speed times this, in km/h.
 	speedometerScale: number,
 }
@@ -182,6 +194,7 @@ local defaults: MovementConfig = {
 	attachCooldown = 3,
 	knockdownSlideSeconds = { Hit = 1.5, Fall = 1.5, Dive = 0.8 },
 	hardLanding = { drop = 40, knockdownSeconds = 1.5 },
+	goalEscape = { speed = 6, seconds = 0.5, push = 30 },
 	speedometerScale = 1.2,
 }
 
@@ -240,6 +253,7 @@ local fields = Validate.record({
 	attachCooldown = nonNegative,
 	knockdownSlideSeconds = Validate.record({ Hit = positive, Fall = positive, Dive = positive }),
 	hardLanding = Validate.record({ drop = positive, knockdownSeconds = positive }),
+	goalEscape = Validate.record({ speed = positive, seconds = positive, push = positive }),
 	speedometerScale = positive,
 })
 
@@ -279,6 +293,13 @@ local rules: { Validate.Rule } = {
 		message = "the collider must clear the ground: colliderDiameter / 2 < hoverHeight",
 		holds = function(movement: MovementConfig): boolean
 			return movement.colliderDiameter / 2 < movement.hoverHeight
+		end,
+	},
+	{
+		-- A push slower than stuck would leave the skater stuck.
+		message = "a goal escape's push must leave the skater faster than stuck: goalEscape.push > goalEscape.speed",
+		holds = function(movement: MovementConfig): boolean
+			return movement.goalEscape.push > movement.goalEscape.speed
 		end,
 	},
 }

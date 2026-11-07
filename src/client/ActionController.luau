@@ -26,10 +26,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ActionRunner = require(ReplicatedStorage.Shared.Actions.ActionRunner)
 local Actions = require(ReplicatedStorage.Shared.Config.Actions)
+local ArenaParts = require(script.Parent.ArenaParts)
 local Attributes = require(ReplicatedStorage.Shared.Net.Attributes)
 local BallCarrier = require(script.Parent.BallCarrier)
 local Config = require(ReplicatedStorage.Shared.Config)
-local Crossing = require(ReplicatedStorage.Shared.Rules.Crossing)
 local InputController = require(script.Parent.InputController)
 local PassTarget = require(ReplicatedStorage.Shared.Actions.PassTarget)
 local Pickup = require(ReplicatedStorage.Shared.Ball.Pickup)
@@ -51,7 +51,6 @@ type AimCamera = { crosshair: (self: AimCamera) -> (Vector3, Vector3) }
 -- (ArenaParts), none until the arena is here; and what hides a pass's receiver, the arena's ride surfaces as the server
 -- casts against them (RideSurfaces.params, #315 Q155).
 type Surfaces = { solid: RaycastParams, params: RaycastParams }
-type Goal = { parts: { goal: Crossing.Disc }? }
 
 -- Spelled out so the module is a Loader.LoadableModule and callers see its methods.
 export type ActionController = {
@@ -86,7 +85,7 @@ export type ActionController = {
 	_camera: AimCamera,
 	_surfaces: Surfaces,
 	_inTheOpen: PassTarget.InTheOpen,
-	_goal: Goal,
+	_goal: ArenaParts.Goal,
 	_sendRequest: (payload: { [string]: any }) -> (),
 	_localId: PlayerId,
 	-- Records reused every step: the keys, and what the player is doing for an action's start and for which action a

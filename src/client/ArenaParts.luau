@@ -32,6 +32,10 @@ export type Parts = {
 	door: { BasePart },
 }
 
+-- What a module that reads only the scoring disc needs of this one (a fake in tests): a throw aims through it
+-- (ActionController), a skater resting in its tunnel is pushed out (SkateController, #423).
+export type Goal = { parts: { goal: Crossing.Disc }? }
+
 -- Spelled out so the module is a Loader.LoadableModule and callers see its members.
 export type ArenaParts = {
 	name: string,

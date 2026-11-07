@@ -43,6 +43,7 @@ export type TouchButton = Input.TouchButton
 export type TouchControl = Input.TouchControl
 export type MatchConfig = Match.MatchConfig
 export type MovementConfig = Movement.MovementConfig
+export type GoalEscapeSettings = Movement.GoalEscapeSettings
 export type NetworkConfig = Network.NetworkConfig
 export type PoseConfig = Pose.PoseConfig
 export type ScoringConfig = Scoring.ScoringConfig

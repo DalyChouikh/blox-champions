@@ -149,6 +149,8 @@ beforeEach(function()
 		Team = function(): string?
 			return "Blue"
 		end,
+		-- No goal: the arena's parts have not reached this client.
+		ArenaParts = { parts = nil },
 	})
 	rig = skaterAt("Skater", Vector3.zero, -Vector3.zAxis)
 	SkateController:bind(rig)

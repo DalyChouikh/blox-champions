@@ -336,6 +336,9 @@ describe("Config defaults", function()
 			-- dives 0.7-0.8 s, whatever the speed).
 			knockdownSlideSeconds = { Hit = 1.5, Fall = 1.5, Dive = 0.8 },
 			hardLanding = { drop = 40, knockdownSeconds = 1.5 },
+			-- Anyone in the goal's tunnel slower than 6 studs/s for half a second is pushed back out the way they came
+			-- at 30 (#423, Q339-Q341).
+			goalEscape = { speed = 6, seconds = 0.5, push = 30 },
 			speedometerScale = 1.2,
 		})
 	end)
@@ -947,6 +950,7 @@ describe("Config defaults", function()
 		expect(goal).toEqual({
 			ringRadius = 9,
 			housingRadius = 10.8,
+			housingDepth = 11,
 			heightAboveFloor = 52,
 			panelThickness = 0.5,
 			panelTransparency = 0.3,
@@ -1223,6 +1227,11 @@ describe("Config.forMode", function()
 			{
 				overrides = { goal = { housingRadius = 0 } },
 				message = "Arena.goal.housingRadius: must be > 0 (got 0)",
+			},
+			-- The goal's tunnel, where a skater can get stuck (#423).
+			{
+				overrides = { goal = { housingDepth = 0 } },
+				message = "Arena.goal.housingDepth: must be > 0 (got 0)",
 			},
 			{ overrides = { goal = { door = { bars = 0 } } }, message = "Arena.goal.door.bars: must be >= 1 (got 0)" },
 			-- #422: a piece is solid or only draws.
@@ -1791,6 +1800,24 @@ describe("Config.forMode", function()
 			-- A wall is steeper than wallAngle from flat: some slope, short of upright (#216, the review #303).
 			{ overrides = { Movement = { wallAngle = 0 } }, message = "Movement.wallAngle: must be > 0 (got 0)" },
 			{ overrides = { Movement = { wallAngle = 90 } }, message = "Movement.wallAngle: must be < 90" },
+			-- Getting out of the goal (#423): a stuck skater is still for a while, then pushed out faster than still.
+			{
+				overrides = { Movement = { goalEscape = { speed = 0 } } },
+				message = "Movement.goalEscape.speed: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { goalEscape = { seconds = 0 } } },
+				message = "Movement.goalEscape.seconds: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { goalEscape = { push = 0 } } },
+				message = "Movement.goalEscape.push: must be > 0 (got 0)",
+			},
+			{
+				overrides = { Movement = { goalEscape = { speed = 5, push = 5 } } },
+				message = "Movement: a goal escape's push must leave the skater faster than stuck: goalEscape.push > "
+					.. "goalEscape.speed",
+			},
 		}
 		for _, case in cases do
 			expect(function()
