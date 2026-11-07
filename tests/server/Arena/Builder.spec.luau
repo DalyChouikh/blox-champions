@@ -41,7 +41,7 @@ describe("Builder.build", function()
 		local geometry = Geometry.build(config)
 		local arena = Builder.build(geometry, config, parent)
 		expect(arena.Parent).toBe(parent)
-		expect(#folder(arena, "Surface"):GetChildren()).toBe(#geometry.surface)
+		expect(#folder(arena, "Surface"):GetChildren()).toBe(#geometry.surface + #geometry.surfaceGlass)
 		expect(#folder(arena, "Glass"):GetChildren()).toBe(#Features.glass(config.Arena))
 		expect(arena:FindFirstChild("Barriers")).toBeNil()
 		expect(#folder(arena, "Top"):GetChildren()).toBe(#geometry.top)
@@ -117,6 +117,45 @@ describe("Builder.build", function()
 		end
 	end)
 
+	-- Q309: the walls look like the glass from their lines up (Config.Arena.glassLook), ridden and climbed as the rest
+	-- of the surface: in its folder, which is not Glass, so climbing is unchanged.
+	it("makes the walls look like the glass above their lines, still ridden and climbed as the surface", function()
+		local geometry = Geometry.build(config)
+		local surface = folder(Builder.build(geometry, config, parent), "Surface")
+		expect(surface:HasTag(Tags.RideSurface)).toBe(true)
+		expect(surface:HasTag(Tags.Glass)).toBe(false)
+		local solids, glassLooking = 0, 0
+		for _, child in surface:GetChildren() do
+			local part = child :: BasePart
+			local solidIndex = tonumber(string.match(part.Name, "^Surface(%d+)$"))
+			local glassIndex = tonumber(string.match(part.Name, "^SurfaceGlass(%d+)$"))
+			local piece = if glassIndex ~= nil
+				then geometry.surfaceGlass[glassIndex]
+				elseif solidIndex ~= nil then geometry.surface[solidIndex]
+				else nil
+			local placed = piece ~= nil
+				and (part.Position - piece.cframe.Position).Magnitude < 1e-3
+				and (part.Size - piece.size).Magnitude < 1e-3
+			local ridden = part.Anchored and part.CanCollide and part.CanQuery and part.CanTouch
+			if glassIndex ~= nil then
+				glassLooking += 1
+				if not (placed and ridden and looksLikeGlass(part, config.Arena) and not part.CastShadow) then
+					error(`{part.Name} does not look like the glass where its piece is, ridden as the surface`)
+				end
+			else
+				solids += 1
+				local solidLook = part.Color == config.Arena.colors.surface
+					and part.Material == Enum.Material.SmoothPlastic
+					and part.Transparency == 0
+					and part.CastShadow
+				if not (placed and ridden and solidLook) then
+					error(`{part.Name} is not a solid surface part where its piece is`)
+				end
+			end
+		end
+		expect({ solids, glassLooking }).toEqual({ #geometry.surface, #geometry.surfaceGlass })
+	end)
+
 	-- Skaters pass through the gate walls (R18), and ArenaGlow and the carrier's arrow find them by their tag.
 	it(
 		"makes each gate's panel a model carrying CornerMarker and its GateIndex, of glass nothing hits, sees or "
@@ -185,7 +224,17 @@ describe("Builder.build", function()
 				end
 			end
 		end
-		expect(checked > 0).toBe(true)
+		-- And the walls above their glass lines (Q309).
+		local glassLooking = 0
+		for _, child in folder(arena, "Surface"):GetChildren() do
+			if string.match(child.Name, "^SurfaceGlass") then
+				glassLooking += 1
+				if not looksLikeGlass(child :: BasePart, custom.Arena) then
+					error(`{child.Name} in Surface does not take the configured glass look`)
+				end
+			end
+		end
+		expect(checked > 0 and glassLooking > 0).toBe(true)
 	end)
 
 	-- A roof that cast shadows kept the whole track in its shade (seen in a playtest); 120 studs of glass would too.
@@ -243,6 +292,12 @@ describe("Builder.build", function()
 		expect(function()
 			Builder.build(broken, config, parent)
 		end).toThrow("ArenaBuilder: surface piece 2 is invalid (size 0, 1, 1)")
+		local cracked = table.clone(geometry)
+		cracked.surfaceGlass = table.clone(geometry.surfaceGlass)
+		cracked.surfaceGlass[3] = { shape = "Wedge", cframe = CFrame.identity, size = Vector3.new(1, 1, 0) }
+		expect(function()
+			Builder.build(cracked, config, parent)
+		end).toThrow("ArenaBuilder: surface glass piece 3 is invalid (size 1, 1, 0)")
 		local adrift = table.clone(geometry)
 		adrift.infield = { { shape = "Block", cframe = CFrame.new(0 / 0, 0, 0), size = Vector3.one } }
 		expect(function()

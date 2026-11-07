@@ -156,7 +156,9 @@ The M1 spec's §9.1 (layout, dimensions, markers, goal placement), §9.2 (folder
 | Closed: the roof | (68, 120) → (12, 120) | the same | Top |
 | Open: strip, ceiling, strip | (68, 120) → (68, 140) → (12, 140) → (12, 120) | the same | Top |
 
-Both sections have the same six solid pieces: a curved end's bowl splits where a straight's room and rise end, at the same shares of the floor (6 and 20 of the 39.32 studs from the bank's foot to the foot curve). So a section blends from one to the other point by point over `profileBlendLength` around each corner (`Centerline.straightness`: 1 on a straight, 0 at a curved end). A curved end's foot curve starts where the bowl arrives, at the angle where the bowl's slope and the foot curve's start agree (`Profile` finds it by halving a quarter turn). Each section has `stripsPerSection` (20) strips: every piece gets one and the rest are shared by how far each piece turns in the section where it turns more (6, 1, 5, 2, 5 and 1), so every crease between strips bends about as much. Every section runs the same way around the track's "O" (inner top, down, across the floors, up the outer side, back across the top), so every slab hangs behind its face, outside the track. The glass, the lips and the top never change along the loop.
+Both sections have the same six solid pieces: a curved end's bowl splits where a straight's room and rise end, at the same shares of the floor (6 and 20 of the 39.32 studs from the bank's foot to the foot curve). So a section blends from one to the other point by point over `profileBlendLength` around each corner (`Centerline.straightness`: 1 on a straight, 0 at a curved end). A curved end's foot curve starts where the bowl arrives, at the angle where the bowl's slope and the foot curve's start agree (`Profile` finds it by halving a quarter turn). Each section has `stripsPerSection` (20) strips: every piece gets one and the rest are shared by how far each piece turns in the section where it turns more (6, 1, 5, 2, 5 and 1), so every crease between strips bends about as much; the glass lines add two (below). Every section runs the same way around the track's "O" (inner top, down, across the floors, up the outer side, back across the top), so every slab hangs behind its face, outside the track. The glass, the lips and the top never change along the loop.
+
+**Where the glass look begins** *(#409, 2026-11-06: the owner's Q308-Q313, like Roller Champions' low solid walls)*. The solid surface looks like the glass from a line up on each wall: the outer wall from `glassLook.outerWall` (20) above the lowest floor (Q312), the inner bank from `glassLook.innerBank` (6) (Q313), each set per map. **The look is not the climb limit** (Q309: "don't stop climbing at the new line, keep the climbing the same"): those parts stay in the `Surface` folder, ridden and climbed exactly as before up to the solid tops at 40 and 16; only the `Glass` folder (§4.1), from those tops up, holds no climbs (#299). Each line is a clean edge at its exact height: the inner bank and the outer foot curve each break at their line in both layouts (`Profile` finds the place by halving the piece's parameter), so every blend has a strip edge there. A break adds one strip to the piece it splits, shared between its two parts by turning as the six pieces share theirs, so every other piece keeps its points: 22 strips (3 + 4, 1, 5, 2, 3 + 3 and 1), the breaks at (5.27, 6) and (74.83, 20) on a straight, (3.51, 6) and (76.97, 20) at a curved end. The bank's strips above 6, the foot curve's above 20 and the wall look like the glass (§4.1). The outer line must cross the foot curve in both layouts (between 14 and 30.00 by default) and the inner one the bank (between 0 and 16): `Arena/Geometry` refuses the build otherwise.
 
 ### 3.2 Config changes
 
@@ -171,6 +173,7 @@ Both sections have the same six solid pieces: a curved end's bowl splits where a
 | `straight` (#268) | — | `{ bankWidth = 24, roomEnd = 30, riseEnd = 44, riseHeight = 8, inclineDeg = 14, footRadius = 22 }` |
 | `curvedEnd` (#268) | — | `{ bowlHeight = 14, bowlPower = 2, footRadius = 18 }` |
 | `stripsPerSection` (the solid profile) | 20 | 20 |
+| `glassLook` (#409) | — | `{ outerWall = 20, innerBank = 6 }` (the heights above the lowest floor where each wall starts looking like the glass, §3.1) |
 | `barrier` | `{ top = 85, thickness = 1, transparency = 0.7 }` | removed: `glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.85, material = Enum.Material.SmoothPlastic }` (2026-10-27: was 0.7 with the Glass material) |
 | `top` | — | `{ kind = "Closed", ceilingAbove = 20 }` (`kind` is `"Closed"` or `"Open"`; `ceilingAbove` is used by Open) |
 | `marker` | `{ width, height }` | removed: `gatePanel = { depth = 0.2 }` (2026-10-27: was `{ openingHeight = 60, depth = 2, segments = 16 }`) |
@@ -188,6 +191,7 @@ Both sections have the same six solid pieces: a curved end's bowl splits where a
 - `top.kind` is `"Closed"` or `"Open"`; `glass.material` is a `Material`;
 - `glass.lipStrips` is a whole number of at least 1;
 - `goal.across` lies between 0 and 1; every transparency lies between 0 and 1;
+- `glassLook`'s two heights are above zero (#409);
 - `straight.inclineDeg` is at least 0 and under 90 (a finite slope); `curvedEnd.bowlPower` is above 1, so the bowl leaves the bank's foot flat (#268).
 
 **Cross-field rules**, in order:
@@ -202,7 +206,7 @@ Both sections have the same six solid pieces: a curved end's bowl splits where a
 
 (2026-10-27: the gate panel's opening and its rule went with R18's amendment; the gate panel's thickness rule, rule 8 since #268 added rule 2, is new.)
 
-**Checked by `Arena/Geometry` against the arena as built:** the goal ring's fit and its arm (§5.3).
+**Checked by `Arena/Geometry` against the arena as built:** the goal ring's fit and its arm (§5.3); each glass line on the curve it breaks (§3.1, #409).
 
 ---
 
@@ -214,6 +218,7 @@ Both sections have the same six solid pieces: a curved end's bowl splits where a
 - **Glass parts:**
   - `glass.material` (SmoothPlastic), `colors.glass`, `glass.transparency` (0.85), `CastShadow` false (120 studs of it would shade the track). Not the Glass material: it hides every non-opaque part behind it (Roblox's DevForum announcement of 2017-12-06, "Non-opaque objects are currently not visible through glass"; measured 2026-10-27: the far glass and the gate panels vanished behind it at 0.7 and 0.9, and showed with SmoothPlastic at 0.8–0.9). The Builder's one `lookLikeGlass` gives this look to the glass, a closed map's roof and the gate panels;
   - `CanCollide`, `CanQuery` and `CanTouch` true, as the floor.
+- **The solid surface above the glass lines** (§3.1, #409) takes the same look as `SurfaceGlass<n>` parts in the `Surface` folder, which is not tagged `Glass`: ridden and climbed as before (Q309).
 - So skaters ride it (their ground and wall rays find it), the collider sweep slides along it, the camera stops in front of it as before any wall, and the ball bounces off it and ends its flight there.
 - The Builder's `Barriers` folder and `Features.barriers` (Task 1) are gone.
 

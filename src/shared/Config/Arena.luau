@@ -46,6 +46,11 @@ export type ArenaConfig = {
 	stripsPerSection: number,
 	-- Every surface part is a slab this thick behind the riding surface.
 	surfaceThickness: number,
+	-- Heights above the lowest floor from which the outer wall and the inner bank look like the glass, per map (the
+	-- owner's Q312, Q313, like Roller Champions' low solid walls): the look only, ridden and climbed as before (Q309).
+	-- Each line breaks its piece of the cross-section, so its edge is clean (Arena/Geometry's Profile, which also
+	-- holds the outer line to the foot curve and the inner one to the bank).
+	glassLook: { outerWall: number, innerBank: number },
 	-- The rideable glass (R5) rising from the inner bank's and the outer wall's tops up to `top` above the lowest
 	-- floor, each wall curling inward at the top into a lip (R15): a quarter circle of `lipRadius` in `lipStrips`
 	-- strips. Its slabs are surfaceThickness thick behind its faces, outside the track; it never darkens the track. It
@@ -99,6 +104,7 @@ local defaults: ArenaConfig = {
 	segmentLength = 4,
 	stripsPerSection = 20,
 	surfaceThickness = 1,
+	glassLook = { outerWall = 20, innerBank = 6 },
 	glass = { top = 120, lipRadius = 12, lipStrips = 4, transparency = 0.85, material = Enum.Material.SmoothPlastic },
 	top = { kind = "Closed", ceilingAbove = 20 },
 	goalGateIndex = 2,
@@ -159,6 +165,7 @@ local fields = Validate.record({
 	-- At least one strip for each of the profile's six pieces.
 	stripsPerSection = Validate.number({ min = 6, integer = true }),
 	surfaceThickness = partSize,
+	glassLook = Validate.record({ outerWall = size, innerBank = size }),
 	-- The glass's height sizes each of its slabs.
 	glass = Validate.record({
 		top = partSize,

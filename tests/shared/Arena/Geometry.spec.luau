@@ -10,8 +10,9 @@ local Geometry = require(ReplicatedStorage.Shared.Arena.Geometry)
 describe("Geometry.build", function()
 	it("collects the whole arena, with one team spawn per team slot", function()
 		local geometry = Geometry.build(Fixtures.config({ Match = { teamSize = 2 } }))
-		-- Surface.build's 124 blocks and 8304 wedges.
-		expect(#geometry.surface).toBe(8428)
+		-- Surface.build's 30 blocks and 6480 wedges below the glass lines, 98 and 2688 that look like the glass.
+		expect(#geometry.surface).toBe(6510)
+		expect(#geometry.surfaceGlass).toBe(2786)
 		expect(#geometry.glass).toBe(3284)
 		expect((geometry :: any).barriers).toBeNil()
 		expect(#geometry.top).toBe(386)

@@ -2,7 +2,8 @@
 -- The riding surface: the cross-section swept around the centerline. At every station the profile (a straight's
 -- section blended into a curved end's as far as that station is from one) is placed across the track; each strip
 -- between two neighboring stations is a quad, built as one block when it is a flat rectangle and as two wedge-pair
--- triangles otherwise. The glass and the top are swept the same way (Features).
+-- triangles otherwise. The strips above each wall's glass line look like the glass (Q312, Q313). The glass and the top
+-- are swept the same way (Features).
 
 local Centerline = require(script.Parent.Centerline)
 local Config = require(script.Parent.Parent.Parent.Config)
@@ -81,10 +82,15 @@ end
 -- the side a strip faces: the side to the left of the ring's direction, seen along the travel direction (into the
 -- track for a profile run from the inner top across to the outer top). Neighboring rectangles that continue each
 -- other in a straight line (a strip whose cross-section does not change along a straight) merge into one long block:
--- fewer parts, and no seams across the strip for a rolling ball to bump on.
-function Surface.sweep(rings: { { Vector3 } }, thickness: number): { Piece }
+-- fewer parts, and no seams across the strip for a rolling ball to bump on. `include`, when given, picks the strips
+-- swept by index (strip 1 between the rings' first two points): Surface.build sweeps the strips that look solid and
+-- those that look like the glass from the same rings.
+function Surface.sweep(rings: { { Vector3 } }, thickness: number, include: ((strip: number) -> boolean)?): { Piece }
 	local pieces: { Piece } = {}
 	for point = 1, #rings[1] - 1 do
+		if include ~= nil and not include(point) then
+			continue
+		end
 		-- The open run of rectangles: its first quad's near edge, and its far edge so far.
 		local runStart: { Vector3 }? = nil
 		local runEnd: { Vector3 }? = nil
@@ -128,12 +134,21 @@ function Surface.section(arena: ArenaConfig, distance: number): { Vector2 }
 	return Profile.points(arena, Centerline.straightness(arena, distance))
 end
 
--- The riding surface: the floors, the inner bank and the outer wall, from the bank's top to the outer wall's top.
-function Surface.build(arena: ArenaConfig): { Piece }
+-- The riding surface: the floors, the inner bank and the outer wall, from the bank's top to the outer wall's top. Its
+-- strips that look solid, then those that look like the glass, from each wall's glass line up (Profile.glassStrips;
+-- the look only, Q309).
+function Surface.build(arena: ArenaConfig): ({ Piece }, { Piece })
 	local rings = Surface.rings(arena, function(distance: number): { Vector2 }
 		return Surface.section(arena, distance)
 	end)
-	return Surface.sweep(rings, arena.surfaceThickness)
+	local glassStrips = Profile.glassStrips(arena)
+	local solid = Surface.sweep(rings, arena.surfaceThickness, function(strip: number): boolean
+		return not glassStrips[strip]
+	end)
+	local glassLook = Surface.sweep(rings, arena.surfaceThickness, function(strip: number): boolean
+		return glassStrips[strip]
+	end)
+	return solid, glassLook
 end
 
 return Surface

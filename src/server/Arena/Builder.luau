@@ -37,6 +37,7 @@ end
 local function validate(geometry: Geometry.ArenaGeometry)
 	local groups: { { name: string, pieces: { Piece } } } = {
 		{ name = "surface", pieces = geometry.surface },
+		{ name = "surface glass", pieces = geometry.surfaceGlass },
 		{ name = "glass", pieces = geometry.glass },
 		{ name = "top", pieces = geometry.top },
 		{ name = "infield", pieces = geometry.infield },
@@ -132,14 +133,20 @@ local function lookLikeGlass(part: BasePart, arena: ArenaConfig)
 	part.CastShadow = false
 end
 
+-- Solids in the glass's colour and look (lookLikeGlass), named `prefix` and their index.
+local function addGlassLooking(pieces: { Piece }, prefix: string, arena: ArenaConfig, parent: Instance)
+	for index, piece in pieces do
+		lookLikeGlass(addSolid(piece, `{prefix}{index}`, arena.colors.glass, parent), arena)
+	end
+end
+
 -- The glass (R5): a ride surface like the floor, so skaters ride it and their rays find it, and the ball bounces off it
 -- and ends its flight on its touch; only its look is glass's. Tagged Glass too: no climb holds on it (#299).
 local function addGlass(pieces: { Piece }, arena: ArenaConfig, parent: Instance)
-	local folder = addTaggedSolids(pieces, "Glass", Tags.RideSurface, arena.colors.glass, parent)
+	local folder = newFolder("Glass", parent)
+	folder:AddTag(Tags.RideSurface)
 	folder:AddTag(Tags.Glass)
-	for _, child in folder:GetChildren() do
-		lookLikeGlass(child :: BasePart, arena)
-	end
+	addGlassLooking(pieces, "Glass", arena, folder)
 end
 
 -- The top (R14): skaters and the ball bounce off it and the collider's sweep finds it, and it is touchable, so the
@@ -218,8 +225,10 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 
 	-- Skaters' rays hit the ride surfaces only (the solid surface and the glass): not the top, and not the infield
-	-- behind the glass, which no skater reaches.
-	addTaggedSolids(geometry.surface, "Surface", Tags.RideSurface, colors.surface, model)
+	-- behind the glass, which no skater reaches. The surface above each wall's glass line only looks like the glass:
+	-- in the Surface folder, not tagged Glass, it is climbed as before (Q309).
+	local surface = addTaggedSolids(geometry.surface, "Surface", Tags.RideSurface, colors.surface, model)
+	addGlassLooking(geometry.surfaceGlass, "SurfaceGlass", arena, surface)
 	addGlass(geometry.glass, arena, model)
 	addTop(geometry.top, arena, model)
 	addSolids(geometry.infield, "Infield", colors.infield, newFolder("Infield", model))
