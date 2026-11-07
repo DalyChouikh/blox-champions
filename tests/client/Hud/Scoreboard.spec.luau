@@ -221,6 +221,23 @@ describe("Scoreboard, S5 Compact chips on phones", function()
 		expect(part(mounted, "LapChips")).toBeNil()
 	end)
 
+	-- The banner font draws digits high: the worth sits at its chip's middle, lowered by bannerDigitRise of its text
+	-- size in whole pixels, on desktop and phone (the owner, #414).
+	it("centres the worth in its chip, lowered as far as its font draws digits high", function()
+		local own = Fixtures.config({ UI = { hud = { look = { bannerDigitRise = 0.5 } } } })
+		local open = { streak = 1, goalOpenFor = "Blue" }
+		local mounted, rerender = Fixtures.mount(board(open, false, nil, own), folder)
+		-- Half the desktop's 26 px worth: 13 px down; half the phone's 22 px: 11.
+		expect(part(mounted, "WorthText").Position).toEqual(UDim2.new(0.5, 0, 0.5, 13))
+		rerender(board(open, true, nil, own))
+		expect(part(mounted, "WorthText").Position).toEqual(UDim2.new(0.5, 0, 0.5, 11))
+		-- Whole pixels, rounded: 0.16 of the phone's 22 is 3.52, 4 px; of the desktop's 26, 4.16, 4 px.
+		rerender(board(open, true, nil, config))
+		expect(part(mounted, "WorthText").Position).toEqual(UDim2.new(0.5, 0, 0.5, 4))
+		rerender(board(open, false, nil, config))
+		expect(part(mounted, "WorthText").Position).toEqual(UDim2.new(0.5, 0, 0.5, 4))
+	end)
+
 	it("hangs the worth chip outside the row, beside the team the goal is open for", function()
 		local mounted, rerender = Fixtures.mount(board({ streak = 1, goalOpenFor = "Blue" }, true), folder)
 		local worth = part(mounted, "Worth")

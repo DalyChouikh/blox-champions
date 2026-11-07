@@ -40,8 +40,8 @@ local CENTRE, MIDDLE, FULL = Style.CENTRE, Style.MIDDLE, Style.FULL
 local WHITE = Style.WHITE
 
 -- Lettering filling its box, centred; `scale` grows it from its centre, `font` replaces the look's, `zIndex` orders
--- it over a sibling.
-type LabelOptions = { scale: React.Binding<number>?, font: Enum.Font?, zIndex: number? }
+-- it over a sibling, `drop` lowers it that many pixels.
+type LabelOptions = { scale: React.Binding<number>?, font: Enum.Font?, zIndex: number?, drop: number? }
 
 local function label(
 	config: Config.GameConfig,
@@ -54,7 +54,7 @@ local function label(
 		"TextLabel",
 		Style.lettering(config, {
 			AnchorPoint = CENTRE,
-			Position = MIDDLE,
+			Position = UDim2.new(0.5, 0, 0.5, options and options.drop or 0),
 			Size = FULL,
 			Text = text,
 			TextSize = size,
@@ -125,6 +125,7 @@ end
 local function worthChip(props: ScoreboardProps, place: Style.Props): React.ReactElement
 	local config, motion = props.config, props.motion
 	local look = config.UI.hud.look
+	local size = sizesOf(props).worth
 	place.Visible = motion.worth.binding:map(shown)
 	return React.createElement("Frame", Style.holder(place), {
 		Pop = React.createElement("Frame", Style.holder(centred()), {
@@ -139,12 +140,13 @@ local function worthChip(props: ScoreboardProps, place: Style.Props): React.Reac
 						BorderSizePixel = 0,
 						ZIndex = 1,
 					}, { Corner = React.createElement("UICorner", { CornerRadius = look.corner }) }),
-					WorthText = label(
-						config,
-						motion.worthText,
-						sizesOf(props).worth,
-						{ font = look.bannerFont, zIndex = 2 }
-					),
+					-- Lowered by as much as the font draws its digits high, so the worth sits at the chip's middle
+					-- (the owner, #414), in whole pixels, as the countdown's digit is.
+					WorthText = label(config, motion.worthText, size, {
+						font = look.bannerFont,
+						zIndex = 2,
+						drop = math.round(look.bannerDigitRise * size),
+					}),
 				}),
 			}),
 		}),

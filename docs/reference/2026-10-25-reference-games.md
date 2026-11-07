@@ -2596,6 +2596,17 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   clean; no guard warning over 24 placements; not checked: getting stuck by skating in, two players at once):
   **"Yes, ship it"**: the PR opens stacked on #425; the owner's 2-player check of the whole stack stays before its
   merge (Q321).
+- **Q343 #414 shipped, with the worth chip centred** (session 101, recommended; #414 built after Q299: the bottom
+  line says "ORANGE GOAL IS ACTIVE!" as the goal opens, then "2 LAPS FOR ORANGE!" and "3 LAPS FOR ORANGE!" at laps 2
+  and 3, each popping in again in today's place and look, the team's own name for Blue; gone at a goal or a steal as
+  before; the three lines in config (UI.text.goalOpenByLap); 1524/1524; 14/14 mutations; nothing per frame; Play
+  shots of all three lines on desktop and the emulated phone, consoles clean): **"Yes, ship it"**, then, before the
+  PR, the owner: "before shipping, I want you to very fast include this change in this PR along it, make the goal
+  hint +1, +3, +5 centered in its box in the top scoreboard, in both phones and desktop, currently it is a little on
+  the top". So the scoreboard's worth chip lowers its number by look.bannerDigitRise (0.16) of its text size, in
+  whole pixels, as the countdown's digit already did (Luckiest Guy draws digits high): 4 px on desktop (26 px text)
+  and on the phone (22 px); Play shots on both show it in the chip's middle. The PR opens stacked on #426; the
+  owner's 2-player check of the whole stack stays before its merge (Q321).
 
 ## Roller Champions
 

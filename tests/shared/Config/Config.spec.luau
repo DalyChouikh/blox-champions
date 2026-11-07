@@ -544,7 +544,8 @@ describe("Config defaults", function()
 			speedUnit = "KM/H",
 			possession = "%s has the ball",
 			lapCompleted = "LAP %d COMPLETED",
-			goalOpen = "%s GOAL IS ACTIVE!",
+			-- The goal message per lap of the streak: as the goal opens (Q191), then each lap after (#414, Q299).
+			goalOpenByLap = { "%s GOAL IS ACTIVE!", "2 LAPS FOR %s!", "3 LAPS FOR %s!" },
 			scored = "%s scored!",
 			wins = "%s WINS!",
 			mvpLine = "Score %d \u{B7} Goals %d \u{B7} Steals %d",
@@ -2427,6 +2428,15 @@ describe("Config.forMode", function()
 			{
 				overrides = { UI = { text = { clockWarning = "%%d SECONDS" } } },
 				message = "UI.text.clockWarning: placeholder count must be 1",
+			},
+			-- A goal message for each lap, each naming the team (#414).
+			{
+				overrides = { UI = { text = { goalOpenByLap = { "%s GOAL IS ACTIVE!", "2 LAPS!" } } } },
+				message = "UI.text.goalOpenByLap[2]: placeholder count must be 1",
+			},
+			{
+				overrides = { UI = { text = { goalOpenByLap = {} } } },
+				message = "UI.text.goalOpenByLap: must not be empty",
 			},
 			{ overrides = { UI = { hud = { feedMaxEntries = 0 } } }, message = "UI.hud.feedMaxEntries: must be >= 1" },
 			-- The screen markers (#376): whole pixels where seams show, the band's lines inside the ball, a chevron
