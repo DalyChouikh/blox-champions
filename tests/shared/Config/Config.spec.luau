@@ -970,6 +970,8 @@ describe("Config defaults", function()
 				Lip = { color = warmWhite, material = smooth, glows = true },
 				Band = { color = Color3.fromRGB(16, 19, 29), material = smooth, glows = false },
 			},
+			-- #422 (Q331, Q335-Q337): the housing and pylon are solid; the strips, lip and band only draw.
+			solid = { Shell = true, Strips = false, Lip = false, Band = false },
 		})
 		-- The pieces in the build's order, the one each mesh is asked for in.
 		expect(require(ReplicatedStorage.Shared.Config.Arena).goalPieces).toEqual({ "Shell", "Strips", "Lip", "Band" })
@@ -1223,6 +1225,11 @@ describe("Config.forMode", function()
 				message = "Arena.goal.housingRadius: must be > 0 (got 0)",
 			},
 			{ overrides = { goal = { door = { bars = 0 } } }, message = "Arena.goal.door.bars: must be >= 1 (got 0)" },
+			-- #422: a piece is solid or only draws.
+			{
+				overrides = { goal = { solid = { Shell = 1 } } },
+				message = "Arena.goal.solid.Shell: expected boolean, got number",
+			},
 			{
 				overrides = { goal = { door = { past = -0.1 } } },
 				message = "Arena.goal.door.past: must be >= 0 (got -0.1)",

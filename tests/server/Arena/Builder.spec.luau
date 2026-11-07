@@ -270,6 +270,13 @@ describe("Builder.build", function()
 		expect((folder(arena, "Goal"):FindFirstChild("GoalPanel") :: Part).Transparency).toBeCloseTo(0.6, 4)
 	end)
 
+	-- #422 (Q335-Q337): the shut goal stops a skater as it stops the ball; open, it lets both through (MatchService
+	-- switches its collision and its queries).
+	it("makes the goal's panel a barrier", function()
+		local arena = Builder.build(Geometry.build(config), config, parent)
+		expect((folder(arena, "Goal"):FindFirstChild("GoalPanel") :: Part):HasTag(Tags.Barrier)).toBe(true)
+	end)
+
 	it("leaves nothing behind when a piece is invalid", function()
 		local geometry = Geometry.build(config)
 		local broken = table.clone(geometry)
@@ -348,7 +355,7 @@ describe("Builder.dressGoal", function()
 		return goal, meshes
 	end
 
-	it("places each mesh at its box in the goal's frame, in its look, only drawing, beside the hoop", function()
+	it("places each mesh at its box in the goal's frame, in its look, solid or only drawing, by the hoop", function()
 		local goal, meshes = goalAndMeshes(config)
 		local hoop = goal:FindFirstChild("GoalHoop") :: Model
 		local frame = hoop:GetPivot()
@@ -370,7 +377,12 @@ describe("Builder.dressGoal", function()
 			expect(mesh.Color).toEqual(wanted.color)
 			expect(mesh.Material).toBe(wanted.material)
 			expect(mesh.Anchored).toBe(true)
-			expect(mesh.CanCollide or mesh.CanQuery or mesh.CanTouch).toBe(false)
+			-- #422 (Q335-Q337): the housing and pylon stop skaters and the ball, a barrier no skater rides; the
+			-- rest only draw.
+			local solid = config.Arena.goal.solid[name]
+			expect(mesh.CanCollide and mesh.CanQuery and mesh.CanTouch).toBe(solid)
+			expect(mesh.CanCollide or mesh.CanQuery or mesh.CanTouch).toBe(solid)
+			expect(mesh:HasTag(Tags.Barrier)).toBe(solid)
 		end
 	end)
 

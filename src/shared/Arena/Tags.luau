@@ -20,8 +20,8 @@ local Tags = {
 	-- On the folders of surfaces skaters ride (the floors, the banks, the walls and the glass): the only things their
 	-- rays hit.
 	RideSurface = "RideSurface",
-	-- On the folder of the arena's top (A7): skaters and the ball bounce off it, and only a skater's collider sweep
-	-- sees it; every ray looks through it.
+	-- On the folder of the arena's top (A7), the goal's solid pieces and its panel (#422): skaters and the ball bounce
+	-- off them, and only a skater's collider sweep sees them; every ray looks through them.
 	Barrier = "Barrier",
 	-- On the folder of the glass, a ride surface too: the skates only roll on it, so no climb holds there (#299).
 	Glass = "Glass",

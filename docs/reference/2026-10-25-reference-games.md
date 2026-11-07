@@ -2532,6 +2532,41 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   switch; 1505/1505; six skaters about 1 us a frame; the design page https://claude.ai/artifact/XKRHYqFiG8CUGEyndQ7myj,
   section 'The skates' fire, built as look G'): **"Yes, ship it"**: the PR opens stacked on #420; the owner's
   2-player check of the whole stack stays before its merge (Q321).
+- **Q333 the findings filed, the goal first** (session 99, recommended): asked whether to file Q331's two goal
+  findings (skaters pass through the goal's housing and pylon and should hit its walls; a carrier stuck inside the
+  goal while scoring is pushed out) and my own (1 Play start in 3 logged a MovementGuard warning: a character load
+  races the server's placement on its spawn, so the server briefly sees the skater at Roblox's own spot over the
+  arena's centre and moves them back) as issues, and their order against #414: **"All 3: goal first"**: all three
+  filed; next the goal's walls and the stuck carrier, each grilled and tried in Studio, then #414, then the load
+  warning.
+- **Q334 three tickets for the findings** (session 99, recommended; the to-tickets breakdown after Q333): **"Yes, file
+  these 3"**: 1 skaters hit the goal's walls (the housing and pylon solid for skaters, inside the opening's tunnel and
+  outside; the open opening stays open and the shut door still closes it; scoring, saves and the aim unchanged; what
+  the ball does at the shell and how precise the collision is, settled by questions and a Studio trial the owner
+  plays), none; 2 a carrier stuck inside the goal is pushed out (what counts as stuck and where they go, settled the
+  same way), blocked by 1; 3 no guard warning when a character loads (the guard stops counting the client's position
+  from before the server's placement, still catching a real teleport; checked over several Play starts), none.
+- **Q335 the ball bounces off the goal too** (session 99, recommended; #422's first question: once skaters hit the
+  goal's housing and pylon, what does the ball do there; today a throw that misses the opening passes through the
+  housing and only bounces off the thin rim round the opening): **"bounces off it too, but make sure that both
+  players and ball if it passes through the goal, it is okay, but the if they hit the goal walls then they bounce"**:
+  one solid goal: skaters and the ball pass through the open opening as today, and bounce off the housing (outside
+  and the opening's tunnel) and the pylon, as off any wall.
+- **Q336 trial the goal mesh's own collision** (session 99, recommended; #422; measured in Studio: the Shell mesh's
+  Default collision (0.43 s a make) keeps the opening open out to 7-9 studs from its centre, the tunnel wall at 9.0,
+  the pylon's face at 10.1; PreciseConvexDecomposition takes ~31 s every server start): **"Trial the mesh's own
+  shape"**: the goal mesh itself becomes solid for skaters (as a barrier: it stops and bounces them, they don't ride
+  it) and for the ball, and the owner plays it in Studio (into the housing and pylon from the wall, through the open
+  opening, into the tunnel walls); a blockier stand-in only if it snags or feels wrong.
+- **Q337 the goal's own collision, build it** (session 99, recommended; #422's trial in Studio Play: the Shell mesh
+  made again with CollisionFidelity Default (0.43 s), invisible, solid, tagged Barrier in the GoalLook model, and the
+  goal's panel tagged Barrier so the shut door stops skaters; the owner played it): **"Feels right, build it"**: the
+  goal mesh's Default collision, solid for skaters and the ball; the shut door a barrier too.
+- **Q338 #422 shipped** (session 99, recommended; #422 built as tried: the goal's housing and pylon solid by the
+  Shell mesh's own Default collision, skaters and the ball bouncing off them and passing through the open opening,
+  the shut goal's panel a barrier too; 1508/1508; in Play the tunnel wall at 9.0 and the pylon at 10.1, the opening
+  clear; not checked by me: a thrown ball hitting the housing, covered by the owner's trial throws): **"Yes, ship
+  it"**: the PR opens stacked on #421; the owner's 2-player check of the whole stack stays before its merge (Q321).
 
 ## Roller Champions
 
