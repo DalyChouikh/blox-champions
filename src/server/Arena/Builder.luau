@@ -194,6 +194,8 @@ local function buildGoal(goal: Types.Goal, arena: ArenaConfig, parent: Instance)
 	local panel = addSolid(goal.panel, "GoalPanel", color, parent)
 	panel.Transparency = arena.goal.panelTransparency
 	panel:AddTag(Tags.GoalPanel)
+	-- The shut goal stops a skater as it stops the ball (#422); open, MatchService turns its collision and queries off.
+	panel:AddTag(Tags.Barrier)
 end
 
 local function buildSpawns(geometry: Geometry.ArenaGeometry, config: Config.GameConfig, parent: Instance)
@@ -246,17 +248,24 @@ function Builder.build(geometry: Geometry.ArenaGeometry, config: Config.GameConf
 end
 
 -- Puts the goal's meshes (the Halo pylon, #410; in Arena.goalPieces' order) on a built goal: each at its box in the
--- hoop's frame, in its look, only drawing, in a GoalLook model beside the hoop, with the door that shuts the
--- opening (Q324), whose bars' ends the housing hides: solid, in the goal's colour, only drawing, in a model
--- tagged GoalDoor. The ring's blocks and the panel then hide, keeping the ring's collision, the rules' opening and
--- the shut goal's wall, and what glows while the goal is open moves from the blocks to the pieces whose look glows.
+-- hoop's frame, in its look, solid or only drawing (Arena.goal.solid, #422), in a GoalLook model beside the hoop, with
+-- the door that shuts the opening (Q324), whose bars' ends the housing hides: solid, in the goal's colour, only
+-- drawing, in a model tagged GoalDoor. The ring's blocks and the panel then hide, keeping the ring's collision, the
+-- rules' opening and the shut goal's wall, and what glows while the goal is open moves from the blocks to the pieces
+-- whose look glows.
 function Builder.dressGoal(hoop: PVInstance, panel: BasePart, meshes: { MeshPart }, arena: ArenaConfig)
 	local goal = arena.goal
 	local frame = hoop:GetPivot()
 	local look = Instance.new("Model")
 	look.Name = "GoalLook"
 	for index, name in Arena.goalPieces do
-		local mesh = DrawOnly(meshes[index])
+		-- A solid piece stops skaters and the ball by its own shape (a barrier, never ridden: #422); the rest draw.
+		local mesh = meshes[index]
+		if goal.solid[name] then
+			mesh:AddTag(Tags.Barrier)
+		else
+			DrawOnly(mesh)
+		end
 		local box, wanted = goal.pieces[name], goal.looks[name]
 		mesh.Name = name
 		mesh.Anchored = true

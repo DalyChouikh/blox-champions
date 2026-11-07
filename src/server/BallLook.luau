@@ -102,7 +102,7 @@ local BallLook: BallLook = {
 		self._template = readied(sphere())
 		self._meshed = false
 		self._early = {}
-		Meshes.fetch({ id }, make, function(meshes: { MeshPart })
+		Meshes.fetch({ { id = id, solid = false } }, make, function(meshes: { MeshPart })
 			if generation == self._generation then
 				meshed(self, meshes[1])
 			end

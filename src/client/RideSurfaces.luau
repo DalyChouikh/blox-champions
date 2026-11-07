@@ -2,9 +2,9 @@
 -- The arena surfaces skaters ride (Tags.RideSurface), as the one RaycastParams every client ray goes through: the
 -- skating's ground and wall rays, the poses', the camera's and the ball's ground marker. Rays hit only these, never the
 -- barriers, gates, markers, the goal, characters or the ball. Beside it, `solid` adds the barriers (Tags.Barrier: the
--- arena's top, A7): the one filter the skater's collider sweep goes through, so a barrier stops a skater as a wall or
--- a ceiling does while every ray looks through it. Both follow their tags as the arena is built or replaced, and
--- `ready` says whether the ride surfaces are here yet.
+-- arena's top, A7; the goal's housing, pylon and shut panel, #422): the one filter the skater's collider sweep goes
+-- through, so a barrier stops a skater as a wall or a ceiling does while every ray looks through it. Both follow their
+-- tags as the arena is built or replaced, and `ready` says whether the ride surfaces are here yet.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

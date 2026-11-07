@@ -36,11 +36,12 @@ local GoalLook: GoalLook = {
 		local log: (line: string) -> () = deps.Log or warn
 		self._generation += 1
 		local generation = self._generation
-		local ids: { string } = {}
+		local goal = config.Arena.goal
+		local requests: { Meshes.Request } = {}
 		for _, name in Arena.goalPieces do
-			table.insert(ids, config.Arena.goal.meshes[name])
+			table.insert(requests, { id = goal.meshes[name], solid = goal.solid[name] })
 		end
-		Meshes.fetch(ids, make, function(meshes: { MeshPart })
+		Meshes.fetch(requests, make, function(meshes: { MeshPart })
 			if generation == self._generation then
 				Builder.dressGoal(arena.goalHoop, arena.goalPanel, meshes, config.Arena)
 			end

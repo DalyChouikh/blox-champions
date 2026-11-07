@@ -22,18 +22,21 @@ local IDS = { meshes.Shell, meshes.Strips, meshes.Lip, meshes.Band }
 local parent: Folder
 -- The mesh ids asked for, and the lines logged, since the last init.
 local asked: { string }
+-- Whether each mesh asked for was asked for as solid, in the same order.
+local solids: { boolean }
 local logged: { string }
 
 -- An arena as ArenaService builds one, and GoalLook started on it with a mesh maker that never reaches Roblox: an
 -- empty MeshPart, or what `make` does. Returns the arena's Goal folder.
 local function init(make: ((id: string) -> MeshPart)?): Folder
-	asked, logged = {}, {}
+	asked, solids, logged = {}, {}, {}
 	local arena = Builder.build(Geometry.build(config), config, parent)
 	GoalLook:init({
 		Config = config,
 		ArenaService = { model = arena, arena = TaggedLayout.read(arena) },
-		MakeMesh = function(id: string): MeshPart
+		MakeMesh = function(id: string, solid: boolean): MeshPart
 			table.insert(asked, id)
+			table.insert(solids, solid)
 			return if make ~= nil then make(id) else Instance.new("MeshPart")
 		end,
 		Log = function(line: string)
@@ -69,6 +72,8 @@ describe("GoalLook", function()
 		local goal = init()
 		task.wait()
 		expect(asked).toEqual(IDS)
+		-- The housing and pylon are solid (#422, Q335-Q337); the strips, lip and band only draw.
+		expect(solids).toEqual({ true, false, false, false })
 		local look = goal:FindFirstChild("GoalLook")
 		expect(look).never.toBeNil()
 		for _, name in Arena.goalPieces do

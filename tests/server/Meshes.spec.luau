@@ -9,7 +9,7 @@ local Meshes = require(ServerScriptService.Server.Meshes)
 
 -- A mesh maker that never reaches Roblox: each id it is asked for is noted, and gets a MeshPart named after it.
 local function maker(asked: { string }, wait: BindableEvent?): Meshes.Make
-	return function(id: string): MeshPart
+	return function(id: string, _solid: boolean): MeshPart
 		table.insert(asked, id)
 		if wait ~= nil then
 			wait.Event:Wait()
@@ -20,13 +20,49 @@ local function maker(asked: { string }, wait: BindableEvent?): Meshes.Make
 	end
 end
 
+-- Requests for the meshes `ids`, none solid.
+local function requests(ids: { string }): { Meshes.Request }
+	local made: { Meshes.Request } = {}
+	for _, id in ids do
+		table.insert(made, { id = id, solid = false })
+	end
+	return made
+end
+
+-- #422, measured in Studio: a mesh's Default collision kept the goal's opening open (the tunnel wall at 9.0, its
+-- radius) in 0.43 s a make; the precise kind took ~31 s every make. A look that never collides needs no shape: Box.
+describe("Meshes.fidelity", function()
+	it("gives a solid mesh Roblox's Default collision and one that only draws a box", function()
+		expect(Meshes.fidelity(true)).toBe(Enum.CollisionFidelity.Default)
+		expect(Meshes.fidelity(false)).toBe(Enum.CollisionFidelity.Box)
+	end)
+end)
+
 describe("Meshes.fetch", function()
+	-- #422 (the owner's Q335-Q337): a solid mesh is made with its collision shape, the rest only draw.
+	it("asks for each mesh with whether it is solid", function()
+		local seen: { string } = {}
+		Meshes.fetch(
+			{ { id = "a", solid = true }, { id = "b", solid = false } },
+			function(id: string, solid: boolean): MeshPart
+				table.insert(seen, `{id} {solid}`)
+				return Instance.new("MeshPart")
+			end,
+			function(_meshes: { MeshPart }) end,
+			function(_id: string, _why: string)
+				error("nothing fails here")
+			end
+		)
+		task.wait()
+		expect(seen).toEqual({ "a true", "b false" })
+	end)
+
 	-- Found in Play (#400): a start held up by a mesh's download let Roblox load a joining player's default character.
 	it("never holds up its caller, then hands over every mesh in the ids' order once all have come", function()
 		local asked: { string } = {}
 		local arrived = Instance.new("BindableEvent")
 		local got: { MeshPart }? = nil
-		Meshes.fetch({ "a", "b", "c" }, maker(asked, arrived), function(meshes: { MeshPart })
+		Meshes.fetch(requests({ "a", "b", "c" }), maker(asked, arrived), function(meshes: { MeshPart })
 			got = meshes
 		end, function(_id: string, _why: string)
 			error("nothing fails here")
@@ -49,7 +85,7 @@ describe("Meshes.fetch", function()
 		local made: { MeshPart } = {}
 		local fails: { string } = {}
 		local doneCalled = false
-		Meshes.fetch({ "a", "b", "c" }, function(id: string): MeshPart
+		Meshes.fetch(requests({ "a", "b", "c" }), function(id: string, _solid: boolean): MeshPart
 			table.insert(asked, id)
 			if id == "b" then
 				error("HTTP 403 (Forbidden)", 0)

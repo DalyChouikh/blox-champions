@@ -106,6 +106,9 @@ export type ArenaConfig = {
 		meshes: GoalMeshes<string>,
 		pieces: GoalMeshes<GoalBox>,
 		looks: GoalMeshes<GoalLook>,
+		-- Whether a piece stops skaters and the ball (a barrier: they bounce off it, no skater rides it), by its mesh's
+		-- own collision shape; one that is not only draws.
+		solid: GoalMeshes<boolean>,
 	},
 	-- The glass panel at each gate (R18): a thin wall across the track, filling its whole cross-section from the
 	-- surface up to the walls' top, `depth` thick along the track (thinner than the goal's parts: a rule below).
@@ -176,6 +179,10 @@ local defaults: ArenaConfig = {
 			Lip = { color = Color3.fromRGB(245, 242, 236), material = Enum.Material.SmoothPlastic, glows = true },
 			Band = { color = Color3.fromRGB(16, 19, 29), material = Enum.Material.SmoothPlastic, glows = false },
 		},
+		-- The housing and pylon are solid, so skaters and the ball bounce off the goal's walls and pass only through
+		-- its open opening (the owner's Q331, Q335; the shape tried in Studio, Q337); the strips, lip and band lie on
+		-- the housing and only draw.
+		solid = { Shell = true, Strips = false, Lip = false, Band = false },
 	},
 	gatePanel = { depth = 0.2 },
 	teamSpawnSpacing = 10,
@@ -263,6 +270,7 @@ local fields = Validate.record({
 		looks = goalMeshes(
 			Validate.record({ color = color, material = Validate.enumItem(Enum.Material), glows = Validate.boolean() })
 		),
+		solid = goalMeshes(Validate.boolean()),
 	}),
 	gatePanel = Validate.record({ depth = partSize }),
 	teamSpawnSpacing = size,

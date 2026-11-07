@@ -25,8 +25,9 @@ local function init(make: ((id: string) -> MeshPart)?)
 	asked, logged = {}, {}
 	BallLook:init({
 		Config = config,
-		MakeMesh = function(id: string): MeshPart
-			table.insert(asked, id)
+		MakeMesh = function(id: string, solid: boolean): MeshPart
+			-- The look only draws (the ball's own part collides): a solid ask would show in `asked`.
+			table.insert(asked, if solid then `{id} (solid)` else id)
 			return if make ~= nil then make(id) else Instance.new("MeshPart")
 		end,
 		Log = function(line: string)
