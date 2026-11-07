@@ -147,8 +147,6 @@ export type SkateController = {
 	_playerList: PlayerList.PlayerList?,
 }
 
--- Who playersAround walks before start.
-local NO_PLAYERS: { Player } = table.freeze({})
 -- How many surfaces one step slides along: a wall or a barrier, the floor it meets, and a third at a corner.
 local CONTACT_PASSES = 3
 
@@ -161,9 +159,7 @@ local function playersAround(self: SkateController): { SkaterView }
 	local views = self._views
 	local count = 0
 	local localPlayer = Players.LocalPlayer
-	local playerList = self._playerList
-	local players: { Player } = if playerList ~= nil then playerList.list else NO_PLAYERS
-	for _, player in players do
+	for _, player in PlayerList.listOf(self._playerList) do
 		local character = player.Character
 		local root = if character ~= nil then character:FindFirstChild(SkaterRig.root) :: BasePart? else nil
 		if player ~= localPlayer and root ~= nil then

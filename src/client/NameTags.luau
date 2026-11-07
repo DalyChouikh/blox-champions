@@ -90,9 +90,6 @@ export type NameTags = {
 	_rings: { [Config.TagSizes]: { UDim2 } },
 }
 
--- Who a step walks before start.
-local NO_PLAYERS: { Player } = table.freeze({})
-
 -- Whether two keys draw alike: Hud.passKey and Hud.attachKey are new ones at each of the Hud's renders.
 local function sameKey(a: Style.KeyView?, b: Style.KeyView?): boolean
 	if a == nil or b == nil then
@@ -232,7 +229,7 @@ local NameTags: NameTags = {
 	_hud = nil :: any,
 	_parent = nil :: any,
 	_players = function(): { Player }
-		return NO_PLAYERS
+		return PlayerList.listOf(nil)
 	end,
 	_localPlayer = nil :: any,
 	_playerList = nil,
@@ -252,11 +249,9 @@ local NameTags: NameTags = {
 		self._actions = deps.ActionController
 		self._skate = deps.SkateController
 		self._hud = deps.Hud
-		self._players = deps.Players
-			or function(): { Player }
-				local playerList = self._playerList
-				return if playerList ~= nil then playerList.list else NO_PLAYERS
-			end
+		self._players = deps.Players or function(): { Player }
+			return PlayerList.listOf(self._playerList)
+		end
 		self._localPlayer = deps.LocalPlayer or Players.LocalPlayer :: Player
 		self._parent = deps.Parent or self._localPlayer:WaitForChild("PlayerGui")
 		self._tags = {}

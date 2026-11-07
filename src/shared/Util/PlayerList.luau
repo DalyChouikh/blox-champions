@@ -18,6 +18,10 @@ type Fields = {
 	_connections: { Connection },
 }
 
+-- The players a module walks before it makes its list. Frozen, so nothing can join it.
+local NONE: { Player } = {}
+table.freeze(NONE)
+
 local PlayerList = {}
 PlayerList.__index = PlayerList
 
@@ -43,6 +47,11 @@ function PlayerList.new(players: PlayersService): PlayerList
 		},
 	}
 	return setmetatable(self, PlayerList)
+end
+
+-- `playerList`'s players, or none before it is made: a module makes its list at start, after every module's init.
+function PlayerList.listOf(playerList: PlayerList?): { Player }
+	return if playerList ~= nil then playerList.list else NONE
 end
 
 -- Stops following the game; the list keeps the players it had.
