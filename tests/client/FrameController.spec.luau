@@ -53,6 +53,7 @@ local function deps(overrides: { [string]: Stepped }?): { [string]: any }
 		ArenaGlow = recorder("arenaGlow"),
 		GoalWorth = recorder("goalWorth"),
 		FireLines = recorder("fireLines"),
+		SkateFire = recorder("skateFire"),
 		BallTrail = recorder("ballTrail"),
 		NameTags = recorder("nameTags"),
 		Log = function(line: string)
@@ -88,6 +89,7 @@ describe("FrameController", function()
 			"ArenaGlow",
 			"GoalWorth",
 			"FireLines",
+			"SkateFire",
 			"BallTrail",
 			"NameTags",
 		})
@@ -100,7 +102,8 @@ describe("FrameController", function()
 
 	it(
 		"checks Roblox's overlays, then draws the ball, then renders the camera, touch controls, HUD state, HUD, "
-			.. "world markers, arena glow, goal's worth, fire lines, ball's trail and name tags before each frame",
+			.. "world markers, arena glow, goal's worth, fire lines, skate fire, ball's trail and name tags before "
+			.. "each frame",
 		function()
 			FrameController:render(0.25)
 			expect(order).toEqual({
@@ -114,6 +117,7 @@ describe("FrameController", function()
 				"arenaGlow 0.25",
 				"goalWorth 0.25",
 				"fireLines 0.25",
+				"skateFire 0.25",
 				"ballTrail 0.25",
 				"nameTags 0.25",
 			})
@@ -138,6 +142,7 @@ describe("FrameController", function()
 			"arenaGlow 0.25",
 			"goalWorth 0.25",
 			"fireLines 0.25",
+			"skateFire 0.25",
 			"ballTrail 0.25",
 			"nameTags 0.25",
 		}

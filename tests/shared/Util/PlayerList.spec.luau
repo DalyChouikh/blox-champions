@@ -55,4 +55,12 @@ describe("PlayerList", function()
 		players.PlayerRemoving:Fire(first)
 		expect(list.list).toEqual({ first, second })
 	end)
+
+	-- A module makes its list at start, after every init: until then it walks no one, and nothing can join that.
+	it("gives a made list's players, and none, frozen, before the list is made", function()
+		local list = PlayerList.new(players)
+		expect(PlayerList.listOf(list) == list.list).toBe(true)
+		expect(PlayerList.listOf(nil)).toEqual({})
+		expect(table.isfrozen(PlayerList.listOf(nil))).toBe(true)
+	end)
 end)

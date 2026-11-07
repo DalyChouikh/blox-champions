@@ -880,6 +880,18 @@ describe("Config defaults", function()
 			textHeight = 0.55,
 			behind = 0.5,
 		})
+		-- The skates' fire (#413, Q298; look G, Q331): a ribbon 0.8 studs across, 0.3 over each sole, 0.4 s of
+		-- travel long, showing from 2 studs/s, at three times its colour's brightness, 0.1 see-through at the skate
+		-- and 0.35 at 0.6 of the way back, fading to nothing from there.
+		expect(ui.skateFire).toEqual({
+			width = 0.8,
+			lift = 0.3,
+			lifetime = 0.4,
+			minSpeed = 2,
+			brightness = 3,
+			transparency = 0.1,
+			fade = { from = 0.6, transparency = 0.35 },
+		})
 		-- The ball's trail (#313), bolder after the screenshots (Q146); the thrower's arc went (Q149).
 		expect(ui.ballTrail).toEqual({ lifetime = 0.4, width = 2, color = Color3.new(1, 1, 1), transparency = 0 })
 	end)
@@ -2567,6 +2579,44 @@ describe("Config.forMode", function()
 			{
 				overrides = { UI = { arenaGlow = { fireLines = { fadeSeconds = -0.1 } } } },
 				message = "UI.arenaGlow.fireLines.fadeSeconds: must be >= 0 (got -0.1)",
+			},
+			-- The skates' fire: some width and length, on or over the sole, a speed of none or more, some light, seen
+			-- at the skate and where its fade starts, somewhere along it.
+			{
+				overrides = { UI = { skateFire = { lift = -0.1 } } },
+				message = "UI.skateFire.lift: must be >= 0 (got -0.1)",
+			},
+			{
+				overrides = { UI = { skateFire = { brightness = 0 } } },
+				message = "UI.skateFire.brightness: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { skateFire = { fade = { from = 1 } } } },
+				message = "UI.skateFire.fade.from: must be < 1 (got 1)",
+			},
+			{
+				overrides = { UI = { skateFire = { fade = { from = 0 } } } },
+				message = "UI.skateFire.fade.from: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { skateFire = { fade = { transparency = 1 } } } },
+				message = "UI.skateFire.fade.transparency: must be < 1 (got 1)",
+			},
+			{
+				overrides = { UI = { skateFire = { width = 0 } } },
+				message = "UI.skateFire.width: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { skateFire = { lifetime = 0 } } },
+				message = "UI.skateFire.lifetime: must be > 0 (got 0)",
+			},
+			{
+				overrides = { UI = { skateFire = { minSpeed = -1 } } },
+				message = "UI.skateFire.minSpeed: must be >= 0 (got -1)",
+			},
+			{
+				overrides = { UI = { skateFire = { transparency = 1 } } },
+				message = "UI.skateFire.transparency: must be < 1 (got 1)",
 			},
 			-- Each lap's line stands apart from the last (Q302's stack): 0.8 thick needs more than 0.8 between.
 			{

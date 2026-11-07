@@ -490,6 +490,20 @@ export type GoalWorthSettings = {
 	behind: number,
 }
 
+-- The skates' fire (#413, the owner's Q298): a ribbon `width` studs across, `lift` studs over each skate's sole,
+-- `lifetime` seconds of travel long (so longer with speed), showing while the skater moves at `minSpeed` studs/s or
+-- more, drawn in the team's colour at `brightness` times its light (Q331), `transparency` see-through at the skate and
+-- `fade.transparency` at `fade.from` of the way back, where it starts fading to nothing at its tail.
+export type SkateFireSettings = {
+	width: number,
+	lift: number,
+	lifetime: number,
+	minSpeed: number,
+	brightness: number,
+	transparency: number,
+	fade: { from: number, transparency: number },
+}
+
 -- The trail behind a thrown, passed or rolled ball on every screen (§9.4, #313): `lifetime` seconds long and `width`
 -- studs wide in `color`, `transparency` see-through behind the ball, fading to nothing at its end.
 export type BallTrailSettings = { lifetime: number, width: number, color: Color3, transparency: number }
@@ -510,6 +524,7 @@ export type UIConfig = {
 	nameTag: NameTagSettings,
 	arenaGlow: ArenaGlowSettings,
 	goalWorth: GoalWorthSettings,
+	skateFire: SkateFireSettings,
 	ballTrail: BallTrailSettings,
 }
 
@@ -970,6 +985,20 @@ local defaults: UIConfig = {
 	},
 	-- Filling the opening (Q327), the number about a radius tall as the design page drew it (Q294).
 	goalWorth = { thickness = 0.2, fill = 1, textHeight = 0.55, behind = 0.5 },
+	-- Look G (Q331), as Studio Play showed it: about a skate wide; over the sole by more than the 0.26 studs a sole
+	-- dips into the floor while skating (measured), so the floor never hides it; 0.4 s of travel, about 6 body heights
+	-- at softCap, nearly solid for its first half like RC's (Video 36 at 42.1 s); from a crawl up, so standing still
+	-- (an idle pose's foot sway) leaves none; three times as bright as its colour, so it glows as the gate markers'
+	-- Neon does (orange toward amber, blue a neon cyan).
+	skateFire = {
+		width = 0.8,
+		lift = 0.3,
+		lifetime = 0.4,
+		minSpeed = 2,
+		brightness = 3,
+		transparency = 0.1,
+		fade = { from = 0.6, transparency = 0.35 },
+	},
 	-- The owner asked for a trail behind the ball (Q98; RC's thrown ball leaves a white streak, Video 4 at
 	-- 366.8-367.0 s and Video 31 at 39.1 s; Illegal Soccer's a white dashed one), white as the crosshair is (Q141)
 	-- and behind a team-coloured ball too, as RC's (Q160), and bolder once a thin faint one was seen from the side
@@ -1517,6 +1546,18 @@ local fields = Validate.record({
 		fill = Validate.number({ above = 0, max = 1 }),
 		textHeight = Validate.number({ above = 0, max = 1 }),
 		behind = nonNegative,
+	}),
+	skateFire = Validate.record({
+		width = positive,
+		lift = nonNegative,
+		lifetime = positive,
+		minSpeed = nonNegative,
+		brightness = positive,
+		transparency = seen,
+		fade = Validate.record({
+			from = Validate.number({ above = 0, below = 1 }),
+			transparency = seen,
+		}),
 	}),
 	ballTrail = Validate.record({
 		lifetime = positive,

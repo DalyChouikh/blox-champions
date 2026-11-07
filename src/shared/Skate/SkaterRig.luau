@@ -6,12 +6,14 @@
 local Freeze = require(script.Parent.Parent.Util.Freeze)
 local Pose = require(script.Parent.Pose)
 
+local LEFT_LEG = "Left Leg"
+
 local SkaterRig = {
 	-- What Roblox names in every character: the root part, the humanoid, the R6 left leg (which sets an R6 avatar's
 	-- standing height) and the default animation script.
 	root = "HumanoidRootPart",
 	humanoid = "Humanoid",
-	leftLeg = "Left Leg",
+	leftLeg = LEFT_LEG,
 	animate = "Animate",
 	-- The one fixed-size ball every skater collides with, welded to the root.
 	collider = "SkateCollider",
@@ -37,6 +39,8 @@ local SkaterRig = {
 			rightShoulder = "Right Shoulder",
 		},
 	} :: { R15: { [Pose.Role]: string }, R6: { [Pose.Role]: string } },
+	-- The parts each skate's fire trails from (SkateFire), for each rig type: an R15 avatar's feet, an R6 one's legs.
+	feet = { R15 = { "LeftFoot", "RightFoot" }, R6 = { LEFT_LEG, "Right Leg" } },
 	groups = {
 		-- Avatar parts: they collide with nothing.
 		body = "SkaterBody",

@@ -5,11 +5,12 @@
 -- from the server's state, a catch's pull into the hand), so everything after reads the spot drawn, then the camera,
 -- which shows the skater where physics left them, then the touch controls, which show what each button does now, then
 -- the HUD's state, whose clocks count on, then the HUD, which shows it, then the world's markers, the arena's glow, the
--- goal's worth and the fire lines, which read that state too, then the ball's trail, then the name tags. Roblox gives
--- RunService handlers no documented order (they ran in reverse of their connection order when measured), so only this
--- module connects them, one per phase. Each module's step is guarded (#392, the owner's Q263): an error in one (a HUD
--- binding's update, say) no longer skips the steps after it that frame; the first is reported, naming the module and
--- where it was thrown, never every frame, and the module is still stepped each frame, so one that recovers goes on.
+-- goal's worth and the fire lines, which read that state too, then the skates' fire, then the ball's trail, then the
+-- name tags. Roblox gives RunService handlers no documented order (they ran in reverse of their connection order when
+-- measured), so only this module connects them, one per phase. Each module's step is guarded (#392, the owner's Q263):
+-- an error in one (a HUD binding's update, say) no longer skips the steps after it that frame; the first is reported,
+-- naming the module and where it was thrown, never every frame, and the module is still stepped each frame, so one that
+-- recovers goes on.
 
 local RunService = game:GetService("RunService")
 
@@ -32,6 +33,7 @@ local DRAWN: { string } = {
 	"ArenaGlow",
 	"GoalWorth",
 	"FireLines",
+	"SkateFire",
 	"BallTrail",
 	"NameTags",
 }

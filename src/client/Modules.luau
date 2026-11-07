@@ -25,6 +25,7 @@ local modules: { Loader.LoadableModule } = {
 	require(script.Parent.ArenaGlow),
 	require(script.Parent.GoalWorth),
 	require(script.Parent.FireLines),
+	require(script.Parent.SkateFire),
 	require(script.Parent.BallTrail),
 	require(script.Parent.NameTags),
 	require(script.Parent.FrameController),
