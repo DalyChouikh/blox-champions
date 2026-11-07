@@ -85,7 +85,7 @@ describe("Banner", function()
 		expect(front.Text).toBe("GOAL!")
 		expect(front.TextSize).toBe(60)
 		local edge = group:FindFirstChild("Edge") :: TextLabel
-		expect(edge.TextColor3 == config.UI.hud.look.teamColors.Blue).toBe(true)
+		expect(edge.TextColor3 == config.UI.teamColors.Blue).toBe(true)
 		rerender(banner({ kind = "Lap", team = "Orange", value = 2 }, 100))
 		expect(front.Text).toBe("LAP 2 COMPLETED")
 		expect(front.TextSize).toBe(30)

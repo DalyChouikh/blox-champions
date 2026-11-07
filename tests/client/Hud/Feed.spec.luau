@@ -22,6 +22,7 @@ local BOX = Color3.fromRGB(40, 50, 60)
 -- So a chip's ink stands 27 px tall, 31 px from the next.
 local config = Fixtures.config({
 	UI = {
+		teamColors = { Blue = Color3.fromRGB(10, 20, 30), Orange = Color3.fromRGB(200, 100, 40) },
 		hud = {
 			screenMargin = 8,
 			look = {
@@ -31,7 +32,6 @@ local config = Fixtures.config({
 				shade = 0,
 				groupRoom = 4,
 				box = BOX,
-				teamColors = { Blue = Color3.fromRGB(10, 20, 30), Orange = Color3.fromRGB(200, 100, 40) },
 			},
 			layout = {
 				feed = {

@@ -2120,6 +2120,335 @@ stack (#225-#304) was approved for merging the same turn ("Merge now").
   B the black band as seen (recommended), at 2x and at 52 / 34 px): neither; the owner's words: "no don't animate the
   ball hint, keep it like now, you mean the hint of the ball ofscreen right?" (yes: the off-screen ball badge, #376).
   So the badge keeps RC's two lines at their fixed lean (Q265), and #402 is closed as not planned.
+- **Q290 the ball's 2-player check** (session 92, #400 + #401; asked after #404's fix went up as #407): the owner's
+  own 2-player test of the Blender ball with its black band and its roll (at most 2.5 turns a second, Q287) on both
+  screens: "tested, good to merge". So #403's and #405's last boxes are met.
+- **Q291 merge the stack** (session 92, recommended): **"Yes, merge all 4"**: #403 (the ball's look), #405 (its roll),
+  #406 (Roblox never loads a character on its own, #394), #407 (the CI flake, #404), squashed in order, each later
+  branch rebuilt on the new main with its tree checked and CI green before its merge.
+- **Q292 publish after the merge** (session 92, recommended): **"Yes, publish after the merge"**: the new main built to
+  build/game.rbxl and published by the owner (place 74253300416513, on 3332f73 since 2026-11-05); the publish window
+  closed by me.
+- **Q293 no CI retry** (session 92, recommended): **"No retry"**: a red cloud run stays red, and a flake is diagnosed
+  like #404; a retry would also pass a real, sometimes-slow problem, which #407's scaled budgets are there to catch.
+- **RC's lap moment studied for the captions** (session 92, the Presentation part's next item, Q181/Q182; Video 35,
+  `...2026-11-01 211344.mp4`, 'Fallen Stadium', at 5.8-8.8 s (lap 1) and 42.0-44.4 s (lap 2), 10-20 frames a
+  second; crops in the durable handoffs folder `s92/frames/cap_rc_*.jpg`). What RC does when the carrier's team
+  completes a lap:
+  - **The goal shows its worth in its middle:** the goal ring's centre disc glows in the possessing team's colour
+    with the worth in blocky digits, "+1" at 42.8 s and "+3" from 42.9 s, about 0.1-0.15 s after the carrier passed
+    the gate (42.75 s), before anything else arrives; it reads from anywhere the goal is in view.
+  - **A fireball from the gate to the goal:** about 0.2 s after the gate (42.95 s) a fireball, white-hot head and a long
+    orange tail, comes from over the outer wall behind the skater and streaks along the wall's top to the goal ring
+    in about 0.3 s (43.0-43.3 s); then thin orange streaks along the wall fade over about a second (to ~44.4 s).
+  - **The caption:** "Lap 2 Completed" in a pink-orange outlined script under the scoreboard from ~42.9 s (ours:
+    LAP n COMPLETED, #356).
+  - **A feed line at the bottom centre:** "Orange has a chance to score!" after lap 1 (7.5-8.8 s), "2 laps for
+    Orange!" after lap 2 (from ~43.5 s), a small white box with dark text (ours: "<Team> goal is active!", Q191).
+  - **Fire trails from the skates:** the carrier's two skates sometimes leave long orange fire trails on the ground
+    behind them, but not because of the lap: within the same streak they show at 40-42 s and 47 s and are gone at
+    43-45 s, while the skater slows to throw (44.7 s); none at 5.8-6.6 s (standing, throwing), present at 7.6-8.6 s
+    (skating on). So they follow the skater's motion (speed or pumping: not settled); when exactly, and whether
+    every skater has them, is not seen yet.
+  Ours today at a lap: the LAP n COMPLETED banner, the scoreboard's lap chips, the goal-active message, the next
+  gate's glowing wall and chevron (#376/#384); the goal ring (white rim, radius 7, 29 studs up, a panel while
+  closed) shows nothing of its worth, and nothing flies or burns. Next: draw RC's moment beside ours on the design
+  page (animated), then ask one question at a time.
+- **Q294 the goal shows its worth** (session 92, the captions; the owner's /login moved the design page to
+  https://claude.ai/artifact/VBbQKJJuUCXoLmV4oDiNNZ, the earlier 2VPvUoeq1YxxQFhw3quNhw being the previous account's;
+  section 'When your team completes a lap': RC's frames, ours today, and our lap drawn live with each RC piece
+  switchable, desktop and phone): **"Yes as drawn"** (recommended): a see-through disc in the possessing team's
+  colour inside the open goal, +1/+3/+5 in our banner lettering, popping when it changes; the ball flies through it;
+  the HUD's chip stays. With two new items in the owner's words: "also in my todo list, is that I am going to update
+  the goal in the arena map to match RC structure, it shouldn't be a hanging disk, and to be thick and more at the
+  top, but not sure if we do it later or now? what is in our current todo list first? also a small todo, I want to
+  explore having the ball color in neon colors, like RC, not bare orange and blue, and for anything else like RC,
+  it is has more brighter colors for some stuff, like neon I think". So: **RC's goal structure** (not a disc hanging
+  from an arm: a thick goal, higher up) and **neon colours** (the ball and other things brighter, like RC), each
+  studied in RC's frames and shown on the page first; their place in the order asked next.
+- **Q295 the order: the goal and the colours first** (session 92, recommended; asked after the owner's two new items,
+  with the current list: captions, goal sequence, intro/kickoff cameras, podium, drop-in, camera pitch, then M1's
+  close): **"Goal + colours before the captions build"**: the captions' remaining questions now (the fireball, the
+  skates' fire, the bottom line's words), then RC's goal structure (frames, page, a playable trial), then neon
+  colours (page), then the captions built on the new goal in the new colours, so nothing is built twice.
+- **Q296 the fireball not seen** (session 92, the captions; design page version 1): asked whether to have RC's
+  fireball as drawn; the owner: "didn't see a fireball". Found: the drawing flew it along the outer wall's top, which
+  sits above our camera's view (our glass is 120 studs tall, RC's far lower relative to its camera), so it showed only
+  at the goal. Version 2 flies it along the outer glass at about the goal's height, in from the right edge, with the
+  streaks following its path; asked again.
+- **Q297 the fireball, as drawn** (session 92, recommended; design page version 2): **"Yes, as drawn"**: on each lap
+  a fireball in the team's colour flies from the gate just passed along the outer glass at about the goal's height
+  into the goal in 0.35 s, a flash at the goal, then streaks along its path fade over 1.1 s; every screen shows it on
+  its own; it does nothing to play. Built with the captions, on the new goal.
+- **Q298 skate fire for everyone** (session 92; not the recommended trial): "Yes we need to have skate fier, it is
+  for everyone, in the teams color, and while the character is moving, like speeding, pumping, any movement". So
+  every skater's two skates leave fire trails in their team's colour whenever they move (skating, pumping, any
+  motion), none while still; a trail drawn behind a moving skate grows with its speed. Not tied to the lap. Built
+  with the captions (its own issue).
+- **Q299 the bottom line's words** (session 92, recommended): **"Today's, plus lap counts"**: lap 1 ORANGE GOAL IS
+  ACTIVE! (as today, Q191; RC's words in Video 4), lap 2 2 LAPS FOR ORANGE!, lap 3 3 LAPS FOR ORANGE! (Video 35's
+  form), same place and look as today. Not chosen: today's only; Video 35's "has a chance to score!". So the
+  captions' design is settled (Q294, Q297-Q299); next: RC's goal structure, then neon colours (Q295), then the
+  captions' issues.
+- **RC's goal structure studied** (session 92, for the owner's Q294 item; Video 4 Pixel City at 363-367 s, 2-5
+  frames a second, zoomed at full resolution; Video 35 Fallen Stadium at 56.5-60.5 s; crops in the durable handoffs
+  folder `s92/frames/goal_rc_*.jpg`). Pixel City's goal is **a thick, rounded, glossy housing** (silver-white with a
+  purple band, deep like a lens hood, so from the side it reads as a capsule) round **the glowing disc** (the team's
+  colour, the worth in its middle), **mounted on a tall striped pillar beside it** (purple with yellow stripes), high
+  over the track by the outer side; no thin ring and no hanging arm. Fallen Stadium's goal sits high against its stone
+  archway (not resolved closer in that video). Also seen at a goal (Video 35, 58.9-60.5 s; for the goal-sequence
+  item): "GOAL" bursts out of the ring in the world, the scorer's line "Heatblast123 scored 3 points!" top left, the
+  scorer's points big on the scoreboard ("3"), and a bottom line "Orange never stops!"; in Video 4 the bottom line
+  "Two time's the charm!" after the second goal. Ours: a white rim (radius 7, 29 studs up) hanging from a thin arm,
+  a translucent panel while closed. Next: draw the goal's options on the page (and a Studio render of each), then a
+  playable trial of its height.
+- **Q300 the goal on the wall, and the fireball lines** (session 92; the design page version 3, section 'A goal like
+  RC's: thick, rounded, high': A a rounded housing modelled in Blender on a pillar, B a deeper rim of 32 blocks by the
+  arena's code). The owner: "let's use blender, but not quite that model, the goal should be attached to the wall,
+  not attached by a pole, here is a video I just recorded from RC, inspecting more the goal, take a thorough look at
+  it, and one thing I also noticed, about the fireball to the goal, first, on each marker the player pass, the
+  fireball goes from the previous marker to the next marker and stop, and same thing when he goes in to the next
+  marker, till he reach the goal marker and compelete a lap, then if he starts another lap, there is a second
+  fireball line, and same thing fireball from marker to marker in the second line, so basically there are 3 lines on
+  top of each other, take a thorough look in the video, and by that, I think we can remove the vertical line that
+  goes with the ball currently in the glass wall and have these or if you can find a cool way to include them
+  together not sure, here is the video: "D:\Screenshots\Videos\Screen Recording 2026-11-06 132044.mp4", and then
+  also if it would help, look at the fire trails from the skates and trail from the ball". So: **the goal is modelled
+  in Blender (A), but attached to the wall, not on a pole** (its shape from the new video); **the fireball is not one
+  streak per lap**: at each marker passed, a fire line runs from the previous marker to the next and stays, marker
+  by marker round the lap; each lap adds a line above the last, so up to 3 stacked lines (Q297 corrected); the
+  carrier's vertical beam on the glass (#376's CarrierBeam) may go in their favour, or both combined; and the skate
+  trails and the ball's trail to be studied too. The new video is **Video 36**: `D:\Screenshots\Videos\Screen
+  Recording 2026-11-06 132044.mp4`.
+- **Video 36, overview** (session 92; the owner's RC recording for Q300, `D:\Screenshots\Videos\Screen Recording
+  2026-11-06 132044.mp4`, 1:53, 1916 x 1078, 30 fps; a red-and-blue map with dragon towers; read at one frame every
+  2 s, not yet frame by frame). The owner (Orange) alone: the kickoff (0-12 s, the count 5..1 in the goal's disc),
+  "GO ORANGE TEAM!" (~10 s), three carried laps, "Lap 3 Completed" (~86 s), a +5 GOAL, ORANGE TEAM WINS, the replay
+  with the scorer plate "+5 PTS" (from ~92 s), then the players screen. Seen:
+  - **The goal close up** (6-24 s, the camera turned on it; the replay 92-110 s): a thick, deep, rounded housing in
+    the map's red and black (a brand word on its shell), the glowing disc inside, joined to a big white light
+    panel beside it, the unit held high above the stands' rim and hanging from red rails above (corrected after a
+    marked frame: no tower from the floor); not on a free pole.
+  - **Fire lines along the wall's top:** orange lines along the top of the outer wall and stands that grow as the
+    laps go on (several stacked by ~54-80 s); the owner's reading (Q300): marker to marker, one line per lap, up to
+    3. A big fireball streak shows at ~54-56 s. To read frame by frame at each gate.
+  - **Bottom lines:** "And we're off!" (kickoff), "It's about time for Orange" (~42 s), "Orange is trying a second
+    lap" (~62-70 s), "3 points if Orange scores!" (~76 s), "Orange is on a quest for a donut!" (~84-86 s), "Three!" (the kickoff count, ~8 s), "5 points if
+    Orange scores!" (~88 s), "And the ball goes in!" (the goal).
+  - **Skate fire** whenever the skater moves (long orange trails at 47-76 km/h); **the carried ball leaves white
+    wavy trails** behind it (~52 s, ~74 s, ~94 s).
+  Next: frame by frame at 5-10 frames a second: the goal (6-24 s, 92-110 s), each gate's line (40-90 s), the skate
+  and ball trails; crops to `s92/frames/v36_*`.
+- **Video 36, the fire lines (first lap)** (session 92; 36-56 s at one frame a second, the top half): the ball is
+  caught at ~37 s; the carrier passes a gate at ~41-42 s (its orange lines on the glass); at ~44 s a fireball runs
+  along the top of the outer wall (where the wall meets the stands) and leaves a thin orange line along that rim that
+  stays (45-47 s and on); the next gate at ~48-49 s (the glass panel glowing) sends another fireball (~50 s) whose
+  line continues the first along the rim (51-55 s). This matches the owner's Q300 reading: per gate, fire from the
+  passed marker to the next, the line staying. The lines sit at the outer wall's top edge, visible from most of the
+  track there (RC's wall is low next to the stands); ours is glass 120 studs tall, so our lines need a height that
+  shows (a page question). Not read yet: the exact start and end of each line, the second and third laps' lines
+  above (~62-86 s), and what happens to the lines at a goal or a lost ball.
+- **Video 36, the fire lines (laps 2 and 3) and the goal** (session 92; 60-88 s at one frame a second, the top
+  half): each gate passed (the big orange U-shaped frame of lines on the glass at ~61, 66, 69, 73, 82, 85 s) is
+  followed 1-2 s later by a fireball along the rim (~63, 67, 70, 74, 78, 83 s); the lines it leaves stay, and by
+  76-87 s three or four parallel orange lines run stacked along the outer wall's top edge (the owner's "3 lines on
+  top of each other", Q300). "Lap 2 Completed" at ~74-76 s; the goal's disc shows "+3" by ~79 s. The goal seen close
+  at 60-63 s and 77-79 s: a thick red housing, rounded like a heart or shield, a black inner rim, the glowing disc
+  with the worth, joined to a big white light panel beside it, the unit high above the stands' rim (no tower from the floor:
+  corrected after a marked frame).
+  Still to read frame by frame (5-10 a second): where exactly each line starts and ends (marker to marker), how far
+  apart the stacked lines are, and what the lines do at the goal and after it (~88-92 s).
+- **Video 36, one gate at four frames a second** (session 92; 41.5-46.0 s): the carrier passes the gate at ~43.75 s
+  (the gate's U-shaped frame of orange lines on the glass flashes bright); ~0.25 s later (~44.0 s) a fireball
+  leaves from that gate and flies FORWARD along the outer wall's top edge (where it meets the stands), toward the
+  next marker ahead, a long streak behind it (44.0-44.75 s, out of view ahead after that); its line stays along the
+  rim (44.5-45.75 s and on). So each line runs from the gate just passed to the next marker, as the owner said
+  (Q300); the next gate's fireball then carries the line on. Not seen in this stretch: the flight's full time to
+  the next marker.
+- **Video 36, lap 3 and the trails** (session 92; 87-93 s at two frames a second): the last gate at ~89.5 s, "Lap 3
+  Completed" from ~90 s, the goal's disc showing "+5" from ~90.5 s; the stacked fire lines (four or five along the
+  rim by then) stay up to the goal. All along, the carried ball leaves two thin white wavy trails behind it, and the
+  skates two long orange fire trails (Q298). Not read: the goal's own moment (~93 s on, the goal-sequence item) and
+  whether the lines clear at the goal.
+- **Q301 the lines replace the beam** (session 92, recommended; the design page version 4, section 'Fire lines from
+  marker to marker, one per lap': RC Video 36 frames at 43.75/44.25/45.5/86 s, a top-down lap animation, our
+  straight with the lines along the top of our solid outer wall, 40 studs up, the beam switchable): **"Lines replace
+  the beam"**: each marker passed sends a fireball forward along the wall's top to the next marker, its line
+  staying, one line per lap, stacked (three by lap 3); the carrier's tall beam on the glass (Arena spec 5.4,
+  CarrierBeam) goes; the ball badge and name tags still show who carries. Q297's single fireball to the goal is
+  replaced by these lines.
+- **Q302 the lines at the solid wall's top** (session 92, recommended): **"At the solid wall's top, as drawn"**: the
+  three fire lines run along the top of our solid outer wall (40 studs up, where the glass begins), at about 40, 42
+  and 44 studs, like RC's wall-top edge by the stands; checked in a Studio Play shot on the page before it is built.
+  Not chosen: lower on the wall (~20 studs); a trial of both.
+- **Q303 the lines clear when the streak ends** (session 92, recommended; Video 36 at 92-98 s: the stacked lines
+  gone the moment of GOAL at ~95 s, only the arena's own blue stripes left; a ball lost to the other team not in the
+  video): **"When the streak ends"**: at a goal or when the other team takes the ball, the lines fade out quickly
+  (~0.3 s), the same moment the lap chips empty; the other team's lines then start from their first marker.
+- **Q304 the goal fixed onto the wall** (session 92; the design page version 5, section 'A goal like RC's', block
+  'Your Q300: on the wall, not on a pole': Video 36's goal at 8/14/62 s and two rough Blender sketches of our housing
+  fixed onto the wall by a plate, 29 and 48 studs up): **"Fixed onto the wall with a plate"** (not the recommended
+  tower), with the owner's words: "but what do you mean a tower in the wall like Video 36? where is the tower? can
+  you explain more? also make note, that for goal, later we also have skins, for goal and goal score, like
+  finishing, like in the video where if you can notice the white thunder and lightning, so give me more real
+  iterations of the goal to see". So: the housing is held onto our outer wall by a short thick plate (no tower, no
+  pole); **later: goal skins and goal-score effects** (a finishing burst when a goal is scored, like Video 36's white
+  thunder and lightning at the goal; with the cosmetics milestone, M8, and the goal-sequence item); next: **more
+  real iterations of the goal's look** (several housing designs, rendered properly in an arena setting), and an
+  answer on the "tower" (corrected after marking the frame: there is no tower; the tall white block beside the housing
+  at 8 s and 62 s is a big light panel joined to it, the unit held high above the stands' rim, hanging from red
+  rails above, seen from behind at 14 s).
+- **Q305 the lens goal, refined** (session 92; the design page version 7, block 'Four goals fixed onto our wall':
+  1 Lens (recommended), 2 Shield, 3 Rounded square, 4 Hexagon, Blender renders in a slice of our arena, each held
+  onto the outer wall by a plate at 29 studs): **Lens**, with the owner's words: "but it should be a little bigger,
+  and if possible the text inside follow the text font or anything else that look cool, modern and vibrant and bold
+  also to be clear, and the outer of the lens, should be thinner, and more width to the back place, like if we look
+  at it from below and behind". So: the lens housing, a little bigger; its number in our bold banner lettering (look
+  C's Luckiest Guy, white with a dark outline) or another bold, clear, vibrant face; the ring's front edge thinner;
+  the housing deeper toward the back (its depth seen from below and behind). Drawn again from the front and from
+  below and behind before its height and size trial.
+- **Q306 the number both ways, the goal sunk into the wall** (session 92; the design page version 8, block 'The
+  lens, refined'; asked whether the look is settled before its height and size trial): the owner: "Ok, two more
+  things, the goal hint like the +1,+3,+5 should be either on the middle and visible from front and behind, or on
+  both sides, and one more thing, like RC, the goal should be a little immersed to the wall on the right side, take
+  a thorough look, the goal not a complete full circle, the right side is a little immersed into the wall". So: the
+  worth disc sits in the middle of the housing with the number readable from the front and from behind (or a number
+  on each face); and the housing's wall side is sunk a little into the outer wall (RC's goal is not a free full
+  circle: its wall side goes into the wall), drawn again before the trial.
+- **Q307 the lens look settled** (session 93, recommended; the design page version 9, block 'The lens, refined':
+  the housing's wall side sunk 3.5 studs into the outer wall, the disc in the body's middle with the number on both
+  faces): **"Yes, build this look"**. Not chosen: sink it deeper; sink it less. Next: a playable Studio trial of the
+  goal's height and size, then neon colours (Q295), then the tickets.
+- **Q308 the goal trial, and lower solid walls with glass above** (session 93, recommended; the design page version
+  10, section 'Where the lens goal sits on our wall': the goal's gate cut across to scale, the lens sunk 3.5 studs
+  into the wall at centres 42/45/48/52; found: at the goal's gate our outer wall stands upright only above ~32 studs,
+  so a goal sunk into it needs a centre of ~40 or more): **"Yes, build this trial"** (keys 1-4 the centre at 42 / 45 /
+  48 / 52, keys 5-7 the opening 7 / 8 / 9), with the owner's words: "but also I'd like to lower the gray wall and
+  switch them to glass, like RC, real ground are way shorter than ours, both in outer and middle walls, take a
+  thorough look and let's do that". So: **our solid (gray) walls, the outer wall and the middle (inner) bank, become
+  much lower, glass above them, like RC's**: studied in RC's frames (heights in skater heights), drawn to scale on the
+  page and tried in Studio together with the goal (a lower solid wall also changes how low the goal can sit).
+- **RC's solid walls read** (session 93, for Q308; single frames, rough, the skater nearer the camera than the wall
+  so the wall reads low; crops in the durable handoffs folder `s93/frames/`): **Video 36** (the red/blue map) at 24 s
+  and 92 s: the outer wall a short red curve up from the floor and a white rim, about one skater height, the crowd
+  standing right behind it (no glass seen above it there); the middle a low ramp with white chevrons. **Video 14**
+  (Mexico Arena) at 4.25 s: a wide red bank, then a black band and an ad board about as tall as the skater, then
+  glass with the crowd behind: about two skater heights solid in all. **Video 20** (Pinball Stadium): the wooden floor
+  curving up into a green band and a white edge, then the stands' glass. Ours: the outer wall solid to 40 studs, 27
+  (4.6 skater heights) above where the floor starts curving up (12.8 on the straights, 14 on the curved ends); the
+  middle bank solid to 16 (2.7 skater heights).
+- **Q309 same shape, glass lower, climbing unchanged** (session 93; the design page version 11, section 'The goal on
+  our wall, and glass lower down': RC's frames, our goal's gate cut across to scale with the glass line switchable):
+  **"Yes, same shape, glass lower"** (recommended), with the owner's correction: "yes but don't stop climbing at the
+  new line, keep the climbing the same". So: the shape skaters ride stays as today (trial 6); the upper part of the
+  same surface only LOOKS like glass; climbing (Q84) still goes up to where it ends today (the outer wall's old solid
+  top at 40, the middle bank's at 16), so it is no longer tied to how a surface looks. In the trial, key 8 cycles the
+  outer wall's glass line (40 today / 28 / 24 / 20 studs above the lowest floor) and key 9 the middle bank's (16
+  today / 12 / 9 / 6), beside the goal's keys 1-7. Not chosen: reshaping the walls' curved feet.
+- **Q310 the goal's centre at 52** (session 93; after playing the trial: keys 1-4 the lens stand-in's centre at 42 /
+  45 / 48 / 52 studs above the lowest floor, sunk 3.5 into the outer wall at the goal's gate): **"52 (key 4)"**, the
+  highest tried (no option was recommended): the housing from 40.6 to 63.4, its opening's centre 8.9 skater heights
+  up, 7.9 studs out from the wall.
+- **Q311 the goal's opening at 9** (session 93; after playing the trial, keys 5-7 the opening 7 / 8 / 9 at the
+  centre 52): **"9 (key 7)"**, the biggest tried (not the recommended 8). Correction to my question's words: 7 / 8 / 9
+  is the opening's RADIUS (Arena.goal.ringRadius), not its width across; at 9 the opening is 18 studs across (today
+  14) and the housing reaches 12.4 from the centre (24.8 across). The owner chose by what they played, which used
+  the real sizes.
+- **Q312 the outer glass from 20, set per map** (session 93; after playing the trial, key 8 the outer wall's glass
+  line 40 / 28 / 24 / 20 studs above the lowest floor): the owner: "20, by default, but maybe for later arena map
+  customization can chance it for other arenas". So: the outer wall looks like glass from 20 studs up by default
+  (about 1.2 skater heights above where the floor starts curving up on the straights; the lowest tried; not the
+  recommended 24), and the line is a per-map setting (config), so other arenas can set their own.
+- **Q313 the middle glass from 6** (session 93; after playing the trial, key 9 the middle bank's glass line 16 / 12 /
+  9 / 6 studs above the floor): **"6"**, the lowest tried (not the recommended 9): about one skater height, like Video
+  36's low chevron ramp; a per-map setting like the outer wall's (Q312), 6 by default. So the trial's settled
+  picks: the goal's centre 52 (Q310), its opening radius 9 (Q311), the outer glass from 20 (Q312), the middle glass
+  from 6 (Q313); climbing unchanged (Q309). Next: restore Studio's copies, then neon colours (Q295), then the tickets.
+- **Q314 the goal redesigned: melted into the wall, a tower bar, smooth** (session 93; asked after the trial whether
+  to stop it and restore Studio's copies): the owner, on the trial's goal (a ring of 32 blocks sunk 3.5 into the
+  wall standing in for the lens): "Well, I still don't like the goal, first it looks like a full circle immersed into
+  the wall, which is not cool, it should be cut off, it should be like melted into the wall, maybe we can add the
+  tower bar vertical to the goal like RC to help ease the goal into that, and most importantly, I don't like the goal
+  because it is too strict, too many sharp edge, we want the game to be cool, modern, so unleash your UI, 3D modeling
+  skills, and help me create a good goal, like RC, take a thorough look from all videos". So: **a new goal design**,
+  studied in every RC video's goal first: the housing cut off at the wall and blended into it ("melted", not a full
+  circle pushed in), a vertical tower bar beside it like RC's (Video 36's tall light panel joined to the housing) to
+  ease the goal into the wall, smooth rounded forms with no sharp edges, cool and modern; modelled in Blender and
+  rendered in our arena at the trial's picks (centre 52, opening radius 9, outer glass from 20) before asking. The
+  trial stays running for now.
+- **Q315 the Halo pylon** (session 93, recommended; the design page version 13, section 'A goal that grows out of
+  the wall': RC's goals (Pixel City's ring on a striped neon pillar; Video 36's thick ring, cross plate and tall
+  light tower) and three Blender designs at the trial's picks, each ring and tower melted into one smooth body
+  (signed-distance union and fillet, the opening cut back out round), shown from down the track, front, side and
+  below-behind): **"1 Halo pylon"**: a slim pylon in the outer wall from the solid rim at 20 to 84 studs, two neon
+  strips down its face, swelling round the ring's wall side so the ring grows out of it; the ring's centre 67 studs
+  out from the middle glass (4 further from the wall than the trial's, so the whole opening stays in front of the
+  pylon, which stands 3 out of the glass), 52 up, opening radius 9. Not chosen: the light tower, the fin. Colours
+  (shell, neon, disc) come from the neon colours round (Q295), next.
+- **RC's colours sampled for the neon round** (session 93, the owner's Q294 item, Q295's order; Video 36, pixels
+  averaged over 7 x 7 patches with PIL in `s93/frames/`, so JPEG-softened, rough): the HUD's blue team badge
+  **#0eb2f7** (a cyan-azure), the orange ball badge **#ea5e0f** and the speed digits **#e85e11** (a vivid
+  red-leaning orange); the gate's U-frame lines and the fire lines glow orange with near-white cores (52 s); the skate
+  fire orange-red. The ball badge is white with black lines while nobody carries (24 s) and turns the carrier's team
+  orange when the owner catches it (37 s); the carried ball itself reads orange-lit in the glove (92 s, one blurred
+  frame: not settled whether the 3D ball changes colour). Ours today: world team colours (Config.UI.teamColors,
+  the gate panels' and goal's Neon glow) Blue #0d69ac and Orange #da8541, duller and darker than RC's; the HUD's
+  (UI hud look) Blue #3d8bff and Orange #ff9a3c; the ball white with a black band (Q275). Noted in session 92's
+  handoff: a probe's Neon-material orange read yellow, so a neon pick may need a deeper base (to check in renders).
+  Next: the page (today vs RC's sampled colours vs neon picks tuned for Roblox's Neon, on our real ball, a gate
+  panel, the goal and the HUD), then grill.
+- **Q316 RC's team colours, tried first** (session 93, recommended; the design page version 14, section 'Brighter
+  team colours, like RC's': RC's colours sampled from Video 36, ours, and a Studio render of each in Neon and plain):
+  **"RC's colours, and let's test it before"**: orange **#ea5e0f** and blue **#0eb2f7** for the team colour
+  everywhere (the world's glow on the gate walls, the open goal, the fire lines and the skate fire; the HUD to match),
+  replacing today's world #da8541 (which glows yellow in Neon) / #0d69ac and the HUD's #ff9a3c / #3d8bff; first a
+  playable Studio trial of them (Studio's copies only) before anything is built.
+- **Q317 a key to switch the colour modes** (session 94; asked after Q316's trial was Play-checked: RC's blue
+  #0eb2f7 and orange #ea5e0f in the world and on the HUD, 0 warnings; a skater on Blue's lit lap chips read clearly
+  against empty ones; RC's darker orange computed at 4.4:1 against an empty chip, today's HUD orange 7.1:1, the blue
+  6.2:1 against today's 4.5:1; options: RC's everywhere (recommended), RC's world + today's HUD, RC's with a lighter
+  HUD orange, back to today's): the owner: "can you add a key to switch between the modes so I can visualize the
+  difference? and have all the options, like RC colors everywhere, RC world and todays HUD, RC but a ligher HUD
+  orange, todays colours". So the trial gets keys 1-4, one per option, switching live (the world's glow, the spawn
+  pads, the carried ball, the HUD); the lighter HUD orange tried is #f47a34 (RC's hue, lifted: 5.5:1 against an
+  empty chip); Tab+T switches team to see the other team's chips. The pick is asked after the owner plays it (Q318).
+- **Q318 RC's colours everywhere** (session 94, recommended; after playing the trial's keys 1-4): **"1 RC's
+  everywhere"**: blue **#0eb2f7** and orange **#ea5e0f** for the world (the gate walls' and the open goal's glow,
+  the spawn pads, the carried ball, the marks; later the fire lines and the skate fire) and for the HUD alike, one
+  colour pair in the config (today's two pairs, the world's and the HUD look's, become one). Not chosen: RC's world
+  with today's HUD; RC's with a lighter HUD orange #f47a34; today's. Next: the team-colour ticket with the others.
+- **RC's carried ball glows in the team's colour** (session 94, Q294's first item "the ball color in neon colors";
+  single compressed frames, rough; crops in the durable handoffs folder `s94/frames/`): **Video 4** (Pixel City) at
+  ~104.5-105 s, a Blue AI skater carries: the ball in the glove glows a pale cyan-white disc with a dark rim (its
+  wavy trails and skate fire cyan too); **Video 36** at ~37.4-37.9 s, the owner (Orange) at night: the ball's lit
+  side glows yellow-orange, the rest reads dark; **Video 35** at ~4.2 s, Orange in daylight: the part showing under
+  the big glove glows yellow-orange. The loose ball reads white (Video 36 at ~36.3 s, in flight). The ball badge over
+  the carrier turns the team's colour (ours already does, BallBadge). Ours today: the carried ball is PAINTED the
+  team's world colour (WorldMarkers.wear writes the look's Color; the band picture stays black), no glow.
+  Studio facts (Play probes on the real ball, restored after): the SurfaceAppearance's EmissiveTint and
+  EmissiveStrength can be written at run time (client); with no EmissiveMaskContent nothing glows; a mask made in
+  memory (EditableImage) makes it glow but drops the band picture (ColorMap) while set; an uploaded picture set as
+  the mask at run time keeps the band; the glow scales with the part's colour (a black base gave no glow, a white
+  base a white-hot core with a team halo, the team colour a team glow); Neon material on the ball does nothing under
+  its paint. EmissiveMaskContent is Plugin security (set through the skin's model file, like ColorMap). Design page
+  https://claude.ai/artifact/Wo2ebE8d7wV5FU3gCbgHVX (this account's, session 94), section 'The carried ball glows in
+  its team's colour, like RC's': RC's three frames; ours A painted, B glowing in the team's colour, C white-hot with
+  a team halo, each in blue and orange; B from the game's camera.
+- **Q319 the carried ball glows in its team's colour** (session 94, recommended; the design page
+  https://claude.ai/artifact/Wo2ebE8d7wV5FU3gCbgHVX, section 'The carried ball glows in its team's colour, like
+  RC's': A painted, B glowing in the team's colour, C white-hot with a team halo): **"B Glowing team colour but the
+  black band should be more black, not light like that, or is that already done"**. So: while carried, the ball's
+  coloured part glows in the team's colour (cyan for Blue, yellow-orange for Orange, RC's #0eb2f7 / #ea5e0f, Q318)
+  and the band stays fully black, as in A (the light band in B's renders came from the test's in-memory mask, which
+  drops the band picture; an uploaded mask keeps it, checked); the loose ball stays white with its black band, no
+  glow. Needs one picture uploaded by the owner (the glow mask: white where it glows, black on the band), then a
+  playable trial of the brightness; the band's blackness checked on the real build before that question.
+- **Q320 the tickets: eight issues, in order** (session 94, recommended; the to-tickets breakdown): **"Yes, file all
+  8"**: 1 team colours, RC's pair shared by the world and the HUD (Q316-Q318), none; 2 the walls' glass lines, outer
+  20 / middle 6 per map, look only (Q308-Q313), none; 3 the goal, the Halo pylon made in Blender (Q314-Q315), blocked
+  by 2; 4 the goal's worth disc (Q294, Q306), blocked by 3; 5 fire lines marker to marker replacing the carrier's beam
+  (Q300-Q303; their height asked with a Studio shot when built), blocked by 2; 6 skate fire (Q298), none; 7 the bottom
+  line's lap counts (Q299), none; 8 the carried ball's glow, band black (Q319), blocked by 1. Each one PR, test-first.
 
 ## Roller Champions
 

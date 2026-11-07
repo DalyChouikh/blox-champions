@@ -12,8 +12,8 @@ local Speedometer = require(game:GetService("StarterPlayer").StarterPlayerScript
 local config = Fixtures.config()
 local hud = config.UI.hud
 local place = hud.layout.speedometer
--- The HUD's own Orange (look C, the owner: Q201).
-local ORANGE = config.UI.hud.look.teamColors.Orange
+-- The team's Orange (one pair for the world and the HUD, the owner's Q318).
+local ORANGE = config.UI.teamColors.Orange
 
 local folder: Folder?
 

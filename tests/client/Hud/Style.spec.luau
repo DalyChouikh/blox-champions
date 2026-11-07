@@ -15,6 +15,7 @@ local TextService = game:GetService("TextService")
 -- bottom, team colours of its own, and 3 px of room inside a fading group.
 local config = Fixtures.config({
 	UI = {
+		teamColors = { Blue = Color3.fromRGB(0, 100, 250), Orange = Color3.fromRGB(250, 150, 0) },
 		hud = {
 			look = {
 				ink = Color3.fromRGB(10, 20, 30),
@@ -23,7 +24,6 @@ local config = Fixtures.config({
 				textOutline = 1.5,
 				corner = UDim.new(0, 10),
 				shade = 0.5,
-				teamColors = { Blue = Color3.fromRGB(0, 100, 250), Orange = Color3.fromRGB(250, 150, 0) },
 				key = Color3.fromRGB(240, 200, 60),
 				pressed = Color3.fromRGB(240, 120, 40),
 				sweepTransparency = 0.3,
@@ -223,7 +223,8 @@ describe("Style (look C)", function()
 		expect(ink.ZIndex < line.ZIndex and line.ZIndex < content.ZIndex).toBe(true)
 	end)
 
-	it("colours a team in the HUD's own pair, not the world's, and no team in the text colour", function()
+	-- One pair for the world and the HUD (the owner's Q318, #408).
+	it("colours a team in the world's team colours, and no team in the text colour", function()
 		expect(Style.teamColor(config, "Blue") == Color3.fromRGB(0, 100, 250)).toBe(true)
 		expect(Style.teamColor(config, "Orange") == Color3.fromRGB(250, 150, 0)).toBe(true)
 		expect(Style.teamColor(config, nil) == config.UI.hud.textColor).toBe(true)

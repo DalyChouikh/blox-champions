@@ -1,7 +1,7 @@
 --!strict
 -- The TAB board's table (spec §6.4, §11.1; #357, the owner's Q236, Q237), drawn by the board (Hud/ScoreTab) and the end
 -- screen (Hud/EndScreen, #358, Q243): look C's box in look.box, clipped to its corners, holding a header of the
--- columns' names (UI.text.columns) over each team's bar in its HUD colour, with its name and score, the viewer's team
+-- columns' names (UI.text.columns) over each team's bar in its team colour, with its name and score, the viewer's team
 -- first (a spectator's in the teams' own order), and its rows by score as the server sends them: an avatar circle
 -- (HudText.avatar), the name, score, goals, assists, saves and steals, the viewer's row outlined in look.key. Its teams
 -- show `shown` pixels tall and scroll the rest. A plain function of its props.
@@ -124,7 +124,7 @@ local function row(
 	)
 end
 
--- `team`'s bar at `order`: its HUD colour over an ink line, its name at the left and its score at the right.
+-- `team`'s bar at `order`: its team colour over an ink line, its name at the left and its score at the right.
 local function bar(props: TeamTableProps, sizes: Config.TabSizes, team: Team.Team, order: number): React.ReactElement
 	local config = props.config
 	local look = config.UI.hud.look

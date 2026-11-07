@@ -79,7 +79,7 @@ describe("Countdown", function()
 	-- digit inside a ring, both in the player's own team colour (Q108, Q110), in look C (#353).
 	it("shows the count's digit inside a ring at the crosshair's place, both in its team's colour over ink", function()
 		local count = mount({ kind = "Countdown", team = "Orange", value = 3 })
-		local orange = config.UI.hud.look.teamColors.Orange
+		local orange = config.UI.teamColors.Orange
 		expect(count.Visible).toBe(true)
 		expect(count.AnchorPoint == Vector2.new(0.5, 0.5)).toBe(true)
 		expect(count.Position).toEqual(UDim2.fromScale(0.5, 0.3))

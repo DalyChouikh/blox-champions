@@ -26,7 +26,7 @@ export type NameTagProps = {
 	config: Config.GameConfig,
 	sizes: Config.TagSizes,
 	name: string,
-	-- The team's HUD colour (Style.teamColor).
+	-- The team's colour (Style.teamColor).
 	color: Color3,
 	-- The pass key while they are a pass's target; nil otherwise. (`key` is React's own prop: it never reaches here.)
 	passKey: Style.KeyView?,

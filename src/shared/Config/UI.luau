@@ -323,11 +323,10 @@ export type HudLayout = {
 -- Look C, Bold arcade (Hud/Style): text in `font`, banners and the goal's worth in `bannerFont`, in the HUD's text
 -- colour with an ink outline textOutline pixels thick. A box has `corner`s, an ink outline `outline` pixels wide and
 -- an ink shadow dropping `shadow` pixels below it; it is its colour at the top and that colour times (1 - shade) at the
--- bottom. `box` colours a box that is no team's (the clock's, an empty lap chip); `teamColors` the HUD's team parts
--- (Style.teamColor), brighter than the world's UI.teamColors. bannerFont draws a digit's middle bannerDigitRise of
--- its text size above its line's middle; a digit centred in a shape moves down by that (Hud/Countdown). A key's
--- cap is `key` with its name in ink, `pressed` while it pops (the press's mark too); a cooling key's sweep is ink,
--- sweepTransparency see-through.
+-- bottom. `box` colours a box that is no team's (the clock's, an empty lap chip); a team's parts take UI.teamColors
+-- (Style.teamColor). bannerFont draws a digit's middle bannerDigitRise of its text size above its line's middle; a
+-- digit centred in a shape moves down by that (Hud/Countdown). A key's cap is `key` with its name in ink, `pressed`
+-- while it pops (the press's mark too); a cooling key's sweep is ink, sweepTransparency see-through.
 export type LookSettings = {
 	font: Enum.Font,
 	bannerFont: Enum.Font,
@@ -339,7 +338,6 @@ export type LookSettings = {
 	corner: UDim,
 	box: Color3,
 	shade: number,
-	teamColors: TeamColors,
 	key: Color3,
 	pressed: Color3,
 	sweepTransparency: number,
@@ -474,7 +472,8 @@ export type BallTrailSettings = { lifetime: number, width: number, color: Color3
 
 export type UIConfig = {
 	clockWarnings: { number },
-	-- The world's team colours: the arena's glow and pads, the carrier's beam, the ball, the markers and name tags.
+	-- The team colours, one pair for the world and the HUD: the arena's glow and pads, the carrier's beam, the ball,
+	-- the markers, the name tags and every HUD part in a team's colour (Hud/Style.teamColor).
 	teamColors: TeamColors,
 	teamNames: { Blue: string, Orange: string },
 	controlLabels: ControlLabels,
@@ -491,7 +490,10 @@ export type UIConfig = {
 
 local defaults: UIConfig = {
 	clockWarnings = { 60, 30 },
-	teamColors = { Blue = Color3.fromRGB(13, 105, 172), Orange = Color3.fromRGB(218, 133, 65) },
+	-- Roller Champions' blue #0eb2f7 and orange #ea5e0f, read from the owner's Video 36 (the owner's Q316, then Q318
+	-- after playing four options): they glow true in Neon, where the old world orange #da8541 glowed yellow, and a lit
+	-- lap chip still reads against an empty one, so the HUD's lighter pair (Q201) went.
+	teamColors = { Blue = Color3.fromRGB(14, 178, 247), Orange = Color3.fromRGB(234, 94, 15) },
 	teamNames = { Blue = "Blue", Orange = "Orange" },
 	controlLabels = {
 		Jump = "Jump",
@@ -624,9 +626,6 @@ local defaults: UIConfig = {
 			corner = UDim.new(0, 14),
 			box = Color3.fromRGB(42, 51, 80),
 			shade = 0.4,
-			-- The page's brighter pair (#3d8bff, #ff9a3c), for the HUD only (the owner, Q201: "I want the lighter
-			-- one"): the world's darker teamColors made a lit lap chip hard to tell from an empty one.
-			teamColors = { Blue = Color3.fromRGB(61, 139, 255), Orange = Color3.fromRGB(255, 154, 60) },
 			-- The page's key caps (#354): #ffd23f with ink lettering, #ff8a2c while pressed (the page drew RC's >>
 			-- beside it in a near orange, #f08a2c: one colour here), and its cooldown's 62% black sweep (Q186).
 			key = Color3.fromRGB(255, 210, 63),
@@ -1027,7 +1026,6 @@ local tabSizes = Validate.record({
 	switchSize = textSize,
 })
 local boardTextSizes = Validate.record({ score = textSize, clock = textSize, worth = textSize, period = textSize })
-local teamColors = Validate.record({ Blue = Validate.datatype("Color3"), Orange = Validate.datatype("Color3") })
 local speedTextSizes = Validate.record({ speed = textSize, unit = textSize })
 local ringSizes = Validate.record({ carry = positive, charge = positive, thickness = positive })
 -- The screen markers' widths, and the badge's lines and gap, in whole pixels, so their edges meet pixel edges.
@@ -1209,7 +1207,7 @@ local fields = Validate.record({
 		noDuplicates,
 		"must not contain duplicates"
 	),
-	teamColors = teamColors,
+	teamColors = Validate.record({ Blue = Validate.datatype("Color3"), Orange = Validate.datatype("Color3") }),
 	teamNames = Validate.record({ Blue = label, Orange = label }),
 	controlLabels = Validate.record({
 		Jump = label,
@@ -1308,7 +1306,6 @@ local fields = Validate.record({
 			box = Validate.datatype("Color3"),
 			-- A bottom as dark as black would lose the box's colour there.
 			shade = seen,
-			teamColors = teamColors,
 			key = Validate.datatype("Color3"),
 			pressed = Validate.datatype("Color3"),
 			-- A sweep that shows nothing would show no cooldown.

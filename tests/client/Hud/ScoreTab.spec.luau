@@ -157,7 +157,7 @@ describe("ScoreTab", function()
 		expect((name:FindFirstChild("Ink") :: UIStroke).Color == look.ink).toBe(true)
 		expect(cell(frame, "3", "Score").TextXAlignment).toBe(Enum.TextXAlignment.Center)
 		local bar = find(frame, "Orange") :: Frame
-		expect((bar:FindFirstChild("Fill") :: Frame).BackgroundColor3 == look.teamColors.Orange).toBe(true)
+		expect((bar:FindFirstChild("Fill") :: Frame).BackgroundColor3 == config.UI.teamColors.Orange).toBe(true)
 		expect((bar:FindFirstChild("Line") :: Frame).BackgroundColor3 == look.ink).toBe(true)
 		expect((bar:FindFirstChild("Line") :: Frame).Size.Y.Offset).toBe(look.outline)
 		-- The box's ink drops look.shadow under its fill.
